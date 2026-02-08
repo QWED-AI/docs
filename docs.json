@@ -1,68 +1,181 @@
 {
   "$schema": "https://mintlify.com/docs.json",
   "theme": "mint",
-  "name": "Mint Starter Kit",
+  "name": "QWED Documentation",
   "colors": {
-    "primary": "#16A34A",
-    "light": "#07C983",
-    "dark": "#15803D"
+    "primary": "#7C3AED",
+    "light": "#A78BFA",
+    "dark": "#5B21B6"
   },
   "favicon": "/favicon.svg",
   "navigation": {
     "tabs": [
       {
-        "tab": "Guides",
+        "tab": "Getting Started",
         "groups": [
           {
-            "group": "Getting started",
+            "group": "Introduction",
             "pages": [
-              "index",
-              "quickstart",
-              "development"
+              "intro",
+              "architecture",
+              "faq"
             ]
           },
           {
-            "group": "Customization",
+            "group": "Quick Start",
             "pages": [
-              "essentials/settings",
-              "essentials/navigation"
-            ]
-          },
-          {
-            "group": "Writing content",
-            "pages": [
-              "essentials/markdown",
-              "essentials/code",
-              "essentials/images",
-              "essentials/reusable-snippets"
-            ]
-          },
-          {
-            "group": "AI tools",
-            "pages": [
-              "ai-tools/cursor",
-              "ai-tools/claude-code",
-              "ai-tools/windsurf"
+              "getting-started/installation",
+              "getting-started/first-verification",
+              "getting-started/quickstart"
             ]
           }
         ]
       },
       {
-        "tab": "API reference",
+        "tab": "Engines",
         "groups": [
           {
-            "group": "API documentation",
+            "group": "Verification Engines",
             "pages": [
-              "api-reference/introduction"
+              "engines/overview",
+              "engines/math",
+              "engines/logic",
+              "engines/code",
+              "engines/sql",
+              "engines/schema",
+              "engines/stats",
+              "engines/fact",
+              "engines/consensus",
+              "engines/image",
+              "engines/reasoning",
+              "engines/graph",
+              "engines/taint"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "groups": [
+          {
+            "group": "API",
+            "pages": [
+              "api/overview",
+              "api/authentication",
+              "api/endpoints",
+              "api/errors",
+              "api/rate-limits",
+              "api/dsl-reference"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "SDKs",
+        "groups": [
+          {
+            "group": "SDK Documentation",
+            "pages": [
+              "sdks/python",
+              "sdks/typescript",
+              "sdks/go",
+              "sdks/rust"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Packages",
+        "groups": [
+          {
+            "group": "QWED Finance",
+            "pages": [
+              "finance/overview",
+              "finance/guards",
+              "finance/action",
+              "finance/compliance",
+              "finance/design"
             ]
           },
           {
-            "group": "Endpoint examples",
+            "group": "QWED Legal",
             "pages": [
-              "api-reference/endpoint/get",
-              "api-reference/endpoint/create",
-              "api-reference/endpoint/delete",
-              "api-reference/endpoint/webhook"
+              "legal/overview",
+              "legal/guards",
+              "legal/action"
+            ]
+          },
+          {
+            "group": "QWED Tax",
+            "pages": [
+              "tax/overview",
+              "tax/guards",
+              "tax/action"
+            ]
+          },
+          {
+            "group": "QWED UCP",
+            "pages": [
+              "ucp/overview",
+              "ucp/guards",
+              "ucp/action"
+            ]
+          },
+          {
+            "group": "QWED Infra",
+            "pages": [
+              "infra/overview",
+              "infra/guards",
+              "infra/action"
+            ]
+          },
+          {
+            "group": "QWED MCP",
+            "pages": [
+              "mcp/overview",
+              "mcp/installation"
+            ]
+          },
+          {
+            "group": "Open Responses",
+            "pages": [
+              "open-responses/overview",
+              "open-responses/usage"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Advanced",
+        "groups": [
+          {
+            "group": "Advanced Topics",
+            "pages": [
+              "advanced/architecture-diagrams",
+              "advanced/attestations",
+              "advanced/cli",
+              "advanced/comparison",
+              "advanced/compliance",
+              "advanced/deployment",
+              "advanced/determinism-guarantee",
+              "advanced/github-action",
+              "advanced/integration-guide",
+              "advanced/neurosymbolic",
+              "advanced/ollama",
+              "advanced/performance-benchmarks",
+              "advanced/pii-masking",
+              "advanced/qwed-local",
+              "advanced/security-hardening",
+              "advanced/self-hosting",
+              "advanced/specification-guide",
+              "advanced/symbolic-limits",
+              "advanced/why-cloud-llms"
+            ]
+          },
+          {
+            "group": "Contributing",
+            "pages": [
+              "advanced/contributor-onboarding"
             ]
           }
         ]
@@ -71,14 +184,14 @@
     "global": {
       "anchors": [
         {
-          "anchor": "Documentation",
-          "href": "https://mintlify.com/docs",
-          "icon": "book-open-cover"
+          "anchor": "GitHub",
+          "href": "https://github.com/QWED-AI",
+          "icon": "github"
         },
         {
-          "anchor": "Blog",
-          "href": "https://mintlify.com/blog",
-          "icon": "newspaper"
+          "anchor": "PyPI",
+          "href": "https://pypi.org/project/qwed/",
+          "icon": "python"
         }
       ]
     }
@@ -91,32 +204,20 @@
     "links": [
       {
         "label": "Support",
-        "href": "mailto:hi@mintlify.com"
+        "href": "mailto:rahul@qwedai.com"
       }
     ],
     "primary": {
       "type": "button",
-      "label": "Dashboard",
-      "href": "https://dashboard.mintlify.com"
+      "label": "Get Started",
+      "href": "/intro"
     }
-  },
-  "contextual": {
-    "options": [
-     "copy",
-     "view",
-     "chatgpt",
-     "claude",
-     "perplexity",
-     "mcp",
-     "cursor",
-     "vscode"
-   ]
   },
   "footer": {
     "socials": {
-      "x": "https://x.com/mintlify",
-      "github": "https://github.com/mintlify",
-      "linkedin": "https://linkedin.com/company/mintlify"
+      "x": "https://x.com/rahuldass29",
+      "github": "https://github.com/QWED-AI",
+      "linkedin": "https://linkedin.com/in/rahul-dass-23b370b0"
     }
   }
 }
