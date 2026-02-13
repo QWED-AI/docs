@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="200" height="200">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 28 28" width="28" height="28">
   <defs>
     <linearGradient id="shieldGradient" x1="0%" y1="0%" x2="0%" y2="100%">
       <stop offset="0%" style="stop-color:#00ff88;stop-opacity:1" />
@@ -7,25 +7,25 @@
   </defs>
   
   <!-- Shield Outline -->
-  <path d="M 100 20 
-           L 170 45 
-           L 170 100 
-           Q 170 150, 100 180 
-           Q 30 150, 30 100 
-           L 30 45 
+  <path d="M 14 3 
+           L 24 7 
+           L 24 14 
+           Q 24 21, 14 25 
+           Q 4 21, 4 14 
+           L 4 7 
            Z" 
         fill="none" 
         stroke="url(#shieldGradient)" 
-        stroke-width="6" 
+        stroke-width="1.2" 
         stroke-linejoin="round"/>
   
   <!-- Checkmark -->
-  <path d="M 70 100 
-           L 90 120 
-           L 135 70" 
+  <path d="M 10 14 
+           L 13 17 
+           L 19 10" 
         fill="none" 
         stroke="url(#shieldGradient)" 
-        stroke-width="8" 
+        stroke-width="1.5" 
         stroke-linecap="round" 
         stroke-linejoin="round"/>
 </svg>
