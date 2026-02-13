@@ -1,9 +1,17 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
   <defs>
-    <linearGradient id="shieldGradient" x1="0%" y1="0%" x2="0%" y2="100%">
-      <stop offset="0%" style="stop-color:#00ff88;stop-opacity:1" />
-      <stop offset="100%" style="stop-color:#00cc66;stop-opacity:1" />
+    <linearGradient id="shieldGradientDark" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#00ffaa;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#00dd77;stop-opacity:1" />
     </linearGradient>
+    
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="2" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
   </defs>
   
   <!-- Shield Outline -->
@@ -15,17 +23,19 @@
            L 19 29 
            Z" 
         fill="none" 
-        stroke="url(#shieldGradient)" 
+        stroke="url(#shieldGradientDark)" 
         stroke-width="4" 
-        stroke-linejoin="round"/>
+        stroke-linejoin="round"
+        filter="url(#glow)"/>
   
   <!-- Checkmark -->
   <path d="M 45 64 
            L 58 77 
            L 86 45" 
         fill="none" 
-        stroke="url(#shieldGradient)" 
+        stroke="url(#shieldGradientDark)" 
         stroke-width="5" 
         stroke-linecap="round" 
-        stroke-linejoin="round"/>
+        stroke-linejoin="round"
+        filter="url(#glow)"/>
 </svg>
