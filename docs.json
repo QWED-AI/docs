@@ -204,8 +204,8 @@
     ]
   },
   "logo": {
-    "light": "https://github.com/QWED-AI/docs/blob/main/logo/light.svg",
-    "dark": "https://github.com/QWED-AI/docs/blob/main/logo/dark.svg",
+    "light": "/logo/light.svg",
+    "dark": "/logo/dark.svg",
     "href": "https://github.com/QWED-AI/docs/blob/main/logo/light.svg"
   },
   "navbar": {
