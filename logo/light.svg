@@ -6,6 +6,9 @@
     </linearGradient>
   </defs>
   
+  <!-- Background circle for visibility on light backgrounds -->
+  <circle cx="64" cy="64" r="60" fill="#0a1f15" opacity="0.95"/>
+  
   <!-- Shield Outline -->
   <path d="M 64 13 
            L 109 29 
