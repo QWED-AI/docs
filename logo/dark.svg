@@ -1,5 +1,31 @@
-<svg width="128" height="128" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <path d="M9.06145 23.1079C5.26816 22.3769 -3.39077 20.6274 1.4173 5.06384C9.6344 6.09939 16.9728 14.0644 9.06145 23.1079Z" fill="#1CCFA0"/>
-  <path d="M8.91928 23.0939C5.27642 21.2223 0.78371 4.20891 17.0071 0C20.7569 7.19341 19.6212 16.5452 8.91928 23.0939Z" fill="#1CCFA0"/>
-  <path d="M8.91388 23.0788C8.73534 19.8817 10.1585 9.08525 23.5699 13.1107C23.1812 20.1229 18.984 26.4182 8.91388 23.0788Z" fill="#1CCFA0"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
+  <defs>
+    <linearGradient id="shieldGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#00ff88;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#00cc66;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  
+  <!-- Shield Outline -->
+  <path d="M 64 13 
+           L 109 29 
+           L 109 64 
+           Q 109 96, 64 115 
+           Q 19 96, 19 64 
+           L 19 29 
+           Z" 
+        fill="none" 
+        stroke="url(#shieldGradient)" 
+        stroke-width="4" 
+        stroke-linejoin="round"/>
+  
+  <!-- Checkmark -->
+  <path d="M 45 64 
+           L 58 77 
+           L 86 45" 
+        fill="none" 
+        stroke="url(#shieldGradient)" 
+        stroke-width="5" 
+        stroke-linecap="round" 
+        stroke-linejoin="round"/>
 </svg>
