@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 128" width="400" height="128">
   <defs>
     <linearGradient id="shieldGradientDark" x1="0%" y1="0%" x2="0%" y2="100%">
       <stop offset="0%" style="stop-color:#00ffaa;stop-opacity:1" />
@@ -38,4 +38,14 @@
         stroke-linecap="round" 
         stroke-linejoin="round"
         filter="url(#glow)"/>
+  
+  <!-- Text: QWED-AI Docs -->
+  <text x="140" y="74" 
+        font-family="'Inter', 'SF Pro Display', -apple-system, system-ui, sans-serif" 
+        font-size="42" 
+        font-weight="700"
+        fill="url(#shieldGradientDark)"
+        filter="url(#glow)">
+    QWED-AI <tspan font-weight="400" opacity="0.8">Docs</tspan>
+  </text>
 </svg>
