@@ -9,20 +9,6 @@
   },
   "favicon": "/favicon.svg",
   "navigation": {
-    "global": {
-      "anchors": [
-        {
-          "anchor": "GitHub",
-          "icon": "github",
-          "href": "https://github.com/QWED-AI"
-        },
-        {
-          "anchor": "PyPI",
-          "icon": "python",
-          "href": "https://pypi.org/project/qwed/"
-        }
-      ]
-    },
     "tabs": [
       {
         "tab": "Getting Started",
@@ -193,20 +179,26 @@
             ]
           }
         ]
-      },
-      {
-        "tab": "Qwed Integrations",
-        "pages": [
-          "advanced/integration-overview",
-          "finance/integrations/open-responses"
-        ]
       }
-    ]
+    ],
+    "global": {
+      "anchors": [
+        {
+          "anchor": "GitHub",
+          "href": "https://github.com/QWED-AI",
+          "icon": "github"
+        },
+        {
+          "anchor": "PyPI",
+          "href": "https://pypi.org/project/qwed/",
+          "icon": "python"
+        }
+      ]
+    }
   },
   "logo": {
-    "light": "/logo/light.svg",
-    "dark": "/logo/dark.svg",
-    "href": "https://github.com/QWED-AI/docs/blob/main/logo/light.svg"
+    "light": "/logo/light.png",
+    "dark": "/logo/dark.png"
   },
   "navbar": {
     "links": [
@@ -227,19 +219,5 @@
       "github": "https://github.com/QWED-AI",
       "linkedin": "https://linkedin.com/in/rahul-dass-23b370b0"
     }
-  },
-  "integrations": {
-    "gtm": {
-      "tagId": "GT-WRDQWG6B"
-    }
-  },
-  "seo": {
-    "indexing": "all"
-  },
-  "thumbnails": {
-    "background": "/images/og-card.png"
-  },
-  "styling": {
-    "eyebrows": "breadcrumbs"
   }
 }
