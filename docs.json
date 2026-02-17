@@ -25,8 +25,9 @@
             "group": "Quick Start",
             "pages": [
               "getting-started/installation",
-              "getting-started/first-verification",
-              "getting-started/quickstart"
+              "getting-started/quickstart",
+              "getting-started/concepts",
+              "getting-started/llm-configuration"
             ]
           }
         ]
@@ -76,71 +77,11 @@
           {
             "group": "SDK Documentation",
             "pages": [
+              "sdks/overview",
               "sdks/python",
               "sdks/typescript",
               "sdks/go",
               "sdks/rust"
-            ]
-          }
-        ]
-      },
-      {
-        "tab": "Packages",
-        "groups": [
-          {
-            "group": "QWED Finance",
-            "pages": [
-              "finance/overview",
-              "finance/guards",
-              "finance/action",
-              "finance/compliance",
-              "finance/design"
-            ]
-          },
-          {
-            "group": "QWED Legal",
-            "pages": [
-              "legal/overview",
-              "legal/guards",
-              "legal/action"
-            ]
-          },
-          {
-            "group": "QWED Tax",
-            "pages": [
-              "tax/overview",
-              "tax/guards",
-              "tax/action"
-            ]
-          },
-          {
-            "group": "QWED UCP",
-            "pages": [
-              "ucp/overview",
-              "ucp/guards",
-              "ucp/action"
-            ]
-          },
-          {
-            "group": "QWED Infra",
-            "pages": [
-              "infra/overview",
-              "infra/guards",
-              "infra/action"
-            ]
-          },
-          {
-            "group": "QWED MCP",
-            "pages": [
-              "mcp/overview",
-              "mcp/installation"
-            ]
-          },
-          {
-            "group": "Open Responses",
-            "pages": [
-              "open-responses/overview",
-              "open-responses/usage"
             ]
           }
         ]
@@ -176,6 +117,13 @@
             "group": "Contributing",
             "pages": [
               "advanced/contributor-onboarding"
+            ]
+          },
+          {
+            "group": "Specifications",
+            "pages": [
+              "specs/attestation",
+              "specs/agent"
             ]
           }
         ]
