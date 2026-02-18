@@ -4,14 +4,12 @@ title: "QWED GitHub Action"
 
 **Neurosymbolic verification for your CI/CD pipeline**
 
-[![GitHub Marketplace](https://img.shields.io/badge/Marketplace-QWED%20Verification-blue?logo=github)](https://github.com/marketplace/actions/qwed-neurosymbolic-verification)
-[![Version](https://img.shields.io/github/v/release/QWED-AI/qwed-verification)](https://github.com/QWED-AI/qwed-verification/releases)
-
 ## What is QWED?
 
 QWED combines **Neural Networks** (LLMs) with **Symbolic Reasoning** (SymPy, Z3) to provide deterministic verification of AI outputs.
 
 **Use cases:**
+
 - ✅ Verify mathematical calculations in PRs
 - ✅ Check logical reasoning in documentation
 - ✅ Detect unsafe code patterns
@@ -40,23 +38,23 @@ jobs:
 
 ## Inputs
 
-| Input | Description | Required | Default |
-|-------|-------------|----------|---------|
-| `query` | Question or statement to verify | ✅ Yes | - |
-| `provider` | LLM provider (`openai`, `anthropic`, `gemini`) | No | `openai` |
-| `api-key` | API key for LLM provider | No | - |
-| `model` | Model name (e.g., `gpt-4o-mini`) | No | `gpt-4o-mini` |
-| `mask-pii` | Enable PII masking (`true`/`false`) | No | `false` |
-| `verification-type` | Type: `auto`, `math`, `logic`, `code` | No | `auto` |
+| Input               | Description                                    | Required | Default       |
+| ------------------- | ---------------------------------------------- | -------- | ------------- |
+| `query`             | Question or statement to verify                | ✅ Yes    | -             |
+| `provider`          | LLM provider (`openai`, `anthropic`, `gemini`) | No       | `openai`      |
+| `api-key`           | API key for LLM provider                       | No       | -             |
+| `model`             | Model name (e.g., `gpt-4o-mini`)               | No       | `gpt-4o-mini` |
+| `mask-pii`          | Enable PII masking (`true`/`false`)            | No       | `false`       |
+| `verification-type` | Type: `auto`, `math`, `logic`, `code`          | No       | `auto`        |
 
 ## Outputs
 
-| Output | Description |
-|--------|-------------|
-| `verified` | Verification result (`true`/`false`) |
-| `value` | Verified value or result |
-| `confidence` | Confidence score (0.0-1.0) |
-| `evidence` | JSON evidence of verification |
+| Output       | Description                          |
+| ------------ | ------------------------------------ |
+| `verified`   | Verification result (`true`/`false`) |
+| `value`      | Verified value or result             |
+| `confidence` | Confidence score (0.0-1.0)           |
+| `evidence`   | JSON evidence of verification        |
 
 ## Examples
 
@@ -84,7 +82,7 @@ jobs:
 
 ### Check Code Security
 
-```yaml
+````yaml
 - name: Security Check
   uses: QWED-AI/qwed-verification@v2.2.0
   with:
@@ -92,9 +90,11 @@ jobs:
       Is this code safe?
       ```python
       eval(user_input)
-      ```
-    verification-type: "code"
-```
+````
+
+verification-type: "code"
+
+````
 
 ### Enterprise: PII Masking
 
@@ -106,7 +106,7 @@ jobs:
     mask-pii: "true"
     provider: "openai"
     api-key: ${{ secrets.OPENAI_API_KEY }}
-```
+````
 
 ## Privacy & Security
 
@@ -128,6 +128,7 @@ Symbolic Verification (SymPy, Z3, AST)
 ```
 
 **Example:**
+
 - Query: "What is the derivative of x^2?"
 - LLM says: "2x"
 - SymPy computes: `diff(x**2, x) = 2*x`
@@ -136,6 +137,7 @@ Symbolic Verification (SymPy, Z3, AST)
 ## Requirements
 
 **API Keys** (choose one):
+
 - OpenAI: `OPENAI_API_KEY`
 - Anthropic: `ANTHROPIC_API_KEY`
 - Google: `GOOGLE_API_KEY`
@@ -144,10 +146,10 @@ Symbolic Verification (SymPy, Z3, AST)
 
 ## Documentation
 
-- **[Full Documentation](https://github.com/QWED-AI/qwed-verification/blob/main/README.md)**
-- **[PII Masking Guide](https://github.com/QWED-AI/qwed-verification/blob/main/docs/PII_MASKING.md)**
-- **[LLM Configuration](https://github.com/QWED-AI/qwed-verification/blob/main/docs/LLM_CONFIGURATION.md)**
-- **[Python SDK](https://github.com/QWED-AI/qwed-verification/blob/main/docs/QWED_LOCAL.md)**
+- [**Full Documentation**](https://github.com/QWED-AI/qwed-verification/blob/main/README.md)
+- [**PII Masking Guide**](https://github.com/QWED-AI/qwed-verification/blob/main/docs/PII_MASKING.md)
+- [**LLM Configuration**](https://github.com/QWED-AI/qwed-verification/blob/main/docs/LLM_CONFIGURATION.md)
+- [**Python SDK**](https://github.com/QWED-AI/qwed-verification/blob/main/docs/QWED_LOCAL.md)
 
 ## Support
 
@@ -161,4 +163,4 @@ Apache 2.0 - See [LICENSE](https://github.com/QWED-AI/qwed-verification/blob/mai
 
 ---
 
-**Made with 💜 by [QWED-AI](https://github.com/QWED-AI)**
+[**Made with 💜 by QWED-AI**](https://github.com/QWED-AI)

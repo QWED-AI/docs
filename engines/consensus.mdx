@@ -1,8 +1,7 @@
 ---
-sidebar_position: 9
+sidebar_position: "9"
+title: "Consensus Engine"
 ---
-
-# Consensus Engine
 
 The Consensus Engine orchestrates multiple verification engines for high-confidence results with fault tolerance.
 
@@ -33,11 +32,11 @@ print(result.agreement_status) # "unanimous"
 
 ## Verification Modes
 
-| Mode | Engines | Speed | Confidence |
-|------|---------|-------|------------|
-| `single` | 1 (SymPy) | ⚡ Fast | Good |
-| `high` | 2 (SymPy + Python) | Medium | High |
-| `maximum` | 3+ (All applicable) | Slower | Maximum |
+| Mode      | Engines             | Speed  | Confidence |
+| --------- | ------------------- | ------ | ---------- |
+| `single`  | 1 (SymPy)           | ⚡ Fast | Good       |
+| `high`    | 2 (SymPy + Python)  | Medium | High       |
+| `maximum` | 3+ (All applicable) | Slower | Maximum    |
 
 ## Async Execution
 
@@ -77,12 +76,11 @@ client.reset_circuit_breakers()
 The engine uses weighted voting:
 
 | Engine | Reliability Weight |
-|--------|-------------------|
-| SymPy | 1.00 |
-| Z3 | 0.995 |
-| Python | 0.99 |
-| Stats | 0.98 |
-| Fact | 0.85 |
+| ------ | ------------------ |
+| SymPy  | 1.00               |
+| Z3     | 0.995              |
+| Python | 0.99               |
+| Stats  | 0.98               |
+| Fact   | 0.85               |
 
 Final confidence = weighted average of agreeing engines.
-

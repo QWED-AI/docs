@@ -1,8 +1,7 @@
 ---
-sidebar_position: 5
+sidebar_position: "5"
+title: "Stats Engine"
 ---
-
-# Stats Engine
 
 The Stats Engine executes statistical queries on tabular data using secure sandboxed execution.
 
@@ -37,11 +36,11 @@ print(result.answer)  # 150.0
 
 ## Sandbox Options
 
-| Sandbox | Security | Portability | Speed |
-|---------|----------|-------------|-------|
-| Docker | ⭐⭐⭐ | ⭐⭐ | ⭐⭐ |
-| Wasm | ⭐⭐⭐ | ⭐⭐⭐ | ⭐⭐⭐ |
-| Restricted | ⭐⭐ | ⭐⭐⭐ | ⭐⭐⭐ |
+| Sandbox    | Security | Portability | Speed |
+| ---------- | -------- | ----------- | ----- |
+| Docker     | ⭐⭐⭐      | ⭐⭐          | ⭐⭐    |
+| Wasm       | ⭐⭐⭐      | ⭐⭐⭐         | ⭐⭐⭐   |
+| Restricted | ⭐⭐       | ⭐⭐⭐         | ⭐⭐⭐   |
 
 ## Direct Operations
 
@@ -54,4 +53,3 @@ result = client.compute_statistics(
     operation="mean"  # mean, median, std, var, sum, count, min, max
 )
 ```
-

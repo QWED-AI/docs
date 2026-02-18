@@ -9,6 +9,20 @@
   },
   "favicon": "/favicon.svg",
   "navigation": {
+    "global": {
+      "anchors": [
+        {
+          "anchor": "GitHub",
+          "icon": "github",
+          "href": "https://github.com/QWED-AI/qwed-verification/"
+        },
+        {
+          "anchor": "PyPI",
+          "icon": "python",
+          "href": "https://pypi.org/project/qwed/"
+        }
+      ]
+    },
     "tabs": [
       {
         "tab": "Getting Started",
@@ -128,21 +142,7 @@
           }
         ]
       }
-    ],
-    "global": {
-      "anchors": [
-        {
-          "anchor": "GitHub",
-          "href": "https://github.com/QWED-AI",
-          "icon": "github"
-        },
-        {
-          "anchor": "PyPI",
-          "href": "https://pypi.org/project/qwed/",
-          "icon": "python"
-        }
-      ]
-    }
+    ]
   },
   "logo": {
     "light": "/logo/light.svg",

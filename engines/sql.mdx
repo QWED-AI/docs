@@ -1,8 +1,7 @@
 ---
-sidebar_position: 5
+sidebar_position: "5"
+title: "SQL Engine"
 ---
-
-# SQL Engine
 
 SQL query validation and injection detection.
 
@@ -37,12 +36,12 @@ print(result.vulnerabilities)
 
 ## Detected Patterns
 
-| Pattern | Risk | Example |
-|---------|------|---------|
-| Comment injection | Critical | `; --` |
-| OR injection | Critical | `' OR '1'='1` |
-| UNION injection | Critical | `UNION SELECT` |
-| Chained DROP | Critical | `; DROP TABLE` |
+| Pattern           | Risk     | Example        |
+| ----------------- | -------- | -------------- |
+| Comment injection | Critical | `; --`         |
+| OR injection      | Critical | `' OR '1'='1`  |
+| UNION injection   | Critical | `UNION SELECT` |
+| Chained DROP      | Critical | `; DROP TABLE` |
 
 ## Destructive Operations
 
@@ -55,11 +54,11 @@ print(result.vulnerabilities)
 ```
 
 | Operation | Severity |
-|-----------|----------|
-| DROP | Critical |
-| DELETE | High |
-| TRUNCATE | High |
-| UPDATE | High |
+| --------- | -------- |
+| DROP      | Critical |
+| DELETE    | High     |
+| TRUNCATE  | High     |
+| UPDATE    | High     |
 
 ## Supported Dialects
 
@@ -72,4 +71,3 @@ print(result.vulnerabilities)
 ```python
 result = client.verify_sql(query, schema, dialect="postgresql")
 ```
-

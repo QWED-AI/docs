@@ -1,13 +1,11 @@
 ---
-sidebar_position: 2
-title: QWED Attestation Spec
+sidebar_position: "2"
+title: "QWED-Attestation Specification v1.0"
 ---
 
-# QWED-Attestation Specification v1.0
-
-> **Status:** Draft  
-> **Version:** 1.0.0  
-> **Date:** 2025-12-20  
+> **Status:** Draft\
+> **Version:** 1.0.0\
+> **Date:** 2025-12-20\
 > **Extends:** QWED-SPEC v1.0
 
 ---
@@ -33,24 +31,24 @@ QWED-Attestation defines a standard format for **cryptographic proofs of verific
 
 ### 1.2 Use Cases
 
-| Use Case | Description |
-|----------|-------------|
-| **Audit Trail** | Prove that verification occurred for compliance |
-| **Trust Transfer** | Third party can verify without re-running |
-| **Offline Verification** | Validate attestation without network |
-| **Chain of Custody** | Track verification through system handoffs |
-| **Non-Repudiation** | Verifier cannot deny issuing attestation |
+| Use Case                 | Description                                     |
+| ------------------------ | ----------------------------------------------- |
+| **Audit Trail**          | Prove that verification occurred for compliance |
+| **Trust Transfer**       | Third party can verify without re-running       |
+| **Offline Verification** | Validate attestation without network            |
+| **Chain of Custody**     | Track verification through system handoffs      |
+| **Non-Repudiation**      | Verifier cannot deny issuing attestation        |
 
 ### 1.3 Terminology
 
-| Term | Definition |
-|------|------------|
-| **Attestation** | Signed proof of verification result |
-| **Issuer** | QWED verifier that creates the attestation |
-| **Subject** | The content that was verified |
-| **Holder** | Entity that possesses the attestation |
-| **Verifier** | Party validating the attestation |
-| **Claim** | Statement within the attestation |
+| Term            | Definition                                 |
+| --------------- | ------------------------------------------ |
+| **Attestation** | Signed proof of verification result        |
+| **Issuer**      | QWED verifier that creates the attestation |
+| **Subject**     | The content that was verified              |
+| **Holder**      | Entity that possesses the attestation      |
+| **Verifier**    | Party validating the attestation           |
+| **Claim**       | Statement within the attestation           |
 
 ---
 
@@ -96,12 +94,12 @@ QWED-Attestation defines a standard format for **cryptographic proofs of verific
 
 ### 2.3 Attestation Lifecycle
 
-| State | Description |
-|-------|-------------|
-| `issued` | Attestation created and signed |
-| `valid` | Within validity period, signature valid |
-| `expired` | Past expiration time |
-| `revoked` | Explicitly invalidated by issuer |
+| State     | Description                             |
+| --------- | --------------------------------------- |
+| `issued`  | Attestation created and signed          |
+| `valid`   | Within validity period, signature valid |
+| `expired` | Past expiration time                    |
+| `revoked` | Explicitly invalidated by issuer        |
 
 ---
 
@@ -125,11 +123,11 @@ QWED Attestations use JSON Web Token (JWT) format per [RFC 7519](https://www.rfc
 }
 ```
 
-| Field | Required | Description |
-|-------|----------|-------------|
-| `alg` | REQUIRED | Signature algorithm (ES256, EdDSA) |
+| Field | Required | Description                                 |
+| ----- | -------- | ------------------------------------------- |
+| `alg` | REQUIRED | Signature algorithm (ES256, EdDSA)          |
 | `typ` | REQUIRED | Token type (MUST be `qwed-attestation+jwt`) |
-| `kid` | REQUIRED | Key identifier (DID-based) |
+| `kid` | REQUIRED | Key identifier (DID-based)                  |
 
 ### 3.3 Payload Schema
 
@@ -215,6 +213,7 @@ QWED Attestations use JSON Web Token (JWT) format per [RFC 7519](https://www.rfc
 ### 3.4 Example Attestation (Decoded)
 
 **Header:**
+
 ```json
 {
   "alg": "ES256",
@@ -224,6 +223,7 @@ QWED Attestations use JSON Web Token (JWT) format per [RFC 7519](https://www.rfc
 ```
 
 **Payload:**
+
 ```json
 {
   "iss": "did:qwed:node:mainnet-001",
@@ -246,6 +246,7 @@ QWED Attestations use JSON Web Token (JWT) format per [RFC 7519](https://www.rfc
 ```
 
 **Encoded JWT:**
+
 ```
 eyJhbGciOiJFUzI1NiIsInR5cCI6InF3ZWQtYXR0ZXN0YXRpb24rand0Iiwia2lk
 IjoiZGlkOnF3ZWQ6bm9kZTptYWlubmV0LTAwMSNzaWduaW5nLWtleS0yMDI1In0.
@@ -263,16 +264,17 @@ MEUCIQDKZnw...signature...
 
 ### 4.1 Algorithms
 
-| Algorithm | Usage | Requirement |
-|-----------|-------|-------------|
-| **ES256** | Attestation signing | REQUIRED |
-| **EdDSA** | Attestation signing | RECOMMENDED |
-| **SHA-256** | Content hashing | REQUIRED |
-| **SHA-384** | Content hashing | OPTIONAL |
+| Algorithm   | Usage               | Requirement |
+| ----------- | ------------------- | ----------- |
+| **ES256**   | Attestation signing | REQUIRED    |
+| **EdDSA**   | Attestation signing | RECOMMENDED |
+| **SHA-256** | Content hashing     | REQUIRED    |
+| **SHA-384** | Content hashing     | OPTIONAL    |
 
 ### 4.2 Key Types
 
 **Issuer Keys:**
+
 ```json
 {
   "kty": "EC",
@@ -555,12 +557,12 @@ if is_valid:
 
 ### 8.3 Storage Recommendations
 
-| Use Case | Recommended Storage |
-|----------|---------------------|
-| Short-term audit | In-memory / Redis |
+| Use Case             | Recommended Storage    |
+| -------------------- | ---------------------- |
+| Short-term audit     | In-memory / Redis      |
 | Long-term compliance | Database with indexing |
-| Immutable record | Blockchain anchor |
-| Offline verification | File system |
+| Immutable record     | Blockchain anchor      |
+| Offline verification | File system            |
 
 ### 8.4 Security Recommendations
 
@@ -574,22 +576,22 @@ if is_valid:
 
 ## Appendix A: Error Codes
 
-| Code | Description |
-|------|-------------|
+| Code      | Description                |
+| --------- | -------------------------- |
 | `ATT-001` | Invalid attestation format |
-| `ATT-002` | Untrusted issuer |
-| `ATT-003` | Invalid signature |
-| `ATT-004` | Attestation expired |
-| `ATT-005` | Attestation not yet valid |
-| `ATT-006` | Attestation revoked |
-| `ATT-007` | Missing required claim |
-| `ATT-008` | Chain validation failed |
+| `ATT-002` | Untrusted issuer           |
+| `ATT-003` | Invalid signature          |
+| `ATT-004` | Attestation expired        |
+| `ATT-005` | Attestation not yet valid  |
+| `ATT-006` | Attestation revoked        |
+| `ATT-007` | Missing required claim     |
+| `ATT-008` | Chain validation failed    |
 
 ## Appendix B: MIME Types
 
-| Type | Usage |
-|------|-------|
-| `application/qwed-attestation+jwt` | Attestation JWT |
+| Type                                | Usage               |
+| ----------------------------------- | ------------------- |
+| `application/qwed-attestation+jwt`  | Attestation JWT     |
 | `application/qwed-attestation+json` | Decoded attestation |
 
 ## Appendix C: DID Method
@@ -598,5 +600,4 @@ The `did:qwed` method specification will be published separately.
 
 ---
 
-*© 2025 QWED-AI. This specification is released under Apache 2.0 License.*
-
+_© 2025 QWED-AI. This specification is released under Apache 2.0 License._

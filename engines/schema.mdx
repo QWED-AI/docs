@@ -1,16 +1,16 @@
 ---
-sidebar_position: 11
+sidebar_position: "11"
+title: "Schema Verifier"
 ---
-
-# Schema Verifier
 
 The **Schema Verifier** goes beyond standard JSON validation. It combines **Pydantic** structure enforcement with **Symbolic Math** checks deeply embedded within the schema.
 
 ## How It Works
 
 It validates that:
-1.  **Structure:** The output matches the required JSON keys and types.
-2.  **Logic:** The numeric values *inside* the JSON are mathematically consistent (e.g., `total == sum(items)`).
+
+1. **Structure:** The output matches the required JSON keys and types.
+2. **Logic:** The numeric values _inside_ the JSON are mathematically consistent (e.g., `total == sum(items)`).
 
 ## Usage
 
@@ -42,6 +42,6 @@ response = client.verify_schema(
 
 ## When to use
 
--   **Invoice Processing:** Ensure line items sum to the total.
--   **Financial Reports:** Ensure balance sheets balance.
--   **Tax Forms:** Ensure calculated fields match underlying data.
+- **Invoice Processing:** Ensure line items sum to the total.
+- **Financial Reports:** Ensure balance sheets balance.
+- **Tax Forms:** Ensure calculated fields match underlying data.
