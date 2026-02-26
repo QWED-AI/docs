@@ -18,6 +18,7 @@
             "pages": [
               "intro",
               "architecture",
+              "whitepaper",
               "faq"
             ]
           },
@@ -28,6 +29,13 @@
               "getting-started/quickstart",
               "getting-started/concepts",
               "getting-started/llm-configuration"
+            ]
+          },
+          {
+            "group": "Resources",
+            "pages": [
+              "support",
+              "troubleshooting"
             ]
           }
         ]
@@ -56,6 +64,40 @@
         ]
       },
       {
+        "tab": "SDKs & Integrations",
+        "groups": [
+          {
+            "group": "SDK Documentation",
+            "pages": [
+              "sdks/overview",
+              "sdks/python",
+              "sdks/typescript",
+              "sdks/go",
+              "sdks/rust"
+            ]
+          },
+          {
+            "group": "Framework Integrations",
+            "pages": [
+              "integrations/langchain",
+              "integrations/llamaindex",
+              "integrations/crewai"
+            ]
+          },
+          {
+            "group": "Integration Guide",
+            "pages": [
+              "integration/getting-started",
+              "integration/common-pitfalls",
+              "integration/testing",
+              "integration/production",
+              "integration/monitoring",
+              "integration/troubleshooting"
+            ]
+          }
+        ]
+      },
+      {
         "tab": "API Reference",
         "groups": [
           {
@@ -72,16 +114,75 @@
         ]
       },
       {
-        "tab": "SDKs",
+        "tab": "Ecosystem",
         "groups": [
           {
-            "group": "SDK Documentation",
+            "group": "🏦 QWED-Finance",
             "pages": [
-              "sdks/overview",
-              "sdks/python",
-              "sdks/typescript",
-              "sdks/go",
-              "sdks/rust"
+              "finance/overview",
+              "finance/guards",
+              "finance/compliance",
+              "finance/design",
+              "finance/action",
+              "finance/integrations/ucp",
+              "finance/integrations/open-responses"
+            ]
+          },
+          {
+            "group": "🏛️ QWED-Legal",
+            "pages": [
+              "legal/overview",
+              "legal/guards",
+              "legal/examples",
+              "legal/troubleshooting"
+            ]
+          },
+          {
+            "group": "💸 QWED-Tax",
+            "pages": [
+              "tax/overview",
+              "tax/guards",
+              "tax/integration"
+            ]
+          },
+          {
+            "group": "🛒 QWED-UCP",
+            "pages": [
+              "ucp/overview",
+              "ucp/guards",
+              "ucp/middleware-fastapi",
+              "ucp/middleware-express",
+              "ucp/examples",
+              "ucp/troubleshooting"
+            ]
+          },
+          {
+            "group": "🔌 QWED-MCP",
+            "pages": [
+              "mcp/overview",
+              "mcp/tools",
+              "mcp/examples",
+              "mcp/troubleshooting"
+            ]
+          },
+          {
+            "group": "🤖 Open Responses",
+            "pages": [
+              "open-responses/overview",
+              "open-responses/guards",
+              "open-responses/langchain",
+              "open-responses/openai",
+              "open-responses/examples",
+              "open-responses/troubleshooting"
+            ]
+          },
+          {
+            "group": "☁️ QWED-Infra",
+            "pages": [
+              "infra/overview",
+              "infra/guards",
+              "infra/examples",
+              "infra/troubleshooting"
             ]
           }
         ]
@@ -94,13 +195,17 @@
             "pages": [
               "advanced/architecture-diagrams",
               "advanced/attestations",
+              "advanced/agent-verification",
               "advanced/cli",
               "advanced/comparison",
               "advanced/compliance",
               "advanced/deployment",
+              "advanced/design",
               "advanced/determinism-guarantee",
               "advanced/github-action",
+              "advanced/github-app",
               "advanced/integration-guide",
+              "advanced/integration-overview",
               "advanced/neurosymbolic",
               "advanced/ollama",
               "advanced/performance-benchmarks",
@@ -122,6 +227,8 @@
           {
             "group": "Specifications",
             "pages": [
+              "specs/overview",
+              "specs/qwed-spec",
               "specs/attestation",
               "specs/agent"
             ]
@@ -140,6 +247,11 @@
           "anchor": "PyPI",
           "href": "https://pypi.org/project/qwed/",
           "icon": "python"
+        },
+        {
+          "anchor": "Support",
+          "href": "https://qwedai.com/contact",
+          "icon": "envelope"
         }
       ]
     }
@@ -152,7 +264,7 @@
     "links": [
       {
         "label": "Support",
-        "href": "mailto:rahul@qwedai.com"
+        "href": "https://qwedai.com/contact"
       }
     ],
     "primary": {
