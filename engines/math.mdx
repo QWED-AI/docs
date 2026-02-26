@@ -1,12 +1,8 @@
 ---
-sidebar_position: 2
-title: Math Engine
-description: Deterministic verification of mathematical expressions using SymPy
+sidebar_position: "2"
+title: "Math Engine"
+description: "Deterministic verification of mathematical expressions using SymPy"
 ---
-
-# Math Engine
-
-**Deterministic verification of mathematical expressions using SymPy.**
 
 The Math Engine is QWED's core verification engine. It uses [SymPy](https://www.sympy.org/) for symbolic computation to provide **100% accurate** verification of mathematical claims.
 
@@ -14,15 +10,15 @@ The Math Engine is QWED's core verification engine. It uses [SymPy](https://www.
 
 ## Capabilities
 
-| Category | Examples | Accuracy |
-|----------|----------|----------|
-| **Arithmetic** | `2+2=4`, `15*3=45` | 100% |
-| **Algebra** | `x^2 - 1 = (x-1)(x+1)` | 100% |
-| **Calculus** | Derivatives, Integrals, Limits | 100% |
-| **Trigonometry** | `sin(π/2) = 1`, `cos(0) = 1` | 100% |
-| **Logarithms** | `log(e) = 1`, `ln(e^x) = x` | 100% |
-| **Financial** | Compound interest, NPV, IRR | 100% |
-| **Statistics** | Mean, std dev, percentiles | 100% |
+| Category         | Examples                       | Accuracy |
+| ---------------- | ------------------------------ | -------- |
+| **Arithmetic**   | `2+2=4`, `15*3=45`             | 100%     |
+| **Algebra**      | `x^2 - 1 = (x-1)(x+1)`         | 100%     |
+| **Calculus**     | Derivatives, Integrals, Limits | 100%     |
+| **Trigonometry** | `sin(π/2) = 1`, `cos(0) = 1`   | 100%     |
+| **Logarithms**   | `log(e) = 1`, `ln(e^x) = x`    | 100%     |
+| **Financial**    | Compound interest, NPV, IRR    | 100%     |
+| **Statistics**   | Mean, std dev, percentiles     | 100%     |
 
 ---
 
@@ -211,23 +207,23 @@ result = client.verify_math(
 
 ## Edge Cases
 
-| Scenario | Behavior |
-|----------|----------|
-| Division by zero | Returns error, not verified |
-| Undefined expressions | Returns "UNDEFINED" status |
-| Complex numbers | Fully supported |
-| Very large numbers | Uses arbitrary precision |
-| Symbolic variables | Verified algebraically |
+| Scenario              | Behavior                    |
+| --------------------- | --------------------------- |
+| Division by zero      | Returns error, not verified |
+| Undefined expressions | Returns "UNDEFINED" status  |
+| Complex numbers       | Fully supported             |
+| Very large numbers    | Uses arbitrary precision    |
+| Symbolic variables    | Verified algebraically      |
 
 ---
 
 ## Performance
 
-| Operation | Avg Latency | Throughput |
-|-----------|-------------|------------|
-| Simple arithmetic | 1.5ms | 690/sec |
-| Complex expression | 5ms | 200/sec |
-| Identity proof | 10ms | 100/sec |
+| Operation          | Avg Latency | Throughput |
+| ------------------ | ----------- | ---------- |
+| Simple arithmetic  | 1.5ms       | 690/sec    |
+| Complex expression | 5ms         | 200/sec    |
+| Identity proof     | 10ms        | 100/sec    |
 
 ---
 

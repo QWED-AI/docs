@@ -1,13 +1,11 @@
 ---
-sidebar_position: 3
-title: QWED Agent Spec
+sidebar_position: "3"
+title: "QWED-Agent Specification v1.0"
 ---
 
-# QWED-Agent Specification v1.0
-
-> **Status:** Draft  
-> **Version:** 1.0.0  
-> **Date:** 2025-12-20  
+> **Status:** Draft\
+> **Version:** 1.0.0\
+> **Date:** 2025-12-20\
 > **Extends:** QWED-SPEC v1.0, QWED-Attestation v1.0
 
 ---
@@ -34,17 +32,18 @@ QWED-Agent defines a protocol for **AI agents to verify their actions** before e
 
 ### 1.2 Problem Statement
 
-| Problem | Risk |
-|---------|------|
-| Agents execute unverified code | Security vulnerabilities |
-| Agents make unverified calculations | Financial errors |
-| Agents generate unverified SQL | Data corruption |
-| Agents exceed resource limits | Cost overruns |
-| No audit trail of agent actions | Compliance violations |
+| Problem                             | Risk                     |
+| ----------------------------------- | ------------------------ |
+| Agents execute unverified code      | Security vulnerabilities |
+| Agents make unverified calculations | Financial errors         |
+| Agents generate unverified SQL      | Data corruption          |
+| Agents exceed resource limits       | Cost overruns            |
+| No audit trail of agent actions     | Compliance violations    |
 
 ### 1.3 Solution
 
 QWED-Agent establishes:
+
 - Pre-execution verification of agent outputs
 - Tool call approval workflow
 - Budget enforcement
@@ -53,14 +52,14 @@ QWED-Agent establishes:
 
 ### 1.4 Terminology
 
-| Term | Definition |
-|------|------------|
-| **Agent** | Autonomous AI system performing tasks |
-| **Principal** | Entity that owns/controls the agent |
-| **Tool** | External capability an agent can invoke |
-| **Action** | Any operation an agent wants to perform |
-| **Verification Gate** | Check before action execution |
-| **Budget** | Resource limits for the agent |
+| Term                  | Definition                              |
+| --------------------- | --------------------------------------- |
+| **Agent**             | Autonomous AI system performing tasks   |
+| **Principal**         | Entity that owns/controls the agent     |
+| **Tool**              | External capability an agent can invoke |
+| **Action**            | Any operation an agent wants to perform |
+| **Verification Gate** | Check before action execution           |
+| **Budget**            | Resource limits for the agent           |
 
 ---
 
@@ -91,14 +90,14 @@ QWED-Agent establishes:
 
 ### 2.2 Verification Types for Agents
 
-| Action Type | Verification Engine | Risk Level |
-|-------------|---------------------|------------|
-| Math calculation | Math Engine | Low |
-| Database query | SQL Engine | High |
-| Code execution | Code Engine | Critical |
-| External API call | Tool Verification | Medium |
-| File operations | Security Check | High |
-| Network requests | Policy Check | Medium |
+| Action Type       | Verification Engine | Risk Level |
+| ----------------- | ------------------- | ---------- |
+| Math calculation  | Math Engine         | Low        |
+| Database query    | SQL Engine          | High       |
+| Code execution    | Code Engine         | Critical   |
+| External API call | Tool Verification   | Medium     |
+| File operations   | Security Check      | High       |
+| Network requests  | Policy Check        | Medium     |
 
 ### 2.3 Decision Matrix
 
@@ -164,11 +163,11 @@ Agents MUST register with QWED before use:
 
 ### 3.3 Agent Types
 
-| Type | Description | Trust Level |
-|------|-------------|-------------|
-| `supervised` | Human approval for high-risk actions | Low |
-| `autonomous` | Self-executing within limits | Medium |
-| `trusted` | Full autonomy (enterprise only) | High |
+| Type         | Description                          | Trust Level |
+| ------------ | ------------------------------------ | ----------- |
+| `supervised` | Human approval for high-risk actions | Low         |
+| `autonomous` | Self-executing within limits         | Medium      |
+| `trusted`    | Full autonomy (enterprise only)      | High        |
 
 ### 3.4 Agent Identity
 
@@ -230,13 +229,13 @@ did:qwed:agent:<agent_id>
 
 ### 4.3 Decision Types
 
-| Decision | Meaning | Agent Action |
-|----------|---------|--------------|
-| `APPROVED` | Safe to execute | Proceed |
-| `DENIED` | Verification failed | Abort + log |
-| `CORRECTED` | Fixed version available | Use corrected |
-| `PENDING` | Requires human approval | Wait |
-| `BUDGET_EXCEEDED` | Limits reached | Abort |
+| Decision          | Meaning                 | Agent Action  |
+| ----------------- | ----------------------- | ------------- |
+| `APPROVED`        | Safe to execute         | Proceed       |
+| `DENIED`          | Verification failed     | Abort + log   |
+| `CORRECTED`       | Fixed version available | Use corrected |
+| `PENDING`         | Requires human approval | Wait          |
+| `BUDGET_EXCEEDED` | Limits reached          | Abort         |
 
 ---
 
@@ -424,6 +423,7 @@ GET /agents/:agent_id/activity?from=2025-12-01&to=2025-12-20
 ```
 
 Response:
+
 ```json
 {
   "agent_id": "agent_xyz789",
@@ -454,12 +454,12 @@ GET /agents/:agent_id/compliance-report?format=pdf
 
 ### 8.1 Trust Level Definitions
 
-| Level | Description | Verification | Approval |
-|-------|-------------|--------------|----------|
-| **0: Untrusted** | No autonomous actions | All | All |
-| **1: Supervised** | Low-risk autonomous | High-risk | High-risk |
+| Level             | Description             | Verification  | Approval      |
+| ----------------- | ----------------------- | ------------- | ------------- |
+| **0: Untrusted**  | No autonomous actions   | All           | All           |
+| **1: Supervised** | Low-risk autonomous     | High-risk     | High-risk     |
 | **2: Autonomous** | Most actions autonomous | Critical only | Critical only |
-| **3: Trusted** | Full autonomy | None | None |
+| **3: Trusted**    | Full autonomy           | None          | None          |
 
 ### 8.2 Trust Elevation
 
@@ -486,12 +486,12 @@ Agents can request trust elevation:
 
 Automatic trust reduction on violations:
 
-| Violation | Penalty |
-|-----------|---------|
+| Violation                 | Penalty   |
+| ------------------------- | --------- |
 | Security policy violation | -2 levels |
-| Repeated denials (>10%) | -1 level |
-| Budget abuse | -1 level |
-| Principal complaint | Suspend |
+| Repeated denials (\>10%)  | -1 level  |
+| Budget abuse              | -1 level  |
+| Principal complaint       | Suspend   |
 
 ---
 
@@ -573,32 +573,31 @@ verified_agent = QWEDVerifiedAgent(
 
 ## Appendix A: Error Codes
 
-| Code | Description |
-|------|-------------|
-| `QWED-AGENT-001` | Agent not registered |
-| `QWED-AGENT-002` | Invalid agent token |
-| `QWED-AGENT-003` | Agent suspended |
-| `QWED-AGENT-004` | Tool not allowed |
-| `QWED-AGENT-005` | Verification failed |
-| `QWED-AGENT-BUDGET-001` | Daily cost exceeded |
-| `QWED-AGENT-BUDGET-002` | Hourly rate exceeded |
-| `QWED-AGENT-BUDGET-003` | Token limit exceeded |
-| `QWED-AGENT-TRUST-001` | Insufficient trust level |
-| `QWED-AGENT-TRUST-002` | Action requires approval |
+| Code                    | Description              |
+| ----------------------- | ------------------------ |
+| `QWED-AGENT-001`        | Agent not registered     |
+| `QWED-AGENT-002`        | Invalid agent token      |
+| `QWED-AGENT-003`        | Agent suspended          |
+| `QWED-AGENT-004`        | Tool not allowed         |
+| `QWED-AGENT-005`        | Verification failed      |
+| `QWED-AGENT-BUDGET-001` | Daily cost exceeded      |
+| `QWED-AGENT-BUDGET-002` | Hourly rate exceeded     |
+| `QWED-AGENT-BUDGET-003` | Token limit exceeded     |
+| `QWED-AGENT-TRUST-001`  | Insufficient trust level |
+| `QWED-AGENT-TRUST-002`  | Action requires approval |
 
 ## Appendix B: HTTP Endpoints
 
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/agents/register` | POST | Register new agent |
-| `/agents/:id` | GET | Get agent details |
-| `/agents/:id/verify` | POST | Verify agent action |
-| `/agents/:id/tools/:tool` | POST | Verify tool call |
-| `/agents/:id/activity` | GET | Get activity log |
-| `/agents/:id/budget` | GET | Get budget status |
-| `/agents/:id/trust` | POST | Request trust change |
+| Endpoint                  | Method | Description          |
+| ------------------------- | ------ | -------------------- |
+| `/agents/register`        | POST   | Register new agent   |
+| `/agents/:id`             | GET    | Get agent details    |
+| `/agents/:id/verify`      | POST   | Verify agent action  |
+| `/agents/:id/tools/:tool` | POST   | Verify tool call     |
+| `/agents/:id/activity`    | GET    | Get activity log     |
+| `/agents/:id/budget`      | GET    | Get budget status    |
+| `/agents/:id/trust`       | POST   | Request trust change |
 
 ---
 
-*© 2025 QWED-AI. This specification is released under Apache 2.0 License.*
-
+_© 2025 QWED-AI. This specification is released under Apache 2.0 License._

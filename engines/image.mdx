@@ -1,8 +1,7 @@
 ---
-sidebar_position: 7
+sidebar_position: "7"
+title: "Image Engine"
 ---
-
-# Image Engine
 
 The Image Engine verifies claims about images using **deterministic methods first**, with VLM fallback only for complex semantic claims.
 
@@ -37,13 +36,13 @@ print(result.methods_used) # ["metadata_extraction", "size_verification"]
 
 ## Claim Types
 
-| Claim Type | Method | Deterministic? |
-|------------|--------|----------------|
-| Size/Dimensions | Metadata parsing | ✅ 100% |
-| Format | Header detection | ✅ 100% |
-| Color | Pixel sampling | ⚠️ Partial |
-| Text | OCR required | ❌ VLM |
-| Semantic | Understanding | ❌ VLM |
+| Claim Type      | Method           | Deterministic? |
+| --------------- | ---------------- | -------------- |
+| Size/Dimensions | Metadata parsing | ✅ 100%         |
+| Format          | Header detection | ✅ 100%         |
+| Color           | Pixel sampling   | ⚠️ Partial     |
+| Text            | OCR required     | ❌ VLM          |
+| Semantic        | Understanding    | ❌ VLM          |
 
 ## Multi-VLM Consensus
 
@@ -59,4 +58,3 @@ result = client.verify_image_consensus(
 print(result.agreement_count)  # 3/3
 print(result.vlm_results)      # Individual VLM responses
 ```
-

@@ -1,12 +1,8 @@
 ---
-sidebar_position: 3
-title: Logic Engine
-description: Verify logical constraints and satisfiability using Z3 SMT solver
+sidebar_position: "3"
+title: "Logic Engine"
+description: "Verify logical constraints and satisfiability using Z3 SMT solver"
 ---
-
-# Logic Engine
-
-**Verify logical constraints using the Z3 SMT Solver.**
 
 The Logic Engine uses [Z3](https://github.com/Z3Prover/z3), Microsoft's industry-leading Satisfiability Modulo Theories (SMT) solver, to verify logical constraints with mathematical precision.
 
@@ -14,13 +10,13 @@ The Logic Engine uses [Z3](https://github.com/Z3Prover/z3), Microsoft's industry
 
 ## Capabilities
 
-| Feature | Description |
-|---------|-------------|
-| **Satisfiability** | Check if constraints have a solution |
-| **Model Finding** | Find values that satisfy constraints |
-| **Proof Generation** | Prove tautologies |
-| **Quantifiers** | FORALL, EXISTS support |
-| **Arithmetic** | Integer and real arithmetic |
+| Feature              | Description                          |
+| -------------------- | ------------------------------------ |
+| **Satisfiability**   | Check if constraints have a solution |
+| **Model Finding**    | Find values that satisfy constraints |
+| **Proof Generation** | Prove tautologies                    |
+| **Quantifiers**      | FORALL, EXISTS support               |
+| **Arithmetic**       | Integer and real arithmetic          |
 
 ---
 
@@ -45,13 +41,13 @@ QWED uses a secure S-expression DSL for logic expressions.
 
 ### Operators
 
-| Category | Operators | Example |
-|----------|-----------|---------|
-| **Logic** | AND, OR, NOT | `(AND a b)` |
-| **Comparison** | GT, LT, EQ, GTE, LTE, NEQ | `(GT x 5)` |
-| **Implication** | IMPLIES, IFF | `(IMPLIES a b)` |
-| **Quantifiers** | FORALL, EXISTS | `(FORALL x (GT x 0))` |
-| **Arithmetic** | PLUS, MINUS, MULT, DIV | `(PLUS x y)` |
+| Category        | Operators                 | Example               |
+| --------------- | ------------------------- | --------------------- |
+| **Logic**       | AND, OR, NOT              | `(AND a b)`           |
+| **Comparison**  | GT, LT, EQ, GTE, LTE, NEQ | `(GT x 5)`            |
+| **Implication** | IMPLIES, IFF              | `(IMPLIES a b)`       |
+| **Quantifiers** | FORALL, EXISTS            | `(FORALL x (GT x 0))` |
+| **Arithmetic**  | PLUS, MINUS, MULT, DIV    | `(PLUS x y)`          |
 
 ### Examples
 
@@ -195,11 +191,11 @@ if not result.satisfiable:
 
 ## Performance
 
-| Operation | Avg Latency |
-|-----------|-------------|
-| Simple constraint | 5ms |
-| Complex (10+ clauses) | 20ms |
-| Quantified | 50ms |
+| Operation             | Avg Latency |
+| --------------------- | ----------- |
+| Simple constraint     | 5ms         |
+| Complex (10+ clauses) | 20ms        |
+| Quantified            | 50ms        |
 
 ---
 

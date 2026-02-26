@@ -1,12 +1,8 @@
 ---
-sidebar_position: 4
-title: Code Engine
-description: Verify Python code correctness using symbolic execution
+sidebar_position: "4"
+title: "Code Engine"
+description: "Verify Python code correctness using symbolic execution"
 ---
-
-# Code Engine
-
-**Verify Python code using CrossHair symbolic execution.**
 
 The Code Engine uses [CrossHair](https://github.com/pschanely/crosshair), a symbolic execution tool for Python, to verify code correctness without running it.
 
@@ -14,13 +10,13 @@ The Code Engine uses [CrossHair](https://github.com/pschanely/crosshair), a symb
 
 ## Capabilities
 
-| Feature | Description |
-|---------|-------------|
-| **Property Verification** | Verify pre/post conditions |
-| **Safety Checks** | Division by zero, null checks |
-| **Vulnerability Detection** | SQL injection, XSS |
-| **Type Checking** | Runtime type violations |
-| **Boundary Analysis** | Edge case detection |
+| Feature                     | Description                   |
+| --------------------------- | ----------------------------- |
+| **Property Verification**   | Verify pre/post conditions    |
+| **Safety Checks**           | Division by zero, null checks |
+| **Vulnerability Detection** | SQL injection, XSS            |
+| **Type Checking**           | Runtime type violations       |
+| **Boundary Analysis**       | Edge case detection           |
 
 ---
 
@@ -198,12 +194,12 @@ print(result.recursive)       # False
 
 ## Language Support
 
-| Language | Support Level |
-|----------|---------------|
-| Python | Full |
+| Language   | Support Level  |
+| ---------- | -------------- |
+| Python     | Full           |
 | JavaScript | Basic (coming) |
 | TypeScript | Basic (coming) |
-| SQL | Via SQL Engine |
+| SQL        | Via SQL Engine |
 
 ---
 
@@ -223,11 +219,11 @@ result = client.verify_code(
 
 ## Performance
 
-| Code Size | Avg Latency |
-|-----------|-------------|
-| < 50 lines | 200ms |
-| 50-200 lines | 500ms |
-| > 200 lines | 1-5s |
+| Code Size    | Avg Latency |
+| ------------ | ----------- |
+| \< 50 lines  | 200ms       |
+| 50-200 lines | 500ms       |
+| \> 200 lines | 1-5s        |
 
 ---
 
