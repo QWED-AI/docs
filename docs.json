@@ -93,7 +93,7 @@
         ]
       },
       {
-        "tab": "Products",
+        "tab": "Extensions",
         "groups": [
           {
             "group": "QWED Finance",
@@ -132,23 +132,9 @@
               "infra/examples",
               "infra/troubleshooting"
             ]
-          }
-        ]
-      },
-      {
-        "tab": "Integrations",
-        "groups": [
-          {
-            "group": "MCP Server",
-            "pages": [
-              "mcp/overview",
-              "mcp/tools",
-              "mcp/examples",
-              "mcp/troubleshooting"
-            ]
           },
           {
-            "group": "Open Responses",
+            "group": "QWED Open-Responses",
             "pages": [
               "open-responses/overview",
               "open-responses/guards",
@@ -159,7 +145,16 @@
             ]
           },
           {
-            "group": "UCP (Commerce)",
+            "group": "QWED MCP",
+            "pages": [
+              "mcp/overview",
+              "mcp/tools",
+              "mcp/examples",
+              "mcp/troubleshooting"
+            ]
+          },
+          {
+            "group": "QWED UCP",
             "pages": [
               "ucp/overview",
               "ucp/guards",
@@ -168,7 +163,12 @@
               "ucp/examples",
               "ucp/troubleshooting"
             ]
-          },
+          }
+        ]
+      },
+      {
+        "tab": "Integrations",
+        "groups": [
           {
             "group": "AI Frameworks",
             "pages": [
