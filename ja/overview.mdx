@@ -1,49 +1,80 @@
 ---
-sidebar_position: 1
-title: Overview
-description: QWED-Infra for Infrastructure as Code verification using Z3 Solver and Graph Theory. Verify Terraform, AWS IAM, and Kubernetes configurations before deployment.
+sidebar_position: "1"
+title: SDKs Overview
+description: QWED official SDKs for Python, TypeScript, Go, and Rust. Compare features, view quick install commands, and get started with verification in minutes.
 ---
 
-# QWED-Infra ☁️
+QWED provides official SDKs for 4 languages.
 
-**Deterministic Verification for Infrastructure as Code (IaC)**
+## Available SDKs
 
-![Verified by QWED](https://img.shields.io/badge/Verified_by-QWED-00C853?style=flat\&logo=checkmarx)
-![PyPI](https://img.shields.io/pypi/v/qwed-infra?color=blue)
+| Language                       | Package                      | Status   |
+| ------------------------------ | ---------------------------- | -------- |
+| [Python](/sdks/python)         | `qwed`                       | ✅ Stable |
+| [TypeScript](/sdks/typescript) | `@qwed-ai/sdk`               | ✅ Stable |
+| [Go](/sdks/go)                 | `github.com/qwed-ai/qwed-go` | ✅ Stable |
+| [Rust](/sdks/rust)             | `qwed`                       | ✅ Stable |
 
-`qwed-infra` is a Python library that uses **Formal Methods (Z3 Solver)** and **Graph Theory** to mathematically prove the security and compliance of detailed infrastructure definitions (Terraform, AWS IAM, Kubernetes).
+## Feature Comparison
 
-It prevents AI agents (like Devin or Copilot Workspace) from deploying insecure or expensive infrastructure by verifying configuration *before* deployment.
+| Feature          | Python | TypeScript | Go | Rust |
+| ---------------- | ------ | ---------- | -- | ---- |
+| Sync Client      | ✅      | ✅          | ✅  | ✅    |
+| Async Client     | ✅      | ✅          | ✅  | ✅    |
+| Batch Operations | ✅      | ✅          | ✅  | ✅    |
+| Agent API        | ✅      | ✅          | ❌  | ❌    |
+| Attestations     | ✅      | ✅          | ✅  | ✅    |
+| CLI              | ✅      | ❌          | ❌  | ❌    |
 
-## 🎯 Architecture
-
-```mermaid
-graph TD
-    A[Terraform Code] -->|TerraformParser| B{QWED Engine}
-    B -->|Mathematical Proof| C["Z3 Solver (IAM)"]
-    B -->|Graph Traversal| D["NetworkX (Reachability)"]
-    B -->|Arithmetic| E["Pricing Catalog (Cost)"]
-    C --> F[Verification Result]
-    D --> F
-    E --> F
-```
-
-## 🚀 Key Features
-
-### 🛡️ IamGuard
-
-Verifies AWS IAM Policies using the **Z3 Theorem Prover**. Instead of regex matching, it converts policies into logical formulas to prove reachability and specific permissions.
-
-### 🌐 NetworkGuard
-
-Verifies Network Reachability using **Graph Theory** (NetworkX). Validates paths like `Internet -> IGW -> Route -> Security Group -> Instance`.
-
-### 💰 CostGuard
-
-Deterministic Cloud Cost estimation before deployment. Enforce budgets and prevent expensive instance provisioning errors.
-
-## 📦 Installation
+## Quick Install
 
 ```bash
-pip install qwed-infra
+# Python
+pip install qwed
+
+# TypeScript
+npm install @qwed-ai/sdk
+
+# Go
+go get github.com/qwed-ai/qwed-go
+
+# Rust
+cargo add qwed
 ```
+
+## Minimal Example
+
+<Tabs>
+  <Tab title="Python">
+    ```python
+    from qwed_sdk import QWEDClient
+
+    client = QWEDClient(api_key="qwed_...")
+    result = client.verify("2+2=4")
+    print(result.verified)  # True
+    ```
+  </Tab>
+  <Tab title="TypeScript">
+    ```typescript
+    import { QWEDClient } from '@qwed-ai/sdk';
+
+    const client = new QWEDClient({ apiKey: 'qwed_...' });
+    const result = await client.verify('2+2=4');
+    console.log(result.verified);  // true
+    ```
+  </Tab>
+  <Tab title="Go">
+    ```go
+    client := qwed.NewClient("qwed_...")
+    result, _ := client.Verify(ctx, "2+2=4")
+    fmt.Println(result.Verified)  // true
+    ```
+  </Tab>
+  <Tab title="Rust">
+    ```rust
+    let client = QWEDClient::new("qwed_...");
+    let result = client.verify("2+2=4").await?;
+    println!("{}", result.verified);  // true
+    ```
+  </Tab>
+</Tabs>
