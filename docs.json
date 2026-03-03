@@ -325,6 +325,46 @@
       "github": "https://github.com/QWED-AI",
       "linkedin": "https://linkedin.com/in/rahul-dass-23b370b0",
       "website": "https://qwedai.com"
-    }
+    },
+    "links": [
+      {
+        "header": "SDKs",
+        "items": [
+          {
+            "label": "Python",
+            "href": "/blob/main/sdks/python.mdx"
+          },
+          {
+            "label": "Go",
+            "href": "/blob/main/sdks/go.mdx"
+          },
+          {
+            "label": "Typescript",
+            "href": "/blob/main/sdks/typescript.mdx"
+          },
+          {
+            "label": "Rust",
+            "href": "/blob/main/sdks/rust.mdx"
+          }
+        ]
+      },
+      {
+        "header": "Integration",
+        "items": [
+          {
+            "label": "CrewAI",
+            "href": "/blob/main/integrations/crewai.mdx"
+          },
+          {
+            "label": "LangChain",
+            "href": "/blob/main/integrations/langchain.mdx"
+          },
+          {
+            "label": "LlamaIndex",
+            "href": "/blob/main/integrations/llamaindex.mdx"
+          }
+        ]
+      }
+    ]
   }
 }
