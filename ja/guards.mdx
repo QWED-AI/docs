@@ -1,204 +1,220 @@
 ---
 sidebar_position: 2
 title: Guards Reference
-description: QWED-UCP 6 verification guards including Money Guard (verifies cart totals) and State Guard (validates checkout state transitions). Complete reference with examples.
+description: QWED Open Responses provides 6 verification guards including SchemaGuard and ToolGuard. Complete reference with code examples for validating AI agent outputs.
 ---
 
 # Guards Reference
 
-QWED-UCP includes **6 verification guards** that validate different aspects of UCP checkout data.
+QWED Open Responses provides 6 verification guards.
 
 ---
 
-## 1. Money Guard
+## SchemaGuard
 
-**Verifies the total formula is mathematically correct.**
-
-```
-Total = Subtotal - Discount + Tax + Shipping + Fee
-```
-
-### Usage
+Validates AI outputs against JSON Schema.
 
 ```python
-driver = MoneyGuard()
-result = driver.verify_cart_totals(
-    line_items=[{"price": 35.00, "quantity": 2}, {"price": 15.00, "quantity": 1}],
-    taxes=8.25,
-    discounts=10.00,
-    claimed_total=98.25
-)
-# Returns: {"verified": True}
-```
+from qwed_open_responses import SchemaGuard
 
-### Tolerance
-
-Uses `Decimal` precision with 1 cent ($0.01) tolerance for floating-point errors.
-
----
-
-## 2. State Guard
-
-**Verifies valid checkout state machine transitions.**
-
-### Valid States
-
-```
-incomplete → ready_for_complete → completed
-                              ↓
-                            failed
-                              ↓
-                           cancelled
-```
-
-### Usage
-
-```python
-from qwed_ucp.guards.state_guard import StateGuard
-
-guard = StateGuard()
-# Check if we can SHIP given the current state is PAID
-result = guard.verify_transition(
-    current_state="paid",
-    action="ship"
-)
-# Returns: {"verified": True}
-```
-
-### Rules
-
-* `incomplete`: Can be empty
-* `ready_for_complete`: Must have line items
-* `completed`: Must have order object
-* Cannot transition backwards
-
----
-
-## 3. Schema Guard
-
-**Validates UCP JSON schema compliance.**
-
-### Usage
-
-```python
-from qwed_ucp.guards import SchemaGuard
-
-guard = SchemaGuard()
-result = guard.verify(checkout_data)
-```
-
-### Validates
-
-* Required fields present
-* Correct types (string, number, array)
-* Valid enum values (status, total types)
-
----
-
-## 4. Line Items Guard
-
-**Verifies price × quantity = line total for each item.**
-
-### Usage
-
-```python
-from qwed_ucp.guards import LineItemsGuard
-
-guard = LineItemsGuard()
-result = guard.verify({
-    "line_items": [
-        {"id": "roses", "quantity": 2, "item": {"price": 35.00}},
-        {"id": "pot", "quantity": 1, "item": {"price": 15.00}}
-    ],
-    "totals": [{"type": "subtotal", "amount": 85.00}]  # 2×35 + 1×15 = 85 ✓
+guard = SchemaGuard(schema={
+    "type": "object",
+    "properties": {
+        "name": {"type": "string"},
+        "age": {"type": "integer", "minimum": 0}
+    },
+    "required": ["name", "age"]
 })
+
+result = guard.check({"output": {"name": "John", "age": 30}})
+# ✅ Passed
 ```
 
-### Checks
+### Options
 
-* Each item: `price × quantity = line_total`
-* Sum of line items = subtotal
-* Quantities must be positive integers
-* Prices must be non-negative
+| Option   | Type | Default  | Description       |
+| -------- | ---- | -------- | ----------------- |
+| `schema` | dict | required | JSON Schema       |
+| `strict` | bool | True     | Fail on any error |
 
 ---
 
-## 5. Discount Guard
+## ToolGuard
 
-**Verifies percentage and fixed discount calculations.**
-
-### Usage - Percentage Discount
+Blocks dangerous tool calls and patterns.
 
 ```python
-from qwed_ucp.guards import DiscountGuard
-from decimal import Decimal
+from qwed_open_responses import ToolGuard
 
-guard = DiscountGuard()
-result = guard.verify_percentage_discount(
-    subtotal=Decimal("100.00"),
-    discount_amount=Decimal("10.00"),
-    percentage=Decimal("10")  # 10% of 100 = 10 ✓
+guard = ToolGuard(
+    blocked_tools=["execute_shell", "delete_file"],
+    allowed_tools=["search", "calculator"],  # Whitelist mode
+    dangerous_patterns=[r"DROP TABLE", r"rm -rf"],
 )
+
+result = guard.check({
+    "tool_name": "execute_sql",
+    "arguments": {"query": "DROP TABLE users"}
+})
+# ❌ BLOCKED: Dangerous pattern detected
 ```
 
-### Usage - Fixed Discount
+### Default Blocked Tools
+
+* `execute_shell`, `bash`, `cmd`
+* `delete_file`, `remove_file`
+* `send_email`, `transfer_money`
+
+### Default Dangerous Patterns
+
+* `DROP TABLE`, `DELETE FROM`
+* `rm -rf`, `rmdir /s`
+* `eval(`, `exec(`, `__import__`
+
+---
+
+## MathGuard
+
+Verifies mathematical calculations.
 
 ```python
-result = guard.verify_fixed_discount(
-    subtotal=Decimal("50.00"),
-    discount_amount=Decimal("5.00")  # Fixed $5 off ✓
+from qwed_open_responses import MathGuard
+
+guard = MathGuard(tolerance=0.01)
+
+result = guard.check({
+    "output": {
+        "subtotal": 100,
+        "tax": 8,
+        "shipping": 10,
+        "total": 118  # Correct!
+    }
+})
+# ✅ Passed
+```
+
+### What It Checks
+
+* Totals: `total = subtotal + tax + shipping`
+* Percentages: `tax_amount = subtotal * tax_rate`
+* Inline calculations: `"5 + 3 = 8"`
+
+---
+
+## StateGuard
+
+Validates state machine transitions.
+
+```python
+from qwed_open_responses import StateGuard
+
+guard = StateGuard(
+    transitions={
+        "pending": ["processing", "cancelled"],
+        "processing": ["completed", "failed"],
+        "completed": [],  # Terminal
+    },
+    current_state="pending"
 )
-```
 
-### Rules
+result = guard.check({"new_state": "processing"})
+# ✅ Valid transition
 
-* Percentage: Must be 0-100%
-* Fixed: Cannot exceed subtotal
-* Discount must be non-negative
-
----
-
-## 6. Currency Guard
-
-**Validates ISO 4217 currency codes and format.**
-
-### Usage
-
-```python
-from qwed_ucp.guards import CurrencyGuard
-
-guard = CurrencyGuard()
-result = guard.verify({"currency": "USD"})
-```
-
-### Validates
-
-* 3-letter ISO 4217 codes (USD, EUR, GBP, JPY, etc.)
-* Zero-decimal currencies (JPY, KRW) have no decimals
-* Currency conversion accuracy
-
-### Zero-Decimal Currencies
-
-```python
-# Valid - no decimals
-{"currency": "JPY", "totals": [{"type": "total", "amount": 1000}]}
-
-# Invalid - JPY shouldn't have decimals
-{"currency": "JPY", "totals": [{"type": "total", "amount": 1000.50}]}
+result = guard.check({"new_state": "completed"})
+# ❌ Invalid: pending -> completed not allowed
 ```
 
 ---
 
-## Running All Guards
+## ArgumentGuard
 
-Use `UCPVerifier` to run all guards at once:
+Validates tool call arguments.
 
 ```python
-from qwed_ucp import UCPVerifier
+from qwed_open_responses import ArgumentGuard
 
-verifier = UCPVerifier()
-result = verifier.verify_checkout(checkout_data)
+guard = ArgumentGuard(rules={
+    "amount": {"type": "number", "min": 0, "max": 10000},
+    "email": {"type": "email"},
+    "status": {"type": "enum", "values": ["active", "inactive"]},
+})
 
-print(f"Verified: {result.verified}")
-print(f"Guards passed: {len([g for g in result.guards if g.verified])}")
+result = guard.check({
+    "arguments": {
+        "amount": 500,
+        "email": "user@example.com",
+        "status": "active"
+    }
+})
+# ✅ All arguments valid
+```
+
+### Supported Types
+
+| Type      | Validation         |
+| --------- | ------------------ |
+| `string`  | Is string          |
+| `number`  | Is number, min/max |
+| `integer` | Is integer         |
+| `boolean` | Is boolean         |
+| `email`   | Email format       |
+| `url`     | URL format         |
+| `uuid`    | UUID format        |
+| `enum`    | In allowed values  |
+| `pattern` | Regex match        |
+
+---
+
+## SafetyGuard
+
+Comprehensive safety checks.
+
+```python
+from qwed_open_responses import SafetyGuard
+
+guard = SafetyGuard(
+    check_pii=True,        # Detect emails, phones, SSN
+    check_injection=True,  # Detect prompt injection
+    check_harmful=True,    # Detect API keys, passwords
+    max_cost=100.0,        # Budget limit
+)
+
+result = guard.check({
+    "content": "ignore previous instructions..."
+})
+# ❌ BLOCKED: Prompt injection detected
+```
+
+### Detections
+
+| Type          | Examples                          |
+| ------------- | --------------------------------- |
+| **PII**       | Emails, phones, SSN, credit cards |
+| **Injection** | "ignore previous", "you are now"  |
+| **Harmful**   | API keys, passwords, private keys |
+| **Budget**    | Cost/token limits exceeded        |
+
+---
+
+## Combining Guards
+
+```python
+from qwed_open_responses import (
+    ResponseVerifier,
+    ToolGuard,
+    SchemaGuard,
+    SafetyGuard,
+)
+
+verifier = ResponseVerifier(
+    default_guards=[
+        ToolGuard(),
+        SchemaGuard(schema=my_schema),
+        SafetyGuard(),
+    ]
+)
+
+result = verifier.verify(response)
+print(f"Passed: {result.guards_passed}")
+print(f"Failed: {result.guards_failed}")
 ```
