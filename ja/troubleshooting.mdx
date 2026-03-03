@@ -1,266 +1,182 @@
 ---
-sidebar_position: 6
+sidebar_position: 4
 title: Troubleshooting
-description: Troubleshoot QWED-UCP issues including Python version requirements (3.10+) and npm installation for Express middleware. Common errors and solutions included.
+description: Troubleshoot QWED-Legal installation issues (Z3 solver, holidays package) and DeadlineGuard problems with jurisdiction-specific holiday calculations.
 ---
 
-# Troubleshooting
-
-Common issues and solutions when using QWED-UCP.
-
----
+# Troubleshooting QWED-Legal
 
 ## Installation Issues
 
-### "No module named 'qwed_ucp'"
+### Z3 Solver Not Found
 
-**Cause:** Package not installed correctly
+**Error:**
 
-**Solutions:**
-
-1. **Check Python version** (requires 3.10+):
-   ```bash
-   python --version
-   ```
-
-2. **Install in correct environment:**
-   ```bash
-   pip install qwed-ucp
-   # or with virtual env
-   python -m venv venv
-   source venv/bin/activate  # or venv\Scripts\activate on Windows
-   pip install qwed-ucp
-   ```
-
-3. **Verify installation:**
-   ```bash
-   pip show qwed-ucp
-   python -c "from qwed_ucp import UCPVerifier; print('OK')"
-   ```
-
----
-
-### npm install fails for Express middleware
-
-**Cause:** Node.js version incompatibility
+```
+ImportError: No module named 'z3'
+```
 
 **Solution:**
 
 ```bash
-# Requires Node.js 18+
-node --version
+pip install z3-solver
+```
 
-# Install
-npm install qwed-ucp-middleware
+Note: The package is `z3-solver`, not `z3`.
+
+### Holidays Package Version
+
+**Error:**
+
+```
+AttributeError: module 'holidays' has no attribute 'country_holidays'
+```
+
+**Solution:**
+
+```bash
+pip install --upgrade holidays>=0.40
 ```
 
 ---
 
-## Verification Failures
+## DeadlineGuard Issues
 
-### "Total mismatch: expected $X, got $Y"
+### Unexpected Holiday Calculation
 
-**Cause:** Money Guard detected incorrect total calculation
+**Problem:** Deadline seems off by a few days.
 
-**Debug:**
+**Cause:** Different jurisdictions have different holidays.
+
+**Solution:**
 
 ```python
-from qwed_ucp.guards import MoneyGuard
-from decimal import Decimal
-
-guard = MoneyGuard()
-result = guard.verify(checkout)
-
-if not result.verified:
-    print(f"Expected total: {result.expected}")
-    print(f"Actual total: {result.actual}")
-    print(f"Difference: {result.difference}")
+# Be explicit about jurisdiction
+guard = DeadlineGuard(country="US", state="CA")  # California holidays
+guard = DeadlineGuard(country="GB")              # UK holidays
+guard = DeadlineGuard(country="IN")              # India holidays
 ```
 
-**Common causes:**
+### "Failed to parse dates" Error
 
-* Discount not subtracted
-* Tax calculated on wrong base
-* Rounding differences
+**Problem:**
 
-**Fix:** Use `Decimal` for monetary calculations:
+```
+Failed to parse dates: Unknown string format
+```
+
+**Solution:** Use ISO format or unambiguous dates:
 
 ```python
-from decimal import Decimal, ROUND_HALF_UP
+# ✅ Good
+guard.verify("2026-01-15", "30 days", "2026-02-14")
 
-subtotal = Decimal("100.00")
-discount = subtotal * Decimal("0.10")  # 10%
-tax = (subtotal - discount) * Decimal("0.0825")
-total = (subtotal - discount + tax).quantize(Decimal("0.01"), ROUND_HALF_UP)
+# ❌ Bad (ambiguous)
+guard.verify("01/02/2026", ...)  # Is this Jan 2 or Feb 1?
 ```
 
 ---
 
-### "Line item mismatch: qty × price ≠ line_total"
+## LiabilityGuard Issues
 
-**Cause:** Line Items Guard detected math error
+### Float Precision Errors
 
-**Debug:**
+**Problem:** Small differences in large calculations.
+
+**Cause:** Floating-point precision.
+
+**Solution:** LiabilityGuard uses `Decimal` internally. The default tolerance is 0.01%. Adjust if needed:
 
 ```python
-for item in checkout["line_items"]:
-    expected = item["quantity"] * item["item"]["price"]
-    print(f"Item: {item['id']}")
-    print(f"  {item['quantity']} × ${item['item']['price']} = ${expected}")
+guard = LiabilityGuard(tolerance_percent=0.001)  # Stricter
+guard = LiabilityGuard(tolerance_percent=0.1)    # More lenient
 ```
-
-**Common causes:**
-
-* Floating-point precision issues
-* Wrong quantity multiplied
-* Missing items in calculation
 
 ---
 
-### "Invalid currency: JPY amounts cannot have decimals"
+## ClauseGuard Issues
 
-**Cause:** Currency Guard detected invalid format
+### No Conflicts Detected (False Negative)
 
-**Zero-decimal currencies:**
+**Problem:** You expect a conflict but ClauseGuard doesn't find it.
 
-* JPY (Japanese Yen)
-* KRW (Korean Won)
-* VND (Vietnamese Dong)
+**Cause:** ClauseGuard uses heuristic pattern matching, not full NLP.
 
-**Fix:**
+**Current Limitations:**
+
+* Only detects termination-related conflicts
+* Limited to English text
+* Requires specific keyword patterns
+
+**Workaround:** For complex contracts, extract key terms manually:
 
 ```python
-# Wrong
-{"currency": "JPY", "amount": 1000.50}
-
-# Correct
-{"currency": "JPY", "amount": 1000}
+clauses = [
+    "Termination allowed after 30 days notice",  # Clear pattern
+    "Minimum term 90 days",                       # Clear pattern
+]
 ```
 
 ---
 
-### "Invalid state transition"
+## CitationGuard Issues
 
-**Cause:** State Guard detected invalid checkout flow
+### Valid Citation Marked Invalid
 
-**Valid transitions:**
+**Problem:** A real citation is flagged as invalid.
 
-```
-incomplete → ready_for_complete → completed
-                               → failed → cancelled
-```
+**Cause:** The reporter isn't in our list.
 
-**Invalid examples:**
+**Solution:** Check if the reporter is a valid Bluebook abbreviation. If it's a less common reporter, it may not be in our list. File an issue to add it:
+[https://github.com/QWED-AI/qwed-legal/issues](https://github.com/QWED-AI/qwed-legal/issues)
 
-* `completed → incomplete` (can't go back)
-* `cancelled → ready_for_complete` (can't resurrect)
+### Statute Citation Format
 
-**Fix:** Follow the state machine flow properly.
+**Problem:** `42 USC 1983` doesn't validate.
 
----
-
-## Middleware Issues
-
-### FastAPI middleware not intercepting requests
-
-**Check route configuration:**
+**Solution:** Use proper formatting with section symbol:
 
 ```python
-# Make sure middleware is added BEFORE routes
-app = FastAPI()
-app.add_middleware(QWEDUCPMiddleware)  # First
+# ✅ Correct
+guard.check_statute_citation("42 U.S.C. § 1983")
 
-@app.post("/checkout")  # Then routes
-async def checkout(): ...
-```
-
-**Check verify_paths:**
-
-```python
-app.add_middleware(
-    QWEDUCPMiddleware,
-    verify_paths=["/checkout", "/api/v1/checkout"]  # Must match your routes
-)
+# ❌ Missing section symbol
+guard.check_statute_citation("42 USC 1983")
 ```
 
 ---
 
-### Express middleware returns 500 instead of 422
+## General Issues
 
-**Check error handling:**
+### Import Errors
 
-```javascript
-app.use('/checkout', createQWEDUCPMiddleware({
-    onFailure: (error, req, res) => {
-        // Make sure this doesn't throw
-        res.status(422).json({
-            error: error.message
-        });
-    }
-}));
+**Problem:**
+
+```
+ImportError: cannot import name 'LegalGuard' from 'qwed_legal'
+```
+
+**Solution:**
+
+```bash
+pip install --upgrade qwed-legal
+```
+
+### Version Mismatch with MCP
+
+**Problem:** MCP tools don't show legal verification options.
+
+**Solution:** Reinstall qwed-mcp after installing qwed-legal:
+
+```bash
+pip install qwed-legal
+pip install --upgrade qwed-mcp
 ```
 
 ---
 
-### CORS issues with middleware
+## Still Stuck?
 
-**Solution for FastAPI:**
-
-```python
-from fastapi.middleware.cors import CORSMiddleware
-
-# Add CORS BEFORE QWED-UCP
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-app.add_middleware(QWEDUCPMiddleware)
-```
-
----
-
-## Performance Issues
-
-### Verification is slow
-
-**Optimize with caching:**
-
-```python
-from functools import lru_cache
-
-@lru_cache(maxsize=1000)
-def verify_cached(checkout_hash: str, checkout_json: str):
-    return verifier.verify_checkout(json.loads(checkout_json))
-```
-
-**Skip unchanged checkouts:**
-
-```python
-# Calculate hash first
-checkout_hash = hash(frozenset(checkout.items()))
-if checkout_hash in verified_cache:
-    return verified_cache[checkout_hash]
-```
-
----
-
-## Common Errors Reference
-
-| Error Message               | Guard     | Likely Cause            | Fix                  |
-| --------------------------- | --------- | ----------------------- | -------------------- |
-| "Total mismatch"            | Money     | Wrong total calculation | Recalculate total    |
-| "Line item mismatch"        | LineItems | qty × price error       | Check each line      |
-| "Invalid currency"          | Currency  | Bad format              | Check ISO 4217       |
-| "Invalid transition"        | State     | Wrong state flow        | Follow state machine |
-| "Schema validation failed"  | Schema    | Missing fields          | Check UCP schema     |
-| "Discount exceeds subtotal" | Discount  | Over 100% off           | Cap discount         |
-
----
-
-## Getting Help
-
-1. **GitHub Issues:** [github.com/QWED-AI/qwed-ucp/issues](https://github.com/QWED-AI/qwed-ucp/issues)
-2. **Documentation:** [docs.qwedai.com/ucp](https://docs.qwedai.com/docs/ucp/overview)
-3. **UCP Protocol:** [developers.google.com/commerce/ucp](https://developers.google.com/commerce/ucp)
+* [GitHub Issues](https://github.com/QWED-AI/qwed-legal/issues)
+* [Discord Community](https://discord.gg/qwed)
+* Email: support@qwedai.com
