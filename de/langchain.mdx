@@ -1,121 +1,160 @@
 ---
-sidebar_position: 1
+sidebar_position: 3
 title: LangChain Integration
-description: Use QWED with LangChain via QWEDTool for verified AI chains and agents. Includes verification callbacks for math, logic, and code validation in your workflows.
+description: Integrate QWED with LangChain via QWEDCallbackHandler. Verify agent actions with configurable guards for math, logic, code, and schema validation.
 ---
 
 # LangChain Integration
 
-Use QWED with LangChain for verified AI chains and agents.
+QWED Open Responses integrates with LangChain via a callback handler.
+
+---
 
 ## Installation
 
 ```bash
-pip install qwed langchain
+pip install qwed-open-responses[langchain]
 ```
+
+---
 
 ## Quick Start
 
 ```python
-from qwed_sdk.langchain import QWEDTool, QWEDVerificationCallback
+from langchain.agents import create_react_agent
+from qwed_open_responses.middleware.langchain import QWEDCallbackHandler
+from qwed_open_responses import ToolGuard, SafetyGuard
 
-# Add QWED as a tool
-from langchain.agents import initialize_agent, AgentType
-from langchain.llms import OpenAI
-
-agent = initialize_agent(
-    tools=[QWEDTool()],
-    llm=OpenAI(),
-    agent=AgentType.ZERO_SHOT_REACT_DESCRIPTION,
+# Create callback with guards
+callback = QWEDCallbackHandler(
+    guards=[ToolGuard(), SafetyGuard()],
+    block_on_failure=True,
 )
 
-result = agent.run("Verify: Is 2+2 equal to 5?")
-# Agent uses QWED tool to verify and corrects the answer
+# Add to agent
+agent = create_react_agent(
+    llm=llm,
+    tools=tools,
+    callbacks=[callback],
+)
+
+# Agent actions are now verified!
+result = agent.invoke({"input": "Search for weather"})
 ```
 
-## Available Components
+---
 
-### QWEDTool
+## Configuration
 
-General-purpose verification tool:
+### QWEDCallbackHandler Options
+
+| Option             | Type     | Default | Description                |
+| ------------------ | -------- | ------- | -------------------------- |
+| `guards`           | list     | `[]`    | Guards to apply            |
+| `block_on_failure` | bool     | `True`  | Raise exception on failure |
+| `on_block`         | callable | `None`  | Callback when blocked      |
+| `verbose`          | bool     | `False` | Print verification results |
+
+---
+
+## Example: Blocking Dangerous Tools
 
 ```python
-from qwed_sdk.langchain import QWEDTool
+from qwed_open_responses import ToolGuard
 
-tool = QWEDTool(api_key="qwed_...")
-print(tool.run("2+2=4"))
-# ✅ VERIFIED: The statement is correct
+# Only allow safe tools
+callback = QWEDCallbackHandler(
+    guards=[
+        ToolGuard(
+            allowed_tools=["search", "calculator", "weather"],
+            blocked_tools=["execute_shell", "write_file"],
+        )
+    ]
+)
+
+# If agent tries to call execute_shell:
+# ToolCallBlocked: Tool call blocked: BLOCKED: Tool 'execute_shell' is not allowed
 ```
 
-### Specialized Tools
+---
+
+## Example: Safety Checks
 
 ```python
-from qwed_sdk.langchain import QWEDMathTool, QWEDLogicTool, QWEDCodeTool
+from qwed_open_responses import SafetyGuard
 
+callback = QWEDCallbackHandler(
+    guards=[
+        SafetyGuard(
+            check_pii=True,
+            check_injection=True,
+            max_cost=50.0,
+        )
+    ]
+)
+```
+
+---
+
+## Handling Blocked Actions
+
+```python
+from qwed_open_responses.middleware.langchain import ToolCallBlocked
+
+try:
+    result = agent.invoke({"input": "Delete all files"})
+except ToolCallBlocked as e:
+    print(f"Action blocked: {e.result.block_reason}")
+    # Log the attempted action
+    log_security_event(e.action, e.result)
+```
+
+---
+
+## Verification Summary
+
+```python
+# After running agent
+summary = callback.get_verification_summary()
+print(f"Total verifications: {summary['total_verifications']}")
+print(f"Passed: {summary['passed']}")
+print(f"Failed: {summary['failed']}")
+print(f"Success rate: {summary['success_rate']:.1%}")
+```
+
+---
+
+## Full Example
+
+```python
+from langchain_openai import ChatOpenAI
+from langchain.agents import create_react_agent, AgentExecutor
+from langchain.tools import Tool
+from qwed_open_responses.middleware.langchain import QWEDCallbackHandler
+from qwed_open_responses import ToolGuard, MathGuard, SafetyGuard
+
+# Define tools
 tools = [
-    QWEDMathTool(),   # Math expressions
-    QWEDLogicTool(),  # QWED-Logic DSL
-    QWEDCodeTool(),   # Code security
+    Tool(name="search", func=search_func, description="Search the web"),
+    Tool(name="calculator", func=calc_func, description="Do math"),
 ]
-```
 
-### QWEDVerificationCallback
-
-Auto-verify all LLM outputs:
-
-```python
-from langchain.chains import LLMChain
-from qwed_sdk.langchain import QWEDVerificationCallback
-
-callback = QWEDVerificationCallback(
-    verify_math=True,
-    verify_code=True,
-    log_results=True,
+# Create verified callback
+callback = QWEDCallbackHandler(
+    guards=[
+        ToolGuard(allowed_tools=["search", "calculator"]),
+        MathGuard(),
+        SafetyGuard(),
+    ],
+    verbose=True,
 )
 
-chain = LLMChain(
-    llm=OpenAI(),
-    prompt=prompt,
-    callbacks=[callback]
-)
+# Create agent
+llm = ChatOpenAI(model="gpt-4")
+agent = create_react_agent(llm, tools, prompt)
+executor = AgentExecutor(agent=agent, tools=tools, callbacks=[callback])
 
-result = chain.run("Calculate 15% of 200")
-# [QWED] ✅ MATH: verified=True
+# Run with verification
+result = executor.invoke({"input": "What is 15% of 200?"})
+# [QWED] Tool: calculator -> [OK] Verified (3 guards passed)
 ```
-
-### QWEDVerifiedChain
-
-Wrap any chain with verification:
-
-```python
-from qwed_sdk.langchain import QWEDVerifiedChain
-
-base_chain = LLMChain(llm=llm, prompt=prompt)
-verified_chain = QWEDVerifiedChain(base_chain, auto_correct=True)
-
-result = verified_chain.run("What is 2+2?")
-print(result.output)    # "4"
-print(result.verified)  # True
-```
-
-## LCEL Integration
-
-Use with LangChain Expression Language:
-
-```python
-from langchain_core.runnables import RunnableLambda
-
-def verify_output(text):
-    from qwed_sdk import QWEDClient
-    client = QWEDClient()
-    result = client.verify(text)
-    return text if result.verified else f"[UNVERIFIED] {text}"
-
-chain = prompt | llm | RunnableLambda(verify_output)
-```
-
-## Best Practices
-
-1. **Use callbacks for monitoring** — Track verification rates
-2. **Use tools for agent autonomy** — Let agents verify themselves
-3. **Use wrappers for guarantees** — Ensure all outputs are verified
