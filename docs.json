@@ -383,5 +383,13 @@
   "banner": {
     "content": "⭐ If you find QWED helpful, consider [giving us a star on GitHub](https://github.com/QWED-AI/qwed-verification)!",
     "dismissible": true
+  },
+  "integrations": {
+    "gtm": {
+      "tagId": "GTM-WFWSMKGZ"
+    },
+    "intercom": {
+      "appId": "q2zprv83"
+    }
   }
 }
