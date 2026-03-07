@@ -370,5 +370,6 @@
         ]
       }
     ]
-  }
+  },
+  "description": "Official documentation for QWED. Learn how to integrate model-agnostic deterministic verification for LLMs using formal symbolic safety rails."
 }
