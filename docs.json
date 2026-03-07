@@ -376,8 +376,67 @@
             "href": "/integrations/llamaindex"
           }
         ]
+      },
+      {
+        "header": "Legal",
+        "items": [
+          {
+            "label": "License",
+            "href": "https://qwedai.com/license"
+          },
+          {
+            "label": "Terms and condition",
+            "href": "https://qwedai.com/terms"
+          },
+          {
+            "label": "Privacy policy",
+            "href": "https://qwedai.com/privacy"
+          },
+          {
+            "label": "Mission and Vision",
+            "href": "https://qwedai.com/vision"
+          }
+        ]
+      },
+      {
+        "header": "Ecosystem",
+        "items": [
+          {
+            "label": "Qwed UCP",
+            "href": "/ucp/overview"
+          },
+          {
+            "label": "Qwed Open Responses",
+            "href": "/open-responses/overview"
+          },
+          {
+            "label": "Qwed Finance",
+            "href": "/finance/overview"
+          },
+          {
+            "label": "Qwed Legal",
+            "href": "/legal/overview"
+          },
+          {
+            "label": "Qwed Tax",
+            "href": "/tax/overview"
+          },
+          {
+            "label": "Qwed Infra",
+            "href": "/infra/overview"
+          },
+          {
+            "label": "Qwed MCP",
+            "href": "/mcp/overview"
+          },
+          {
+            "label": "Qwed Learning",
+            "href": "https://github.com/QWED-AI/qwed-learning"
+          }
+        ]
       }
-    ]
+    ],
+    "copyright": "© 2026 QWED AI. All rights reserved."
   },
   "description": "Official documentation for QWED. Learn how to integrate model-agnostic deterministic verification for LLMs using formal symbolic safety rails.",
   "banner": {
