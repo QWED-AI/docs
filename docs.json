@@ -391,5 +391,8 @@
     "intercom": {
       "appId": "q2zprv83"
     }
+  },
+  "seo": {
+    "indexing": "all"
   }
 }
