@@ -332,19 +332,19 @@
         "items": [
           {
             "label": "Python",
-            "href": "/sdks/python.mdx"
+            "href": "/sdks/python"
           },
           {
             "label": "Go",
-            "href": "/sdks/go.mdx"
+            "href": "/sdks/go"
           },
           {
             "label": "Typescript",
-            "href": "/sdks/typescript.mdx"
+            "href": "/sdks/typescript"
           },
           {
             "label": "Rust",
-            "href": "/sdks/rust.mdx"
+            "href": "/sdks/rust"
           }
         ]
       },
@@ -353,15 +353,15 @@
         "items": [
           {
             "label": "CrewAI",
-            "href": "/integrations/crewai.mdx"
+            "href": "/integrations/crewai"
           },
           {
             "label": "LangChain",
-            "href": "/integrations/langchain.mdx"
+            "href": "/integrations/langchain"
           },
           {
             "label": "LlamaIndex",
-            "href": "/integrations/llamaindex.mdx"
+            "href": "/integrations/llamaindex"
           }
         ]
       }

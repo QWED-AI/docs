@@ -10,32 +10,21 @@ QWED's architecture separates **untrusted LLM translation** from **deterministic
 
 ## Core Principle
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                    QWED VERIFICATION FLOW                       │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                 │
-│   User Input        LLM Translator      Symbolic Verifier       │
-│   ───────────       ─────────────       ─────────────────       │
-│                                                                 │
-│   "What is         ┌──────────┐        ┌──────────────┐        │
-│    15% of 200?"    │          │        │              │        │
-│         │          │  LLM     │        │   SymPy /    │        │
-│         └─────────►│  (GPT,   │───────►│   Z3 /       │        │
-│                    │  Claude) │        │   CrossHair  │        │
-│                    │          │        │              │        │
-│                    └──────────┘        └──────────────┘        │
-│                         ▲                     │                 │
-│                    UNTRUSTED             DETERMINISTIC          │
-│                   (can hallucinate)       (100% correct)        │
-│                                               │                 │
-│                                               ▼                 │
-│                                        ┌──────────────┐        │
-│                                        │  VERIFIED    │        │
-│                                        │  or REJECTED │        │
-│                                        └──────────────┘        │
-│                                                                 │
-└─────────────────────────────────────────────────────────────────┘
+```mermaid
+flowchart LR
+    I[User input\n"What is 15% of 200?"] --> L[LLM translator\nGPT / Claude / Gemini]
+    L --> S[Symbolic verifier\nSymPy / Z3 / CrossHair]
+    S --> R[Verification decision\nVerified or rejected]
+
+    L -. Untrusted, can hallucinate .-> LU[Probabilistic stage]
+    S -. Deterministic proof .-> SD[Trusted stage]
+
+    classDef untrusted fill:#fff4e5,stroke:#f59e0b,color:#92400e;
+    classDef trusted fill:#ecfeff,stroke:#06b6d4,color:#155e75;
+    classDef result fill:#ecfdf5,stroke:#22c55e,color:#166534;
+    class L,LU untrusted;
+    class S,SD trusted;
+    class R result;
 ```
 
 ---
@@ -44,89 +33,63 @@ QWED's architecture separates **untrusted LLM translation** from **deterministic
 
 ### Layer 1: API Gateway
 
-```
-┌────────────────────────────────────────┐
-│           API GATEWAY                  │
-├────────────────────────────────────────┤
-│  • Authentication (API Key / JWT)      │
-│  • Rate Limiting (per-key limits)      │
-│  • Request Routing                     │
-│  • TLS Termination                     │
-└────────────────────────────────────────┘
-                   │
-                   ▼
+```mermaid
+flowchart TB
+    A[API gateway] --> T[Translation layer]
+    A1[Authentication\nAPI key or JWT] --> A
+    A2[Rate limiting\nper-key limits] --> A
+    A3[Request routing] --> A
+    A4[TLS termination] --> A
 ```
 
 ### Layer 2: Translation Layer (Untrusted)
 
-```
-┌────────────────────────────────────────┐
-│        TRANSLATION LAYER               │
-├────────────────────────────────────────┤
-│                                        │
-│  ┌──────────┐  ┌──────────┐           │
-│  │  GPT-4   │  │  Claude  │  Multi-LLM│
-│  └──────────┘  └──────────┘  Consensus│
-│        │              │               │
-│        └──────┬───────┘               │
-│               │                        │
-│               ▼                        │
-│  ┌──────────────────────┐             │
-│  │  Symbolic Structure  │             │
-│  │  (ReasoningAST)      │             │
-│  └──────────────────────┘             │
-│                                        │
-│  ⚠️  UNTRUSTED OUTPUT                  │
-│     (may contain hallucinations)       │
-│                                        │
-└────────────────────────────────────────┘
-                   │
-                   ▼
+```mermaid
+flowchart TB
+    G[GPT-4] --> C[Consensus translator]
+    H[Claude] --> C
+    M[Gemini or local model] --> C
+    C --> RS[Symbolic structure\nReasoningAST]
+    RS --> U[Untrusted intermediate output]
+
+    classDef untrusted fill:#fff4e5,stroke:#f59e0b,color:#92400e;
+    class C,RS,U untrusted;
 ```
 
 ### Layer 3: Verification Engine (Deterministic)
 
-```
-┌────────────────────────────────────────┐
-│        VERIFICATION ENGINES            │
-├────────────────────────────────────────┤
-│                                        │
-│  ┌─────────┐ ┌─────────┐ ┌─────────┐  │
-│  │  Math   │ │  Logic  │ │  Code   │  │
-│  │ (SymPy) │ │  (Z3)   │ │(CrossH) │  │
-│  └─────────┘ └─────────┘ └─────────┘  │
-│                                        │
-│  ┌─────────┐ ┌─────────┐ ┌─────────┐  │
-│  │   SQL   │ │  Stats  │ │  Facts  │  │
-│  │(SQLGlot)│ │ (SciPy) │ │  (KB)   │  │
-│  └─────────┘ └─────────┘ └─────────┘  │
-│                                        │
-│  ┌─────────┐ ┌─────────┐ ┌─────────┐  │
-│  │  Taint  │ │ Schema  │ │  Graph  │  │
-│  │(AST)    │ │ (JSON)  │ │ (Facts) │  │
-│  └─────────┘ └─────────┘ └─────────┘  │
-│                                        │
-│  ✅ DETERMINISTIC OUTPUT               │
-│     (mathematically proven)            │
-│                                        │
-└────────────────────────────────────────┘
-                   │
-                   ▼
+```mermaid
+flowchart TB
+    IN[Structured claim] --> MATH[Math\nSymPy]
+    IN --> LOGIC[Logic\nZ3]
+    IN --> CODE[Code\nCrossHair]
+    IN --> SQL[SQL\nSQLGlot]
+    IN --> STATS[Stats\nSciPy]
+    IN --> FACTS[Facts\nKnowledge base]
+    IN --> TAINT[Taint\nAST]
+    IN --> SCHEMA[Schema\nJSON Schema]
+    IN --> GRAPH[Graph fact\nTriple checks]
+    MATH --> OUT[Deterministic verdict]
+    LOGIC --> OUT
+    CODE --> OUT
+    SQL --> OUT
+    STATS --> OUT
+    FACTS --> OUT
+    TAINT --> OUT
+    SCHEMA --> OUT
+    GRAPH --> OUT
+
+    classDef trusted fill:#ecfeff,stroke:#06b6d4,color:#155e75;
+    class MATH,LOGIC,CODE,SQL,STATS,FACTS,TAINT,SCHEMA,GRAPH,OUT trusted;
 ```
 
 ### Layer 4: Attestation & Audit
 
-```
-┌────────────────────────────────────────┐
-│        ATTESTATION LAYER               │
-├────────────────────────────────────────┤
-│                                        │
-│  • Cryptographic signatures (JWT)      │
-│  • Immutable audit logs                │
-│  • Compliance exports (SOC2, ISO)      │
-│  • Verification chain                  │
-│                                        │
-└────────────────────────────────────────┘
+```mermaid
+flowchart LR
+    V[Verification verdict] --> J[JWT signature]
+    J --> A[Immutable audit log]
+    A --> C[Compliance export\nSOC2 / ISO]
 ```
 
 **Implementation:** The `AttestationGuard` signs every verification result with a private key, creating a verifiable audit trail.
