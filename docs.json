@@ -32,21 +32,20 @@
             "tab": "Getting Started",
             "groups": [
               {
-                "group": "Introduction",
+                "group": "Start here",
                 "pages": [
                   "intro",
-                  "architecture",
-                  "faq",
-                  "whitepaper"
+                  "getting-started/installation",
+                  "getting-started/quickstart"
                 ]
               },
               {
-                "group": "Quick Start",
+                "group": "Build your mental model",
                 "pages": [
-                  "getting-started/installation",
-                  "getting-started/quickstart",
                   "getting-started/concepts",
-                  "getting-started/llm-configuration"
+                  "getting-started/llm-configuration",
+                  "architecture",
+                  "faq"
                 ]
               },
               {
@@ -174,11 +173,19 @@
             "tab": "Integrations",
             "groups": [
               {
-                "group": "AI Frameworks",
+                "group": "Framework integrations",
                 "pages": [
                   "integrations/langchain",
                   "integrations/llamaindex",
                   "integrations/crewai"
+                ]
+              },
+              {
+                "group": "Protocol quickstarts",
+                "pages": [
+                  "open-responses/overview",
+                  "ucp/overview",
+                  "mcp/overview"
                 ]
               }
             ]
@@ -277,6 +284,7 @@
                 "group": "Specifications",
                 "pages": [
                   "specs/overview",
+                  "whitepaper",
                   "specs/qwed-spec",
                   "specs/attestation",
                   "specs/agent",
