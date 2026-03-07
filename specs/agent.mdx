@@ -68,25 +68,19 @@ QWED-Agent establishes:
 
 ### 2.1 Verification Flow
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                    AGENT EXECUTION LOOP                     │
-├─────────────────────────────────────────────────────────────┤
-│                                                             │
-│  ┌──────────┐    ┌──────────────┐    ┌──────────────┐      │
-│  │  Agent   │───▶│ QWED Gate    │───▶│  Execution   │      │
-│  │  Plans   │    │ (Verify)     │    │  (If Passed) │      │
-│  └──────────┘    └──────────────┘    └──────────────┘      │
-│       │                │                    │               │
-│       │                ▼                    │               │
-│       │         ┌──────────────┐           │               │
-│       │         │  Attestation │           │               │
-│       │         │  (Record)    │           │               │
-│       │         └──────────────┘           │               │
-│       │                                    │               │
-│       ◀────────────────────────────────────┘               │
-│                                                             │
-└─────────────────────────────────────────────────────────────┘
+```mermaid
+flowchart LR
+    P[Agent plans action] --> G[QWED gate verifies action]
+    G -->|Pass| E[Execution]
+    G --> A[Attestation record]
+    E --> P
+
+    classDef untrusted fill:#fff4e5,stroke:#f59e0b,color:#92400e;
+    classDef trusted fill:#ecfeff,stroke:#06b6d4,color:#155e75;
+    classDef result fill:#ecfdf5,stroke:#22c55e,color:#166534;
+    class P untrusted;
+    class G,A trusted;
+    class E result;
 ```
 
 ### 2.2 Verification Types for Agents
@@ -102,20 +96,15 @@ QWED-Agent establishes:
 
 ### 2.3 Decision Matrix
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│              QWED-AGENT DECISION MATRIX                     │
-├──────────────┬──────────────┬──────────────────────────────┤
-│ Verification │ Risk Level   │ Action                       │
-├──────────────┼──────────────┼──────────────────────────────┤
-│ VERIFIED     │ Low          │ Execute immediately          │
-│ VERIFIED     │ High         │ Execute with attestation     │
-│ FAILED       │ Any          │ Block + notify principal     │
-│ CORRECTED    │ Low          │ Execute corrected version    │
-│ CORRECTED    │ High         │ Request principal approval   │
-│ UNCERTAIN    │ Any          │ Request principal approval   │
-└──────────────┴──────────────┴──────────────────────────────┘
-```
+| Verification | Risk level | Action |
+|---|---|---|
+| VERIFIED | Low | Execute immediately |
+| VERIFIED | High | Execute with attestation |
+| FAILED | Any | Block and notify principal |
+| CORRECTED | Low | Execute corrected version |
+| CORRECTED | High | Request principal approval |
+| UNCERTAIN | Any | Request principal approval |
+
 
 ---
 

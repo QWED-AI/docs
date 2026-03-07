@@ -64,15 +64,14 @@ The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT", "SHOULD", "S
 
 ### 2.1 Core Principle: LLM as Untrusted Translator
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                                                             │
-│  User Query → [LLM] → Symbolic Form → [QWED] → Verified    │
-│                 ↑                        ↑                  │
-│           Probabilistic            Deterministic            │
-│           (untrusted)              (trusted)                │
-│                                                             │
-└─────────────────────────────────────────────────────────────┘
+```mermaid
+flowchart LR
+    U[User query] --> L[LLM translator]
+    L --> S[Symbolic form]
+    S --> Q[QWED verifier]
+    Q --> V[Verified result]
+    L -. Probabilistic / untrusted .-> P[No trust guarantee]
+    Q -. Deterministic / trusted .-> D[Proof-backed decision]
 ```
 
 QWED treats LLMs as **untrusted translators**. The LLM's role is to convert natural language into a symbolic representation that can be verified by deterministic engines. The verification step provides the guarantee.
@@ -102,23 +101,15 @@ Trust Level 3: Symbolic Engine      (trusted, deterministic)
 
 ### 3.1 Protocol Layers
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│  Layer 4: Application                                       │
-│  (ChatGPT plugins, Enterprise apps, Agent frameworks)       │
-├─────────────────────────────────────────────────────────────┤
-│  Layer 3: SDK / Client Libraries                            │
-│  (Python, TypeScript, Go, Rust)                             │
-├─────────────────────────────────────────────────────────────┤
-│  Layer 2: QWED Protocol (HTTP/JSON)                         │
-│  ← THIS SPECIFICATION →                                     │
-├─────────────────────────────────────────────────────────────┤
-│  Layer 1: Verification Engines                              │
-│  (SymPy, Z3, Pandas, SQLGlot, AST)                          │
-├─────────────────────────────────────────────────────────────┤
-│  Layer 0: Symbolic Computation                              │
-│  (Mathematical foundations)                                  │
-└─────────────────────────────────────────────────────────────┘
+```mermaid
+flowchart TB
+    L4[Layer 4: Applications\nChat plugins, enterprise apps, agent frameworks]
+    L3[Layer 3: SDKs\nPython, TypeScript, Go, Rust]
+    L2[Layer 2: QWED protocol\nHTTP/JSON - this specification]
+    L1[Layer 1: Verification engines\nSymPy, Z3, Pandas, SQLGlot, AST]
+    L0[Layer 0: Symbolic computation\nMathematical foundations]
+
+    L4 --> L3 --> L2 --> L1 --> L0
 ```
 
 ### 3.2 Request Flow
@@ -819,4 +810,3 @@ The reference implementation is available at:
 ---
 
 *© 2025 QWED-AI. This specification is released under Apache 2.0 License.*
-
