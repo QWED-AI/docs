@@ -39,16 +39,21 @@ Choose your LLM based on your needs:
 
 **QWED** (Query-Wise Engine for Determinism) is the **verification protocol for AI**. It provides deterministic verification of LLM outputs using symbolic engines like Z3, SymPy, and AST analysis.
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                    QWED VERIFICATION FLOW                   │
-├─────────────────────────────────────────────────────────────┤
-│                                                             │
-│  User Query ──▶ LLM (Translator) ──▶ QWED (Verifier) ──▶ ✅ │
-│                     ↓ (Probabilistic)    ↓ (Deterministic)  │
-│                  "2+2=5"              "CORRECTED: 4"        │
-│                                                             │
-└─────────────────────────────────────────────────────────────┘
+```mermaid
+flowchart LR
+    U[User query] --> L[LLM translator]
+    L --> Q[QWED verifier]
+    Q --> V[✅ Verified or corrected response]
+
+    L -. Probabilistic output .-> E1[Example: "2+2=5"]
+    Q -. Deterministic verification .-> E2[Example: "Corrected: 4"]
+
+    classDef untrusted fill:#fff4e5,stroke:#f59e0b,color:#92400e;
+    classDef trusted fill:#ecfeff,stroke:#06b6d4,color:#155e75;
+    classDef result fill:#ecfdf5,stroke:#22c55e,color:#166534;
+    class L,E1 untrusted;
+    class Q,E2 trusted;
+    class V result;
 ```
 
 ## Why QWED?
