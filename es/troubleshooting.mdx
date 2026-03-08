@@ -1,229 +1,182 @@
 ---
-sidebar_position: 7
+sidebar_position: 4
 title: Troubleshooting
-description: Debug QWED integration issues including Invalid API Key errors and unexpected verification failures. Step-by-step troubleshooting guide with solutions.
+description: Troubleshoot QWED-Legal installation issues (Z3 solver, holidays package) and DeadlineGuard problems with jurisdiction-specific holiday calculations.
 ---
 
-# Troubleshooting Guide
+# Troubleshooting QWED-Legal
 
-Common issues and how to fix them.
+## Installation Issues
 
-## Authentication Errors
+### Z3 Solver Not Found
 
-### Problem: "Invalid API Key"
+**Error:**
 
-**Symptoms:**
-
-```python
-AuthenticationError: Invalid API key
+```
+ImportError: No module named 'z3'
 ```
 
-**Solutions:**
+**Solution:**
 
-1. **Check API key is correct:**
-   ```bash
-   echo $QWED_API_KEY
-   ```
-
-2. **Verify key is active:**
-   * Log into dashboard
-   * Check API keys page
-   * Regenerate if needed
-
-3. **Check for whitespace:**
-   ```python
-   api_key = os.getenv("QWED_API_KEY").strip()
-   ```
-
----
-
-## Verification Failures
-
-### Problem: Unexpected Verification Failures
-
-**Symptoms:**
-
-```python
-result.verified == False  # But should be True
+```bash
+pip install z3-solver
 ```
 
-**Debug steps:**
+Note: The package is `z3-solver`, not `z3`.
 
-1. **Enable verbose mode:**
-   ```python
-   client = QWEDClient(api_key="...", verbose=True)
-   result = client.verify("2+2=4")
-   ```
+### Holidays Package Version
 
-2. **Check trace:**
-   ```python
-   result = client.verify("2+2=4", return_trace=True)
-   print(json.dumps(result.trace, indent=2))
-   ```
+**Error:**
 
-3. **Verify input format:**
-   ```python
-   # Ensure input is well-formed
-   query = "Calculate 2+2"  # Natural language
-   # Not: "2 + 2"  # Might fail
-   ```
-
----
-
-## Performance Issues
-
-### Problem: Slow Response Times
-
-**Symptoms:**
-Response time > 5 seconds
-
-**Solutions:**
-
-1. **Use batch processing:**
-   ```python
-   # ❌ Slow
-   for q in queries:
-       result = client.verify(q)
-
-   # ✅ Fast
-   results = client.verify_batch([
-       BatchItem(query=q) for q in queries
-   ])
-   ```
-
-2. **Increase timeout:**
-   ```python
-   client = QWEDClient(api_key="...", timeout=60)
-   ```
-
-3. **Check network latency:**
-   ```bash
-   ping api.qwedai.com
-   ```
-
----
-
-## Quota Issues
-
-### Problem: "Quota Exceeded"
-
-**Symptoms:**
-
-```python
-QuotaExceededError: API quota exceeded
+```
+AttributeError: module 'holidays' has no attribute 'country_holidays'
 ```
 
-**Solutions:**
+**Solution:**
 
-1. **Check quota status:**
-   ```python
-   status = client.get_quota_status()
-   print(f"Used: {status.used}, Remaining: {status.remaining}")
-   ```
-
-2. **Upgrade plan:**
-   * Visit https://qwedai.com/pricing
-   * Contact sales for enterprise
-
-3. **Implement rate limiting:**
-   ```python
-   from time import sleep
-
-   for query in queries:
-       result = client.verify(query)
-       sleep(0.1)  # 10 req/sec max
-   ```
+```bash
+pip install --upgrade holidays>=0.40
+```
 
 ---
 
-## Integration Issues
+## DeadlineGuard Issues
 
-### Problem: Pages Still Showing 404
+### Unexpected Holiday Calculation
 
-**症 Symptoms:**
-"Page Not Found" on integration pages
+**Problem:** Deadline seems off by a few days.
 
-**Solutions:**
+**Cause:** Different jurisdictions have different holidays.
 
-1. **Use correct URL format:**
-   ```
-   ❌ docs.qwedai.com/integration/getting-started
-   ✅ docs.qwedai.com/docs/integration/getting-started
-   ```
+**Solution:**
 
-2. **Hard refresh:**
-   * Windows: Ctrl + Shift + R
-   * Mac: Cmd + Shift + R
+```python
+# Be explicit about jurisdiction
+guard = DeadlineGuard(country="US", state="CA")  # California holidays
+guard = DeadlineGuard(country="GB")              # UK holidays
+guard = DeadlineGuard(country="IN")              # India holidays
+```
 
-3. **Check deployment:**
-   * Visit https://github.com/QWED-AI/qwed-enterprise/actions
-   * Verify latest deployment succeeded
+### "Failed to parse dates" Error
 
----
+**Problem:**
 
-## Error Code Reference
+```
+Failed to parse dates: Unknown string format
+```
 
-| Error Code       | Meaning         | Solution             |
-| ---------------- | --------------- | -------------------- |
-| `AUTH_001`       | Invalid API key | Check/regenerate key |
-| `AUTH_002`       | Expired key     | Renew API key        |
-| `QUOTA_001`      | Quota exceeded  | Upgrade plan         |
-| `TIMEOUT_001`    | Request timeout | Increase timeout     |
-| `VALIDATION_001` | Invalid input   | Check input format   |
+**Solution:** Use ISO format or unambiguous dates:
 
----
+```python
+# ✅ Good
+guard.verify("2026-01-15", "30 days", "2026-02-14")
 
-## Getting Help
-
-### Self-Service:
-
-1. **Check logs:**
-   ```python
-   import logging
-   logging.basicConfig(level=logging.DEBUG)
-   ```
-
-2. **Run test suite:**
-   ```bash
-   python test_qwed_integration.py
-   ```
-
-3. **Search documentation:**
-   * https://docs.qwedai.com
-
-### Community Support:
-
-* 💬 [GitHub Discussions](https://github.com/QWED-AI/qwed-verification/discussions)
-* 🐛 [Report Bug](https://github.com/QWED-AI/qwed-verification/issues)
-
-### Enterprise Support:
-
-* 📧 Email: support@qwedai.com
-* 💼 Slack Connect (Enterprise customers)
-* 📞 Emergency Hotline (Enterprise Pro+)
+# ❌ Bad (ambiguous)
+guard.verify("01/02/2026", ...)  # Is this Jan 2 or Feb 1?
+```
 
 ---
 
-## Debug Checklist
+## LiabilityGuard Issues
 
-When troubleshooting:
+### Float Precision Errors
 
-* [ ] Check error message carefully
-* [ ] Enable verbose/debug mode
-* [ ] Review logs
-* [ ] Test with simple query
-* [ ] Check network connectivity
-* [ ] Verify API key
-* [ ] Check quota status
-* [ ] Review recent code changes
-* [ ] Test in isolation
-* [ ] Search documentation
+**Problem:** Small differences in large calculations.
+
+**Cause:** Floating-point precision.
+
+**Solution:** LiabilityGuard uses `Decimal` internally. The default tolerance is 0.01%. Adjust if needed:
+
+```python
+guard = LiabilityGuard(tolerance_percent=0.001)  # Stricter
+guard = LiabilityGuard(tolerance_percent=0.1)    # More lenient
+```
 
 ---
 
-**Still stuck?** Contact support@qwedai.com with:
+## ClauseGuard Issues
 
-* Error message
-* Code snippet
-* Steps to reproduce
-* QWED SDK version
+### No Conflicts Detected (False Negative)
+
+**Problem:** You expect a conflict but ClauseGuard doesn't find it.
+
+**Cause:** ClauseGuard uses heuristic pattern matching, not full NLP.
+
+**Current Limitations:**
+
+* Only detects termination-related conflicts
+* Limited to English text
+* Requires specific keyword patterns
+
+**Workaround:** For complex contracts, extract key terms manually:
+
+```python
+clauses = [
+    "Termination allowed after 30 days notice",  # Clear pattern
+    "Minimum term 90 days",                       # Clear pattern
+]
+```
+
+---
+
+## CitationGuard Issues
+
+### Valid Citation Marked Invalid
+
+**Problem:** A real citation is flagged as invalid.
+
+**Cause:** The reporter isn't in our list.
+
+**Solution:** Check if the reporter is a valid Bluebook abbreviation. If it's a less common reporter, it may not be in our list. File an issue to add it:
+[https://github.com/QWED-AI/qwed-legal/issues](https://github.com/QWED-AI/qwed-legal/issues)
+
+### Statute Citation Format
+
+**Problem:** `42 USC 1983` doesn't validate.
+
+**Solution:** Use proper formatting with section symbol:
+
+```python
+# ✅ Correct
+guard.check_statute_citation("42 U.S.C. § 1983")
+
+# ❌ Missing section symbol
+guard.check_statute_citation("42 USC 1983")
+```
+
+---
+
+## General Issues
+
+### Import Errors
+
+**Problem:**
+
+```
+ImportError: cannot import name 'LegalGuard' from 'qwed_legal'
+```
+
+**Solution:**
+
+```bash
+pip install --upgrade qwed-legal
+```
+
+### Version Mismatch with MCP
+
+**Problem:** MCP tools don't show legal verification options.
+
+**Solution:** Reinstall qwed-mcp after installing qwed-legal:
+
+```bash
+pip install qwed-legal
+pip install --upgrade qwed-mcp
+```
+
+---
+
+## Still Stuck?
+
+* [GitHub Issues](https://github.com/QWED-AI/qwed-legal/issues)
+* [Discord Community](https://discord.gg/qwed)
+* Email: support@qwedai.com
