@@ -1,92 +1,204 @@
 ---
 sidebar_position: 2
-title: The Guards
-description: "QWED-Tax guards: US guards (ClassificationGuard for W-2/1099, NexusGuard for sales tax, PayrollGuard for FICA) and India guards (CryptoTaxGuard, GSTGuard, InvestmentGuard)."
+title: Guards Reference
+description: QWED-UCP 6 verification guards including Money Guard (verifies cart totals) and State Guard (validates checkout state transitions). Complete reference with examples.
 ---
 
-# The Guards
+# Guards Reference
 
-QWED-Tax verifies logic deterministically. No probabilities, just rules.
+QWED-UCP includes **6 verification guards** that validate different aspects of UCP checkout data.
 
-## 🇺🇸 United States (IRS)
+---
 
-### 1. ClassificationGuard (IRS Common Law)
+## 1. Money Guard
 
-**Goal:** Prevent "Employee Misclassification" lawsuits.
-**Logic:** Uses the IRS Common Law test to determine if a worker is a W-2 Employee or 1099 Contractor.
+**Verifies the total formula is mathematically correct.**
 
-* **Behavioral Control:** Does the employer provide tools/instructions?
-* **Financial Control:** Does the employer reimburse expenses?
-* **Relationship:** Is it indefinite?
+```
+Total = Subtotal - Discount + Tax + Shipping + Fee
+```
 
-**Rule:** If you control *how* they work and *pay* their expenses, they are an Employee (W-2), even if the AI says "1099".
+### Usage
 
-### 2. NexusGuard (Economic Nexus)
+```python
+driver = MoneyGuard()
+result = driver.verify_cart_totals(
+    line_items=[{"price": 35.00, "quantity": 2}, {"price": 15.00, "quantity": 1}],
+    taxes=8.25,
+    discounts=10.00,
+    claimed_total=98.25
+)
+# Returns: {"verified": True}
+```
 
-**Goal:** Prevent Sales Tax Evasion.
-**Logic:** Checks local state thresholds for 2025.
+### Tolerance
 
-* **NY/TX/CA:** > $500,000 Sales
-* **FL/IL/PA:** > $100,000 Sales
-  **Rule:** If YTD Sales > Threshold and AI says "No Tax", **BLOCK**.
+Uses `Decimal` precision with 1 cent ($0.01) tolerance for floating-point errors.
 
-### 3. PayrollGuard (FICA Limits)
+---
 
-**Goal:** Verify Paycheck Math.
-**Logic:**
+## 2. State Guard
 
-* **Gross-to-Net:** `Gross - Taxes - Deductions == Net` (Exact Decimal match).
-* **Soical Security Cap:** Enforces 2025 Wage Base Limit ($176,100). Tax stops after this amount.
+**Verifies valid checkout state machine transitions.**
 
-## 🇮🇳 India (CBDT)
+### Valid States
 
-### 1. CryptoTaxGuard (Sec 115BBH)
+```
+incomplete → ready_for_complete → completed
+                              ↓
+                            failed
+                              ↓
+                           cancelled
+```
 
-**Rule:** Losses from Virtual Digital Assets (VDA) cannot be set off against any other income (including other VDA gains).
-**Verdict:** Blocks any AI attempt to reduce tax liability using crypto losses.
+### Usage
 
-### 2. GSTGuard (RCM)
+```python
+from qwed_ucp.guards.state_guard import StateGuard
 
-**Rule:** Certain services (GTA, Legal) require **Reverse Charge Mechanism** (Recipient pays tax).
-**Verdict:** Blocks invoices where AI failed to apply RCM logic.
+guard = StateGuard()
+# Check if we can SHIP given the current state is PAID
+result = guard.verify_transition(
+    current_state="paid",
+    action="ship"
+)
+# Returns: {"verified": True}
+```
 
-### 3. InvestmentGuard (Trading)
+### Rules
 
-**Goal:** Prevent Set-Off Errors.
-**Logic:**
+* `incomplete`: Can be empty
+* `ready_for_complete`: Must have line items
+* `completed`: Must have order object
+* Cannot transition backwards
 
-* **SpeculationGuard:** Intraday Equity losses are "Speculative". They cannot be set off against F&O (Non-speculative) or Salary income.
-* **CapitalGainsGuard:** Enforces strictly defined holding periods (e.g. Equity > 12m = LTCG).
-  **Verdict:** Blocks "Illegal Set-Off" claims.
+---
 
-### 4. CorporateGuard (Loans & Valuation)
+## 3. Schema Guard
 
-**Goal:** Corporate Governance (Sec 185/Valuation).
-**Logic:**
+**Validates UCP JSON schema compliance.**
 
-* **RelatedPartyGuard:** Prohibits loans to Directors/Relatives/Holding-Co-Directors unless specific exemptions apply.
-* **ValuationGuard:** Deterministically calculates Convertible Note conversion prices (`min(Cap, Discount)`).
-  **Verdict:** Blocks loans that risk "Deemed Dividend" or Section 185 violation.
+### Usage
 
-### 5. RemittanceGuard (FEMA/LRS)
+```python
+from qwed_ucp.guards import SchemaGuard
 
-**Goal:** Prevent Forex Violations.
-**Logic:**
+guard = SchemaGuard()
+result = guard.verify(checkout_data)
+```
 
-* **LRS Limit:** Enforces $250,000 annual limit per PAN.
-* **Prohibited List:** Blocks Gambling, Lottery, Racing, and **Margin Trading**.
-* **TCS Logic:** Applies 20% Tax for generic remittance, 5% for Education/Medical.
-  **Verdict:** Blocks prohibited remittances and miscalculated TCS.
+### Validates
 
-### 6. Accounts Payable Guards (Indirect Tax)
+* Required fields present
+* Correct types (string, number, array)
+* Valid enum values (status, total types)
 
-**Goal:** Automate GST/VAT and TDS compliance.
-**Logic:**
+---
 
-* **InputCreditGuard:** Checks Section 17(5) "Blocked List".
-  * *Food/Beverages:* Blocked.
-  * *Motor Vehicles:* Blocked (unless transport biz).
-* **TDSGuard:** Calculates withholding based on service type.
-  * *Professional Fees:* 10% (Sec 194J).
-  * *Contractors:* 1% or 2% (Sec 194C).
-    **Verdict:** Blocks ITC claims on personal items and ensures vendor payments have TDS deducted.
+## 4. Line Items Guard
+
+**Verifies price × quantity = line total for each item.**
+
+### Usage
+
+```python
+from qwed_ucp.guards import LineItemsGuard
+
+guard = LineItemsGuard()
+result = guard.verify({
+    "line_items": [
+        {"id": "roses", "quantity": 2, "item": {"price": 35.00}},
+        {"id": "pot", "quantity": 1, "item": {"price": 15.00}}
+    ],
+    "totals": [{"type": "subtotal", "amount": 85.00}]  # 2×35 + 1×15 = 85 ✓
+})
+```
+
+### Checks
+
+* Each item: `price × quantity = line_total`
+* Sum of line items = subtotal
+* Quantities must be positive integers
+* Prices must be non-negative
+
+---
+
+## 5. Discount Guard
+
+**Verifies percentage and fixed discount calculations.**
+
+### Usage - Percentage Discount
+
+```python
+from qwed_ucp.guards import DiscountGuard
+from decimal import Decimal
+
+guard = DiscountGuard()
+result = guard.verify_percentage_discount(
+    subtotal=Decimal("100.00"),
+    discount_amount=Decimal("10.00"),
+    percentage=Decimal("10")  # 10% of 100 = 10 ✓
+)
+```
+
+### Usage - Fixed Discount
+
+```python
+result = guard.verify_fixed_discount(
+    subtotal=Decimal("50.00"),
+    discount_amount=Decimal("5.00")  # Fixed $5 off ✓
+)
+```
+
+### Rules
+
+* Percentage: Must be 0-100%
+* Fixed: Cannot exceed subtotal
+* Discount must be non-negative
+
+---
+
+## 6. Currency Guard
+
+**Validates ISO 4217 currency codes and format.**
+
+### Usage
+
+```python
+from qwed_ucp.guards import CurrencyGuard
+
+guard = CurrencyGuard()
+result = guard.verify({"currency": "USD"})
+```
+
+### Validates
+
+* 3-letter ISO 4217 codes (USD, EUR, GBP, JPY, etc.)
+* Zero-decimal currencies (JPY, KRW) have no decimals
+* Currency conversion accuracy
+
+### Zero-Decimal Currencies
+
+```python
+# Valid - no decimals
+{"currency": "JPY", "totals": [{"type": "total", "amount": 1000}]}
+
+# Invalid - JPY shouldn't have decimals
+{"currency": "JPY", "totals": [{"type": "total", "amount": 1000.50}]}
+```
+
+---
+
+## Running All Guards
+
+Use `UCPVerifier` to run all guards at once:
+
+```python
+from qwed_ucp import UCPVerifier
+
+verifier = UCPVerifier()
+result = verifier.verify_checkout(checkout_data)
+
+print(f"Verified: {result.verified}")
+print(f"Guards passed: {len([g for g in result.guards if g.verified])}")
+```
