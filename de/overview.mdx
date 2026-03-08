@@ -1,80 +1,76 @@
 ---
-sidebar_position: "1"
-title: SDKs Overview
-description: QWED official SDKs for Python, TypeScript, Go, and Rust. Compare features, view quick install commands, and get started with verification in minutes.
+sidebar_position: 1
+title: Protocol Specifications
+description: QWED formal specifications for interoperability. Overview of QWED-SPEC, QWED-Attestation, and QWED-Agent protocols for deterministic AI verification systems.
 ---
 
-QWED provides official SDKs for 4 languages.
+# Protocol Specifications
 
-## Available SDKs
+QWED is defined by formal specifications that enable interoperability.
 
-| Language                       | Package                      | Status   |
-| ------------------------------ | ---------------------------- | -------- |
-| [Python](/sdks/python)         | `qwed`                       | ✅ Stable |
-| [TypeScript](/sdks/typescript) | `@qwed-ai/sdk`               | ✅ Stable |
-| [Go](/sdks/go)                 | `github.com/qwed-ai/qwed-go` | ✅ Stable |
-| [Rust](/sdks/rust)             | `qwed`                       | ✅ Stable |
+## Core Specifications
 
-## Feature Comparison
+| Specification                          | Version | Description              |
+| -------------------------------------- | ------- | ------------------------ |
+| [QWED-SPEC](/specs/qwed-spec)          | v1.0.0  | Core protocol definition |
+| [QWED-Attestation](/specs/attestation) | v1.0.0  | Cryptographic proofs     |
+| [QWED-Agent](/specs/agent)             | v1.0.0  | AI agent verification    |
 
-| Feature          | Python | TypeScript | Go | Rust |
-| ---------------- | ------ | ---------- | -- | ---- |
-| Sync Client      | ✅      | ✅          | ✅  | ✅    |
-| Async Client     | ✅      | ✅          | ✅  | ✅    |
-| Batch Operations | ✅      | ✅          | ✅  | ✅    |
-| Agent API        | ✅      | ✅          | ❌  | ❌    |
-| Attestations     | ✅      | ✅          | ✅  | ✅    |
-| CLI              | ✅      | ❌          | ❌  | ❌    |
+## What's in a Spec?
 
-## Quick Install
+### QWED-SPEC v1.0
 
-```bash
-# Python
-pip install qwed
+The core specification defines:
 
-# TypeScript
-npm install @qwed-ai/sdk
+* **Request/Response Format** — JSON schemas for API
+* **Verification Engines** — Math, Logic, Code, SQL, etc.
+* **QWED-Logic DSL** — Grammar for logical expressions
+* **Error Codes** — Standardized error taxonomy
+* **Versioning** — Semantic versioning rules
 
-# Go
-go get github.com/qwed-ai/qwed-go
+### QWED-Attestation v1.0
 
-# Rust
-cargo add qwed
+The attestation specification defines:
+
+* **JWT Format** — ES256 signed tokens
+* **Claims** — Standard and custom JWT claims
+* **Trust Anchors** — Issuer verification
+* **Chain Validation** — Linked attestations
+
+### QWED-Agent v1.0
+
+The agent specification defines:
+
+* **Registration** — Agent identity and permissions
+* **Action Verification** — Pre-execution checks
+* **Budget Management** — Cost and rate limits
+* **Trust Levels** — 0-3 autonomy scale
+
+## JSON Schemas
+
+Machine-readable schemas are available at:
+
+```
+specs/schemas/
+├── request.v1.json
+├── response.v1.json
+├── attestation.v1.json
+└── agent.v1.json
 ```
 
-## Minimal Example
+## Implementing QWED
 
-<Tabs>
-  <Tab title="Python">
-    ```python
-    from qwed_sdk import QWEDClient
+To implement the QWED protocol:
 
-    client = QWEDClient(api_key="qwed_...")
-    result = client.verify("2+2=4")
-    print(result.verified)  # True
-    ```
-  </Tab>
-  <Tab title="TypeScript">
-    ```typescript
-    import { QWEDClient } from '@qwed-ai/sdk';
+1. Parse requests per `request.v1.json`
+2. Route to appropriate verification engine
+3. Return responses per `response.v1.json`
+4. Optionally generate attestations per QWED-Attestation
 
-    const client = new QWEDClient({ apiKey: 'qwed_...' });
-    const result = await client.verify('2+2=4');
-    console.log(result.verified);  // true
-    ```
-  </Tab>
-  <Tab title="Go">
-    ```go
-    client := qwed.NewClient("qwed_...")
-    result, _ := client.Verify(ctx, "2+2=4")
-    fmt.Println(result.Verified)  // true
-    ```
-  </Tab>
-  <Tab title="Rust">
-    ```rust
-    let client = QWEDClient::new("qwed_...");
-    let result = client.verify("2+2=4").await?;
-    println!("{}", result.verified);  // true
-    ```
-  </Tab>
-</Tabs>
+## Conformance Levels
+
+| Level        | Requirements               |
+| ------------ | -------------------------- |
+| **Basic**    | Request/response format    |
+| **Standard** | * All 8 engines            |
+| **Full**     | - Attestations + Agent API |
