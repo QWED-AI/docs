@@ -1,49 +1,97 @@
 ---
 sidebar_position: 1
-title: Overview
-description: QWED-Infra for Infrastructure as Code verification using Z3 Solver and Graph Theory. Verify Terraform, AWS IAM, and Kubernetes configurations before deployment.
+title: API Overview
+description: QWED RESTful API reference. Learn about base URLs, authentication via API keys, core verification endpoints, and request formats for LLM output verification.
 ---
 
-# QWED-Infra ☁️
+QWED provides a RESTful API for verification.
 
-**Deterministic Verification for Infrastructure as Code (IaC)**
+## Base URL
 
-![Verified by QWED](https://img.shields.io/badge/Verified_by-QWED-00C853?style=flat\&logo=checkmarx)
-![PyPI](https://img.shields.io/pypi/v/qwed-infra?color=blue)
-
-`qwed-infra` is a Python library that uses **Formal Methods (Z3 Solver)** and **Graph Theory** to mathematically prove the security and compliance of detailed infrastructure definitions (Terraform, AWS IAM, Kubernetes).
-
-It prevents AI agents (like Devin or Copilot Workspace) from deploying insecure or expensive infrastructure by verifying configuration *before* deployment.
-
-## 🎯 Architecture
-
-```mermaid
-graph TD
-    A[Terraform Code] -->|TerraformParser| B{QWED Engine}
-    B -->|Mathematical Proof| C["Z3 Solver (IAM)"]
-    B -->|Graph Traversal| D["NetworkX (Reachability)"]
-    B -->|Arithmetic| E["Pricing Catalog (Cost)"]
-    C --> F[Verification Result]
-    D --> F
-    E --> F
+```
+https://api.qwedai.com/v1
 ```
 
-## 🚀 Key Features
+Or for local development:
 
-### 🛡️ IamGuard
+```
+http://localhost:8000
+```
 
-Verifies AWS IAM Policies using the **Z3 Theorem Prover**. Instead of regex matching, it converts policies into logical formulas to prove reachability and specific permissions.
+## Authentication
 
-### 🌐 NetworkGuard
-
-Verifies Network Reachability using **Graph Theory** (NetworkX). Validates paths like `Internet -> IGW -> Route -> Security Group -> Instance`.
-
-### 💰 CostGuard
-
-Deterministic Cloud Cost estimation before deployment. Enforce budgets and prevent expensive instance provisioning errors.
-
-## 📦 Installation
+All requests require an API key:
 
 ```bash
-pip install qwed-infra
+curl -H "X-API-Key: qwed_your_key" https://api.qwedai.com/v1/health
 ```
+
+## Core Endpoints
+
+| Method | Endpoint        | Description              |
+| ------ | --------------- | ------------------------ |
+| GET    | `/health`       | Health check             |
+| POST   | `/verify`       | Auto-detect verification |
+| POST   | `/verify/math`  | Math verification        |
+| POST   | `/verify/logic` | Logic verification       |
+| POST   | `/verify/code`  | Code security            |
+| POST   | `/verify/sql`   | SQL validation           |
+| POST   | `/verify/fact`  | Fact checking            |
+| POST   | `/verify/batch` | Batch verification       |
+
+## Request Format
+
+```json
+{
+  "query": "2+2=4",
+  "type": "math",
+  "options": {
+    "include_attestation": true,
+    "timeout_ms": 30000
+  }
+}
+```
+
+## Response Format
+
+```json
+{
+  "status": "VERIFIED",
+  "verified": true,
+  "engine": "math",
+  "result": {
+    "is_valid": true,
+    "message": "Expression is correct"
+  },
+  "attestation": "eyJhbGciOiJFUzI1NiIs...",
+  "metadata": {
+    "request_id": "req_abc123",
+    "latency_ms": 45
+  }
+}
+```
+
+## Status Codes
+
+| Code | Meaning      |
+| ---- | ------------ |
+| 200  | Success      |
+| 400  | Bad request  |
+| 401  | Unauthorized |
+| 429  | Rate limited |
+| 500  | Server error |
+
+## Rate Limits
+
+| Plan       | Requests/min | Requests/day |
+| ---------- | ------------ | ------------ |
+| Free       | 60           | 1,000        |
+| Pro        | 600          | 50,000       |
+| Enterprise | Unlimited    | Unlimited    |
+
+## Detailed Reference
+
+* [All Endpoints](/api/endpoints)
+* [Authentication](/api/authentication)
+* [Error Codes](/api/errors)
+* [Rate Limits](/api/rate-limits)
