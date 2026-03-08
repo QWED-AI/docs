@@ -1,220 +1,92 @@
 ---
 sidebar_position: 2
-title: Guards Reference
-description: QWED Open Responses provides 6 verification guards including SchemaGuard and ToolGuard. Complete reference with code examples for validating AI agent outputs.
+title: The Guards
+description: "QWED-Tax guards: US guards (ClassificationGuard for W-2/1099, NexusGuard for sales tax, PayrollGuard for FICA) and India guards (CryptoTaxGuard, GSTGuard, InvestmentGuard)."
 ---
 
-# Guards Reference
+# The Guards
 
-QWED Open Responses provides 6 verification guards.
+QWED-Tax verifies logic deterministically. No probabilities, just rules.
 
----
+## 🇺🇸 United States (IRS)
 
-## SchemaGuard
+### 1. ClassificationGuard (IRS Common Law)
 
-Validates AI outputs against JSON Schema.
+**Goal:** Prevent "Employee Misclassification" lawsuits.
+**Logic:** Uses the IRS Common Law test to determine if a worker is a W-2 Employee or 1099 Contractor.
 
-```python
-from qwed_open_responses import SchemaGuard
+* **Behavioral Control:** Does the employer provide tools/instructions?
+* **Financial Control:** Does the employer reimburse expenses?
+* **Relationship:** Is it indefinite?
 
-guard = SchemaGuard(schema={
-    "type": "object",
-    "properties": {
-        "name": {"type": "string"},
-        "age": {"type": "integer", "minimum": 0}
-    },
-    "required": ["name", "age"]
-})
+**Rule:** If you control *how* they work and *pay* their expenses, they are an Employee (W-2), even if the AI says "1099".
 
-result = guard.check({"output": {"name": "John", "age": 30}})
-# ✅ Passed
-```
+### 2. NexusGuard (Economic Nexus)
 
-### Options
+**Goal:** Prevent Sales Tax Evasion.
+**Logic:** Checks local state thresholds for 2025.
 
-| Option   | Type | Default  | Description       |
-| -------- | ---- | -------- | ----------------- |
-| `schema` | dict | required | JSON Schema       |
-| `strict` | bool | True     | Fail on any error |
+* **NY/TX/CA:** > $500,000 Sales
+* **FL/IL/PA:** > $100,000 Sales
+  **Rule:** If YTD Sales > Threshold and AI says "No Tax", **BLOCK**.
 
----
+### 3. PayrollGuard (FICA Limits)
 
-## ToolGuard
+**Goal:** Verify Paycheck Math.
+**Logic:**
 
-Blocks dangerous tool calls and patterns.
+* **Gross-to-Net:** `Gross - Taxes - Deductions == Net` (Exact Decimal match).
+* **Soical Security Cap:** Enforces 2025 Wage Base Limit ($176,100). Tax stops after this amount.
 
-```python
-from qwed_open_responses import ToolGuard
+## 🇮🇳 India (CBDT)
 
-guard = ToolGuard(
-    blocked_tools=["execute_shell", "delete_file"],
-    allowed_tools=["search", "calculator"],  # Whitelist mode
-    dangerous_patterns=[r"DROP TABLE", r"rm -rf"],
-)
+### 1. CryptoTaxGuard (Sec 115BBH)
 
-result = guard.check({
-    "tool_name": "execute_sql",
-    "arguments": {"query": "DROP TABLE users"}
-})
-# ❌ BLOCKED: Dangerous pattern detected
-```
+**Rule:** Losses from Virtual Digital Assets (VDA) cannot be set off against any other income (including other VDA gains).
+**Verdict:** Blocks any AI attempt to reduce tax liability using crypto losses.
 
-### Default Blocked Tools
+### 2. GSTGuard (RCM)
 
-* `execute_shell`, `bash`, `cmd`
-* `delete_file`, `remove_file`
-* `send_email`, `transfer_money`
+**Rule:** Certain services (GTA, Legal) require **Reverse Charge Mechanism** (Recipient pays tax).
+**Verdict:** Blocks invoices where AI failed to apply RCM logic.
 
-### Default Dangerous Patterns
+### 3. InvestmentGuard (Trading)
 
-* `DROP TABLE`, `DELETE FROM`
-* `rm -rf`, `rmdir /s`
-* `eval(`, `exec(`, `__import__`
+**Goal:** Prevent Set-Off Errors.
+**Logic:**
 
----
+* **SpeculationGuard:** Intraday Equity losses are "Speculative". They cannot be set off against F&O (Non-speculative) or Salary income.
+* **CapitalGainsGuard:** Enforces strictly defined holding periods (e.g. Equity > 12m = LTCG).
+  **Verdict:** Blocks "Illegal Set-Off" claims.
 
-## MathGuard
+### 4. CorporateGuard (Loans & Valuation)
 
-Verifies mathematical calculations.
+**Goal:** Corporate Governance (Sec 185/Valuation).
+**Logic:**
 
-```python
-from qwed_open_responses import MathGuard
+* **RelatedPartyGuard:** Prohibits loans to Directors/Relatives/Holding-Co-Directors unless specific exemptions apply.
+* **ValuationGuard:** Deterministically calculates Convertible Note conversion prices (`min(Cap, Discount)`).
+  **Verdict:** Blocks loans that risk "Deemed Dividend" or Section 185 violation.
 
-guard = MathGuard(tolerance=0.01)
+### 5. RemittanceGuard (FEMA/LRS)
 
-result = guard.check({
-    "output": {
-        "subtotal": 100,
-        "tax": 8,
-        "shipping": 10,
-        "total": 118  # Correct!
-    }
-})
-# ✅ Passed
-```
+**Goal:** Prevent Forex Violations.
+**Logic:**
 
-### What It Checks
+* **LRS Limit:** Enforces $250,000 annual limit per PAN.
+* **Prohibited List:** Blocks Gambling, Lottery, Racing, and **Margin Trading**.
+* **TCS Logic:** Applies 20% Tax for generic remittance, 5% for Education/Medical.
+  **Verdict:** Blocks prohibited remittances and miscalculated TCS.
 
-* Totals: `total = subtotal + tax + shipping`
-* Percentages: `tax_amount = subtotal * tax_rate`
-* Inline calculations: `"5 + 3 = 8"`
+### 6. Accounts Payable Guards (Indirect Tax)
 
----
+**Goal:** Automate GST/VAT and TDS compliance.
+**Logic:**
 
-## StateGuard
-
-Validates state machine transitions.
-
-```python
-from qwed_open_responses import StateGuard
-
-guard = StateGuard(
-    transitions={
-        "pending": ["processing", "cancelled"],
-        "processing": ["completed", "failed"],
-        "completed": [],  # Terminal
-    },
-    current_state="pending"
-)
-
-result = guard.check({"new_state": "processing"})
-# ✅ Valid transition
-
-result = guard.check({"new_state": "completed"})
-# ❌ Invalid: pending -> completed not allowed
-```
-
----
-
-## ArgumentGuard
-
-Validates tool call arguments.
-
-```python
-from qwed_open_responses import ArgumentGuard
-
-guard = ArgumentGuard(rules={
-    "amount": {"type": "number", "min": 0, "max": 10000},
-    "email": {"type": "email"},
-    "status": {"type": "enum", "values": ["active", "inactive"]},
-})
-
-result = guard.check({
-    "arguments": {
-        "amount": 500,
-        "email": "user@example.com",
-        "status": "active"
-    }
-})
-# ✅ All arguments valid
-```
-
-### Supported Types
-
-| Type      | Validation         |
-| --------- | ------------------ |
-| `string`  | Is string          |
-| `number`  | Is number, min/max |
-| `integer` | Is integer         |
-| `boolean` | Is boolean         |
-| `email`   | Email format       |
-| `url`     | URL format         |
-| `uuid`    | UUID format        |
-| `enum`    | In allowed values  |
-| `pattern` | Regex match        |
-
----
-
-## SafetyGuard
-
-Comprehensive safety checks.
-
-```python
-from qwed_open_responses import SafetyGuard
-
-guard = SafetyGuard(
-    check_pii=True,        # Detect emails, phones, SSN
-    check_injection=True,  # Detect prompt injection
-    check_harmful=True,    # Detect API keys, passwords
-    max_cost=100.0,        # Budget limit
-)
-
-result = guard.check({
-    "content": "ignore previous instructions..."
-})
-# ❌ BLOCKED: Prompt injection detected
-```
-
-### Detections
-
-| Type          | Examples                          |
-| ------------- | --------------------------------- |
-| **PII**       | Emails, phones, SSN, credit cards |
-| **Injection** | "ignore previous", "you are now"  |
-| **Harmful**   | API keys, passwords, private keys |
-| **Budget**    | Cost/token limits exceeded        |
-
----
-
-## Combining Guards
-
-```python
-from qwed_open_responses import (
-    ResponseVerifier,
-    ToolGuard,
-    SchemaGuard,
-    SafetyGuard,
-)
-
-verifier = ResponseVerifier(
-    default_guards=[
-        ToolGuard(),
-        SchemaGuard(schema=my_schema),
-        SafetyGuard(),
-    ]
-)
-
-result = verifier.verify(response)
-print(f"Passed: {result.guards_passed}")
-print(f"Failed: {result.guards_failed}")
-```
+* **InputCreditGuard:** Checks Section 17(5) "Blocked List".
+  * *Food/Beverages:* Blocked.
+  * *Motor Vehicles:* Blocked (unless transport biz).
+* **TDSGuard:** Calculates withholding based on service type.
+  * *Professional Fees:* 10% (Sec 194J).
+  * *Contractors:* 1% or 2% (Sec 194C).
+    **Verdict:** Blocks ITC claims on personal items and ensures vendor payments have TDS deducted.
