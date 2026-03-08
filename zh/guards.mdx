@@ -1,204 +1,312 @@
 ---
 sidebar_position: 2
-title: Guards Reference
-description: QWED-UCP 6 verification guards including Money Guard (verifies cart totals) and State Guard (validates checkout state transitions). Complete reference with examples.
+title: The 5 Guards
+description: QWED-Finance verification guards including ComplianceGuard (Z3 for AML/KYC), CalendarGuard, DerivativesGuard, MessageGuard, and QueryGuard with code examples.
 ---
 
-# Guards Reference
+# The 5 Guards
 
-QWED-UCP includes **6 verification guards** that validate different aspects of UCP checkout data.
+QWED-Finance uses **Neurosymbolic AI** - combining neural (LLM) outputs with symbolic (math/logic) verification.
 
----
+## 1. Compliance Guard (Z3)
 
-## 1. Money Guard
-
-**Verifies the total formula is mathematically correct.**
-
-```
-Total = Subtotal - Discount + Tax + Shipping + Fee
-```
-
-### Usage
+**Purpose:** Verify KYC/AML regulatory decisions using formal boolean logic.
 
 ```python
-driver = MoneyGuard()
-result = driver.verify_cart_totals(
-    line_items=[{"price": 35.00, "quantity": 2}, {"price": 15.00, "quantity": 1}],
-    taxes=8.25,
-    discounts=10.00,
-    claimed_total=98.25
+from qwed_finance import ComplianceGuard
+
+guard = ComplianceGuard()
+
+# AML Threshold Check (BSA/FinCEN)
+result = guard.verify_aml_flag(
+    amount=15000,
+    country_code="US",
+    llm_flagged=True
 )
-# Returns: {"verified": True}
+# result.compliant = True ✅
+# result.proof = "amount >= 10000 → CTR required"
 ```
 
-### Tolerance
+### Methods
 
-Uses `Decimal` precision with 1 cent ($0.01) tolerance for floating-point errors.
+| Method                       | Description                        |
+| ---------------------------- | ---------------------------------- |
+| `verify_aml_flag()`          | Check CTR threshold ($10,000)      |
+| `verify_kyc_complete()`      | Validate KYC document requirements |
+| `verify_transaction_limit()` | Enforce daily limits               |
+| `verify_sanctions_check()`   | OFAC sanctions screening           |
+
+### How Z3 Works
+
+```python
+# Z3 proves: IF amount >= 10000 THEN flag_required
+from z3 import *
+amount = Real('amount')
+flag = Bool('flag')
+solver = Solver()
+solver.add(Implies(amount >= 10000, flag == True))
+```
 
 ---
 
-## 2. State Guard
+## 2. Calendar Guard (SymPy)
 
-**Verifies valid checkout state machine transitions.**
-
-### Valid States
-
-```
-incomplete → ready_for_complete → completed
-                              ↓
-                            failed
-                              ↓
-                           cancelled
-```
-
-### Usage
+**Purpose:** Deterministic day count conventions for interest calculations.
 
 ```python
-from qwed_ucp.guards.state_guard import StateGuard
+from qwed_finance import CalendarGuard, DayCountConvention
+from datetime import date
 
-guard = StateGuard()
-# Check if we can SHIP given the current state is PAID
-result = guard.verify_transition(
-    current_state="paid",
-    action="ship"
+guard = CalendarGuard()
+
+# Verify 30/360 day count
+result = guard.verify_day_count(
+    start_date=date(2026, 1, 1),
+    end_date=date(2026, 7, 1),
+    llm_days=180,
+    convention=DayCountConvention.THIRTY_360
 )
-# Returns: {"verified": True}
+# result.verified = True ✅
 ```
 
-### Rules
+### Supported Conventions
 
-* `incomplete`: Can be empty
-* `ready_for_complete`: Must have line items
-* `completed`: Must have order object
-* Cannot transition backwards
+| Convention      | Use Case                  |
+| --------------- | ------------------------- |
+| `ACTUAL_ACTUAL` | US Treasury bonds         |
+| `ACTUAL_360`    | T-Bills, Commercial paper |
+| `ACTUAL_365`    | UK Gilts                  |
+| `THIRTY_360`    | Corporate bonds           |
+| `THIRTY_E_360`  | Eurobonds                 |
 
 ---
 
-## 3. Schema Guard
+## 3. Derivatives Guard (Black-Scholes)
 
-**Validates UCP JSON schema compliance.**
-
-### Usage
+**Purpose:** Options pricing and margin verification using pure calculus.
 
 ```python
-from qwed_ucp.guards import SchemaGuard
+from qwed_finance import DerivativesGuard, OptionType
 
-guard = SchemaGuard()
-result = guard.verify(checkout_data)
-```
+guard = DerivativesGuard()
 
-### Validates
-
-* Required fields present
-* Correct types (string, number, array)
-* Valid enum values (status, total types)
-
----
-
-## 4. Line Items Guard
-
-**Verifies price × quantity = line total for each item.**
-
-### Usage
-
-```python
-from qwed_ucp.guards import LineItemsGuard
-
-guard = LineItemsGuard()
-result = guard.verify({
-    "line_items": [
-        {"id": "roses", "quantity": 2, "item": {"price": 35.00}},
-        {"id": "pot", "quantity": 1, "item": {"price": 15.00}}
-    ],
-    "totals": [{"type": "subtotal", "amount": 85.00}]  # 2×35 + 1×15 = 85 ✓
-})
-```
-
-### Checks
-
-* Each item: `price × quantity = line_total`
-* Sum of line items = subtotal
-* Quantities must be positive integers
-* Prices must be non-negative
-
----
-
-## 5. Discount Guard
-
-**Verifies percentage and fixed discount calculations.**
-
-### Usage - Percentage Discount
-
-```python
-from qwed_ucp.guards import DiscountGuard
-from decimal import Decimal
-
-guard = DiscountGuard()
-result = guard.verify_percentage_discount(
-    subtotal=Decimal("100.00"),
-    discount_amount=Decimal("10.00"),
-    percentage=Decimal("10")  # 10% of 100 = 10 ✓
+# Verify Black-Scholes call price
+result = guard.verify_black_scholes(
+    spot_price=100,
+    strike_price=105,
+    time_to_expiry=0.25,
+    risk_free_rate=0.05,
+    volatility=0.20,
+    option_type=OptionType.CALL,
+    llm_price="$3.50"
 )
+# result.greeks = {"delta": 0.4502, "gamma": 0.0389, ...}
 ```
 
-### Usage - Fixed Discount
+### Methods
+
+| Method                     | Description                 |
+| -------------------------- | --------------------------- |
+| `verify_black_scholes()`   | Options pricing with Greeks |
+| `verify_delta()`           | Delta calculation           |
+| `verify_margin_call()`     | Margin call decision        |
+| `verify_put_call_parity()` | Arbitrage detection         |
+
+---
+
+## 4. Message Guard (XML Schema)
+
+**Purpose:** Validate ISO 20022 and SWIFT messages before transmission.
 
 ```python
-result = guard.verify_fixed_discount(
-    subtotal=Decimal("50.00"),
-    discount_amount=Decimal("5.00")  # Fixed $5 off ✓
+from qwed_finance import MessageGuard, MessageType
+
+guard = MessageGuard()
+
+# Verify pacs.008 payment message
+result = guard.verify_iso20022_xml(
+    xml_string=pacs008_xml,
+    msg_type=MessageType.PACS_008
 )
+# result.valid = True/False
+# result.errors = ["Missing required element: GrpHdr"]
 ```
 
-### Rules
+### Supported Formats
 
-* Percentage: Must be 0-100%
-* Fixed: Cannot exceed subtotal
-* Discount must be non-negative
+| Format     | Description              |
+| ---------- | ------------------------ |
+| `PACS_008` | Customer Credit Transfer |
+| `CAMT_053` | Bank Statement           |
+| `PAIN_001` | Payment Initiation       |
+| `MT103`    | SWIFT Single Transfer    |
+| `MT202`    | SWIFT Bank Transfer      |
 
----
-
-## 6. Currency Guard
-
-**Validates ISO 4217 currency codes and format.**
-
-### Usage
+### SWIFT MT Validation
 
 ```python
-from qwed_ucp.guards import CurrencyGuard
-
-guard = CurrencyGuard()
-result = guard.verify({"currency": "USD"})
-```
-
-### Validates
-
-* 3-letter ISO 4217 codes (USD, EUR, GBP, JPY, etc.)
-* Zero-decimal currencies (JPY, KRW) have no decimals
-* Currency conversion accuracy
-
-### Zero-Decimal Currencies
-
-```python
-# Valid - no decimals
-{"currency": "JPY", "totals": [{"type": "total", "amount": 1000}]}
-
-# Invalid - JPY shouldn't have decimals
-{"currency": "JPY", "totals": [{"type": "total", "amount": 1000.50}]}
+# Validate MT103 fields
+result = guard.verify_swift_mt(
+    mt_string=mt103_message,
+    mt_type=SwiftMtType.MT103
+)
+# Checks Field 20, 32A, 50K, 59, etc.
 ```
 
 ---
 
-## Running All Guards
+## 5. ISOGuard (JSON Schema)
 
-Use `UCPVerifier` to run all guards at once:
+**Purpose:** Enforce ISO 20022 compliance for JSON-based Agentic Banking.
 
 ```python
-from qwed_ucp import UCPVerifier
+from qwed_finance import ISOGuard
 
-verifier = UCPVerifier()
-result = verifier.verify_checkout(checkout_data)
+guard = ISOGuard()
 
-print(f"Verified: {result.verified}")
-print(f"Guards passed: {len([g for g in result.guards if g.verified])}")
+# Verify pacs.008 (JSON format)
+result = guard.verify_payment_message(
+    message={
+        "MsgId": "1234AB",
+        "CreDtTm": "2026-01-28T10:00:00",
+        "NbOfTxs": 1,
+        "TtlIntrBkSttlmAmt": {"amount": 100.50, "currency": "USD"}
+    },
+    msg_type="pacs.008"
+)
+# result.verified = True ✅
 ```
+
+### Why JSON vs XML?
+
+While `MessageGuard` handles traditional XML SWIFT messages, `ISOGuard` enables **Modern Banking Agents** to speak the same standard using lightweight JSON.
+
+---
+
+## 6. Query Guard (SQLGlot)
+
+**Purpose:** Prevent SQL injection and unauthorized data access.
+
+```python
+from qwed_finance import QueryGuard
+
+guard = QueryGuard(allowed_tables={"transactions", "accounts"})
+
+# Check read-only safety
+result = guard.verify_readonly_safety(
+    "DELETE FROM users WHERE id=1"
+)
+# result.safe = False ❌
+# result.violations = ["Mutation detected: DELETE statement"]
+```
+
+### Methods
+
+| Method                     | Description                     |
+| -------------------------- | ------------------------------- |
+| `verify_readonly_safety()` | Block INSERT/UPDATE/DELETE/DROP |
+| `verify_table_access()`    | Whitelist allowed tables        |
+| `verify_column_access()`   | Block PII columns               |
+| `verify_no_injection()`    | Detect injection patterns       |
+
+### Why AST, Not Regex?
+
+```sql
+-- Regex might miss this:
+SELECT * FROM (DELETE FROM users RETURNING *) AS x
+
+-- SQLGlot AST catches it by parsing the tree structure
+```
+
+---
+
+## Cross-Guard (Multi-Layer)
+
+**Purpose:** Combine multiple guards for comprehensive verification.
+
+```python
+from qwed_finance import CrossGuard
+
+guard = CrossGuard()
+
+# SWIFT + Sanctions in one call
+result = guard.verify_swift_with_sanctions(
+    mt_string=swift_message,
+    sanctions_list=["ACME Corp", "Bad Bank LLC"]
+)
+# Validates SWIFT format AND screens entities
+```
+
+---
+
+## 7. Bond Guard (Yield Analytics)
+
+**Purpose:** Verify fixed income calculations like Yield to Maturity (YTM) and duration using Newton-Raphson.
+
+```python
+from qwed_finance import BondGuard
+
+guard = BondGuard()
+
+# Verify YTM calculation
+result = guard.verify_ytm(
+    face_value=1000,
+    coupon_rate=0.05,
+    price=950,
+    years_to_maturity=10,
+    llm_output="5.66%"
+)
+# result.verified = True ✅
+# result.computed_ytm = 0.0566...
+```
+
+---
+
+## 8. FX Guard (Currency Arbitration)
+
+**Purpose:** Validate cross-currency conversions and detect arbitrage opportunities.
+
+```python
+from qwed_finance import FXGuard
+
+guard = FXGuard()
+
+# Verify Spot Conversion
+result = guard.verify_conversion(
+    amount=1000,
+    from_currency="USD",
+    to_currency="EUR",
+    rate=0.92,
+    llm_output="920.00 EUR"
+)
+# result.verified = True ✅
+```
+
+---
+
+## 9. Risk Guard (Portfolio Metrics)
+
+**Purpose:** Ensure risk metrics like Sharpe Ratio and VaR (Value at Risk) are mathematically consistent.
+
+```python
+from qwed_finance import RiskGuard
+
+guard = RiskGuard()
+
+# Verify Sharpe Ratio
+# (Return - RiskFree) / Volatility
+result = guard.verify_sharpe_ratio(
+    portfolio_return=0.12,
+    risk_free_rate=0.03,
+    volatility=0.15,
+    llm_output="0.60" 
+)
+# result.verified = True ✅
+# result.computed_sharpe = 0.60
+```
+
+---
+
+:::tip PyPI Package
+All 9 guards are available via `pip install qwed-finance`
+:::
