@@ -1,271 +1,266 @@
 ---
-sidebar_position: 10
-title: Troubleshooting Guide
-description: Resolve common QWED verification issues including authentication errors, API key problems, and rate limits. Step-by-step debugging solutions included.
+sidebar_position: 6
+title: Troubleshooting
+description: Troubleshoot QWED-UCP issues including Python version requirements (3.10+) and npm installation for Express middleware. Common errors and solutions included.
 ---
 
-Common issues and how to resolve them.
+# Troubleshooting
+
+Common issues and solutions when using QWED-UCP.
 
 ---
 
-## Authentication Errors
+## Installation Issues
 
-### API Key Invalid
+### "No module named 'qwed_ucp'"
 
-```
-Error: 401 Unauthorized - Invalid API key
-```
+**Cause:** Package not installed correctly
+
+**Solutions:**
+
+1. **Check Python version** (requires 3.10+):
+   ```bash
+   python --version
+   ```
+
+2. **Install in correct environment:**
+   ```bash
+   pip install qwed-ucp
+   # or with virtual env
+   python -m venv venv
+   source venv/bin/activate  # or venv\Scripts\activate on Windows
+   pip install qwed-ucp
+   ```
+
+3. **Verify installation:**
+   ```bash
+   pip show qwed-ucp
+   python -c "from qwed_ucp import UCPVerifier; print('OK')"
+   ```
+
+---
+
+### npm install fails for Express middleware
+
+**Cause:** Node.js version incompatibility
 
 **Solution:**
 
-1. Check your API key is correct: `echo $QWED_API_KEY`
-2. Regenerate key at [cloud.qwedai.com](https://cloud.qwedai.com)
-3. Ensure no extra spaces or newlines
+```bash
+# Requires Node.js 18+
+node --version
 
-```python
-# Correct
-client = QWEDClient(api_key="qwed_live_abc123...")
-
-# Wrong - has newline
-client = QWEDClient(api_key="qwed_live_abc123...\n")
-```
-
-### Rate Limit Exceeded
-
-```
-Error: 429 Too Many Requests
-```
-
-**Solution:**
-
-* Free tier: 100 requests/minute
-* Pro tier: 1,000 requests/minute
-* Enterprise: Unlimited
-
-```python
-from qwed_sdk import QWEDClient
-import time
-
-client = QWEDClient()
-
-# Implement backoff
-for attempt in range(3):
-    try:
-        result = client.verify("2+2=4")
-        break
-    except RateLimitError:
-        time.sleep(2 ** attempt)
+# Install
+npm install qwed-ucp-middleware
 ```
 
 ---
 
 ## Verification Failures
 
-### Math: Floating Point Precision
+### "Total mismatch: expected $X, got $Y"
+
+**Cause:** Money Guard detected incorrect total calculation
+
+**Debug:**
 
 ```python
-# Fails due to floating point
-result = client.verify_math("0.1 + 0.2 = 0.3")
-# False! (0.1 + 0.2 = 0.30000000000000004)
+from qwed_ucp.guards import MoneyGuard
+from decimal import Decimal
+
+guard = MoneyGuard()
+result = guard.verify(checkout)
+
+if not result.verified:
+    print(f"Expected total: {result.expected}")
+    print(f"Actual total: {result.actual}")
+    print(f"Difference: {result.difference}")
 ```
 
-**Solution:** Use tolerance parameter:
+**Common causes:**
+
+* Discount not subtracted
+* Tax calculated on wrong base
+* Rounding differences
+
+**Fix:** Use `Decimal` for monetary calculations:
 
 ```python
-result = client.verify_math("0.1 + 0.2 = 0.3", tolerance=1e-10)
-# True
-```
+from decimal import Decimal, ROUND_HALF_UP
 
-### Logic: Unsatisfiable Constraints
-
-```
-Error: No satisfying assignment found
-```
-
-**Solution:** Check for contradictions:
-
-```python
-# This is unsatisfiable
-"(AND (GT x 10) (LT x 5))"  # x > 10 AND x < 5 - impossible!
-
-# Check satisfiability first
-result = client.check_satisfiability("(AND (GT x 10) (LT x 5))")
-print(result.satisfiable)  # False
-```
-
-### Code: Timeout
-
-```
-Error: Verification timeout after 30s
-```
-
-**Solution:**
-
-1. Increase timeout: `client.verify_code(code, timeout=60)`
-2. Simplify code (reduce loops, recursion)
-3. Use bounded verification
-
----
-
-## SDK Issues
-
-### Import Error
-
-```
-ModuleNotFoundError: No module named 'qwed_sdk'
-```
-
-**Solution:**
-
-```bash
-pip install qwed
-# or
-pip install qwed-sdk
-```
-
-### Async Not Working
-
-```python
-# Wrong - missing await
-result = client.verify("2+2=4")  # Returns coroutine, not result
-```
-
-**Solution:**
-
-```python
-# Sync client
-from qwed_sdk import QWEDClient
-client = QWEDClient()
-result = client.verify("2+2=4")
-
-# Async client
-from qwed_sdk import QWEDAsyncClient
-async with QWEDAsyncClient() as client:
-    result = await client.verify("2+2=4")  # Must await!
+subtotal = Decimal("100.00")
+discount = subtotal * Decimal("0.10")  # 10%
+tax = (subtotal - discount) * Decimal("0.0825")
+total = (subtotal - discount + tax).quantize(Decimal("0.01"), ROUND_HALF_UP)
 ```
 
 ---
 
-## DSL Syntax Errors
+### "Line item mismatch: qty × price ≠ line_total"
 
-### Unknown Operator
+**Cause:** Line Items Guard detected math error
 
+**Debug:**
+
+```python
+for item in checkout["line_items"]:
+    expected = item["quantity"] * item["item"]["price"]
+    print(f"Item: {item['id']}")
+    print(f"  {item['quantity']} × ${item['item']['price']} = ${expected}")
 ```
-SECURITY BLOCK: Unknown operator 'CHECK_IF_VALID'
-```
 
-**Solution:** Only use allowed operators:
+**Common causes:**
 
-| Allowed        | Not Allowed     |
-| -------------- | --------------- |
-| AND, OR, NOT   | CHECK, VALIDATE |
-| GT, LT, EQ     | GREATER, LESS   |
-| IMPLIES, IFF   | IF, THEN        |
-| FORALL, EXISTS | ALL, ANY        |
+* Floating-point precision issues
+* Wrong quantity multiplied
+* Missing items in calculation
+
+---
+
+### "Invalid currency: JPY amounts cannot have decimals"
+
+**Cause:** Currency Guard detected invalid format
+
+**Zero-decimal currencies:**
+
+* JPY (Japanese Yen)
+* KRW (Korean Won)
+* VND (Vietnamese Dong)
+
+**Fix:**
 
 ```python
 # Wrong
-"(CHECK_IF_VALID x)"
+{"currency": "JPY", "amount": 1000.50}
 
 # Correct
-"(GT x 0)"
+{"currency": "JPY", "amount": 1000}
 ```
 
-### Missing Parentheses
+---
+
+### "Invalid state transition"
+
+**Cause:** State Guard detected invalid checkout flow
+
+**Valid transitions:**
 
 ```
-SyntaxError: Missing closing ')'
+incomplete → ready_for_complete → completed
+                               → failed → cancelled
 ```
 
-**Solution:** Count your parentheses:
+**Invalid examples:**
+
+* `completed → incomplete` (can't go back)
+* `cancelled → ready_for_complete` (can't resurrect)
+
+**Fix:** Follow the state machine flow properly.
+
+---
+
+## Middleware Issues
+
+### FastAPI middleware not intercepting requests
+
+**Check route configuration:**
 
 ```python
-# Wrong - 3 open, 2 close
-"(AND (GT x 5) (LT y 10)"
+# Make sure middleware is added BEFORE routes
+app = FastAPI()
+app.add_middleware(QWEDUCPMiddleware)  # First
 
-# Correct - 3 open, 3 close
-"(AND (GT x 5) (LT y 10))"
+@app.post("/checkout")  # Then routes
+async def checkout(): ...
+```
+
+**Check verify_paths:**
+
+```python
+app.add_middleware(
+    QWEDUCPMiddleware,
+    verify_paths=["/checkout", "/api/v1/checkout"]  # Must match your routes
+)
+```
+
+---
+
+### Express middleware returns 500 instead of 422
+
+**Check error handling:**
+
+```javascript
+app.use('/checkout', createQWEDUCPMiddleware({
+    onFailure: (error, req, res) => {
+        // Make sure this doesn't throw
+        res.status(422).json({
+            error: error.message
+        });
+    }
+}));
+```
+
+---
+
+### CORS issues with middleware
+
+**Solution for FastAPI:**
+
+```python
+from fastapi.middleware.cors import CORSMiddleware
+
+# Add CORS BEFORE QWED-UCP
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+app.add_middleware(QWEDUCPMiddleware)
 ```
 
 ---
 
 ## Performance Issues
 
-### Slow Verification
+### Verification is slow
 
-**Possible causes:**
-
-1. Complex expressions with many variables
-2. Large code files
-3. Deep recursion in symbolic execution
-
-**Solutions:**
+**Optimize with caching:**
 
 ```python
-# 1. Use caching
-from qwed_sdk import QWEDClient
-client = QWEDClient(cache=True)
+from functools import lru_cache
 
-# 2. Batch requests
-results = client.verify_batch([
-    {"query": "2+2=4"},
-    {"query": "3+3=6"},
-])
-
-# 3. Use async for parallel requests
-async def verify_many(queries):
-    async with QWEDAsyncClient() as client:
-        tasks = [client.verify(q) for q in queries]
-        return await asyncio.gather(*tasks)
+@lru_cache(maxsize=1000)
+def verify_cached(checkout_hash: str, checkout_json: str):
+    return verifier.verify_checkout(json.loads(checkout_json))
 ```
 
-### High Memory Usage
-
-**Solution:** Stream large results:
+**Skip unchanged checkouts:**
 
 ```python
-# For large batch operations
-for result in client.verify_batch_stream(large_list):
-    process(result)
-    # Processes one at a time, not all in memory
+# Calculate hash first
+checkout_hash = hash(frozenset(checkout.items()))
+if checkout_hash in verified_cache:
+    return verified_cache[checkout_hash]
 ```
 
 ---
 
-## Common Error Codes
+## Common Errors Reference
 
-| Code   | Meaning            | Solution             |
-| ------ | ------------------ | -------------------- |
-| `E001` | Invalid expression | Check syntax         |
-| `E002` | Type mismatch      | Check variable types |
-| `E003` | Division by zero   | Add guards           |
-| `E004` | Timeout            | Simplify query       |
-| `E005` | Rate limit         | Implement backoff    |
-| `E401` | Auth failed        | Check API key        |
-| `E500` | Server error       | Contact support      |
+| Error Message               | Guard     | Likely Cause            | Fix                  |
+| --------------------------- | --------- | ----------------------- | -------------------- |
+| "Total mismatch"            | Money     | Wrong total calculation | Recalculate total    |
+| "Line item mismatch"        | LineItems | qty × price error       | Check each line      |
+| "Invalid currency"          | Currency  | Bad format              | Check ISO 4217       |
+| "Invalid transition"        | State     | Wrong state flow        | Follow state machine |
+| "Schema validation failed"  | Schema    | Missing fields          | Check UCP schema     |
+| "Discount exceeds subtotal" | Discount  | Over 100% off           | Cap discount         |
 
 ---
 
 ## Getting Help
 
-1. **Documentation:** [docs.qwedai.com](https://docs.qwedai.com)
-2. **GitHub Issues:** [github.com/QWED-AI/qwed-verification/issues](https://github.com/QWED-AI/qwed-verification/issues)
-3. **Email:** support@qwedai.com
-4. **Intercom:** Chat widget on docs site
-
----
-
-## Debug Mode
-
-Enable debug logging:
-
-```python
-import logging
-logging.basicConfig(level=logging.DEBUG)
-
-from qwed_sdk import QWEDClient
-client = QWEDClient()
-
-# Now you'll see detailed request/response logs
-result = client.verify("2+2=4")
-```
+1. **GitHub Issues:** [github.com/QWED-AI/qwed-ucp/issues](https://github.com/QWED-AI/qwed-ucp/issues)
+2. **Documentation:** [docs.qwedai.com/ucp](https://docs.qwedai.com/docs/ucp/overview)
+3. **UCP Protocol:** [developers.google.com/commerce/ucp](https://developers.google.com/commerce/ucp)
