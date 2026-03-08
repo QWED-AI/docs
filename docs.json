@@ -20,6 +20,11 @@
           "anchor": "PyPI",
           "icon": "python",
           "href": "https://pypi.org/project/qwed/"
+        },
+        {
+          "anchor": "Docker",
+          "icon": "docker",
+          "href": "https://hub.docker.com/orgs/qwedai/repositories"
         }
       ]
     },
@@ -436,11 +441,11 @@
         ]
       }
     ],
-    "copyright": "© 2026 QWED AI. All rights reserved."
+    "copyright": "\u00a9 2026 QWED AI. All rights reserved."
   },
   "description": "Official documentation for QWED. Learn how to integrate model-agnostic deterministic verification for LLMs using formal symbolic safety rails.",
   "banner": {
-    "content": "⭐ If you find QWED helpful, consider [giving us a star on GitHub](https://github.com/QWED-AI/qwed-verification)!",
+    "content": "\u2b50 If you find QWED helpful, consider [giving us a star on GitHub](https://github.com/QWED-AI/qwed-verification)!",
     "dismissible": true
   },
   "integrations": {
