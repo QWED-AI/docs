@@ -1,90 +1,221 @@
 ---
 sidebar_position: 1
-title: Verification Engines
-description: Explore QWED's 11 specialized verification engines. Each uses deterministic methods first with LLM fallback for math, logic, code, SQL, and more.
+title: Overview
+description: QWED-Finance is a guardrail library for financial AI using SymPy and Z3 to prevent LLM hallucinations. Features 9 specialized guards for compliance and calculations.
 ---
 
-# Verification Engines
+# QWED-Finance
 
-QWED provides **11 specialized verification engines**, each using deterministic methods first and LLM only as fallback.
+**The Seatbelt for Banking Agents** 🏦
 
-## Engine Overview
+> When an LLM told a customer his Chase card had "$12,889" in rewards, QWED-Finance would have caught the hallucination before it caused a lawsuit.
 
-| Engine        | Technology          | Key Features                                          |
-| ------------- | ------------------- | ----------------------------------------------------- |
-| **Math**      | SymPy + Decimal     | Calculus, Matrix ops, NPV/IRR, Statistics             |
-| **Logic**     | Z3 Theorem Prover   | ForAll/Exists quantifiers, BitVectors, Arrays         |
-| **Reasoning** | Multi-LLM + Cache   | Chain-of-thought validation, Result caching           |
-| **Stats**     | Wasm/Docker Sandbox | Secure code execution with AST validation             |
-| **Fact**      | TF-IDF + NLP        | Semantic similarity, Entity matching, Citations       |
-| **Graph**     | Knowledge Graph     | Triple verification (Subject-Predicate-Object)        |
-| **Code**      | Multi-Lang AST      | Python, JavaScript, Java, Go security analysis        |
-| **SQL**       | SQLGlot AST         | Complexity limits, Cost estimation, Schema validation |
-| **Taint**     | Data Flow Analysis  | Trace untrusted inputs to sensitive sinks             |
-| **Image**     | Deterministic + VLM | Metadata extraction, Size verification, Multi-VLM     |
-| **Schema**    | Pydantic + Math     | JSON structure + embedded calculation checks          |
+# QWED Finance (v2.0.1)
 
-## Deterministic-First Philosophy
+**Deterministic Verification for Financial AI**
 
-All engines now follow a **deterministic-first** approach:
+QWED Finance is a specialized guardrail library designed to prevent financial hallucinations in Large Language Models (LLMs). It uses **Neurosymbolic AI**—combining the flexibility of GenAI with the mathematical certainty of symbolic solvers (SymPy, Z3) and standard financial algorithms.
 
-1. **Try deterministic methods first** (100% reproducible)
-2. **Fall back to LLM only when necessary**
-3. **Discount LLM confidence** when used
+> **New in v2.0.1:** Added **BondGuard**, **FXGuard**, and **RiskGuard** for institutional-grade analytics.
+
+## Why QWED Finance?
+
+LLMs struggle with basic math and strict logic. In finance, close enough is not good enough.
+
+* **Problem:** LLM says "IRR is 12%" (when it's actually 11.8%)
+* **Solution:** QWED calculates the *exact* IRR symbolically and either validates or corrects the LLM.
+
+## Key Features
+
+* ✅ **9 Specialized Guards:** Compliance, Calendar, Derivatives, Messages, ISO, Query, **Bond**, **FX**, **Risk**.
+* ✅ **GitHub Action v2.0:** Integrated CI/CD verifier with SARIF support for security dashboards.
+* ✅ **Audit Trails:** Cryptographic attestation of verification results.
+* ✅ **Zero Hallucination:** Fallback to deterministic engines ensures 100% mathematical accuracy.
+
+## The 4 Pillars of Banking Verification
+
+| Pillar               | Guard                            | Engine     | Use Case                  |
+| -------------------- | -------------------------------- | ---------- | ------------------------- |
+| **Calculation**      | Finance + Calendar + Derivatives | SymPy      | NPV, IRR, Options pricing |
+| **Regulation**       | Compliance                       | Z3         | KYC/AML, OFAC sanctions   |
+| **Interoperability** | Message                          | XML Schema | ISO 20022, SWIFT MT       |
+| **Data Safety**      | Query                            | SQLGlot    | SQL injection prevention  |
+
+## Quick Example
 
 ```python
-# Example: Fact verification is now deterministic!
-result = client.verify_fact(
-    claim="Paris is in France",
-    context="Paris is the capital of France."
+from qwed_finance import ComplianceGuard
+
+guard = ComplianceGuard()
+
+# Verify AML flagging decision
+result = guard.verify_aml_flag(
+    amount=15000,        # Over $10k threshold
+    country_code="US",
+    llm_flagged=True     # LLM flagged it
 )
-# Uses TF-IDF similarity + entity matching
-# No LLM needed for most claims!
+
+print(result.compliant)  # True ✅
+print(result.proof)      # "amount >= 10000 → flag required"
 ```
 
-> 📖 **See [Determinism Guarantee](/advanced/determinism-guarantee)** for the full engine classification and how to check if a response is `SYMBOLIC` or `HEURISTIC`.
+## Architecture
 
-## Engine Selection
+### High-Level Flow
 
-QWED auto-detects the appropriate engine:
-
-| Content Pattern                     | Detected Engine |
-| ----------------------------------- | --------------- |
-| `2+2=4`, `sqrt(16)`, `derivative`   | Math            |
-| `(AND ...)`, `ForAll`, `Exists`     | Logic           |
-| `SELECT`, `INSERT`, `DROP`          | SQL             |
-| ` ```python `, `import`, `function` | Code            |
-| Claims with context                 | Fact            |
-| Image bytes + claim                 | Image           |
-
-Or specify explicitly:
-
-```python
-result = client.verify(query, type="math")
+```mermaid
+flowchart TB
+    subgraph Agent["🤖 Banking Agent"]
+        LLM["LLM (GPT-4, Claude)"]
+    end
+    
+    subgraph QWED["🛡️ QWED-Finance v1.0.0"]
+        direction TB
+        subgraph Guards["Verification Guards"]
+            CG["Compliance Guard<br/>(Z3 Logic)"]
+            CAL["Calendar Guard<br/>(SymPy)"]
+            DG["Derivatives Guard<br/>(Black-Scholes)"]
+            MG["Message Guard<br/>(XML Schema)"]
+            QG["Query Guard<br/>(SQLGlot AST)"]
+        end
+        XG["Cross-Guard<br/>(Multi-layer)"]
+        Receipt["📋 Verification Receipt<br/>SHA-256 + Timestamp"]
+    end
+    
+    subgraph Output["✅ Verified Output"]
+        Bank["Banking System"]
+        SWIFT["SWIFT Network"]
+        DB["Database"]
+    end
+    
+    LLM -->|"Tool Call"| Guards
+    Guards --> XG
+    XG --> Receipt
+    Receipt -->|"Approved"| Output
+    Receipt -->|"Rejected"| LLM
 ```
 
-## Engine Documentation
+### Guard Selection Flow
 
-### Deterministic Engines
+```mermaid
+flowchart LR
+    Input["LLM Output"] --> Detect{"Detect Type"}
+    
+    Detect -->|"$$ Amount"| CG["Compliance Guard"]
+    Detect -->|"Date/Time"| CAL["Calendar Guard"]
+    Detect -->|"Option Price"| DG["Derivatives Guard"]
+    Detect -->|"XML/SWIFT"| MG["Message Guard"]
+    Detect -->|"SQL Query"| QG["Query Guard"]
+    
+    CG --> Result["Verified ✓ / Rejected ✗"]
+    CAL --> Result
+    DG --> Result
+    MG --> Result
+    QG --> Result
+```
 
-* [Math Engine](/engines/math) - Calculus, Matrix, Financial
-* [Logic Engine](/engines/logic) - Quantifiers, Theorem Proving
-* [Schema Engine](/engines/schema) - JSON Structure & Math
+### Verification Engine Stack
 
-### Security Engines
+```mermaid
+graph TB
+    subgraph "QWED-Finance"
+        subgraph "Layer 1: Guards"
+            G1["Compliance"] 
+            G2["Calendar"]
+            G3["Derivatives"]
+            G4["Message"]
+            G5["Query"]
+        end
+        
+        subgraph "Layer 2: Engines"
+            E1["🔬 Z3 SMT Solver"]
+            E2["📐 SymPy Symbolic Math"]
+            E3["📊 Black-Scholes Calculus"]
+            E4["📄 XML Schema Validation"]
+            E5["🗃️ SQLGlot AST Parser"]
+        end
+        
+        subgraph "Layer 3: Audit"
+            A1["Verification Receipt"]
+            A2["Audit Log"]
+        end
+    end
+    
+    G1 --> E1
+    G2 --> E2
+    G3 --> E3
+    G4 --> E4
+    G5 --> E5
+    
+    E1 --> A1
+    E2 --> A1
+    E3 --> A1
+    E4 --> A1
+    E5 --> A1
+    A1 --> A2
+```
 
-* [Code Engine](/engines/code) - Multi-language Security
-* [SQL Engine](/engines/sql) - Complexity Limits
-* [Taint Engine](/engines/taint) - Data Flow Analysis
+### Payment Verification Sequence
 
-### Data Verification Engines
+```mermaid
+sequenceDiagram
+    participant User
+    participant Agent as Banking Agent
+    participant QWED as QWED-Finance
+    participant Bank as Bank API
+    
+    User->>Agent: "Transfer $15,000 to John"
+    Agent->>QWED: verify_payment_token()
+    
+    Note over QWED: Check 1: Amount limits
+    Note over QWED: Check 2: AML threshold ($10k)
+    Note over QWED: Check 3: KYC status
+    Note over QWED: Check 4: Sanctions screening
+    
+    alt All checks pass
+        QWED-->>Agent: ✅ Approved + Receipt
+        Agent->>Bank: Execute transfer
+        Bank-->>User: Transfer complete
+    else AML flag required
+        QWED-->>Agent: ⚠️ Pending Review
+        Agent-->>User: "Flagged for compliance review"
+    else Sanctions hit
+        QWED-->>Agent: ❌ Blocked
+        Agent-->>User: "Transaction blocked"
+    end
+```
 
-* [Stats Engine](/engines/stats) - Wasm Sandbox Execution
-* [Fact Engine](/engines/fact) - TF-IDF + Citations
-* [Graph Engine](/engines/graph) - Knowledge Graph Triples
-* [Image Engine](/engines/image) - Deterministic Verification
+## Why Not Just Trust the LLM?
 
-### Orchestration Engines
+LLMs are **probabilistic**. They can:
 
-* [Reasoning Engine](/engines/reasoning) - Multi-LLM Validation
-* [Consensus Engine](/engines/consensus) - Parallel Execution
+* Hallucinate numbers ($12,889 instead of $2.88)
+* Miss compliance thresholds (CTR at $10,000.01)
+* Generate malformed XML (rejected by SWIFT)
+* Create dangerous SQL (DROP TABLE)
+
+QWED-Finance uses **deterministic** verification:
+
+| LLM Output                 | QWED Verification   | Engine    |
+| -------------------------- | ------------------- | --------- |
+| "NPV is $180.42"           | SymPy recalculates  | Math      |
+| "Transaction is compliant" | Z3 checks threshold | Logic     |
+| "Payment XML is valid"     | Schema validation   | Structure |
+| "SELECT \* FROM users"     | AST analysis        | SQL       |
+
+## Regulatory Alignment
+
+QWED-Finance aligns with:
+
+* **RBI FREE-AI Framework** (India 2025)
+* **BSA/FinCEN** (AML/CTR thresholds)
+* **OFAC** (Sanctions screening)
+* **ISO 20022** (Payment messaging)
+
+> "Accuracy alone is not sufficient - transparency, auditability, and defensible decision logic are required." — India AI Governance Guidelines
+
+## Next Steps
+
+* [The 5 Guards](/finance/guards) - Deep dive into each verification guard
+* [Compliance & Auditing](/finance/compliance) - Receipts and regulatory proof
+* [Integrations](/finance/integrations/ucp) - Connect with UCP and Open Responses
