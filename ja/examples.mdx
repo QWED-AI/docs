@@ -1,214 +1,287 @@
 ---
 sidebar_position: 3
-title: Examples
-description: Real-world QWED-Legal examples including employment contract deadline verification and SaaS liability cap calculations with Python code samples.
+title: Examples & Tutorials
+description: Real-world QWED-MCP examples including financial calculations with compound interest verification. Step-by-step tutorials for common verification scenarios.
 ---
 
-# Real-World Examples
+# Examples & Tutorials
 
-## 1. Employment Contract Deadline
+Real-world examples of using QWED-MCP for verification in different scenarios.
 
-**Scenario:** An AI reviews an employment contract and calculates the probation end date.
+---
+
+## Example 1: Financial Calculations
+
+### Scenario
+
+You're building an AI-powered financial advisor. Users ask for compound interest calculations, and you need to ensure the AI's math is correct.
+
+### Setup
+
+```json
+{
+  "mcpServers": {
+    "qwed-verification": {
+      "command": "qwed-mcp"
+    }
+  }
+}
+```
+
+### Conversation
+
+**User:** Calculate the future value of $10,000 invested at 5% annual interest, compounded monthly, for 10 years.
+
+**Claude's Process:**
+
+1. Calculate: FV = P(1 + r/n)^(nt) = 10000(1 + 0.05/12)^(12×10)
+2. Call `verify_math` to confirm:
+
+```json
+{
+  "expression": "10000 * (1 + 0.05/12)**(12*10)",
+  "claimed_result": "16470.09",
+  "operation": "evaluate"
+}
+```
+
+**Result:** ✅ VERIFIED
+
+**Claude's Response:** The future value is **$16,470.09** (verified).
+
+---
+
+## Example 2: Legal Reasoning
+
+### Scenario
+
+An AI legal assistant needs to verify that conclusions follow from legal premises.
+
+### Conversation
+
+**User:** Under contract law: If both parties agree and consideration is exchanged, a contract is formed. Alice agreed and paid Bob. Is there a valid contract?
+
+**Claude's Process:**
+
+1. Formalize the logic
+2. Call `verify_logic`:
+
+```json
+{
+  "premises": [
+    "if agreed and consideration then contract",
+    "Alice agreed",
+    "consideration exchanged"
+  ],
+  "conclusion": "contract formed"
+}
+```
+
+**Result:** ✅ VERIFIED - The conclusion logically follows.
+
+---
+
+## Example 3: Secure Code Review
+
+### Scenario
+
+A developer asks AI to review their code for security issues.
+
+### Conversation
+
+**User:** Review this login function:
 
 ```python
-from qwed_legal import DeadlineGuard
+def login(username, password):
+    query = f"SELECT * FROM users WHERE name='{username}'"
+    user = db.execute(query)
+    if eval(f"'{password}' == '{user.password}'"):
+        return True
+    return False
+```
 
-guard = DeadlineGuard(country="US")
+**Claude's Process:**
 
-# Employment contract signed Jan 15, 2026
-# Probation period: 90 days
-# LLM claims probation ends: April 10, 2026
+1. Call `verify_code`:
 
-result = guard.verify(
-    signing_date="2026-01-15",
-    term="90 days",
-    claimed_deadline="2026-04-10"
+```json
+{
+  "code": "def login(username, password):\n    query = f\"SELECT * FROM users WHERE name='{username}'\"\n    user = db.execute(query)\n    if eval(f\"'{password}' == '{user.password}'\"):\n        return True\n    return False",
+  "language": "python"
+}
+```
+
+**Result:**
+
+```
+❌ FAILED - Found 2 security issues
+Issues:
+  - Dangerous function call: eval()
+  - Warning: String concatenation in SQL query detected
+```
+
+**Claude's Response:**
+
+🚨 **Security Issues Found:**
+
+1. **SQL Injection** - Direct string formatting in SQL query
+2. **Code Injection** - Using `eval()` for password comparison
+
+**Recommended Fix:**
+
+```python
+def login(username, password):
+    query = "SELECT * FROM users WHERE name = ?"
+    user = db.execute(query, (username,))
+    return password == user.password
+```
+
+---
+
+## Example 4: Research Paper Validation
+
+### Scenario
+
+Verifying statistical claims in AI-assisted research paper review.
+
+### Conversation
+
+**User:** The paper claims: "If the p-value < 0.05, we reject the null hypothesis. Our p-value was 0.03. Therefore, we reject the null hypothesis."
+
+**Claude's Process:**
+
+```json
+{
+  "premises": [
+    "if p_value less than 0.05 then reject_null",
+    "p_value less than 0.05"
+  ],
+  "conclusion": "reject_null"
+}
+```
+
+**Result:** ✅ VERIFIED
+
+---
+
+## Example 5: SQL Query Validation
+
+### Scenario
+
+An AI data analyst generates SQL queries. You need to ensure they're safe before execution.
+
+### Conversation
+
+**User:** Get all orders for user input "admin' OR '1'='1"
+
+**Claude's Process:**
+
+1. Generate query
+2. Call `verify_sql` before responding:
+
+```json
+{
+  "query": "SELECT * FROM orders WHERE user_id = 'admin'' OR ''1''=''1'",
+  "allowed_tables": ["orders", "users", "products"]
+}
+```
+
+**Result:**
+
+```
+❌ FAILED - Potential SQL injection detected
+Issues:
+  - Suspicious tautology pattern: 1=1
+  - Potential injection characters detected
+```
+
+**Claude's Response:**
+
+⚠️ **Security Warning:** The input appears to be a SQL injection attempt. I cannot generate this query safely.
+
+**Safe Alternative:** Use parameterized queries:
+
+```sql
+SELECT * FROM orders WHERE user_id = ?
+-- Pass user_id as parameter
+```
+
+---
+
+## Example 6: Integration with LangChain
+
+### Python Code
+
+```python
+from langchain_anthropic import ChatAnthropic
+from langchain.agents import create_tool_calling_agent, AgentExecutor
+from langchain.tools import StructuredTool
+import subprocess
+import json
+
+# Create QWED tools that call MCP server
+def verify_math(expression: str, claimed_result: str, operation: str = "evaluate") -> str:
+    """Verify mathematical calculations using SymPy."""
+    result = subprocess.run(
+        ["qwed-mcp-cli", "verify_math", 
+         "--expression", expression,
+         "--claimed_result", claimed_result,
+         "--operation", operation],
+        capture_output=True, text=True
+    )
+    return result.stdout
+
+math_tool = StructuredTool.from_function(
+    func=verify_math,
+    name="verify_math",
+    description="Verify mathematical calculations. Use after doing any math."
 )
 
-print(result.verified)  # False!
-print(result.message)
-# ❌ ERROR: Deadline mismatch. 
-# Expected 2026-04-15, but LLM claimed 2026-04-10. 
-# Difference: 5 days.
+# Create agent with verification
+llm = ChatAnthropic(model="claude-3-sonnet")
+agent = create_tool_calling_agent(llm, [math_tool], prompt)
+executor = AgentExecutor(agent=agent, tools=[math_tool])
+
+# Use it
+result = executor.invoke({
+    "input": "What's the integral of 2x? Verify your answer."
+})
 ```
 
 ---
 
-## 2. SaaS Liability Cap
+## Best Practices
 
-**Scenario:** A SaaS contract limits liability to 200% of annual fees.
-
-```python
-from qwed_legal import LiabilityGuard
-
-guard = LiabilityGuard()
-
-# Annual contract value: $500,000
-# Liability cap: 200%
-# LLM claims cap is: $1,500,000
-
-result = guard.verify_cap(
-    contract_value=500_000,
-    cap_percentage=200,
-    claimed_cap=1_500_000
-)
-
-print(result.verified)  # False!
-print(result.message)
-# ❌ ERROR: Liability cap mismatch. 
-# 200% of $500,000.00 = $1,000,000.00, 
-# but LLM claimed $1,500,000.00.
-```
-
----
-
-## 3. Conflicting Termination Clauses
-
-**Scenario:** An NDA contains multiple termination clauses.
-
-```python
-from qwed_legal import ClauseGuard
-
-guard = ClauseGuard()
-
-clauses = [
-    "Either party may terminate this Agreement with 30 days written notice.",
-    "This Agreement shall remain in effect for a minimum of 12 months.",
-    "Discloser may terminate immediately if Recipient breaches confidentiality.",
-]
-
-result = guard.check_consistency(clauses)
-
-print(result.consistent)  # False!
-print(result.message)
-# ⚠️ WARNING: 1 potential conflict(s) detected:
-#   - Clause 1 vs Clause 2: Termination notice (30 days) conflicts 
-#     with minimum term (365 days)
-```
-
----
-
-## 4. Verifying AI-Generated Case Citations
-
-**Scenario:** An AI legal research assistant provides case citations. Verify them.
-
-```python
-from qwed_legal import CitationGuard
-
-guard = CitationGuard()
-
-# Citations provided by LLM
-citations = [
-    "Miranda v. Arizona, 384 U.S. 436 (1966)",          # Real case
-    "Brown v. Board of Education, 347 U.S. 483 (1954)",  # Real case
-    "Smith v. Jones, 123 FAKE 456 (2020)",               # FAKE!
-    "Doe v. Roe, 999 X.Y.Z. 789 (2019)",                 # FAKE!
-]
-
-result = guard.verify_batch(citations)
-
-print(f"Valid: {result.valid}/{result.total}")  # Valid: 2/4
-
-# Check each citation
-for i, cite_result in enumerate(result.citations):
-    status = "✅" if cite_result.valid else "❌"
-    print(f"{status} {citations[i]}")
-    if not cite_result.valid:
-        print(f"   Issues: {cite_result.issues}")
-```
-
-**Output:**
+### 1. Always Verify Before Responding
 
 ```
-Valid: 2/4
-✅ Miranda v. Arizona, 384 U.S. 436 (1966)
-✅ Brown v. Board of Education, 347 U.S. 483 (1954)
-❌ Smith v. Jones, 123 FAKE 456 (2020)
-   Issues: ["Unknown reporter abbreviation: 'FAKE'"]
-❌ Doe v. Roe, 999 X.Y.Z. 789 (2019)
-   Issues: ["Unknown reporter abbreviation: 'X.Y.Z.'"]
+User asks → AI calculates → AI verifies → AI responds
+                            ↓ (if fails)
+                        AI recalculates
 ```
 
----
+### 2. Use Appropriate Tools
 
-## 5. Real Estate Contract with UK Holidays
+| Task              | Tool           |
+| ----------------- | -------------- |
+| Math/calculations | `verify_math`  |
+| Logic/reasoning   | `verify_logic` |
+| Code review       | `verify_code`  |
+| SQL queries       | `verify_sql`   |
 
-**Scenario:** A UK property sale has completion date calculated in business days.
+### 3. Handle Verification Failures
 
-```python
-from qwed_legal import DeadlineGuard
+When verification fails:
 
-# UK holidays (Christmas, Boxing Day, Easter, etc.)
-guard = DeadlineGuard(country="GB")
+1. Acknowledge the error
+2. Recalculate
+3. Verify again
+4. Explain the correction to user
 
-# Contract exchanged Dec 15, 2025
-# Completion: 20 business days
-# Agent claims: Jan 7, 2026
-
-result = guard.verify(
-    signing_date="2025-12-15",
-    term="20 business days",
-    claimed_deadline="2026-01-07"
-)
-
-print(result.verified)  # False!
-# UK has Christmas (25), Boxing Day (26), New Year's Day (1)
-# These are excluded from business days
-print(result.computed_deadline)  # 2026-01-14 (approximately)
-```
-
----
-
-## 6. Multi-Tier Indemnity
-
-**Scenario:** A vendor contract has tiered indemnity limits.
-
-```python
-from qwed_legal import LiabilityGuard
-
-guard = LiabilityGuard()
-
-# Tier 1: First $1M at 100%
-# Tier 2: Next $500K at 50%
-# Total claimed by LLM: $1.3M
-
-tiers = [
-    {"base": 1_000_000, "percentage": 100},  # = $1M
-    {"base": 500_000, "percentage": 50},      # = $250K
-]
-
-result = guard.verify_tiered_liability(tiers, claimed_total=1_300_000)
-
-print(result.verified)  # False!
-print(result.message)
-# ❌ ERROR: Tiered liability mismatch. 
-# Computed total: $1,250,000.00, but LLM claimed $1,300,000.00.
-```
-
----
-
-## 7. Claude Desktop Integration (MCP)
-
-**Scenario:** A lawyer uses Claude Desktop to verify contract deadlines.
-
-When `qwed-mcp` is installed, Claude Desktop gains these tools:
-
-* `verify_legal_deadline`
-* `verify_legal_citation`
-* `verify_legal_liability`
-
-**User:** "Verify: Contract signed Jan 15, 2026 with 30 business days deadline. Is Feb 14 correct?"
-
-**Claude (via MCP):**
+### 4) Explain Verification to Users
 
 ```
-🛑 QWED Legal: BLOCKED. 
-❌ ERROR: Deadline mismatch. Expected 2026-02-27, but claimed 2026-02-14. 
-Difference: 13 days.
+"I calculated X. Let me verify this is correct...
+✅ Verified using symbolic mathematics.
+The answer is definitely X."
 ```
-
----
-
-## Next Steps
-
-* [Troubleshooting](/legal/troubleshooting) - Common issues and solutions
