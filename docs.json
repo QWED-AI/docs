@@ -324,10 +324,6 @@
       {
         "label": "Support",
         "href": "mailto:rahul@qwedai.com"
-      },
-      {
-        "label": "Docker",
-        "href": "https://hub.docker.com/orgs/qwedai/repositories"
       }
     ],
     "primary": {
