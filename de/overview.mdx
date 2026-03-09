@@ -1,99 +1,166 @@
 ---
 sidebar_position: 1
-title: API Overview
-description: QWED RESTful API reference. Learn about base URLs, authentication via API keys, core verification endpoints, and request formats for LLM output verification.
+title: Overview
+description: QWED Legal helps you review contracts with deterministic checks for dates, contradictory clauses, liability terms, and citation accuracy using specialized guards.
 ---
 
-# API Overview
+# QWED-Legal
 
-QWED provides a RESTful API for verification.
+**The Paralegal for AI-Powered Contract Review** 🏛️
 
-## Base URL
+> When lawyers used ChatGPT and cited 6 fake court cases (Mata v. Avianca), QWED-Legal would have caught them before the $5,000 fine.
 
-```
-https://api.qwedai.com/v1
-```
+## What is QWED-Legal?
 
-Or for local development:
+QWED-Legal is a deterministic verification layer for AI-generated legal document analysis. It catches:
 
-```
-http://localhost:8000
-```
-
-## Authentication
-
-All requests require an API key:
+* **Date calculation errors** (30 business days miscalculated)
+* **Contradictory clauses** (Clause A says X, Clause B says Not X)
+* **Liability miscalculations** (200% of $5M ≠ $15M)
+* **Hallucinated citations** (fake case names, invalid reporters)
 
 ```bash
-curl -H "X-API-Key: qwed_your_key" https://api.qwedai.com/v1/health
+pip install qwed-legal
 ```
 
-## Core Endpoints
+## The 6 Guards of Legal Verification
 
-| Method | Endpoint        | Description              |
-| ------ | --------------- | ------------------------ |
-| GET    | `/health`       | Health check             |
-| POST   | `/verify`       | Auto-detect verification |
-| POST   | `/verify/math`  | Math verification        |
-| POST   | `/verify/logic` | Logic verification       |
-| POST   | `/verify/code`  | Code security            |
-| POST   | `/verify/sql`   | SQL validation           |
-| POST   | `/verify/fact`  | Fact checking            |
-| POST   | `/verify/batch` | Batch verification       |
+| Guard                         | Engine                     | Use Case                                         |
+| ----------------------------- | -------------------------- | ------------------------------------------------ |
+| **DeadlineGuard**             | python-dateutil + holidays | Business days, leap years, jurisdiction holidays |
+| **LiabilityGuard**            | Decimal + SymPy            | Cap %, tiered liability, indemnity limits        |
+| **ClauseGuard**               | Z3 SMT Solver              | Contradiction detection, termination conflicts   |
+| **CitationGuard**             | Regex + Bluebook           | Case citations, reporter validation              |
+| **JurisdictionGuard**         | Rule-based logic           | Choice of law, forum selection, CISG             |
+| **StatuteOfLimitationsGuard** | Date calculations          | Claim periods by jurisdiction                    |
 
-## Request Format
+## Quick Example
 
-```json
-{
-  "query": "2+2=4",
-  "type": "math",
-  "options": {
-    "include_attestation": true,
-    "timeout_ms": 30000
-  }
-}
+### Verify a Deadline Calculation
+
+```python
+from qwed_legal import DeadlineGuard
+
+guard = DeadlineGuard()
+result = guard.verify(
+    signing_date="2026-01-15",
+    term="30 business days",
+    claimed_deadline="2026-02-14"  # LLM claimed this
+)
+
+print(result.verified)   # False!
+print(result.computed_deadline)  # 2026-02-27 (correct)
+# ❌ ERROR: Deadline mismatch. Expected 2026-02-27, but LLM claimed 2026-02-14.
 ```
 
-## Response Format
+### Verify a Legal Citation
 
-```json
-{
-  "status": "VERIFIED",
-  "verified": true,
-  "engine": "math",
-  "result": {
-    "is_valid": true,
-    "message": "Expression is correct"
-  },
-  "attestation": "eyJhbGciOiJFUzI1NiIs...",
-  "metadata": {
-    "request_id": "req_abc123",
-    "latency_ms": 45
-  }
-}
+```python
+from qwed_legal import CitationGuard
+
+guard = CitationGuard()
+result = guard.verify("Brown v. Board of Education, 347 U.S. 483 (1954)")
+
+print(result.valid)  # True - valid Bluebook format
+print(result.parsed_components)
+# {'plaintiff': 'Brown', 'defendant': 'Board of Education', 'volume': 347, 'reporter': 'U.S.', 'page': 483, 'year': 1954}
 ```
 
-## Status Codes
+## Architecture
 
-| Code | Meaning      |
-| ---- | ------------ |
-| 200  | Success      |
-| 400  | Bad request  |
-| 401  | Unauthorized |
-| 429  | Rate limited |
-| 500  | Server error |
+### High-Level Flow
 
-## Rate Limits
+```mermaid
+flowchart TB
+    subgraph Agent["🤖 Legal AI Agent"]
+        LLM["LLM (GPT-4, Claude)"]
+    end
+    
+    subgraph QWED["🏛️ QWED-Legal v0.1.0"]
+        direction TB
+        subgraph Guards["6 Verification Guards"]
+            DG["Deadline Guard<br/>(Business Days)"]
+            LG["Liability Guard<br/>(Decimal Math)"]
+            CG["Clause Guard<br/>(Z3 Logic)"]
+            CTG["Citation Guard<br/>(Bluebook)"]
+        end
+        Receipt["📋 Verification Receipt"]
+    end
+    
+    subgraph Output["✅ Verified Output"]
+        Contract["Contract System"]
+        Client["Legal Client"]
+    end
+    
+    LLM -->|"Tool Call"| Guards
+    Guards --> Receipt
+    Receipt -->|"Approved"| Output
+    Receipt -->|"Rejected"| LLM
+```
 
-| Plan       | Requests/min | Requests/day |
-| ---------- | ------------ | ------------ |
-| Free       | 60           | 1,000        |
-| Pro        | 600          | 50,000       |
-| Enterprise | Unlimited    | Unlimited    |
+### Guard Selection Flow
 
-## Detailed Reference
+```mermaid
+flowchart LR
+    Input["LLM Output"] --> Detect{"Detect Type"}
+    
+    Detect -->|"Date/Term"| DG["Deadline Guard"]
+    Detect -->|"$ Amount"| LG["Liability Guard"]
+    Detect -->|"Clause Text"| CG["Clause Guard"]
+    Detect -->|"Case Citation"| CTG["Citation Guard"]
+    
+    DG --> Result["Verified ✓ / Rejected ✗"]
+    LG --> Result
+    CG --> Result
+    CTG --> Result
+```
 
-* [All Endpoints](/api/endpoints)
-* [Authentication](/api/authentication)
-* [Error Codes](/api/errors)
-* [Rate Limits](/api/rate-limits)
+## Audit Log: Real Hallucinations Caught
+
+| Contract Input                                                                            | LLM Claim                | QWED Verdict                       |
+| ----------------------------------------------------------------------------------------- | ------------------------ | ---------------------------------- |
+| "Net 30 Business Days from Dec 20"                                                        | Jan 19                   | 🛑 **BLOCKED** (Actual: Feb 2)     |
+| "Liability Cap: 2x Fees ($50k)"                                                           | $200,000                 | 🛑 **BLOCKED** (Actual: $100,000)  |
+| "Seller may terminate with 30 days notice" + "Neither party may terminate before 90 days" | "Clauses are consistent" | 🛑 **BLOCKED** (Conflict detected) |
+| "Smith v. Jones, 999 FAKE 123"                                                            | Valid citation           | 🛑 **BLOCKED** (Unknown reporter)  |
+
+## Why Not Just Trust the LLM?
+
+LLMs are **probabilistic**. They can:
+
+* **Hallucinate case citations** (Mata v. Avianca scandal)
+* **Miscalculate business days** (ignore holidays, weekends)
+* **Miss contradictory clauses** (termination notice vs minimum term)
+* **Get percentage math wrong** (200% of $5M ≠ $15M)
+
+QWED-Legal uses **deterministic** verification:
+
+| LLM Output               | QWED Verification       | Engine           |
+| ------------------------ | ----------------------- | ---------------- |
+| "Deadline is Feb 14"     | Calculate business days | python-dateutil  |
+| "Liability cap is $15M"  | Decimal math            | SymPy            |
+| "Clauses are consistent" | Z3 satisfiability       | Z3 SMT           |
+| "Citation is valid"      | Bluebook regex          | Pattern matching |
+
+## Jurisdiction Support
+
+DeadlineGuard supports jurisdiction-specific holidays:
+
+```python
+from qwed_legal import DeadlineGuard
+
+# US holidays (default)
+us_guard = DeadlineGuard(country="US")
+
+# UK holidays
+uk_guard = DeadlineGuard(country="GB")
+
+# California-specific holidays
+ca_guard = DeadlineGuard(country="US", state="CA")
+```
+
+## Next Steps
+
+* [The 6 Guards](/legal/guards) - Deep dive into each verification guard
+* [Examples](/legal/examples) - Real-world contract verification scenarios
+* [Troubleshooting](/legal/troubleshooting) - Common issues and solutions
