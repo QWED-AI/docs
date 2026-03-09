@@ -333,6 +333,7 @@
     }
   },
   "footer": {
+    "description": "The AI Verification Layer. Ensuring accuracy, logic, and security in deterministic domains.",
     "socials": {
       "x": "https://x.com/Qwed_ai",
       "github": "https://github.com/QWED-AI",
