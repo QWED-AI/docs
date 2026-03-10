@@ -3,9 +3,9 @@
   "theme": "aspen",
   "name": "QWED Documentation",
   "colors": {
-    "primary": "#7C3AED",
-    "light": "#A78BFA",
-    "dark": "#5B21B6"
+    "primary": "#10b981",
+    "light": "#34d399",
+    "dark": "#047857"
   },
   "favicon": "/favicon.svg",
   "navigation": {
@@ -455,5 +455,8 @@
   },
   "seo": {
     "indexing": "all"
+  },
+  "appearance": {
+    "default": "system"
   }
 }
