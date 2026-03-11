@@ -5,7 +5,25 @@
   "colors": {
     "primary": "#10b981",
     "light": "#34d399",
-    "dark": "#047857"
+    "dark": "#047857",
+    "background": {
+      "dark": "#020408"
+    },
+    "anchors": {
+      "from": "#10b981",
+      "to": "#06b6d4"
+    }
+  },
+  "rounded": "default",
+  "font": {
+    "headings": {
+      "family": "Inter",
+      "weight": 700
+    },
+    "body": {
+      "family": "Inter",
+      "weight": 400
+    }
   },
   "favicon": "/favicon.svg",
   "navigation": {
@@ -340,7 +358,6 @@
     }
   },
   "footer": {
-    "description": "The AI Verification Layer. Ensuring accuracy, logic, and security in deterministic domains.",
     "socials": {
       "x": "https://x.com/Qwed_ai",
       "github": "https://github.com/QWED-AI",
@@ -443,9 +460,29 @@
             "href": "https://github.com/QWED-AI/qwed-learning"
           }
         ]
+      },
+      {
+        "header": "Resources",
+        "items": [
+          {
+            "label": "Releases",
+            "href": "/releases"
+          },
+          {
+            "label": "Changelog",
+            "href": "/changelog"
+          },
+          {
+            "label": "Whitepaper",
+            "href": "/whitepaper"
+          },
+          {
+            "label": "Contributing",
+            "href": "/advanced/contributor-onboarding"
+          }
+        ]
       }
-    ],
-    "copyright": "\u00a9 2026 QWED AI. All rights reserved."
+    ]
   },
   "description": "Official documentation for QWED. Learn how to integrate model-agnostic deterministic verification for LLMs using formal symbolic safety rails.",
   "banner": {
