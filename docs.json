@@ -5,25 +5,7 @@
   "colors": {
     "primary": "#10b981",
     "light": "#34d399",
-    "dark": "#047857",
-    "background": {
-      "dark": "#020408"
-    },
-    "anchors": {
-      "from": "#10b981",
-      "to": "#06b6d4"
-    }
-  },
-  "rounded": "default",
-  "font": {
-    "headings": {
-      "family": "Inter",
-      "weight": 700
-    },
-    "body": {
-      "family": "Inter",
-      "weight": 400
-    }
+    "dark": "#047857"
   },
   "favicon": "/favicon.svg",
   "navigation": {
@@ -404,59 +386,30 @@
         ]
       },
       {
-        "header": "Legal",
-        "items": [
-          {
-            "label": "License",
-            "href": "https://qwedai.com/license"
-          },
-          {
-            "label": "Terms and condition",
-            "href": "https://qwedai.com/terms"
-          },
-          {
-            "label": "Privacy policy",
-            "href": "https://qwedai.com/privacy"
-          },
-          {
-            "label": "Mission and Vision",
-            "href": "https://qwedai.com/vision"
-          }
-        ]
-      },
-      {
         "header": "Ecosystem",
         "items": [
           {
-            "label": "Qwed UCP",
+            "label": "QWED UCP",
             "href": "/ucp/overview"
           },
           {
-            "label": "Qwed Open Responses",
-            "href": "/open-responses/overview"
-          },
-          {
-            "label": "Qwed Finance",
-            "href": "/finance/overview"
-          },
-          {
-            "label": "Qwed Legal",
-            "href": "/legal/overview"
-          },
-          {
-            "label": "Qwed Tax",
-            "href": "/tax/overview"
-          },
-          {
-            "label": "Qwed Infra",
-            "href": "/infra/overview"
-          },
-          {
-            "label": "Qwed MCP",
+            "label": "QWED MCP",
             "href": "/mcp/overview"
           },
           {
-            "label": "Qwed Learning",
+            "label": "Open Responses",
+            "href": "/open-responses/overview"
+          },
+          {
+            "label": "QWED Finance",
+            "href": "/finance/overview"
+          },
+          {
+            "label": "QWED Legal",
+            "href": "/legal/overview"
+          },
+          {
+            "label": "QWED Learning",
             "href": "https://github.com/QWED-AI/qwed-learning"
           }
         ]
@@ -473,12 +426,16 @@
             "href": "/changelog"
           },
           {
-            "label": "Whitepaper",
-            "href": "/whitepaper"
+            "label": "License",
+            "href": "https://qwedai.com/license"
           },
           {
-            "label": "Contributing",
-            "href": "/advanced/contributor-onboarding"
+            "label": "Privacy Policy",
+            "href": "https://qwedai.com/privacy"
+          },
+          {
+            "label": "Terms",
+            "href": "https://qwedai.com/terms"
           }
         ]
       }
