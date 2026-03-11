@@ -54,6 +54,13 @@
                 ]
               },
               {
+                "group": "Releases",
+                "pages": [
+                  "releases",
+                  "changelog"
+                ]
+              },
+              {
                 "group": "Help",
                 "pages": [
                   "troubleshooting",

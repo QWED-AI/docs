@@ -1,0 +1,99 @@
+---
+title: "Changelog"
+description: "All notable changes to QWED Protocol — releases, features, security fixes, and improvements."
+---
+
+## v4.0.0 — Sentinel Edition 🛡️
+**Released: March 12, 2026** · [GitHub Release](https://github.com/QWED-AI/qwed-verification/releases/tag/v4.0.0) · [PyPI](https://pypi.org/project/qwed/4.0.0/)
+
+> **147 commits** since v3.0.1 — the largest update in QWED history.
+
+### 🆕 Agentic Security Guards (Phase 17)
+
+A brand-new guard subsystem for securing AI agent tool chains and RAG pipelines:
+
+- **RAGGuard** — Detects prompt injection, data poisoning, and context manipulation in RAG pipelines. IRAC-compliant reporting.
+- **ExfiltrationGuard** — Prevents data exfiltration through agent tool calls by analyzing output patterns and destination validation.
+- **MCP Poison Guard** — Detects poisoned or tampered MCP tool definitions before agent execution.
+
+All three guards went through **five rounds** of security review via CodeRabbit and SonarCloud.
+
+### 🆕 New Standalone Guards
+
+- **SovereigntyGuard** — Enforces data residency policies and local routing rules (GDPR, data localization).
+- **ToxicFlowGuard** — Stateful detection of toxic tool-chaining patterns across multi-step agent workflows.
+- **SelfInitiatedCoTGuard (S-CoT)** — Verifies self-initiated Chain-of-Thought logic paths for reasoning integrity.
+
+### 🆕 Process Determinism
+
+A new class of deterministic verification:
+
+- **ProcessVerifier** — IRAC/milestone-based process verification with decimal scoring, budget-aware timeouts, and structured compliance reporting. Ensures AI-driven workflows follow deterministic process steps — not just correct answers, but correct *procedures*.
+
+### 🔒 Critical Security Fixes
+
+- Replaced all `eval()` with AST-compiled execution (Code Injection Prevention).
+- Patched critical sandbox escape and namespace mismatch.
+- Hardened SymPy input parsing against injection.
+- Fixed URL whitespace bypass and protocol wildcard bypass.
+- Resolved CVE-2026-24049 (Critical), CVE-2025-8869, and HTTP request smuggling.
+- Fixed all 19 Snyk Code findings.
+- Secured exception handling across `verify_logic`, `ControlPlane`, `verify_stats`, `agent_tool_call`.
+
+### 🐳 Docker Hardening
+
+- Pinned base image digests with hash-verified requirements
+- Non-root user execution with `gosu`/`runuser`
+- Automated Docker Hub publishing on release
+- SBOM generation (SPDX) and Docker Scout scanning
+
+```bash
+docker pull qwedai/qwed-verification:4.0.0
+```
+
+### 🔧 CI/CD Infrastructure
+
+- **Sentry SDK** — Error tracking and monitoring.
+- **CircleCI** — Python matrix testing (3.10, 3.11, 3.12).
+- **SonarCloud** — Code quality and coverage.
+- **Snyk** — Security scanning with SARIF output.
+- **Docker Auto-Publish** — Automated image push on every release.
+
+### 📝 Documentation & Badges
+
+- OpenSSF Best Practices badge (Silver)
+- Snyk security badge and partner attribution
+- Docker Hub pulls badge and BuildKit badge
+- 11 verification engines across all docs
+
+---
+
+## v3.0.1 — Ironclad Update 🦾
+**Released: February 4, 2026** · [GitHub Release](https://github.com/QWED-AI/qwed-verification/releases/tag/v3.0.1)
+
+### 🛡️ Critical Security Hardening
+- **CodeQL Remediation**: Resolved 50+ alerts including ReDoS, Clear-text Logging, and Exception Exposure.
+- **Workflow Permissions**: Enforced `permissions: contents: read` across all GitHub Actions to adhere to Least Privilege.
+- **PII Protection**: Implemented robust `redact_pii` logic in all API endpoints and exception handlers.
+
+### 📝 Compliance
+- **Snyk Attribution**: Added Snyk attribution to README and Documentation footer for Partner Program compliance.
+
+### 🐛 Bug Fixes
+- **API Stability**: Fixed unhandled exceptions in `verify_logic` and `agent_tool_call` endpoints.
+
+---
+
+## v2.4.1 — The Reasoning Engine 🚀
+**Released: January 20, 2026** · [GitHub Release](https://github.com/QWED-AI/qwed-verification/releases/tag/v2.4.1)
+
+### New Features
+- **Optimization Engine (`verify_optimization`)**: Added `LogicVerifier` support for Z3's `Optimize` context.
+- **Vacuity Checker (`check_vacuity`)**: Added logical proof to detect "Vacuous Truths".
+
+### Enterprise Updates
+- **Dockerized GitHub Action**: The main `qwed-verification` action now runs in a Docker container.
+
+### Fixes & Improvements
+- Updated `logic_verifier.py` with additive, non-breaking methods.
+- Replaced shell-based `action_entrypoint.sh` with robust Python handler `action_entrypoint.py`.
