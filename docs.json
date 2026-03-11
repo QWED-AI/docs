@@ -216,7 +216,8 @@
                   "sdks/python",
                   "sdks/typescript",
                   "sdks/go",
-                  "sdks/rust"
+                  "sdks/rust",
+                  "sdks/guards"
                 ]
               }
             ]
