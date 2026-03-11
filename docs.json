@@ -448,9 +448,6 @@
   "integrations": {
     "gtm": {
       "tagId": "GTM-WFWSMKGZ"
-    },
-    "intercom": {
-      "appId": "q2zprv83"
     }
   },
   "seo": {
