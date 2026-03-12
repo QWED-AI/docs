@@ -115,6 +115,40 @@ qwed verify-code -f script.py
 qwed batch -f queries.json
 ```
 
+## Guards
+
+The SDK includes security guards for protecting AI agent pipelines:
+
+```python
+from qwed_sdk.guards import (
+    RAGGuard,
+    ExfiltrationGuard,
+    MCPPoisonGuard,
+    SelfInitiatedCoTGuard,
+    SovereigntyGuard,
+)
+
+# Prevent RAG hallucinations from wrong document chunks
+rag_guard = RAGGuard(max_drm_rate="1/10")
+result = rag_guard.verify_retrieval_context(
+    target_document_id="contract_v2",
+    retrieved_chunks=chunks
+)
+
+# Block data exfiltration to unauthorized endpoints
+exfil_guard = ExfiltrationGuard(allowed_endpoints=["https://api.openai.com"])
+result = exfil_guard.verify_outbound_call(
+    destination_url=url,
+    payload=data
+)
+
+# Detect poisoned MCP tool definitions
+mcp_guard = MCPPoisonGuard()
+result = mcp_guard.verify_tool_definition(tool_schema)
+```
+
+See the [SDK Guards reference](/sdks/guards) for complete documentation.
+
 ## Environment Variables
 
 | Variable        | Description  |
