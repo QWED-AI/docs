@@ -83,7 +83,31 @@ flowchart TB
     class MATH,LOGIC,CODE,SQL,STATS,FACTS,TAINT,SCHEMA,GRAPH,OUT trusted;
 ```
 
-### Layer 4: Attestation & Audit
+### Layer 4: Agent Security Guards (v4)
+
+```mermaid
+flowchart TB
+    AGENT[AI Agent] --> TOOL[Tool Call]
+    TOOL --> RAG[RAGGuard\nDRM prevention]
+    TOOL --> EXF[ExfiltrationGuard\nPII blocking]
+    TOOL --> MCP[MCPPoisonGuard\nTool validation]
+    TOOL --> SOV[SovereigntyGuard\nData residency]
+    TOOL --> COT[S-CoT Guard\nReasoning integrity]
+    RAG --> SAFE[Safe execution]
+    EXF --> SAFE
+    MCP --> SAFE
+    SOV --> SAFE
+    COT --> SAFE
+
+    classDef guard fill:#fef3c7,stroke:#d97706,color:#92400e;
+    classDef safe fill:#ecfdf5,stroke:#22c55e,color:#166534;
+    class RAG,EXF,MCP,SOV,COT guard;
+    class SAFE safe;
+```
+
+**Purpose:** Agent security guards inspect tool calls, RAG contexts, and reasoning paths before execution.
+
+### Layer 5: Attestation & Audit
 
 ```mermaid
 flowchart LR
@@ -150,6 +174,23 @@ QWED includes **11 specialized deterministic engines**:
           ▼
 7. Response to Client
 ```
+
+---
+
+## Agent Security Guards
+
+QWED v4 includes guards for securing AI agent tool chains:
+
+| Guard | Purpose |
+|-------|---------|
+| **RAGGuard** | Prevents Document-Level Retrieval Mismatch (DRM) in RAG pipelines |
+| **ExfiltrationGuard** | Blocks data exfiltration to unauthorized endpoints |
+| **MCPPoisonGuard** | Detects poisoned MCP tool definitions |
+| **SovereigntyGuard** | Enforces data residency policies |
+| **SelfInitiatedCoTGuard** | Verifies autonomous reasoning paths |
+| **ProcessVerifier** | IRAC-based milestone verification |
+
+See [SDK Guards](/sdks/guards) for usage details.
 
 ---
 
