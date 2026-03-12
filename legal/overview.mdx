@@ -23,16 +23,19 @@ QWED-Legal is a deterministic verification layer for AI-generated legal document
 pip install qwed-legal
 ```
 
-## The 6 Guards of Legal Verification
+## The 9 Guards of Legal Verification
 
 | Guard | Engine | Use Case |
 |-------|--------|----------|
 | **DeadlineGuard** | python-dateutil + holidays | Business days, leap years, jurisdiction holidays |
 | **LiabilityGuard** | Decimal + SymPy | Cap %, tiered liability, indemnity limits |
-| **ClauseGuard** | Z3 SMT Solver | Contradiction detection, termination conflicts |
+| **ClauseGuard** | Text heuristics | Text-based contradiction detection |
 | **CitationGuard** | Regex + Bluebook | Case citations, reporter validation |
 | **JurisdictionGuard** | Rule-based logic | Choice of law, forum selection, CISG |
 | **StatuteOfLimitationsGuard** | Date calculations | Claim periods by jurisdiction |
+| **IRACGuard** | Regex patterns | Legal reasoning structure verification |
+| **FairnessGuard** | Counterfactual testing | Algorithmic bias detection |
+| **ContradictionGuard** | Z3 SMT Solver | Formal logic contradiction verification |
 
 ## Quick Example
 
@@ -76,13 +79,16 @@ flowchart TB
         LLM["LLM (GPT-4, Claude)"]
     end
     
-    subgraph QWED["🏛️ QWED-Legal v0.1.0"]
+    subgraph QWED["🏛️ QWED-Legal v0.3.0"]
         direction TB
-        subgraph Guards["6 Verification Guards"]
+        subgraph Guards["9 Verification Guards"]
             DG["Deadline Guard<br/>(Business Days)"]
             LG["Liability Guard<br/>(Decimal Math)"]
-            CG["Clause Guard<br/>(Z3 Logic)"]
+            CG["Clause Guard<br/>(Text Heuristics)"]
             CTG["Citation Guard<br/>(Bluebook)"]
+            IG["IRAC Guard<br/>(Reasoning)"]
+            FG["Fairness Guard<br/>(Bias Detection)"]
+            CDG["Contradiction Guard<br/>(Z3 Logic)"]
         end
         Receipt["📋 Verification Receipt"]
     end
@@ -161,6 +167,6 @@ ca_guard = DeadlineGuard(country="US", state="CA")
 
 ## Next Steps
 
-- [The 6 Guards](/legal/guards) - Deep dive into each verification guard
+- [The 9 Guards](/legal/guards) - Deep dive into each verification guard
 - [Examples](/legal/examples) - Real-world contract verification scenarios
 - [Troubleshooting](/legal/troubleshooting) - Common issues and solutions
