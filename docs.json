@@ -223,7 +223,8 @@
                   "sdks/python",
                   "sdks/typescript",
                   "sdks/go",
-                  "sdks/rust"
+                  "sdks/rust",
+                  "sdks/guards"
                 ]
               }
             ]
@@ -324,7 +325,8 @@
   },
   "logo": {
     "light": "/logo/light.svg",
-    "dark": "/logo/dark.svg"
+    "dark": "/logo/dark.svg",
+    "href": "https://docs.qwedai.com"
   },
   "navbar": {
     "links": [
@@ -456,5 +458,11 @@
   },
   "appearance": {
     "default": "system"
+  },
+  "background": {
+    "color": {
+      "dark": "#020408"
+    },
+    "decoration": "windows"
   }
 }

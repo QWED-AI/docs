@@ -1,10 +1,10 @@
 ---
 sidebar_position: 2
-title: The 6 Guards
-description: "QWED Legal guard reference for deadline checks, liability math, clause contradiction detection, citation validation, jurisdiction checks, and limitation-period analysis."
+title: The 9 Guards
+description: "QWED Legal guard reference for deadline checks, liability math, clause contradiction detection, citation validation, jurisdiction checks, limitation-period analysis, IRAC reasoning, fairness testing, and Z3-powered logic verification."
 ---
 
-# The 6 Guards of QWED-Legal
+# The 9 Guards of QWED-Legal
 
 Each guard uses a deterministic engine to verify a specific aspect of legal documents.
 
@@ -302,6 +302,220 @@ comparison = guard.compare_jurisdictions(
 
 ---
 
+## 7. IRACGuard 📝
+
+**Purpose:** Verify that legal reasoning follows the IRAC framework (Issue, Rule, Application, Conclusion).
+
+### The Problem
+
+LLMs produce legal advice that lacks structured reasoning:
+- Missing clear identification of the legal issue
+- No citation of applicable rules or statutes
+- Conclusions without proper application of law to facts
+
+### The Solution
+
+```python
+from qwed_legal import IRACGuard
+
+guard = IRACGuard()
+
+llm_output = """
+Issue: Whether the defendant breached the employment contract.
+Rule: Under California Labor Code § 2922, employment is presumed at-will.
+Application: The defendant terminated employment without the 30-day notice 
+required by the contract, which modified the at-will presumption.
+Conclusion: The defendant breached the employment contract.
+"""
+
+result = guard.verify_structure(llm_output)
+
+print(result["verified"])    # True
+print(result["components"])  # {'issue': '...', 'rule': '...', 'application': '...', 'conclusion': '...'}
+```
+
+### Detection Types
+
+| Check | Description |
+|-------|-------------|
+| **Structure** | Verifies all 4 IRAC components are present |
+| **Logical Disconnect** | Detects when Application doesn't reference the Rule |
+| **Missing Steps** | Identifies which IRAC components are missing |
+
+### Error Response
+
+```python
+result = guard.verify_structure("The defendant should pay damages.")
+
+print(result["verified"])  # False
+print(result["error"])     # "Failed Reasoned Elaboration. Missing steps: issue, rule, application, conclusion..."
+print(result["missing"])   # ['issue', 'rule', 'application', 'conclusion']
+```
+
+---
+
+## 8. FairnessGuard ⚖️
+
+**Purpose:** Detect algorithmic bias using counterfactual testing.
+
+### The Problem
+
+AI legal systems can exhibit bias based on protected attributes:
+- Different sentencing recommendations based on gender
+- Inconsistent contract assessments based on party names
+- Discriminatory loan approval reasoning
+
+### The Solution
+
+```python
+from qwed_legal import FairnessGuard
+
+# Requires an LLM client for counterfactual generation
+guard = FairnessGuard(llm_client=my_llm)
+
+result = guard.verify_decision_fairness(
+    original_prompt="Should John Smith receive parole given his rehabilitation record?",
+    original_decision="Parole recommended based on positive rehabilitation.",
+    protected_attribute_swap={"John": "Jane", "his": "her"}
+)
+
+print(result["verified"])  # True if decision is consistent
+print(result["status"])    # "FAIRNESS_VERIFIED" or "JUDICIAL_BIAS_DETECTED"
+```
+
+### How It Works
+
+1. **Counterfactual Generation** - Swaps protected attributes (names, pronouns) while preserving case
+2. **Re-evaluation** - Runs the modified prompt through the LLM
+3. **Deterministic Comparison** - Checks if outcomes match exactly
+
+### Detection Types
+
+| Status | Description |
+|--------|-------------|
+| `FAIRNESS_VERIFIED` | Decision unchanged after attribute swap |
+| `JUDICIAL_BIAS_DETECTED` | Decision changed based on protected attributes |
+| `NO_SWAP_REQUIRED` | No protected attributes to test |
+
+<Warning>
+FairnessGuard requires an LLM client at initialization. Without it, `verify_decision_fairness()` will raise a `ValueError`.
+</Warning>
+
+---
+
+## 9. ContradictionGuard 🔍
+
+**Purpose:** Detect logical contradictions in contracts using Z3 SMT Solver.
+
+### The Problem
+
+Contracts can contain mathematically impossible combinations:
+- "Liability capped at $10,000" + "Minimum penalty of $50,000"
+- "Term is exactly 12 months" + "Minimum duration of 24 months"
+
+Text-based heuristics (ClauseGuard) miss these formal logic conflicts.
+
+### The Solution
+
+```python
+from qwed_legal import ContradictionGuard, Clause
+
+guard = ContradictionGuard()
+
+clauses = [
+    Clause(id="1", text="Liability capped at 10000", category="LIABILITY", value=10000),
+    Clause(id="2", text="Penalty shall be 50000", category="LIABILITY", value=50000),
+]
+
+result = guard.verify_consistency(clauses)
+
+print(result["verified"])  # False
+print(result["message"])   # "❌ LOGIC CONTRADICTION: Clauses are mutually exclusive..."
+```
+
+### Clause Structure
+
+The `Clause` dataclass requires:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `id` | `str` | Unique clause identifier |
+| `text` | `str` | Human-readable clause text |
+| `category` | `str` | `DURATION`, `LIABILITY`, or `TERMINATION` |
+| `value` | `int` | Normalized numeric value (days, dollars, etc.) |
+
+### Supported Categories
+
+| Category | Detects |
+|----------|---------|
+| `DURATION` | Conflicting term lengths (exact vs min/max) |
+| `LIABILITY` | Cap vs penalty contradictions |
+
+### Z3 vs ClauseGuard
+
+| Feature | ClauseGuard | ContradictionGuard |
+|---------|-------------|-------------------|
+| **Input** | Raw text strings | Structured `Clause` objects |
+| **Method** | Text heuristics | Z3 SMT Solver |
+| **Detects** | Permission conflicts | Mathematical impossibilities |
+| **Use Case** | Quick checks | Formal verification |
+
+---
+
+## SACProcessor (RAG Helper) 📄
+
+**Purpose:** Prevent Document-Level Retrieval Mismatch (DRM) in legal RAG systems.
+
+### The Problem
+
+Standard RAG chunking causes >95% retrieval mismatch in legal databases because:
+- Legal documents share nearly identical boilerplate
+- Chunk-level embeddings lose document context
+- NDAs, contracts, and agreements look alike at the chunk level
+
+### The Solution
+
+```python
+from qwed_legal import SACProcessor
+
+sac = SACProcessor(llm_client=my_llm)
+
+# Your existing chunks
+chunks = naive_split(contract_text)
+
+# Augment with document fingerprint
+augmented = sac.generate_sac_chunks(
+    document_text=contract_text,
+    chunks=chunks,
+    document_id="NDA-2026-001"
+)
+
+# Each chunk now includes global context
+print(augmented[0])
+# DOCUMENT CONTEXT [NDA-2026-001]: NDA between Acme Corp and Beta Inc...
+# CHUNK CONTENT [1/10]: Original chunk text here...
+```
+
+### Configuration
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `target_summary_length` | 150 | Character limit for document fingerprint |
+| `preview_chars` | 5000 | Max chars sent to LLM for summarization |
+
+### Methods
+
+| Method | Description |
+|--------|-------------|
+| `generate_sac_chunks()` | Augment all chunks with document fingerprint |
+| `generate_fingerprint_only()` | Get just the fingerprint for caching |
+
+<Note>
+SACProcessor requires an LLM client. Generic (automated) summaries outperform expert-guided ones for retrieval.
+</Note>
+
+---
+
 ## All-in-One: LegalGuard
 
 For convenience, use the unified `LegalGuard` class:
@@ -309,16 +523,24 @@ For convenience, use the unified `LegalGuard` class:
 ```python
 from qwed_legal import LegalGuard
 
-guard = LegalGuard()
+# Optional: provide llm_client for FairnessGuard
+guard = LegalGuard(llm_client=my_llm)
 
-# All 6 guards available
+# All 9 guards available
 guard.verify_deadline(...)
 guard.verify_liability_cap(...)
-guard.check_clause_consistency(...)
+guard.check_clause_consistency(...)          # ClauseGuard (text heuristics)
 guard.verify_citation(...)
-guard.verify_jurisdiction(...)               # NEW in v0.2.0
-guard.verify_statute_of_limitations(...)     # NEW in v0.2.0
+guard.verify_jurisdiction(...)
+guard.verify_statute_of_limitations(...)
+guard.verify_irac_structure(...)             # NEW in v0.3.0
+guard.verify_fairness(...)                   # NEW in v0.3.0 (requires llm_client)
+guard.verify_contradiction(...)              # NEW in v0.3.0 (Z3 SMT Solver)
 ```
+
+<Info>
+Most guards are fully deterministic. Only `verify_fairness()` requires an LLM client.
+</Info>
 
 ---
 
