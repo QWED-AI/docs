@@ -1,10 +1,10 @@
 ---
 sidebar_position: 2
-title: The 5 Guards
+title: The 10 Guards
 description: "QWED-Finance verification guards including ComplianceGuard (Z3 for AML/KYC), CalendarGuard, DerivativesGuard, MessageGuard, and QueryGuard with code examples."
 ---
 
-# The 5 Guards
+# The 10 Guards
 
 QWED-Finance uses **Neurosymbolic AI** - combining neural (LLM) outputs with symbolic (math/logic) verification.
 
@@ -219,7 +219,7 @@ SELECT * FROM (DELETE FROM users RETURNING *) AS x
 
 ---
 
-## Cross-Guard (Multi-Layer)
+## 7. Cross-Guard (Multi-Layer)
 
 **Purpose:** Combine multiple guards for comprehensive verification.
 
@@ -238,7 +238,7 @@ result = guard.verify_swift_with_sanctions(
 
 ---
 
-## 7. Bond Guard (Yield Analytics)
+## 8. Bond Guard (Yield Analytics)
 
 **Purpose:** Verify fixed income calculations like Yield to Maturity (YTM) and duration using Newton-Raphson.
 
@@ -261,7 +261,7 @@ result = guard.verify_ytm(
 
 ---
 
-## 8. FX Guard (Currency Arbitration)
+## 9. FX Guard (Currency Arbitration)
 
 **Purpose:** Validate cross-currency conversions and detect arbitrage opportunities.
 
@@ -283,7 +283,7 @@ result = guard.verify_conversion(
 
 ---
 
-## 9. Risk Guard (Portfolio Metrics)
+## 10. Risk Guard (Portfolio Metrics)
 
 **Purpose:** Ensure risk metrics like Sharpe Ratio and VaR (Value at Risk) are mathematically consistent.
 
@@ -307,6 +307,6 @@ result = guard.verify_sharpe_ratio(
 ---
 
 :::tip PyPI Package
-All 9 guards are available via `pip install qwed-finance`
+All 10 guards are available via `pip install qwed-finance`
 :::
 

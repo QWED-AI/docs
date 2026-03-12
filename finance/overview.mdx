@@ -1,7 +1,7 @@
 ---
 sidebar_position: 1
 title: Overview
-description: "QWED-Finance is a guardrail library for financial AI using SymPy and Z3 to prevent LLM hallucinations. Features 9 specialized guards for compliance and calculations."
+description: "QWED-Finance is a guardrail library for financial AI using SymPy and Z3 to prevent LLM hallucinations. Features 10 specialized guards for compliance and calculations."
 ---
 
 # QWED-Finance
@@ -27,7 +27,7 @@ LLMs struggle with basic math and strict logic. In finance, close enough is not 
 
 ## Key Features
 
-*   ✅ **9 Specialized Guards:** Compliance, Calendar, Derivatives, Messages, ISO, Query, **Bond**, **FX**, **Risk**.
+*   ✅ **10 Specialized Guards:** Compliance, Calendar, Derivatives, Messages, Query, Cross, Bond, FX, Risk, ISO.
 *   ✅ **GitHub Action v2.0:** Integrated CI/CD verifier with SARIF support for security dashboards.
 *   ✅ **Audit Trails:** Cryptographic attestation of verification results.
 *   ✅ **Zero Hallucination:** Fallback to deterministic engines ensures 100% mathematical accuracy.
@@ -69,7 +69,7 @@ flowchart TB
         LLM["LLM (GPT-4, Claude)"]
     end
     
-    subgraph QWED["🛡️ QWED-Finance v1.0.0"]
+    subgraph QWED["🛡️ QWED-Finance v2.0.1"]
         direction TB
         subgraph Guards["Verification Guards"]
             CG["Compliance Guard<br/>(Z3 Logic)"]
@@ -216,6 +216,6 @@ QWED-Finance aligns with:
 
 ## Next Steps
 
-- [The 5 Guards](/finance/guards) - Deep dive into each verification guard
+- [The 10 Guards](/finance/guards) - Deep dive into each verification guard
 - [Compliance & Auditing](/finance/compliance) - Receipts and regulatory proof
 - [Integrations](/finance/integrations/ucp) - Connect with UCP and Open Responses

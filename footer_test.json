@@ -1,0 +1,11 @@
+{
+    "footer": {
+        "links": [{
+            "group": "Documentation",
+            "items": [{
+                "label": "Getting Started",
+                "url": "/intro"
+            }]
+        }]
+    }
+}
