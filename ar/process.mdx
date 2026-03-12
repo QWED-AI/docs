@@ -1,0 +1,227 @@
+---
+title: Process Verifier
+description: Verify the structural integrity and process adherence of AI reasoning traces using IRAC pattern matching and milestone validation.
+---
+
+The Process Verifier ensures AI-driven workflows follow deterministic process steps — not just correct answers, but correct *procedures*. It moves verification from "black box" (output only) to "glass box" (reasoning trace).
+
+## When to use
+
+Use the Process Verifier when you need to:
+
+* Verify that AI reasoning follows required steps (IRAC, scientific method, etc.)
+* Ensure compliance with regulatory frameworks that mandate structured analysis
+* Validate that intermediate milestones are present in agent reasoning
+* Audit AI decision-making processes for completeness
+
+## IRAC structure verification
+
+IRAC (Issue, Rule, Application, Conclusion) is a legal reasoning framework. The Process Verifier checks that all four components are present in a reasoning trace.
+
+```python
+from qwed_new.guards.process_guard import ProcessVerifier
+
+verifier = ProcessVerifier()
+
+reasoning = """
+The issue presented is whether the contract was breached.
+
+The rule governing this matter is Article 2 of the UCC, which states
+that a breach occurs when a party fails to perform as promised.
+
+In applying this rule to the facts, the defendant delivered goods 
+two weeks after the agreed date, which constitutes non-performance.
+
+In conclusion, the contract was breached due to late delivery.
+"""
+
+result = verifier.verify_irac_structure(reasoning)
+
+print(result["verified"])      # True
+print(result["score"])         # 1.0
+print(result["missing_steps"]) # []
+```
+
+### Partial compliance
+
+When not all IRAC steps are present, the verifier returns a decimal score and lists missing steps:
+
+```python
+incomplete_reasoning = """
+The question is whether damages should be awarded.
+Based on my analysis, the plaintiff is entitled to compensation.
+"""
+
+result = verifier.verify_irac_structure(incomplete_reasoning)
+
+print(result["verified"])      # False
+print(result["score"])         # 0.5 (2 of 4 steps)
+print(result["missing_steps"]) # ["rule", "application"]
+```
+
+## Milestone verification
+
+For custom process requirements, use `verify_trace` to check for required keywords or milestones:
+
+```python
+from qwed_new.guards.process_guard import ProcessVerifier
+
+verifier = ProcessVerifier()
+
+ai_reasoning = """
+Step 1: Risk assessment complete - identified 3 critical risks.
+Step 2: Compliance check passed - all requirements met.
+Step 3: Stakeholder review - all parties approved.
+Step 4: Implementation timeline defined - 6 week rollout.
+"""
+
+required_milestones = [
+    "risk assessment",
+    "compliance check", 
+    "stakeholder",
+    "implementation"
+]
+
+result = verifier.verify_trace(ai_reasoning, required_milestones)
+
+print(result["verified"])          # True
+print(result["process_rate"])      # 1.0
+print(result["missed_milestones"]) # []
+```
+
+### Process rate calculation
+
+The process rate is the fraction of required milestones found:
+
+```python
+partial_reasoning = """
+We conducted a risk assessment and defined the timeline.
+"""
+
+result = verifier.verify_trace(partial_reasoning, [
+    "risk assessment",
+    "compliance check",
+    "stakeholder review", 
+    "timeline"
+])
+
+print(result["verified"])          # False
+print(result["process_rate"])      # 0.5 (2 of 4 milestones)
+print(result["missed_milestones"]) # ["compliance check", "stakeholder review"]
+```
+
+## Response fields
+
+### `verify_irac_structure` response
+
+| Field           | Type        | Description                                       |
+| --------------- | ----------- | ------------------------------------------------- |
+| `verified`      | `bool`      | `True` if all 4 IRAC steps are present            |
+| `score`         | `float`     | Decimal score from 0.0 to 1.0 (steps found / 4)   |
+| `missing_steps` | `list[str]` | List of missing IRAC components                   |
+| `mechanism`     | `str`       | Always `"Regex Pattern Matching (Deterministic)"` |
+
+### `verify_trace` response
+
+| Field               | Type        | Description                                   |
+| ------------------- | ----------- | --------------------------------------------- |
+| `verified`          | `bool`      | `True` if all milestones are present          |
+| `process_rate`      | `float`     | Decimal score from 0.0 to 1.0 (found / total) |
+| `missed_milestones` | `list[str]` | List of missing milestones                    |
+
+## Determinism
+
+The Process Verifier uses **regex pattern matching** and **keyword search** — no LLM calls. All results are 100% reproducible:
+
+* Same input always produces the same output
+* Scores use Python's `Decimal` type for exact arithmetic
+* No probabilistic components
+
+```python
+result = verifier.verify_irac_structure(reasoning)
+print(result["mechanism"])  # "Regex Pattern Matching (Deterministic)"
+```
+
+## Use cases
+
+### Legal compliance
+
+Ensure AI-generated legal analysis follows required structure:
+
+```python
+def review_legal_memo(memo: str) -> dict:
+    result = verifier.verify_irac_structure(memo)
+    if not result["verified"]:
+        raise ValueError(f"Missing steps: {result['missing_steps']}")
+    return result
+```
+
+### Audit workflows
+
+Validate that AI agents complete required checkpoints:
+
+```python
+audit_milestones = [
+    "data validation",
+    "anomaly detection",
+    "risk scoring",
+    "supervisor approval"
+]
+
+def audit_agent_trace(trace: str) -> bool:
+    result = verifier.verify_trace(trace, audit_milestones)
+    return result["process_rate"] >= 0.75  # 75% threshold
+```
+
+### Medical reasoning
+
+Verify diagnostic reasoning includes required considerations:
+
+```python
+diagnostic_steps = [
+    "patient history",
+    "differential diagnosis",
+    "test results",
+    "treatment plan"
+]
+
+result = verifier.verify_trace(medical_reasoning, diagnostic_steps)
+```
+
+## Integration with guards
+
+Use Process Verifier alongside other QWED guards for comprehensive agent verification:
+
+```python
+from qwed_new.guards.process_guard import ProcessVerifier
+from qwed_sdk.guards import SelfInitiatedCoTGuard
+
+# Verify reasoning structure
+process_verifier = ProcessVerifier()
+irac_result = process_verifier.verify_irac_structure(agent_trace)
+
+# Verify reasoning integrity
+cot_guard = SelfInitiatedCoTGuard(required_elements=["risk", "compliance"])
+cot_result = cot_guard.verify_autonomous_path(agent_trace)
+
+# Both must pass
+if irac_result["verified"] and cot_result["verified"]:
+    execute_action()
+```
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="SDK Guards" icon="shield" href="/sdks/guards">
+    Agentic security guards for AI pipelines
+  </Card>
+  <Card title="Determinism guarantee" icon="lock" href="/advanced/determinism-guarantee">
+    How QWED ensures reproducible results
+  </Card>
+  <Card title="Agent verification" icon="robot" href="/advanced/agent-verification">
+    Pre-execution checks for AI agents
+  </Card>
+  <Card title="Reasoning engine" icon="brain" href="/engines/reasoning">
+    Chain-of-thought validation
+  </Card>
+</CardGroup>
