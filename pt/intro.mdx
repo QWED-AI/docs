@@ -1,7 +1,7 @@
 ---
 title: Introduction to QWED
 sidebarTitle: Introduction to QWED
-description: The model-agnostic deterministic verification protocol for LLMs. Use any AI model while ensuring correctness through 11 symbolic verification engines.
+description: Model-agnostic trust boundary for AI systems. Verify LLM outputs, protect agent tool chains, and enforce process determinism through symbolic verification engines.
 icon: shield-check
 ---
 
@@ -11,9 +11,13 @@ icon: shield-check
 
 ## What is QWED?
 
-**QWED** (Query With Evidence & Determinism) is a **model-agnostic verification protocol** for Large Language Models.
+**QWED** (Query With Evidence & Determinism) is a **model-agnostic trust boundary** for AI systems.
 
-> **"Trust, but Verify."** — QWED treats LLMs as untrusted translators and uses symbolic engines as trusted verifiers. Your LLM, Your Choice, Our Verification.
+> **"Don't fix the liar. Verify the lie."** — QWED verifies outputs, processes, and tool interactions before they enter production. It doesn't reduce hallucinations — it makes them irrelevant.
+
+<Tip>
+**Where QWED fits first:** Verify AI-generated math, logic, SQL, code, and schemas before execution. Protect RAG pipelines against prompt injection. Inspect agent tool calls before they reach external systems. Enforce deterministic process steps in high-stakes workflows.
+</Tip>
 
 ```mermaid
 flowchart LR
