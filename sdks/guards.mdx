@@ -22,6 +22,7 @@ pip install qwed
 | `MCPPoisonGuard` | Detects poisoned MCP tool definitions |
 | `SelfInitiatedCoTGuard` | Verifies autonomous reasoning paths |
 | `SovereigntyGuard` | Enforces data residency policies |
+| `ProcessVerifier` | Validates IRAC structure and milestone completion |
 | `SystemGuard` | Validates shell commands |
 | `ConfigGuard` | Scans configuration for exposed secrets |
 
@@ -276,6 +277,45 @@ print(result["irac.conclusion"])  # Final verdict
 ```
 
 These fields are designed for integration with compliance logging systems and audit trails.
+
+---
+
+## ProcessVerifier
+
+Validates the structural integrity and process adherence of AI reasoning traces. Ensures workflows follow deterministic process steps using IRAC pattern matching and milestone validation.
+
+```python
+from qwed_new.guards.process_guard import ProcessVerifier
+
+verifier = ProcessVerifier()
+
+# Verify IRAC structure in legal reasoning
+result = verifier.verify_irac_structure("""
+The issue is whether the contract was breached.
+The rule is Article 2 of the UCC.
+Applying this rule, the defendant failed to deliver on time.
+In conclusion, breach occurred.
+""")
+
+print(result["verified"])  # True
+print(result["score"])     # 1.0
+
+# Verify custom milestones
+result = verifier.verify_trace(
+    text="Risk assessment complete. Compliance verified. Implementation planned.",
+    key_middle=["risk assessment", "compliance", "implementation"]
+)
+
+print(result["process_rate"])  # 1.0
+```
+
+### Methods
+
+**`verify_irac_structure(reasoning_trace)`** - Checks for Issue, Rule, Application, and Conclusion components. Returns a decimal score (0.0-1.0) and list of missing steps.
+
+**`verify_trace(text, key_middle)`** - Verifies presence of required milestones/keywords. Returns process rate and missed milestones.
+
+See the [Process Verifier](/engines/process) page for detailed documentation.
 
 ---
 
