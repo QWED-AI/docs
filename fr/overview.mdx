@@ -1,297 +1,172 @@
 ---
 sidebar_position: 1
-title: QWED-MCP Overview
-description: QWED MCP is a Model Context Protocol server with deterministic verification tools for math, SQL, logic, and code in Claude Desktop, VS Code, and other MCP clients.
+title: Overview
+description: QWED Legal helps you review contracts with deterministic checks for dates, contradictory clauses, liability terms, and citation accuracy using specialized guards.
 ---
 
-# QWED-MCP Overview
+# QWED-Legal
 
-**Model Context Protocol (MCP) Server for QWED Verification**
+**The Paralegal for AI-Powered Contract Review** 🏛️
 
-[![PyPI version](https://img.shields.io/pypi/v/qwed-mcp)](https://pypi.org/project/qwed-mcp/)
-[![Tests](https://github.com/QWED-AI/qwed-mcp/actions/workflows/publish.yml/badge.svg)](https://github.com/QWED-AI/qwed-mcp/actions)
-[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
+> When lawyers used ChatGPT and cited 6 fake court cases (Mata v. Avianca), QWED-Legal would have caught them before the $5,000 fine.
 
-QWED-MCP brings deterministic verification to Claude Desktop, VS Code, and any MCP-compatible AI assistant. Instead of trusting LLMs to compute correctly, QWED-MCP provides verification tools that use formal methods to guarantee correctness.
+## What is QWED-Legal?
 
----
+QWED-Legal is a deterministic verification layer for AI-generated legal document analysis. It catches:
 
-## Why QWED-MCP?
-
-### The Problem
-
-LLMs are powerful but unreliable for:
-
-* **Mathematical calculations** - They approximate, don't compute
-* **Logical reasoning** - They guess patterns, don't prove
-* **Code security** - They miss edge cases, don't analyze
-* **SQL queries** - They don't validate, just generate
-
-### The Solution
-
-QWED-MCP gives AI assistants access to **deterministic verification tools**:
-
-| Without QWED-MCP                 | With QWED-MCP                                  |
-| -------------------------------- | ---------------------------------------------- |
-| Claude calculates → 95% correct  | Claude + `verify_math` → **100% correct**      |
-| Claude writes SQL → might inject | Claude + `verify_sql` → **injection detected** |
-| Claude reasons → might be wrong  | Claude + `verify_logic` → **formally proven**  |
-| Claude codes → might be unsafe   | Claude + `verify_code` → **security checked**  |
-
----
-
-## How It Works
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│                    Your AI Application                       │
-│  ┌─────────────────┐        ┌─────────────────────────────┐ │
-│  │  Claude Desktop │        │        VS Code + Copilot    │ │
-│  │  or any MCP     │        │        or any MCP Client    │ │
-│  │  compatible     │        │                             │ │
-│  └────────┬────────┘        └──────────────┬──────────────┘ │
-└───────────┼─────────────────────────────────┼───────────────┘
-            │                                 │
-            │         MCP Protocol            │
-            │       (JSON-RPC over stdio)     │
-            ▼                                 ▼
-┌──────────────────────────────────────────────────────────────┐
-│                     QWED-MCP Server                          │
-├──────────────────────────────────────────────────────────────┤
-│                                                              │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────────┐   │
-│  │ verify_math  │  │ verify_logic │  │   verify_code    │   │
-│  │    Tool      │  │    Tool      │  │      Tool        │   │
-│  └──────┬───────┘  └──────┬───────┘  └────────┬─────────┘   │
-│         │                 │                    │             │
-│  ┌──────▼───────┐  ┌──────▼───────┐  ┌────────▼─────────┐   │
-│  │    SymPy     │  │  Z3 Solver   │  │  Python AST      │   │
-│  │   Engine     │  │   Engine     │  │   Analysis       │   │
-│  └──────────────┘  └──────────────┘  └──────────────────┘   │
-│                                                              │
-│  ┌──────────────┐                                            │
-│  │ verify_sql   │                                            │
-│  │    Tool      │                                            │
-│  └──────┬───────┘                                            │
-│         │                                                    │
-│  ┌──────▼───────┐                                            │
-│  │   Pattern    │                                            │
-│  │   Matching   │                                            │
-│  └──────────────┘                                            │
-└──────────────────────────────────────────────────────────────┘
-```
-
----
-
-## Available Tools
-
-| Tool                                      | Engine  | Use Case                                    |
-| ----------------------------------------- | ------- | ------------------------------------------- |
-| [`verify_math`](/mcp/tools#verify_math)   | SymPy   | Verify calculations, derivatives, integrals |
-| [`verify_logic`](/mcp/tools#verify_logic) | Z3 SMT  | Prove logical arguments, check validity     |
-| [`verify_code`](/mcp/tools#verify_code)   | AST     | Detect security vulnerabilities in code     |
-| [`verify_sql`](/mcp/tools#verify_sql)     | Pattern | SQL injection detection, query validation   |
-
----
-
-## Installation
-
-### From PyPI (Recommended)
+* **Date calculation errors** (30 business days miscalculated)
+* **Contradictory clauses** (Clause A says X, Clause B says Not X)
+* **Liability miscalculations** (200% of $5M ≠ $15M)
+* **Hallucinated citations** (fake case names, invalid reporters)
 
 ```bash
-pip install qwed-mcp
+pip install qwed-legal
 ```
 
-### From Source
+## The 9 Guards of Legal Verification
 
-```bash
-git clone https://github.com/QWED-AI/qwed-mcp.git
-cd qwed-mcp
-pip install -e .
-```
+| Guard                         | Engine                     | Use Case                                         |
+| ----------------------------- | -------------------------- | ------------------------------------------------ |
+| **DeadlineGuard**             | python-dateutil + holidays | Business days, leap years, jurisdiction holidays |
+| **LiabilityGuard**            | Decimal + SymPy            | Cap %, tiered liability, indemnity limits        |
+| **ClauseGuard**               | Text heuristics            | Text-based contradiction detection               |
+| **CitationGuard**             | Regex + Bluebook           | Case citations, reporter validation              |
+| **JurisdictionGuard**         | Rule-based logic           | Choice of law, forum selection, CISG             |
+| **StatuteOfLimitationsGuard** | Date calculations          | Claim periods by jurisdiction                    |
+| **IRACGuard**                 | Regex patterns             | Legal reasoning structure verification           |
+| **FairnessGuard**             | Counterfactual testing     | Algorithmic bias detection                       |
+| **ContradictionGuard**        | Z3 SMT Solver              | Formal logic contradiction verification          |
 
-### Verify Installation
+## Quick Example
 
-```bash
-qwed-mcp --version
-# qwed-mcp 0.1.0
-```
-
----
-
-## Quick Start
-
-### Claude Desktop Setup
-
-1. **Find your config file:**
-   * **Windows:** `%APPDATA%\Claude\claude_desktop_config.json`
-   * **macOS:** `~/Library/Application Support/Claude/claude_desktop_config.json`
-   * **Linux:** `~/.config/Claude/claude_desktop_config.json`
-
-2. **Add QWED-MCP server:**
-
-```json
-{
-  "mcpServers": {
-    "qwed-verification": {
-      "command": "qwed-mcp"
-    }
-  }
-}
-```
-
-3. **Restart Claude Desktop**
-
-4. **Test it!** Ask Claude:
-   > "What's the derivative of x^3? Use verify_math to check."
-
-### VS Code Setup
-
-1. **Install MCP extension** (if not already)
-
-2. **Add to settings.json:**
-
-```json
-{
-  "mcp.servers": {
-    "qwed-verification": {
-      "command": "qwed-mcp"
-    }
-  }
-}
-```
-
-3. **Restart VS Code**
-
-### Python Client
-
-You can also use QWED-MCP programmatically:
+### Verify a Deadline Calculation
 
 ```python
-import asyncio
-from mcp import ClientSession, StdioServerParameters
-from mcp.client.stdio import stdio_client
+from qwed_legal import DeadlineGuard
 
-async def main():
-    server_params = StdioServerParameters(command="qwed-mcp")
+guard = DeadlineGuard()
+result = guard.verify(
+    signing_date="2026-01-15",
+    term="30 business days",
+    claimed_deadline="2026-02-14"  # LLM claimed this
+)
+
+print(result.verified)   # False!
+print(result.computed_deadline)  # 2026-02-27 (correct)
+# ❌ ERROR: Deadline mismatch. Expected 2026-02-27, but LLM claimed 2026-02-14.
+```
+
+### Verify a Legal Citation
+
+```python
+from qwed_legal import CitationGuard
+
+guard = CitationGuard()
+result = guard.verify("Brown v. Board of Education, 347 U.S. 483 (1954)")
+
+print(result.valid)  # True - valid Bluebook format
+print(result.parsed_components)
+# {'plaintiff': 'Brown', 'defendant': 'Board of Education', 'volume': 347, 'reporter': 'U.S.', 'page': 483, 'year': 1954}
+```
+
+## Architecture
+
+### High-Level Flow
+
+```mermaid
+flowchart TB
+    subgraph Agent["🤖 Legal AI Agent"]
+        LLM["LLM (GPT-4, Claude)"]
+    end
     
-    async with stdio_client(server_params) as (read, write):
-        async with ClientSession(read, write) as session:
-            await session.initialize()
-            
-            # List available tools
-            tools = await session.list_tools()
-            print(f"Available tools: {[t.name for t in tools.tools]}")
-            
-            # Call verify_math
-            result = await session.call_tool(
-                "verify_math",
-                arguments={
-                    "expression": "x**2",
-                    "claimed_result": "2*x",
-                    "operation": "derivative"
-                }
-            )
-            print(result)
-
-asyncio.run(main())
+    subgraph QWED["🏛️ QWED-Legal v0.3.0"]
+        direction TB
+        subgraph Guards["9 Verification Guards"]
+            DG["Deadline Guard<br/>(Business Days)"]
+            LG["Liability Guard<br/>(Decimal Math)"]
+            CG["Clause Guard<br/>(Text Heuristics)"]
+            CTG["Citation Guard<br/>(Bluebook)"]
+            IG["IRAC Guard<br/>(Reasoning)"]
+            FG["Fairness Guard<br/>(Bias Detection)"]
+            CDG["Contradiction Guard<br/>(Z3 Logic)"]
+        end
+        Receipt["📋 Verification Receipt"]
+    end
+    
+    subgraph Output["✅ Verified Output"]
+        Contract["Contract System"]
+        Client["Legal Client"]
+    end
+    
+    LLM -->|"Tool Call"| Guards
+    Guards --> Receipt
+    Receipt -->|"Approved"| Output
+    Receipt -->|"Rejected"| LLM
 ```
 
----
+### Guard Selection Flow
 
-## Configuration
-
-### Environment Variables
-
-| Variable         | Description                                         | Default |
-| ---------------- | --------------------------------------------------- | ------- |
-| `QWED_LOG_LEVEL` | Logging level (`DEBUG`, `INFO`, `WARNING`, `ERROR`) | `INFO`  |
-| `QWED_TIMEOUT`   | Tool execution timeout in seconds                   | `30`    |
-
-### Example with Environment Variables
-
-**Windows (PowerShell):**
-
-```powershell
-$env:QWED_LOG_LEVEL = "DEBUG"
-qwed-mcp
+```mermaid
+flowchart LR
+    Input["LLM Output"] --> Detect{"Detect Type"}
+    
+    Detect -->|"Date/Term"| DG["Deadline Guard"]
+    Detect -->|"$ Amount"| LG["Liability Guard"]
+    Detect -->|"Clause Text"| CG["Clause Guard"]
+    Detect -->|"Case Citation"| CTG["Citation Guard"]
+    
+    DG --> Result["Verified ✓ / Rejected ✗"]
+    LG --> Result
+    CG --> Result
+    CTG --> Result
 ```
 
-**macOS/Linux:**
+## Audit Log: Real Hallucinations Caught
 
-```bash
-QWED_LOG_LEVEL=DEBUG qwed-mcp
+| Contract Input                                                                            | LLM Claim                | QWED Verdict                       |
+| ----------------------------------------------------------------------------------------- | ------------------------ | ---------------------------------- |
+| "Net 30 Business Days from Dec 20"                                                        | Jan 19                   | 🛑 **BLOCKED** (Actual: Feb 2)     |
+| "Liability Cap: 2x Fees ($50k)"                                                           | $200,000                 | 🛑 **BLOCKED** (Actual: $100,000)  |
+| "Seller may terminate with 30 days notice" + "Neither party may terminate before 90 days" | "Clauses are consistent" | 🛑 **BLOCKED** (Conflict detected) |
+| "Smith v. Jones, 999 FAKE 123"                                                            | Valid citation           | 🛑 **BLOCKED** (Unknown reporter)  |
+
+## Why Not Just Trust the LLM?
+
+LLMs are **probabilistic**. They can:
+
+* **Hallucinate case citations** (Mata v. Avianca scandal)
+* **Miscalculate business days** (ignore holidays, weekends)
+* **Miss contradictory clauses** (termination notice vs minimum term)
+* **Get percentage math wrong** (200% of $5M ≠ $15M)
+
+QWED-Legal uses **deterministic** verification:
+
+| LLM Output               | QWED Verification       | Engine           |
+| ------------------------ | ----------------------- | ---------------- |
+| "Deadline is Feb 14"     | Calculate business days | python-dateutil  |
+| "Liability cap is $15M"  | Decimal math            | SymPy            |
+| "Clauses are consistent" | Z3 satisfiability       | Z3 SMT           |
+| "Citation is valid"      | Bluebook regex          | Pattern matching |
+
+## Jurisdiction Support
+
+DeadlineGuard supports jurisdiction-specific holidays:
+
+```python
+from qwed_legal import DeadlineGuard
+
+# US holidays (default)
+us_guard = DeadlineGuard(country="US")
+
+# UK holidays
+uk_guard = DeadlineGuard(country="GB")
+
+# California-specific holidays
+ca_guard = DeadlineGuard(country="US", state="CA")
 ```
 
----
+## Next Steps
 
-## Use Cases
-
-### 1. Financial Calculations
-
-Verify that AI-generated financial calculations are correct:
-
-```
-User: Calculate compound interest for $10,000 at 5% for 3 years
-
-Claude: The compound interest is $1,576.25
-        Final amount: $11,576.25
-        
-        [Calling verify_math to confirm...]
-        ✅ VERIFIED: 10000 * (1.05)^3 = 11576.25
-```
-
-### 2. Research Validation
-
-Ensure scientific claims are logically valid:
-
-```
-User: If all mammals are warm-blooded, and dolphins are mammals,
-      are dolphins warm-blooded?
-
-Claude: [Calling verify_logic...]
-        ✅ VERIFIED: The conclusion logically follows from the premises
-        
-        Dolphins are warm-blooded.
-```
-
-### 3. Secure Coding
-
-Check AI-generated code for security issues:
-
-```
-User: Write a function to execute user commands
-
-Claude: def run_command(cmd):
-            os.system(cmd)  # Execute the command
-        
-        [Calling verify_code...]
-        ❌ SECURITY ISSUE: os.system() is dangerous
-        
-        Here's a safer alternative...
-```
-
-### 4. SQL Security
-
-Prevent SQL injection in generated queries:
-
-```
-User: Generate a query to find user "admin' OR '1'='1"
-
-Claude: SELECT * FROM users WHERE username = 'admin'' OR ''1''=''1'
-        
-        [Calling verify_sql...]
-        ❌ SQL INJECTION DETECTED: Suspicious tautology pattern
-```
-
----
-
-## Links
-
-* **PyPI:** [pypi.org/project/qwed-mcp](https://pypi.org/project/qwed-mcp/)
-* **GitHub:** [github.com/QWED-AI/qwed-mcp](https://github.com/QWED-AI/qwed-mcp)
-* **Docker Hub (organization):** [hub.docker.com/orgs/qwedai/repositories](https://hub.docker.com/orgs/qwedai/repositories)
-* **Docker Hub (QWED Verification):** [qwedai/qwed-verification](https://hub.docker.com/repository/docker/qwedai/qwed-verification/general)
-* **Docker Hub (QWED MCP):** [qwedai/qwed-mcp](https://hub.docker.com/repository/docker/qwedai/qwed-mcp)
-* **MCP Protocol:** [modelcontextprotocol.io](https://modelcontextprotocol.io)
-* **QWED Core:** [QWED Verification Engine](/intro)
+* [The 9 Guards](/legal/guards) - Deep dive into each verification guard
+* [Examples](/legal/examples) - Real-world contract verification scenarios
+* [Troubleshooting](/legal/troubleshooting) - Common issues and solutions
