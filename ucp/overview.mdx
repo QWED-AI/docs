@@ -63,6 +63,15 @@ AI Agent → UCP Checkout → QWED-UCP Guard → Payment Gateway
 │  │   10% = 10   │  │  USD/EUR/JPY │  │    JSON Validation     │ │
 │  └──────────────┘  └──────────────┘  └────────────────────────┘ │
 │                                                                  │
+│  ┌──────────────┐  ┌──────────────┐  ┌────────────────────────┐ │
+│  │ Refund Guard │  │  Tip Guard   │  │    Fee Guard           │ │
+│  │  full/partial│  │  pre/post-tax│  │    service/delivery    │ │
+│  └──────────────┘  └──────────────┘  └────────────────────────┘ │
+│                                                                  │
+│  ┌────────────────────────────────────────────────────────────┐  │
+│  │                  Attestation Guard (JWT)                   │  │
+│  └────────────────────────────────────────────────────────────┘  │
+│                                                                  │
 │                     All Guards Pass?                             │
 │                    YES ─────┬───── NO                            │
 │                             │                                    │
@@ -78,7 +87,7 @@ AI Agent → UCP Checkout → QWED-UCP Guard → Payment Gateway
 
 ---
 
-## The 6 Guards
+## The 10 Guards
 
 | Guard | What It Verifies | Error When Wrong |
 |-------|------------------|------------------|
@@ -88,6 +97,10 @@ AI Agent → UCP Checkout → QWED-UCP Guard → Payment Gateway
 | **Line Items Guard** | `price × quantity = line_total` | "Line item mismatch: 2 × $35 ≠ $65" |
 | **Discount Guard** | Percentage and fixed discount math | "10% of $100 should be $10, not $15" |
 | **Currency Guard** | ISO 4217 codes, JPY no-decimals | "JPY cannot have decimal amounts" |
+| **Refund Guard** | Full/partial refund amounts, tax reversals | "Refund $150 exceeds original total $100" |
+| **Tip Guard** | Pre/post-tax tip calculations, bounds | "Tip exceeds 100% of base amount" |
+| **Fee Guard** | Service fees, delivery fees, platform fees | "Platform fee 50% exceeds 30% maximum" |
+| **Attestation Guard** | Cryptographic proof of verification (JWT) | "Attestation token expired" |
 
 ---
 

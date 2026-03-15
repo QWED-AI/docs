@@ -1,7 +1,7 @@
 ---
 sidebar_position: 2
 title: The Guards
-description: "QWED Tax guard reference for US and India workflows, including worker classification, sales tax nexus, payroll FICA, crypto tax treatment, GST, and investment tax checks."
+description: "QWED Tax guard reference for US and India workflows, including worker classification, sales tax nexus, payroll FICA, crypto tax, GST, investment tax, DTAA foreign tax credit, and Form 1099 filing requirements."
 ---
 
 # The Guards
@@ -70,7 +70,88 @@ QWED-Tax verifies logic deterministically. No probabilities, just rules.
 *   **InputCreditGuard:** Checks Section 17(5) "Blocked List".
     *   *Food/Beverages:* Blocked.
     *   *Motor Vehicles:* Blocked (unless transport biz).
+    *   *Gift to Employee:* Blocked only above INR 50,000. Gifts below the threshold are ITC-eligible.
 *   **TDSGuard:** Calculates withholding based on service type.
     *   *Professional Fees:* 10% (Sec 194J).
     *   *Contractors:* 1% or 2% (Sec 194C).
 **Verdict:** Blocks ITC claims on personal items and ensures vendor payments have TDS deducted.
+
+<Note>
+Category matching for `InputCreditGuard` uses exact match (not substring). Ensure you pass the canonical category name (e.g., `FOOD_AND_BEVERAGE`, `MOTOR_VEHICLE`, `GIFT_TO_EMPLOYEE`).
+</Note>
+
+## 🌐 International (DTAA)
+
+### DTAAGuard (Foreign Tax Credit)
+**Goal:** Verify Foreign Tax Credit (FTC) eligibility under Double Taxation Avoidance Agreements.
+**Logic:**
+*   **Basic Credit:** Allowable credit = min(Foreign Tax Paid, Home Tax Payable on foreign income).
+*   **Treaty Rate Limit:** When a DTAA treaty rate is provided, the credit is further capped at the treaty-limited amount.
+*   **Excess Lapsed:** Any foreign tax paid above the allowable credit is reported as lapsed.
+
+```python
+from qwed_tax.guards.dtaa_guard import DTAAGuard
+
+guard = DTAAGuard()
+
+# Without treaty rate — simple min(foreign_tax, home_tax)
+result = guard.verify_foreign_tax_credit(
+    foreign_income=1000,
+    foreign_tax_paid=200,
+    home_tax_rate=15.0
+)
+# allowable_credit: 150.0, excess_tax_lapsed: 50.0
+
+# With treaty rate — credit further capped by treaty limit
+result = guard.verify_foreign_tax_credit(
+    foreign_income=1000,
+    foreign_tax_paid=200,
+    home_tax_rate=30.0,
+    foreign_tax_limit_rate=10.0  # Treaty caps at 10%
+)
+# allowable_credit: 100.0, excess_tax_lapsed: 100.0
+```
+
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `foreign_income` | `float` | Yes | - | Income earned in foreign jurisdiction |
+| `foreign_tax_paid` | `float` | Yes | - | Tax paid in foreign jurisdiction |
+| `home_tax_rate` | `float` | Yes | - | Home country tax rate (percentage) |
+| `foreign_tax_limit_rate` | `float` | No | `None` | DTAA treaty rate limit (percentage). When `None`, no treaty cap is applied |
+
+## 🇺🇸 Form 1099 Filing (IRS)
+
+### Form1099Guard
+**Goal:** Verify IRS 1099 filing requirements for contractor payments.
+**Logic:**
+*   Checks payment amount against filing thresholds by payment type.
+*   Determines which form is required (1099-NEC or 1099-MISC).
+
+| Payment Type | Form | Threshold |
+|-------------|------|-----------|
+| Non-employee compensation | 1099-NEC | $600 |
+| Rent | 1099-MISC | $600 |
+| Royalties | 1099-MISC | $10 |
+| Attorney fees | 1099-MISC | $600 |
+
+```python
+from qwed_tax.jurisdictions.us.form1099_guard import Form1099Guard
+from qwed_tax.models import ContractorPayment, PaymentType
+from decimal import Decimal
+
+guard = Form1099Guard()
+
+payment = ContractorPayment(
+    contractor_id="C001",
+    payment_type=PaymentType.NON_EMPLOYEE_COMPENSATION,
+    amount=Decimal("700.00"),
+    calendar_year=2024
+)
+
+result = guard.verify_filing_requirement(payment)
+# {"filing_required": True, "form": "1099-NEC", "reason": "..."}
+```
+
+<Note>
+Payment types without a defined filing rule return `{"filing_required": False, "form": None}` with a descriptive reason.
+</Note>

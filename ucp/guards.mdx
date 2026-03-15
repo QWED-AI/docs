@@ -1,12 +1,12 @@
 ---
 sidebar_position: 2
 title: Guards Reference
-description: "QWED-UCP 6 verification guards including Money Guard (verifies cart totals) and State Guard (validates checkout state transitions). Complete reference with examples."
+description: "QWED-UCP 10 verification guards including Money Guard (verifies cart totals), State Guard (validates checkout state transitions), Refund Guard, Tip Guard, Fee Guard, and Attestation Guard. Complete reference with examples."
 ---
 
 # Guards Reference
 
-QWED-UCP includes **6 verification guards** that validate different aspects of UCP checkout data.
+QWED-UCP includes **10 verification guards** that validate different aspects of UCP checkout data.
 
 ---
 
@@ -189,7 +189,243 @@ result = guard.verify({"currency": "USD"})
 
 ---
 
-## Running All Guards
+## 7. Refund Guard
+
+**Verifies refund amounts match original transactions.**
+
+### Usage - Full refund
+
+```python
+from qwed_ucp.guards.refund import RefundGuard
+from decimal import Decimal
+
+guard = RefundGuard()
+result = guard.verify_full_refund(
+    original_total=Decimal("100.00"),
+    refund_amount=Decimal("100.00")
+)
+# Returns: RefundGuardResult(verified=True, details={"refund_type": "full"})
+```
+
+### Usage - Partial refund
+
+```python
+result = guard.verify_partial_refund(
+    original_total=Decimal("100.00"),
+    refund_amount=Decimal("50.00"),
+    percentage=Decimal("50")  # 50% of 100 = 50 ✓
+)
+```
+
+### Usage - Tax reversal
+
+```python
+result = guard.verify_tax_reversal(
+    original_tax=Decimal("10.00"),
+    refund_tax=Decimal("5.00"),
+    refund_percentage=Decimal("50")  # 50% of tax reversed ✓
+)
+```
+
+### Usage - Checkout refund
+
+```python
+checkout = {"totals": [{"type": "total", "amount": 100.00}]}
+refund = {"amount": 100.00, "type": "full"}
+result = guard.verify(checkout, refund)
+```
+
+### Rules
+
+- Full refund must exactly match original total
+- Partial refund percentage must be 0-100%
+- Refund cannot exceed original total
+- Tax reversal must be proportional to the refund percentage
+
+---
+
+## 8. Tip Guard
+
+**Verifies tip calculations (pre-tax and post-tax).**
+
+### Usage - Pre-tax tip
+
+```python
+from qwed_ucp.guards.tip import TipGuard
+from decimal import Decimal
+
+guard = TipGuard()
+result = guard.verify_percentage_tip(
+    subtotal=Decimal("50.00"),
+    tip_amount=Decimal("9.00"),
+    percentage=Decimal("18")  # 18% of 50 = 9 ✓
+)
+# Returns: TipGuardResult(verified=True, details={"tip_type": "pre-tax"})
+```
+
+### Usage - Post-tax tip
+
+```python
+result = guard.verify_post_tax_tip(
+    total=Decimal("108.00"),
+    tip_amount=Decimal("21.60"),
+    percentage=Decimal("20")  # 20% of 108 = 21.60 ✓
+)
+# Returns: TipGuardResult(verified=True, details={"tip_type": "post-tax"})
+```
+
+### Usage - Bounds check
+
+```python
+result = guard.verify_tip_bounds(
+    tip_amount=Decimal("20.00"),
+    base_amount=Decimal("100.00")
+)
+```
+
+### Rules
+
+- Tip percentage must be 0-100%
+- Tip cannot be negative
+- Tip cannot exceed 100% of the base amount
+- Supports both pre-tax (subtotal) and post-tax (total) calculations
+
+---
+
+## 9. Fee Guard
+
+**Verifies fee calculations (service, delivery, platform).**
+
+### Usage - Service fee
+
+```python
+from qwed_ucp.guards.fee import FeeGuard
+from decimal import Decimal
+
+guard = FeeGuard()
+result = guard.verify_service_fee(
+    subtotal=Decimal("100.00"),
+    fee_amount=Decimal("5.00"),
+    percentage=Decimal("5")  # 5% of 100 = 5 ✓
+)
+# Returns: FeeGuardResult(verified=True, details={"fee_type": "service"})
+```
+
+### Usage - Delivery fee
+
+```python
+# Formula: base_fee + (distance × rate_per_km)
+result = guard.verify_delivery_fee(
+    claimed_fee=Decimal("13.00"),
+    distance_km=Decimal("5"),
+    rate_per_km=Decimal("2.00"),
+    base_fee=Decimal("3.00")  # 3 + 5×2 = 13 ✓
+)
+# Returns: FeeGuardResult(verified=True, details={"fee_type": "delivery"})
+```
+
+### Usage - Platform fee
+
+```python
+result = guard.verify_platform_fee(
+    fee_amount=Decimal("15.00"),
+    subtotal=Decimal("100.00"),
+    max_percentage=Decimal("30")  # 15% < 30% max ✓
+)
+```
+
+### Rules
+
+- Fee percentage cannot be negative
+- Distance and rate cannot be negative
+- Platform fee cannot be negative
+- Platform fee cannot exceed the configured maximum percentage (default 30%)
+
+---
+
+## 10. Attestation Guard
+
+**Generates cryptographic proofs (JWTs) for verification results.**
+
+### Usage - Sign a checkout
+
+```python
+from qwed_ucp.guards.attestation import AttestationGuard
+
+# Production: provide a secret key or set QWED_ATTESTATION_SECRET env var
+guard = AttestationGuard(secret_key="your-secret-key")
+
+# Dev mode: use allow_insecure=True (generates a random secret)
+guard = AttestationGuard(allow_insecure=True)
+
+result = guard.sign_checkout(
+    checkout={"currency": "USD", "totals": [{"type": "total", "amount": 82.79}]},
+    verification_result={"verified": True},
+    guards_passed=["MoneyGuard", "StateGuard", "LineItemsGuard"]
+)
+
+print(result.token)    # JWT token string
+print(result.verified) # True
+print(result.details)  # {"checkout_hash": "...", "issued_at": ..., "expires_at": ...}
+```
+
+### Usage - Verify an attestation
+
+```python
+result = guard.verify_attestation(token="eyJ...")
+
+print(result.verified)  # True if valid and not expired
+print(result.details)   # Decoded JWT payload
+```
+
+### Usage - Create a receipt
+
+```python
+receipt = guard.create_receipt(
+    checkout=checkout_data,
+    verification_result={"verified": True}
+)
+
+print(receipt["receipt_id"])          # "QWED-A1B2C3D4..."
+print(receipt["verified"])            # True
+print(receipt["engine"])              # "QWED-Deterministic-v1"
+print(receipt["verification_mode"])   # "deterministic"
+```
+
+### JWT payload fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `iss` | `string` | Always `"qwed-ucp-attestation"` |
+| `iat` | `int` | Issued-at Unix timestamp |
+| `exp` | `int` | Expiration timestamp (1 hour after issuance) |
+| `checkout_hash` | `string` | SHA-256 hash of the checkout object |
+| `verified` | `bool` | Whether the checkout passed verification |
+| `guards_passed` | `array` | List of guard names that passed |
+| `errors` | `array` | List of errors (if any) |
+| `engine` | `string` | `"QWED-Deterministic-v1"` |
+| `verification_mode` | `string` | `"deterministic"` |
+
+<Warning>
+In production, set `QWED_ATTESTATION_SECRET` as an environment variable or pass `secret_key` directly. Without a secret, initialization raises a `ValueError` unless `allow_insecure=True` or the `QWED_DEV_MODE=1` env var is set.
+</Warning>
+
+---
+
+## Verification result fields
+
+All guard results and `UCPVerificationResult` include:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `verified` | `bool` | Whether verification passed |
+| `engine` | `string` | `"QWED-Deterministic-v1"` |
+| `verification_mode` | `string` | `"deterministic"` |
+| `error` | `string` | Error message (when `verified` is `false`) |
+
+---
+
+## Running all guards
 
 Use `UCPVerifier` to run all guards at once:
 
@@ -200,5 +436,7 @@ verifier = UCPVerifier()
 result = verifier.verify_checkout(checkout_data)
 
 print(f"Verified: {result.verified}")
+print(f"Engine: {result.engine}")                     # "QWED-Deterministic-v1"
+print(f"Mode: {result.verification_mode}")             # "deterministic"
 print(f"Guards passed: {len([g for g in result.guards if g.verified])}")
 ```
