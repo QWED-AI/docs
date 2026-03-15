@@ -43,6 +43,19 @@ else:
     # call_gusto_api()
 ```
 
+### Capital gains date validation
+
+The `audit_transaction` method now validates that both `buy` and `sell` dates are present when `asset_type` and `dates` are provided in the intent. If either is missing, the transaction is blocked with a descriptive error:
+
+```python
+report = preflight.audit_transaction({
+    "asset_type": "equity",
+    "dates": {}  # Missing buy and sell dates
+})
+# report["allowed"] = False
+# report["blocks"] = ["Capital gains checks require both buy and sell dates."]
+```
+
 ### Standalone Usage
 
 You can also use specific guards individually found in `qwed_tax.jurisdictions`.
