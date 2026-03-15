@@ -1,177 +1,442 @@
 ---
 sidebar_position: 2
-title: The Guards
-description: QWED Tax guard reference for US and India workflows, including worker classification, sales tax nexus, payroll FICA, crypto tax, GST, investment tax, DTAA foreign tax credit, and Form 1099 filing requirements.
+title: Guards Reference
+description: QWED-UCP 10 verification guards including Money Guard (verifies cart totals), State Guard (validates checkout state transitions), Refund Guard, Tip Guard, Fee Guard, and Attestation Guard. Complete reference with examples.
 ---
 
-# The Guards
+# Guards Reference
 
-QWED-Tax verifies logic deterministically. No probabilities, just rules.
+QWED-UCP includes **10 verification guards** that validate different aspects of UCP checkout data.
 
-## 🇺🇸 United States (IRS)
+---
 
-### 1. ClassificationGuard (IRS Common Law)
+## 1. Money Guard
 
-**Goal:** Prevent "Employee Misclassification" lawsuits.
-**Logic:** Uses the IRS Common Law test to determine if a worker is a W-2 Employee or 1099 Contractor.
+**Verifies the total formula is mathematically correct.**
 
-* **Behavioral Control:** Does the employer provide tools/instructions?
-* **Financial Control:** Does the employer reimburse expenses?
-* **Relationship:** Is it indefinite?
-
-**Rule:** If you control *how* they work and *pay* their expenses, they are an Employee (W-2), even if the AI says "1099".
-
-### 2. NexusGuard (Economic Nexus)
-
-**Goal:** Prevent Sales Tax Evasion.
-**Logic:** Checks local state thresholds for 2025.
-
-* **NY/TX/CA:** > $500,000 Sales
-* **FL/IL/PA:** > $100,000 Sales
-  **Rule:** If YTD Sales > Threshold and AI says "No Tax", **BLOCK**.
-
-### 3. PayrollGuard (FICA Limits)
-
-**Goal:** Verify Paycheck Math.
-**Logic:**
-
-* **Gross-to-Net:** `Gross - Taxes - Deductions == Net` (Exact Decimal match).
-* **Soical Security Cap:** Enforces 2025 Wage Base Limit ($176,100). Tax stops after this amount.
-
-## 🇮🇳 India (CBDT)
-
-### 1. CryptoTaxGuard (Sec 115BBH)
-
-**Rule:** Losses from Virtual Digital Assets (VDA) cannot be set off against any other income (including other VDA gains).
-**Verdict:** Blocks any AI attempt to reduce tax liability using crypto losses.
-
-### 2. GSTGuard (RCM)
-
-**Rule:** Certain services (GTA, Legal) require **Reverse Charge Mechanism** (Recipient pays tax).
-**Verdict:** Blocks invoices where AI failed to apply RCM logic.
-
-### 3. InvestmentGuard (Trading)
-
-**Goal:** Prevent Set-Off Errors.
-**Logic:**
-
-* **SpeculationGuard:** Intraday Equity losses are "Speculative". They cannot be set off against F&O (Non-speculative) or Salary income.
-* **CapitalGainsGuard:** Enforces strictly defined holding periods (e.g. Equity > 12m = LTCG).
-  **Verdict:** Blocks "Illegal Set-Off" claims.
-
-### 4. CorporateGuard (Loans & Valuation)
-
-**Goal:** Corporate Governance (Sec 185/Valuation).
-**Logic:**
-
-* **RelatedPartyGuard:** Prohibits loans to Directors/Relatives/Holding-Co-Directors unless specific exemptions apply.
-* **ValuationGuard:** Deterministically calculates Convertible Note conversion prices (`min(Cap, Discount)`).
-  **Verdict:** Blocks loans that risk "Deemed Dividend" or Section 185 violation.
-
-### 5. RemittanceGuard (FEMA/LRS)
-
-**Goal:** Prevent Forex Violations.
-**Logic:**
-
-* **LRS Limit:** Enforces $250,000 annual limit per PAN.
-* **Prohibited List:** Blocks Gambling, Lottery, Racing, and **Margin Trading**.
-* **TCS Logic:** Applies 20% Tax for generic remittance, 5% for Education/Medical.
-  **Verdict:** Blocks prohibited remittances and miscalculated TCS.
-
-### 6. Accounts Payable Guards (Indirect Tax)
-
-**Goal:** Automate GST/VAT and TDS compliance.
-**Logic:**
-
-* **InputCreditGuard:** Checks Section 17(5) "Blocked List".
-  * *Food/Beverages:* Blocked.
-  * *Motor Vehicles:* Blocked (unless transport biz).
-  * *Gift to Employee:* Blocked only above INR 50,000. Gifts below the threshold are ITC-eligible.
-* **TDSGuard:** Calculates withholding based on service type.
-  * *Professional Fees:* 10% (Sec 194J).
-  * *Contractors:* 1% or 2% (Sec 194C).
-    **Verdict:** Blocks ITC claims on personal items and ensures vendor payments have TDS deducted.
-
-<Note>
-Category matching for `InputCreditGuard` uses exact match (not substring). Ensure you pass the canonical category name (e.g., `FOOD_AND_BEVERAGE`, `MOTOR_VEHICLE`, `GIFT_TO_EMPLOYEE`).
-</Note>
-
-## 🌐 International (DTAA)
-
-### DTAAGuard (Foreign Tax Credit)
-
-**Goal:** Verify Foreign Tax Credit (FTC) eligibility under Double Taxation Avoidance Agreements.
-**Logic:**
-
-* **Basic Credit:** Allowable credit = min(Foreign Tax Paid, Home Tax Payable on foreign income).
-* **Treaty Rate Limit:** When a DTAA treaty rate is provided, the credit is further capped at the treaty-limited amount.
-* **Excess Lapsed:** Any foreign tax paid above the allowable credit is reported as lapsed.
-
-```python
-from qwed_tax.guards.dtaa_guard import DTAAGuard
-
-guard = DTAAGuard()
-
-# Without treaty rate — simple min(foreign_tax, home_tax)
-result = guard.verify_foreign_tax_credit(
-    foreign_income=1000,
-    foreign_tax_paid=200,
-    home_tax_rate=15.0
-)
-# allowable_credit: 150.0, excess_tax_lapsed: 50.0
-
-# With treaty rate — credit further capped by treaty limit
-result = guard.verify_foreign_tax_credit(
-    foreign_income=1000,
-    foreign_tax_paid=200,
-    home_tax_rate=30.0,
-    foreign_tax_limit_rate=10.0  # Treaty caps at 10%
-)
-# allowable_credit: 100.0, excess_tax_lapsed: 100.0
+```
+Total = Subtotal - Discount + Tax + Shipping + Fee
 ```
 
-| Parameter                | Type    | Required | Default | Description                                                                |
-| ------------------------ | ------- | -------- | ------- | -------------------------------------------------------------------------- |
-| `foreign_income`         | `float` | Yes      | *       | Income earned in foreign jurisdiction                                      |
-| `foreign_tax_paid`       | `float` | Yes      | -       | Tax paid in foreign jurisdiction                                           |
-| `home_tax_rate`          | `float` | Yes      | *       | Home country tax rate (percentage)                                         |
-| `foreign_tax_limit_rate` | `float` | No       | `None`  | DTAA treaty rate limit (percentage). When `None`, no treaty cap is applied |
-
-## 🇺🇸 Form 1099 Filing (IRS)
-
-### Form1099Guard
-
-**Goal:** Verify IRS 1099 filing requirements for contractor payments.
-**Logic:**
-
-* Checks payment amount against filing thresholds by payment type.
-* Determines which form is required (1099-NEC or 1099-MISC).
-
-| Payment Type              | Form      | Threshold |
-| ------------------------- | --------- | --------- |
-| Non-employee compensation | 1099-NEC  | $600      |
-| Rent                      | 1099-MISC | $600      |
-| Royalties                 | 1099-MISC | $10       |
-| Attorney fees             | 1099-MISC | $600      |
+### Usage
 
 ```python
-from qwed_tax.jurisdictions.us.form1099_guard import Form1099Guard
-from qwed_tax.models import ContractorPayment, PaymentType
+driver = MoneyGuard()
+result = driver.verify_cart_totals(
+    line_items=[{"price": 35.00, "quantity": 2}, {"price": 15.00, "quantity": 1}],
+    taxes=8.25,
+    discounts=10.00,
+    claimed_total=98.25
+)
+# Returns: {"verified": True}
+```
+
+### Tolerance
+
+Uses `Decimal` precision with 1 cent ($0.01) tolerance for floating-point errors.
+
+---
+
+## 2. State Guard
+
+**Verifies valid checkout state machine transitions.**
+
+### Valid States
+
+```
+incomplete → ready_for_complete → completed
+                              ↓
+                            failed
+                              ↓
+                           cancelled
+```
+
+### Usage
+
+```python
+from qwed_ucp.guards.state_guard import StateGuard
+
+guard = StateGuard()
+# Check if we can SHIP given the current state is PAID
+result = guard.verify_transition(
+    current_state="paid",
+    action="ship"
+)
+# Returns: {"verified": True}
+```
+
+### Rules
+
+* `incomplete`: Can be empty
+* `ready_for_complete`: Must have line items
+* `completed`: Must have order object
+* Cannot transition backwards
+
+---
+
+## 3. Schema Guard
+
+**Validates UCP JSON schema compliance.**
+
+### Usage
+
+```python
+from qwed_ucp.guards import SchemaGuard
+
+guard = SchemaGuard()
+result = guard.verify(checkout_data)
+```
+
+### Validates
+
+* Required fields present
+* Correct types (string, number, array)
+* Valid enum values (status, total types)
+
+---
+
+## 4. Line Items Guard
+
+**Verifies price × quantity = line total for each item.**
+
+### Usage
+
+```python
+from qwed_ucp.guards import LineItemsGuard
+
+guard = LineItemsGuard()
+result = guard.verify({
+    "line_items": [
+        {"id": "roses", "quantity": 2, "item": {"price": 35.00}},
+        {"id": "pot", "quantity": 1, "item": {"price": 15.00}}
+    ],
+    "totals": [{"type": "subtotal", "amount": 85.00}]  # 2×35 + 1×15 = 85 ✓
+})
+```
+
+### Checks
+
+* Each item: `price × quantity = line_total`
+* Sum of line items = subtotal
+* Quantities must be positive integers
+* Prices must be non-negative
+
+---
+
+## 5. Discount Guard
+
+**Verifies percentage and fixed discount calculations.**
+
+### Usage - Percentage Discount
+
+```python
+from qwed_ucp.guards import DiscountGuard
 from decimal import Decimal
 
-guard = Form1099Guard()
-
-payment = ContractorPayment(
-    contractor_id="C001",
-    payment_type=PaymentType.NON_EMPLOYEE_COMPENSATION,
-    amount=Decimal("700.00"),
-    calendar_year=2024
+guard = DiscountGuard()
+result = guard.verify_percentage_discount(
+    subtotal=Decimal("100.00"),
+    discount_amount=Decimal("10.00"),
+    percentage=Decimal("10")  # 10% of 100 = 10 ✓
 )
-
-result = guard.verify_filing_requirement(payment)
-# {"filing_required": True, "form": "1099-NEC", "reason": "..."}
 ```
 
-<Note>
-Payment types without a defined filing rule return `{"filing_required": False, "form": None}` with a descriptive reason.
-</Note>
+### Usage - Fixed Discount
+
+```python
+result = guard.verify_fixed_discount(
+    subtotal=Decimal("50.00"),
+    discount_amount=Decimal("5.00")  # Fixed $5 off ✓
+)
+```
+
+### Rules
+
+* Percentage: Must be 0-100%
+* Fixed: Cannot exceed subtotal
+* Discount must be non-negative
+
+---
+
+## 6. Currency Guard
+
+**Validates ISO 4217 currency codes and format.**
+
+### Usage
+
+```python
+from qwed_ucp.guards import CurrencyGuard
+
+guard = CurrencyGuard()
+result = guard.verify({"currency": "USD"})
+```
+
+### Validates
+
+* 3-letter ISO 4217 codes (USD, EUR, GBP, JPY, etc.)
+* Zero-decimal currencies (JPY, KRW) have no decimals
+* Currency conversion accuracy
+
+### Zero-Decimal Currencies
+
+```python
+# Valid - no decimals
+{"currency": "JPY", "totals": [{"type": "total", "amount": 1000}]}
+
+# Invalid - JPY shouldn't have decimals
+{"currency": "JPY", "totals": [{"type": "total", "amount": 1000.50}]}
+```
+
+---
+
+## 7. Refund Guard
+
+**Verifies refund amounts match original transactions.**
+
+### Usage - Full refund
+
+```python
+from qwed_ucp.guards.refund import RefundGuard
+from decimal import Decimal
+
+guard = RefundGuard()
+result = guard.verify_full_refund(
+    original_total=Decimal("100.00"),
+    refund_amount=Decimal("100.00")
+)
+# Returns: RefundGuardResult(verified=True, details={"refund_type": "full"})
+```
+
+### Usage - Partial refund
+
+```python
+result = guard.verify_partial_refund(
+    original_total=Decimal("100.00"),
+    refund_amount=Decimal("50.00"),
+    percentage=Decimal("50")  # 50% of 100 = 50 ✓
+)
+```
+
+### Usage - Tax reversal
+
+```python
+result = guard.verify_tax_reversal(
+    original_tax=Decimal("10.00"),
+    refund_tax=Decimal("5.00"),
+    refund_percentage=Decimal("50")  # 50% of tax reversed ✓
+)
+```
+
+### Usage - Checkout refund
+
+```python
+checkout = {"totals": [{"type": "total", "amount": 100.00}]}
+refund = {"amount": 100.00, "type": "full"}
+result = guard.verify(checkout, refund)
+```
+
+### Rules
+
+* Full refund must exactly match original total
+* Partial refund percentage must be 0-100%
+* Refund cannot exceed original total
+* Tax reversal must be proportional to the refund percentage
+
+---
+
+## 8. Tip Guard
+
+**Verifies tip calculations (pre-tax and post-tax).**
+
+### Usage - Pre-tax tip
+
+```python
+from qwed_ucp.guards.tip import TipGuard
+from decimal import Decimal
+
+guard = TipGuard()
+result = guard.verify_percentage_tip(
+    subtotal=Decimal("50.00"),
+    tip_amount=Decimal("9.00"),
+    percentage=Decimal("18")  # 18% of 50 = 9 ✓
+)
+# Returns: TipGuardResult(verified=True, details={"tip_type": "pre-tax"})
+```
+
+### Usage - Post-tax tip
+
+```python
+result = guard.verify_post_tax_tip(
+    total=Decimal("108.00"),
+    tip_amount=Decimal("21.60"),
+    percentage=Decimal("20")  # 20% of 108 = 21.60 ✓
+)
+# Returns: TipGuardResult(verified=True, details={"tip_type": "post-tax"})
+```
+
+### Usage - Bounds check
+
+```python
+result = guard.verify_tip_bounds(
+    tip_amount=Decimal("20.00"),
+    base_amount=Decimal("100.00")
+)
+```
+
+### Rules
+
+* Tip percentage must be 0-100%
+* Tip cannot be negative
+* Tip cannot exceed 100% of the base amount
+* Supports both pre-tax (subtotal) and post-tax (total) calculations
+
+---
+
+## 9. Fee Guard
+
+**Verifies fee calculations (service, delivery, platform).**
+
+### Usage - Service fee
+
+```python
+from qwed_ucp.guards.fee import FeeGuard
+from decimal import Decimal
+
+guard = FeeGuard()
+result = guard.verify_service_fee(
+    subtotal=Decimal("100.00"),
+    fee_amount=Decimal("5.00"),
+    percentage=Decimal("5")  # 5% of 100 = 5 ✓
+)
+# Returns: FeeGuardResult(verified=True, details={"fee_type": "service"})
+```
+
+### Usage - Delivery fee
+
+```python
+# Formula: base_fee + (distance × rate_per_km)
+result = guard.verify_delivery_fee(
+    claimed_fee=Decimal("13.00"),
+    distance_km=Decimal("5"),
+    rate_per_km=Decimal("2.00"),
+    base_fee=Decimal("3.00")  # 3 + 5×2 = 13 ✓
+)
+# Returns: FeeGuardResult(verified=True, details={"fee_type": "delivery"})
+```
+
+### Usage - Platform fee
+
+```python
+result = guard.verify_platform_fee(
+    fee_amount=Decimal("15.00"),
+    subtotal=Decimal("100.00"),
+    max_percentage=Decimal("30")  # 15% < 30% max ✓
+)
+```
+
+### Rules
+
+* Fee percentage cannot be negative
+* Distance and rate cannot be negative
+* Platform fee cannot be negative
+* Platform fee cannot exceed the configured maximum percentage (default 30%)
+
+---
+
+## 10. Attestation Guard
+
+**Generates cryptographic proofs (JWTs) for verification results.**
+
+### Usage - Sign a checkout
+
+```python
+from qwed_ucp.guards.attestation import AttestationGuard
+
+# Production: provide a secret key or set QWED_ATTESTATION_SECRET env var
+guard = AttestationGuard(secret_key="your-secret-key")
+
+# Dev mode: use allow_insecure=True (generates a random secret)
+guard = AttestationGuard(allow_insecure=True)
+
+result = guard.sign_checkout(
+    checkout={"currency": "USD", "totals": [{"type": "total", "amount": 82.79}]},
+    verification_result={"verified": True},
+    guards_passed=["MoneyGuard", "StateGuard", "LineItemsGuard"]
+)
+
+print(result.token)    # JWT token string
+print(result.verified) # True
+print(result.details)  # {"checkout_hash": "...", "issued_at": ..., "expires_at": ...}
+```
+
+### Usage - Verify an attestation
+
+```python
+result = guard.verify_attestation(token="eyJ...")
+
+print(result.verified)  # True if valid and not expired
+print(result.details)   # Decoded JWT payload
+```
+
+### Usage - Create a receipt
+
+```python
+receipt = guard.create_receipt(
+    checkout=checkout_data,
+    verification_result={"verified": True}
+)
+
+print(receipt["receipt_id"])          # "QWED-A1B2C3D4..."
+print(receipt["verified"])            # True
+print(receipt["engine"])              # "QWED-Deterministic-v1"
+print(receipt["verification_mode"])   # "deterministic"
+```
+
+### JWT payload fields
+
+| Field               | Type     | Description                                  |
+| ------------------- | -------- | -------------------------------------------- |
+| `iss`               | `string` | Always `"qwed-ucp-attestation"`              |
+| `iat`               | `int`    | Issued-at Unix timestamp                     |
+| `exp`               | `int`    | Expiration timestamp (1 hour after issuance) |
+| `checkout_hash`     | `string` | SHA-256 hash of the checkout object          |
+| `verified`          | `bool`   | Whether the checkout passed verification     |
+| `guards_passed`     | `array`  | List of guard names that passed              |
+| `errors`            | `array`  | List of errors (if any)                      |
+| `engine`            | `string` | `"QWED-Deterministic-v1"`                    |
+| `verification_mode` | `string` | `"deterministic"`                            |
+
+<Warning>
+In production, set `QWED_ATTESTATION_SECRET` as an environment variable or pass `secret_key` directly. Without a secret, initialization raises a `ValueError` unless `allow_insecure=True` or the `QWED_DEV_MODE=1` env var is set.
+</Warning>
+
+---
+
+## Verification result fields
+
+All guard results and `UCPVerificationResult` include:
+
+| Field               | Type     | Description                                |
+| ------------------- | -------- | ------------------------------------------ |
+| `verified`          | `bool`   | Whether verification passed                |
+| `engine`            | `string` | `"QWED-Deterministic-v1"`                  |
+| `verification_mode` | `string` | `"deterministic"`                          |
+| `error`             | `string` | Error message (when `verified` is `false`) |
+
+---
+
+## Running all guards
+
+Use `UCPVerifier` to run all guards at once:
+
+```python
+from qwed_ucp import UCPVerifier
+
+verifier = UCPVerifier()
+result = verifier.verify_checkout(checkout_data)
+
+print(f"Verified: {result.verified}")
+print(f"Engine: {result.engine}")                     # "QWED-Deterministic-v1"
+print(f"Mode: {result.verification_mode}")             # "deterministic"
+print(f"Guards passed: {len([g for g in result.guards if g.verified])}")
+```
