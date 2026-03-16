@@ -689,6 +689,68 @@ Scans configuration JSON for exposed secrets (API keys, private keys, tokens) us
 
 ---
 
+## AIBOMGenerator (observability)
+
+Generate an AI Bill of Materials (AI-BOM) manifest for visibility into your agent supply chain. This is useful for AI-SPM compliance auditing — tracking which models, verification engines, and MCP tools were used in a given session.
+
+### Description
+
+The `AIBOMGenerator` produces a JSON manifest listing all components involved in an AI pipeline run. Each manifest includes a deterministic `manifest_hash` (SHA-256) so you can verify that two runs used the same component stack.
+
+### Usage
+
+```python
+from qwed_mcp.observability.aibom import AIBOMGenerator
+
+generator = AIBOMGenerator()
+
+bom = generator.generate_manifest(
+    llm_model="gpt-4o",
+    qwed_engines_used=["qwed_tax.TaxVerifier", "qwed_legal.FairnessGuard"],
+    mcp_tools_used=["verify_math", "verify_sql"]
+)
+
+print(bom["compliance"])      # "QWED_AI_SPM_v1"
+print(bom["manifest_hash"])   # deterministic SHA-256 hash
+print(bom["components"])
+# {
+#   "models": [{"name": "gpt-4o", "type": "generator"}],
+#   "verification_engines": [
+#     {"name": "qwed_tax.TaxVerifier", "type": "qwed_deterministic"},
+#     {"name": "qwed_legal.FairnessGuard", "type": "qwed_deterministic"}
+#   ],
+#   "mcp_tools": [
+#     {"name": "verify_math", "type": "action_execution"},
+#     {"name": "verify_sql", "type": "action_execution"}
+#   ]
+# }
+```
+
+### Parameters
+
+| Parameter           | Type        | Required | Default | Description                                                      |
+| ------------------- | ----------- | -------- | ------- | ---------------------------------------------------------------- |
+| `llm_model`         | `str`       | Yes      | *       | Name of the LLM model used (e.g., `"gpt-4o"`, `"claude-3-opus"`) |
+| `qwed_engines_used` | `list[str]` | No       | `[]`    | QWED verification engines used in this pipeline                  |
+| `mcp_tools_used`    | `list[str]` | No       | `[]`    | MCP tools invoked during this session                            |
+
+### Manifest fields
+
+| Field                             | Type     | Description                                        |
+| --------------------------------- | -------- | -------------------------------------------------- |
+| `timestamp`                       | `string` | ISO 8601 UTC timestamp of generation               |
+| `components.models`               | `array`  | LLM models used (`type: "generator"`)              |
+| `components.verification_engines` | `array`  | QWED engines used (`type: "qwed_deterministic"`)   |
+| `components.mcp_tools`            | `array`  | MCP tools used (`type: "action_execution"`)        |
+| `compliance`                      | `string` | Always `"QWED_AI_SPM_v1"`                          |
+| `manifest_hash`                   | `string` | SHA-256 hash of the manifest (excluding timestamp) |
+
+<Note>
+The `manifest_hash` is deterministic for identical inputs — the timestamp is excluded from the hash computation so that two manifests with the same components always produce the same hash.
+</Note>
+
+---
+
 ## Error Handling
 
 All tools return consistent error responses:
