@@ -234,6 +234,69 @@ for tool_call in response.choices[0].message.tool_calls:
 
 ---
 
+## Streaming middleware
+
+The `OpenResponsesMiddleware` intercepts streaming events from the Open Responses protocol, verifying `tool_call` and `function_call` items through your guard stack before they are yielded to the consumer.
+
+### Usage
+
+```python
+from qwed_open_responses.middleware.streaming_interceptor import OpenResponsesMiddleware
+from qwed_open_responses.guards import ToolGuard, SafetyGuard
+
+middleware = OpenResponsesMiddleware(
+    guards=[ToolGuard(), SafetyGuard()],
+    block_on_failure=True,       # Replace blocked items with system_intervention
+    on_blocked=my_callback,      # Optional callback when an item is blocked
+)
+
+# Wrap any async stream of Open Responses items
+async for item in middleware.verify_stream(response_stream):
+    process(item)
+
+# Check runtime stats
+print(middleware.get_stats())
+# {"total": 12, "verified": 10, "blocked": 2}
+```
+
+### Parameters
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `guards` | `list[BaseGuard]` | `[]` | Guards to run against each tool-call item |
+| `block_on_failure` | `bool` | `True` | When `True`, blocked items are replaced with a `system_intervention` item. When `False`, blocked items pass through unmodified (warn-only) |
+| `on_blocked` | `callable` | `None` | Optional callback invoked with `(item, result)` when a tool call is blocked |
+
+### How it works
+
+1. Non-tool items (text, metadata) pass through unchanged
+2. Items with `type` of `tool_call` or `function_call` are verified against all guards
+3. If verification passes, the original item is yielded
+4. If verification fails and `block_on_failure` is `True`, a `system_intervention` item is yielded instead:
+
+```json
+{
+  "type": "system_intervention",
+  "status": "blocked",
+  "tool_name": "execute_shell",
+  "reason": "QWED blocked execute_shell: dangerous tool call",
+  "verification": {
+    "guards_passed": ["SafetyGuard"],
+    "guards_failed": ["ToolGuard"],
+    "mechanism": "QWED Open Responses Streaming Interceptor"
+  }
+}
+```
+
+### Stats methods
+
+| Method | Description |
+|--------|-------------|
+| `get_stats()` | Returns `{"total": int, "verified": int, "blocked": int}` |
+| `reset_stats()` | Resets all counters to zero |
+
+---
+
 ## Why QWED Open Responses?
 
 ### Security Comparison
