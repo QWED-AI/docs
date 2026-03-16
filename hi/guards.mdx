@@ -1,47 +1,559 @@
 ---
 sidebar_position: 2
-title: Verification Guards
-description: Reference for IamGuard, NetworkGuard, and CostGuard — the three QWED-Infra guards for IAM, network, and budget verification.
+title: The 9 Guards
+description: Reference for the 9 QWED Legal guards covering deadlines, liability, contradictions, citations, and jurisdiction checks.
 ---
 
-# Verification Guards
+# The 9 Guards of QWED-Legal
 
-`qwed-infra` provides three primary guards to verify different aspects of your infrastructure.
+Each guard uses a deterministic engine to verify a specific aspect of legal documents.
 
-## 1. 🛡️ IamGuard
+## 1. DeadlineGuard 📅
 
-**Engine:** Z3 Theorem Prover
+**Purpose:** Verify date calculations in contracts.
 
-IamGuard converts AWS IAM Policies into First-Order Logic formulas to prove or disprove access. This is superior to regex-based policy checks because it reasons about logic (AND, OR, NOT, Conditions).
+### The Problem
 
-### Capabilities
+LLMs frequently miscalculate deadlines:
 
-* **Wildcard Logic:** Correctly handles `s3:*`, `bucket/*` expansion.
-* **Conditions:** Supports context keys like `aws:SourceIp` (CIDR blocks), `aws:CurrentTime` (Date), and `StringEquals`.
-* **Deny Overrides:** Mathematically proves that an explicit `Deny` always overrides an `Allow`, regardless of statement order.
-* **Least Privilege Analysis:** Proves if a policy allows stronger permissions than intended (e.g., proves `Admin` access is NOT possible).
+* Confuse **business days** vs **calendar days**
+* Ignore **leap years**
+* Forget **jurisdiction-specific holidays**
 
-## 2. 🌐 NetworkGuard
+### The Solution
 
-**Engine:** NetworkX (Graph Theory)
+```python
+from qwed_legal import DeadlineGuard
 
-NetworkGuard builds a directed graph of your network topology (VPCs, Subnets, Route Tables, Security Groups, NACLs, Internet Gateways). It then uses graph traversal algorithms to verify reachability.
+guard = DeadlineGuard(country="US", state="CA")
 
-### Capabilities
+result = guard.verify(
+    signing_date="2026-01-15",
+    term="30 business days",
+    claimed_deadline="2026-02-14"
+)
 
-* **Public Access Check:** Validates if a path exists from `Internet` to a specific `Instance`.
-  * Path: `Internet -> IGW -> Route Table -> Subnet -> NACL -> Security Group -> Instance`.
-* **Port Verification:** Ensures critical management ports (22 SSH, 3389 RDP) are not exposed to `0.0.0.0/0`.
-* **Segmentation Verification:** Proves that sensitive subnets (e.g., Database) are isolated from public subnets.
+print(result.verified)           # False
+print(result.computed_deadline)  # 2026-02-27
+print(result.difference_days)    # 13
+```
 
-## 3. 💰 CostGuard
+### Features
 
-**Engine:** Deterministic Arithmetic & Pricing Catalog
+| Feature                  | Description                                     |
+| ------------------------ | ----------------------------------------------- |
+| **Business vs Calendar** | Automatically detects "business days" vs "days" |
+| **Holiday Support**      | 200+ countries via `python-holidays`            |
+| **Leap Years**           | Handles Feb 29 correctly                        |
+| **Natural Language**     | Parses "2 weeks", "3 months", "1 year"          |
 
-CostGuard estimates the monthly cost of your infrastructure definition *before* deployment. It uses an embedded, static pricing catalog for standard cloud resources.
+---
 
-### Capabilities
+## 2. LiabilityGuard 💰
 
-* **Budget Enforcement:** Blocks deployment if `estimated_cost > budget`.
-* **Anomaly Detection:** Detects and flags expensive instance types (e.g., `p4d.24xlarge` GPU instances) that might be hallucinations.
-* **Granular Breakdown:** Provides cost breakdown by resource type (Compute, Storage, Database).
+**Purpose:** Verify liability cap and indemnity calculations.
+
+### The Problem
+
+LLMs get percentage math wrong:
+
+* "200% of $5M = $15M" ❌ (Should be $10M)
+* Float precision errors on large amounts
+* Tiered liability miscalculations
+
+### The Solution
+
+```python
+from qwed_legal import LiabilityGuard
+
+guard = LiabilityGuard()
+
+result = guard.verify_cap(
+    contract_value=5_000_000,
+    cap_percentage=200,
+    claimed_cap=15_000_000
+)
+
+print(result.verified)      # False
+print(result.computed_cap)  # 10,000,000
+print(result.difference)    # 5,000,000
+```
+
+### Additional Methods
+
+```python
+# Tiered liability
+result = guard.verify_tiered_liability(
+    tiers=[
+        {"base": 1_000_000, "percentage": 100},
+        {"base": 500_000, "percentage": 50},
+    ],
+    claimed_total=1_250_000  # ✅ Correct: 1M + 250K
+)
+
+# Indemnity limit (3x annual fee)
+result = guard.verify_indemnity_limit(
+    annual_fee=100_000,
+    multiplier=3,
+    claimed_limit=300_000  # ✅ Correct
+)
+```
+
+---
+
+## 3. ClauseGuard ⚖️
+
+**Purpose:** Detect contradictory clauses using formal logic.
+
+### The Problem
+
+LLMs miss logical contradictions:
+
+* "Seller may terminate with 30 days notice"
+* "Neither party may terminate before 90 days"
+
+These clauses **conflict** for days 30-90!
+
+### The Solution
+
+```python
+from qwed_legal import ClauseGuard
+
+guard = ClauseGuard()
+
+result = guard.check_consistency([
+    "Seller may terminate with 30 days notice",
+    "Neither party may terminate before 90 days",
+    "Seller may terminate immediately upon breach"
+])
+
+print(result.consistent)  # False
+print(result.conflicts)
+# [(0, 1, "Termination notice (30 days) conflicts with minimum term (90 days)")]
+```
+
+### Detection Types
+
+| Conflict Type              | Description                   |
+| -------------------------- | ----------------------------- |
+| **Termination**            | Notice period vs minimum term |
+| **Permission/Prohibition** | "May" vs "May not"            |
+| **Exclusivity**            | Multiple exclusive rights     |
+
+---
+
+## 4. CitationGuard 📚
+
+**Purpose:** Verify legal citations are properly formatted and potentially real.
+
+### The Problem
+
+The **Mata v. Avianca** scandal: Lawyers used ChatGPT, which cited **6 fake court cases**. They were fined $5,000 and sanctioned.
+
+### The Solution
+
+```python
+from qwed_legal import CitationGuard
+
+guard = CitationGuard()
+
+# Valid citation
+result = guard.verify("Brown v. Board of Education, 347 U.S. 483 (1954)")
+print(result.valid)  # True
+print(result.parsed_components)
+# {'plaintiff': 'Brown', 'defendant': 'Board of Education', 
+#  'volume': 347, 'reporter': 'U.S.', 'page': 483, 'year': 1954}
+
+# Invalid citation (fake reporter)
+result = guard.verify("Smith v. Jones, 999 FAKE 123 (2020)")
+print(result.valid)   # False
+print(result.issues)  # ["Unknown reporter abbreviation: 'FAKE'"]
+```
+
+### Supported Reporters
+
+| Category          | Examples                            |
+| ----------------- | ----------------------------------- |
+| **Supreme Court** | U.S., S.Ct., L.Ed., L.Ed.2d         |
+| **Federal**       | F., F.2d, F.3d, F.4th, F.Supp.      |
+| **State**         | Cal., N.Y., Tex., Ill., Pa.         |
+| **Regional**      | A., N.E., N.W., P., S.E., S.W., So. |
+
+### Batch Verification
+
+```python
+result = guard.verify_batch([
+    "Brown v. Board, 347 U.S. 483 (1954)",
+    "Fake v. Case, 999 X.Y.Z. 123",
+])
+
+print(result.total)    # 2
+print(result.valid)    # 1
+print(result.invalid)  # 1
+```
+
+### Statute Citations
+
+```python
+result = guard.check_statute_citation("42 U.S.C. § 1983")
+print(result.valid)  # True
+print(result.parsed_components)
+# {'title': 42, 'code': 'U.S.C.', 'section': '1983'}
+```
+
+---
+
+## 5. JurisdictionGuard 🌍
+
+**Purpose:** Verify choice of law and forum selection clauses.
+
+### The Problem
+
+LLMs miss jurisdiction conflicts:
+
+* Governing law in one country, forum in another
+* Missing CISG applicability warnings
+* Cross-border legal system mismatches
+
+### The Solution
+
+```python
+from qwed_legal import JurisdictionGuard
+
+guard = JurisdictionGuard()
+
+result = guard.verify_choice_of_law(
+    parties_countries=["US", "UK"],
+    governing_law="Delaware",
+    forum="London"
+)
+
+print(result.verified)   # False - mismatch detected
+print(result.conflicts)  # ["Governing law 'Delaware' (US state) but forum 'London' is non-US..."]
+```
+
+### Features
+
+| Feature              | Description                                         |
+| -------------------- | --------------------------------------------------- |
+| **Choice of Law**    | Validates governing law makes sense for parties     |
+| **Forum Selection**  | Checks forum vs governing law alignment             |
+| **CISG Detection**   | Warns about international sale of goods conventions |
+| **Convention Check** | Verifies Hague, NY Convention applicability         |
+
+### Convention Check
+
+```python
+result = guard.check_convention_applicability(
+    parties_countries=["US", "DE"],
+    convention="CISG"
+)
+print(result.verified)  # True - both are CISG members
+```
+
+---
+
+## 6. StatuteOfLimitationsGuard ⏰
+
+**Purpose:** Verify claim limitation periods by jurisdiction.
+
+### The Problem
+
+LLMs don't track jurisdiction-specific limitation periods:
+
+* California breach of contract: 4 years
+* New York breach of contract: 6 years
+* Different periods for negligence, fraud, etc.
+
+### The Solution
+
+```python
+from qwed_legal import StatuteOfLimitationsGuard
+
+guard = StatuteOfLimitationsGuard()
+
+result = guard.verify(
+    claim_type="breach_of_contract",
+    jurisdiction="California",
+    incident_date="2020-01-15",
+    filing_date="2026-06-01"
+)
+
+print(result.verified)          # False - 4 year limit exceeded!
+print(result.expiration_date)   # 2024-01-15
+print(result.days_remaining)    # -867 (negative = expired)
+```
+
+### Supported Jurisdictions
+
+| Jurisdiction | Breach of Contract | Negligence | Fraud    |
+| ------------ | ------------------ | ---------- | -------- |
+| California   | 4 years            | 2 years    | 3 years  |
+| New York     | 6 years            | 3 years    | 6 years  |
+| Texas        | 4 years            | 2 years    | 4 years  |
+| UK/England   | 6 years            | 6 years    | 6 years  |
+| Germany      | 3 years            | 3 years    | 10 years |
+| India        | 3 years            | 3 years    | 3 years  |
+
+### Compare Jurisdictions
+
+```python
+comparison = guard.compare_jurisdictions(
+    "breach_of_contract",
+    ["California", "New York", "Delaware"]
+)
+# {'California': 4.0, 'New York': 6.0, 'Delaware': 3.0}
+```
+
+---
+
+## 7. IRACGuard 📝
+
+**Purpose:** Verify that legal reasoning follows the IRAC framework (Issue, Rule, Application, Conclusion).
+
+### The Problem
+
+LLMs produce legal advice that lacks structured reasoning:
+
+* Missing clear identification of the legal issue
+* No citation of applicable rules or statutes
+* Conclusions without proper application of law to facts
+
+### The Solution
+
+```python
+from qwed_legal import IRACGuard
+
+guard = IRACGuard()
+
+llm_output = """
+Issue: Whether the defendant breached the employment contract.
+Rule: Under California Labor Code § 2922, employment is presumed at-will.
+Application: The defendant terminated employment without the 30-day notice 
+required by the contract, which modified the at-will presumption.
+Conclusion: The defendant breached the employment contract.
+"""
+
+result = guard.verify_structure(llm_output)
+
+print(result["verified"])    # True
+print(result["components"])  # {'issue': '...', 'rule': '...', 'application': '...', 'conclusion': '...'}
+```
+
+### Detection Types
+
+| Check                  | Description                                         |
+| ---------------------- | --------------------------------------------------- |
+| **Structure**          | Verifies all 4 IRAC components are present          |
+| **Logical Disconnect** | Detects when Application doesn't reference the Rule |
+| **Missing Steps**      | Identifies which IRAC components are missing        |
+
+### Error Response
+
+```python
+result = guard.verify_structure("The defendant should pay damages.")
+
+print(result["verified"])  # False
+print(result["error"])     # "Failed Reasoned Elaboration. Missing steps: issue, rule, application, conclusion..."
+print(result["missing"])   # ['issue', 'rule', 'application', 'conclusion']
+```
+
+---
+
+## 8. FairnessGuard ⚖️
+
+**Purpose:** Detect algorithmic bias using counterfactual testing.
+
+### The Problem
+
+AI legal systems can exhibit bias based on protected attributes:
+
+* Different sentencing recommendations based on gender
+* Inconsistent contract assessments based on party names
+* Discriminatory loan approval reasoning
+
+### The Solution
+
+```python
+from qwed_legal import FairnessGuard
+
+# Requires an LLM client for counterfactual generation
+guard = FairnessGuard(llm_client=my_llm)
+
+result = guard.verify_decision_fairness(
+    original_prompt="Should John Smith receive parole given his rehabilitation record?",
+    original_decision="Parole recommended based on positive rehabilitation.",
+    protected_attribute_swap={"John": "Jane", "his": "her"}
+)
+
+print(result["verified"])  # True if decision is consistent
+print(result["status"])    # "FAIRNESS_VERIFIED" or "JUDICIAL_BIAS_DETECTED"
+```
+
+### How It Works
+
+1. **Counterfactual Generation** - Swaps protected attributes (names, pronouns) while preserving case
+2. **Re-evaluation** - Runs the modified prompt through the LLM
+3. **Deterministic Comparison** - Checks if outcomes match exactly
+
+### Detection Types
+
+| Status                   | Description                                    |
+| ------------------------ | ---------------------------------------------- |
+| `FAIRNESS_VERIFIED`      | Decision unchanged after attribute swap        |
+| `JUDICIAL_BIAS_DETECTED` | Decision changed based on protected attributes |
+| `NO_SWAP_REQUIRED`       | No protected attributes to test                |
+
+<Warning>
+FairnessGuard requires an LLM client at initialization. Without it, `verify_decision_fairness()` will raise a `ValueError`.
+</Warning>
+
+---
+
+## 9. ContradictionGuard 🔍
+
+**Purpose:** Detect logical contradictions in contracts using Z3 SMT Solver.
+
+### The Problem
+
+Contracts can contain mathematically impossible combinations:
+
+* "Liability capped at $10,000" + "Minimum penalty of $50,000"
+* "Term is exactly 12 months" + "Minimum duration of 24 months"
+
+Text-based heuristics (ClauseGuard) miss these formal logic conflicts.
+
+### The Solution
+
+```python
+from qwed_legal import ContradictionGuard, Clause
+
+guard = ContradictionGuard()
+
+clauses = [
+    Clause(id="1", text="Liability capped at 10000", category="LIABILITY", value=10000),
+    Clause(id="2", text="Penalty shall be 50000", category="LIABILITY", value=50000),
+]
+
+result = guard.verify_consistency(clauses)
+
+print(result["verified"])  # False
+print(result["message"])   # "❌ LOGIC CONTRADICTION: Clauses are mutually exclusive..."
+```
+
+### Clause Structure
+
+The `Clause` dataclass requires:
+
+| Field      | Type  | Description                                    |
+| ---------- | ----- | ---------------------------------------------- |
+| `id`       | `str` | Unique clause identifier                       |
+| `text`     | `str` | Human-readable clause text                     |
+| `category` | `str` | `DURATION`, `LIABILITY`, or `TERMINATION`      |
+| `value`    | `int` | Normalized numeric value (days, dollars, etc.) |
+
+### Supported Categories
+
+| Category    | Detects                                     |
+| ----------- | ------------------------------------------- |
+| `DURATION`  | Conflicting term lengths (exact vs min/max) |
+| `LIABILITY` | Cap vs penalty contradictions               |
+
+### Z3 vs ClauseGuard
+
+| Feature      | ClauseGuard          | ContradictionGuard           |
+| ------------ | -------------------- | ---------------------------- |
+| **Input**    | Raw text strings     | Structured `Clause` objects  |
+| **Method**   | Text heuristics      | Z3 SMT Solver                |
+| **Detects**  | Permission conflicts | Mathematical impossibilities |
+| **Use Case** | Quick checks         | Formal verification          |
+
+---
+
+## SACProcessor (RAG Helper) 📄
+
+**Purpose:** Prevent Document-Level Retrieval Mismatch (DRM) in legal RAG systems.
+
+### The Problem
+
+Standard RAG chunking causes >95% retrieval mismatch in legal databases because:
+
+* Legal documents share nearly identical boilerplate
+* Chunk-level embeddings lose document context
+* NDAs, contracts, and agreements look alike at the chunk level
+
+### The Solution
+
+```python
+from qwed_legal import SACProcessor
+
+sac = SACProcessor(llm_client=my_llm)
+
+# Your existing chunks
+chunks = naive_split(contract_text)
+
+# Augment with document fingerprint
+augmented = sac.generate_sac_chunks(
+    document_text=contract_text,
+    chunks=chunks,
+    document_id="NDA-2026-001"
+)
+
+# Each chunk now includes global context
+print(augmented[0])
+# DOCUMENT CONTEXT [NDA-2026-001]: NDA between Acme Corp and Beta Inc...
+# CHUNK CONTENT [1/10]: Original chunk text here...
+```
+
+### Configuration
+
+| Parameter               | Default | Description                              |
+| ----------------------- | ------- | ---------------------------------------- |
+| `target_summary_length` | 150     | Character limit for document fingerprint |
+| `preview_chars`         | 5000    | Max chars sent to LLM for summarization  |
+
+### Methods
+
+| Method                        | Description                                  |
+| ----------------------------- | -------------------------------------------- |
+| `generate_sac_chunks()`       | Augment all chunks with document fingerprint |
+| `generate_fingerprint_only()` | Get just the fingerprint for caching         |
+
+<Note>
+SACProcessor requires an LLM client. Generic (automated) summaries outperform expert-guided ones for retrieval.
+</Note>
+
+---
+
+## All-in-One: LegalGuard
+
+For convenience, use the unified `LegalGuard` class:
+
+```python
+from qwed_legal import LegalGuard
+
+# Optional: provide llm_client for FairnessGuard
+guard = LegalGuard(llm_client=my_llm)
+
+# All 9 guards available
+guard.verify_deadline(...)
+guard.verify_liability_cap(...)
+guard.check_clause_consistency(...)          # ClauseGuard (text heuristics)
+guard.verify_citation(...)
+guard.verify_jurisdiction(...)
+guard.verify_statute_of_limitations(...)
+guard.verify_irac_structure(...)             # NEW in v0.3.0
+guard.verify_fairness(...)                   # NEW in v0.3.0 (requires llm_client)
+guard.verify_contradiction(...)              # NEW in v0.3.0 (Z3 SMT Solver)
+```
+
+<Info>
+Most guards are fully deterministic. Only `verify_fairness()` requires an LLM client.
+</Info>
+
+---
+
+## Next Steps
+
+* [Examples](/legal/examples) - Real-world scenarios
+* [Troubleshooting](/legal/troubleshooting) - Common issues
