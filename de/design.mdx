@@ -1,401 +1,315 @@
 ---
-title: QWED Design Decisions
-description: QWED's core design philosophy and the Untrusted Translator pattern for deterministic verification of LLM outputs.
+sidebar_position: 5
+title: Design & Architecture
+description: QWED-Finance system architecture with C4 diagrams showing integration with banking systems, SWIFT, and regulators.
 ---
 
-**Last updated:** January 2026\
-**Purpose:** Document the human architectural decisions, trade-offs, and design thinking behind QWED
+# Design & Architecture
 
----
+This page provides a deep dive into the internal design of QWED-Finance.
 
-## Core Philosophy
+## System Overview
 
-> **"Don't reduce hallucinations. Make them irrelevant."**
-
-Large Language Models (LLMs) are probabilistic and will always hallucinate. Rather than trying to fix the LLM, QWED verifies its outputs using deterministic solvers. The LLM becomes an **untrusted translator**, not a trusted computer.
-
----
-
-## Architecture: The Untrusted Translator Pattern
-
-### The Problem
-
-**Traditional approach:** Trust the LLM to compute correctly
-
-* Train it better (fine-tuning)
-* Give it more context (RAG)
-* Ask it to check itself (LLM-as-judge)
-
-**Why this fails:** LLMs are fundamentally probabilistic. No amount of training guarantees correctness.
-
-### The QWED Solution
-
-**Separation of concerns:**
-
-1. **LLM:** Translates natural language → formal specification
-2. **Symbolic Solver:** Verifies the formal specification deterministically
-
-```
-User: "What is the derivative of x²?"
-  ↓
-LLM: Translates to → diff(x**2, x)
-  ↓
-SymPy: Computes → 2*x (proven correct)
-  ↓
-QWED: Returns verified result
+```mermaid
+C4Context
+    title QWED-Finance System Context
+    
+    Person(user, "Banking Customer", "Interacts with banking services")
+    Person(agent, "Banking Agent", "LLM-powered assistant")
+    
+    System(qwed, "QWED-Finance", "Deterministic verification middleware")
+    
+    System_Ext(bank, "Core Banking", "Transaction processing")
+    System_Ext(swift, "SWIFT Network", "International payments")
+    System_Ext(regulator, "Regulators", "RBI, FinCEN, OFAC")
+    
+    Rel(user, agent, "Requests")
+    Rel(agent, qwed, "Verifies outputs")
+    Rel(qwed, bank, "Approved transactions")
+    Rel(qwed, swift, "Verified messages")
+    Rel(qwed, regulator, "Audit receipts")
 ```
 
-**Key insight:** LLMs are good at translation, terrible at computation. Use them for what they're good at.
+## Guard Architecture
 
----
+### Component Diagram
 
-## Design Decision 1: Multiple Specialized Engines
-
-### The Trade-off
-
-**Option A: Single general-purpose verifier**
-
-* Pros: Simpler architecture, one dependency
-* Cons: No general verifier matches domain-specific tools
-
-**Option B: Multiple domain-specific engines** ← **CHOSEN**
-
-* Pros: Each domain uses decades of specialized research
-* Cons: More complex architecture, multiple dependencies
-
-### The Decision
-
-**Chosen:** Multiple specialized engines
-
-**Engines:**
-
-* **SymPy** (math): Symbolic algebra, calculus, linear algebra
-* **Z3** (logic): SAT/SMT solving, formal verification
-* **AST** (code): Static analysis, syntax validation
-* **SQLGlot** (SQL): Query parsing and validation
-* **NLI + TF-IDF** (facts): Grounding against source documents
-
-**Rationale:** Each domain has specialized tools refined over decades. No general-purpose verifier can match the precision of SymPy for calculus or Z3 for logic. Better to integrate experts than build a generalist.
-
----
-
-## Design Decision 2: TF-IDF for Fact Grounding
-
-### The Trade-off
-
-**Option A: Vector embeddings (semantic similarity)**
-
-* Pros: Captures semantic meaning, state-of-the-art
-* Cons: Probabilistic, can match opposite meanings
-
-**Option B: TF-IDF (lexical matching)** ← **CHOSEN**
-
-* Pros: Deterministic, reproducible, searches for evidence
-* Cons: Doesn't capture semantic similarity
-
-### The Decision
-
-**Chosen:** TF-IDF for evidence retrieval
-
-**Example of the problem with embeddings:**
-
-```python
-query1 = "The Earth orbits the Sun"
-query2 = "The Sun orbits the Earth"
-
-# Embeddings similarity: 0.92 (HIGH!)
-# Meaning: Completely opposite
+```mermaid
+graph TB
+    subgraph "qwed_finance/"
+        direction TB
+        
+        subgraph "Guards (Domain Logic)"
+            CG["compliance_guard.py<br/>AML/KYC/Sanctions"]
+            CAL["calendar_guard.py<br/>Day Count Conventions"]
+            DG["derivatives_guard.py<br/>Black-Scholes"]
+            MG["message_guard.py<br/>ISO 20022 / SWIFT"]
+            QG["query_guard.py<br/>SQL Safety"]
+            XG["cross_guard.py<br/>Multi-layer"]
+        end
+        
+        subgraph "Models (Data Structures)"
+            Receipt["models/receipt.py<br/>VerificationReceipt"]
+            Schemas["schemas.py<br/>LoanSchema, etc."]
+        end
+        
+        subgraph "Integrations (External APIs)"
+            OR["integrations/open_responses.py"]
+            UCP["integrations/ucp.py"]
+        end
+        
+        subgraph "Core"
+            FV["finance_verifier.py<br/>NPV, IRR, Loans"]
+        end
+    end
+    
+    subgraph "External Engines"
+        Z3["Z3 SMT Solver"]
+        SymPy["SymPy"]
+        SQLGlot["SQLGlot"]
+    end
+    
+    CG --> Z3
+    CAL --> SymPy
+    DG --> SymPy
+    QG --> SQLGlot
+    
+    CG --> Receipt
+    CAL --> Receipt
+    DG --> Receipt
+    MG --> Receipt
+    QG --> Receipt
 ```
 
-**TF-IDF advantage:** Searches for actual word evidence, not "vibes"
+## Verification Flow
 
-**Academic validation:** 10+ papers (2018-2025) from AAAI, ACL, Neurocomputing use TF-IDF for fact verification (FEVER dataset, etc.)
+### State Machine
 
-**Use case:** For verification, you need **evidence-based grounding**, not semantic similarity.
-
----
-
-## Design Decision 3: LLM-as-Translator vs LLM-as-Judge
-
-### The Trade-off
-
-**Option A: LLM-as-judge** (e.g., GPT-4 checks GPT-3.5)
-
-* Pros: Uses latest models, easy to implement
-* Cons: Both models probabilistic → recursive hallucination
-
-**Option B: Solver-as-judge** ← **CHOSEN**
-
-* Pros: Deterministic, mathematical proof
-* Cons: Limited to verifiable domains
-
-### The Decision
-
-**Chosen:** Symbolic solver as judge
-
-**Comparison:**
-
-| Approach     | Judge    | Guarantee          | Example            |
-| ------------ | -------- | ------------------ | ------------------ |
-| LLM-as-judge | GPT-4    | Probabilistic      | "Probably correct" |
-| QWED         | SymPy/Z3 | Mathematical proof | "Provably correct" |
-
-**Rationale:** If both judge and generator are probabilistic, errors compound. Need deterministic judge for verification.
-
-**Limitation acknowledged:** Only works for mathematically verifiable domains (math, logic, syntax). Not for creative writing or subjective content.
-
----
-
-## Design Decision 4: API Design Philosophy
-
-### The Trade-off
-
-**Option A: Low-level API** (expose all solver internals)
-
-* Pros: Maximum flexibility
-* Cons: Steep learning curve, users need solver expertise
-
-**Option B: High-level developer-friendly API** ← **CHOSEN**
-
-* Pros: Easy to use, hides complexity
-* Cons: Less control over solver behavior
-
-### The Decision
-
-**Chosen:** High-level, developer-friendly API
-
-**Design principles:**
-
-1. **Single method per domain:** `verify_math()`, `verify_logic()`, `verify_code()`
-2. **Smart routing:** Auto-detect domain from query
-3. **Rich error messages:** Explain what failed and why
-4. **Fallback values:** Graceful degradation on verification failure
-
-**Example:**
-
-```python
-# User doesn't need to know about SymPy internals
-result = client.verify_math("What is 2+2?")
-print(result.verified)  # True
-print(result.value)  # 4
+```mermaid
+stateDiagram-v2
+    [*] --> Received: LLM Output
+    
+    Received --> Parsing: Extract Data
+    Parsing --> GuardSelection: Detect Type
+    
+    GuardSelection --> ComplianceCheck: Financial Amount
+    GuardSelection --> CalendarCheck: Date Calculation
+    GuardSelection --> DerivativesCheck: Options/Greeks
+    GuardSelection --> MessageCheck: XML/SWIFT
+    GuardSelection --> QueryCheck: SQL Query
+    
+    ComplianceCheck --> SymbolicProof
+    CalendarCheck --> SymbolicProof
+    DerivativesCheck --> SymbolicProof
+    MessageCheck --> SchemaValidation
+    QueryCheck --> ASTAnalysis
+    
+    SymbolicProof --> ReceiptGeneration
+    SchemaValidation --> ReceiptGeneration
+    ASTAnalysis --> ReceiptGeneration
+    
+    ReceiptGeneration --> Approved: verified=True
+    ReceiptGeneration --> Rejected: verified=False
+    ReceiptGeneration --> PendingReview: needs_review=True
+    
+    Approved --> [*]
+    Rejected --> [*]
+    PendingReview --> [*]
 ```
 
-**Rationale:** Developers shouldn't need to learn SymPy, Z3, AST separately. QWED provides a unified interface.
+## Data Flow
 
----
+### Verification Receipt Lifecycle
 
-## Design Decision 5: Integration Patterns
-
-### The Trade-off
-
-**Option A: Standalone verification service**
-
-* Pros: Clean separation
-* Cons: Hard to integrate with existing LLM workflows
-
-**Option B: Framework integrations** ← **CHOSEN**
-
-* Pros: Drops into LangChain, LlamaIndex, etc.
-* Cons: More maintenance, framework dependencies
-
-### The Decision
-
-**Chosen:** Native integrations with popular frameworks
-
-**Integrations:**
-
-* **LangChain:** `QWEDTool` as native LangChain tool
-* **LlamaIndex:** Query engine wrapper
-* **Direct API:** For custom workflows
-
-**Rationale:** Developers already use LangChain/LlamaIndex. QWED should integrate seamlessly rather than forcing workflow changes.
-
----
-
-## Design Decision 6: Error Handling Philosophy
-
-### The Trade-off
-
-**Option A: Fail fast** (reject on any error)
-
-* Pros: Safe, conservative
-* Cons: Breaks user experience
-
-**Option B: Graceful degradation with audit trails** ← **CHOSEN**
-
-* Pros: Better UX, transparent failures
-* Cons: Users might miss errors
-
-### The Decision
-
-**Chosen:** Graceful degradation with comprehensive logging
-
-**Pattern:**
-
-```python
-try:
-    result = verify_math(query, llm_output)
-except VerificationError as e:
-    log_error(e, audit_trail=True)
-    return fallback_value  # User-defined
+```mermaid
+flowchart LR
+    subgraph Input
+        LLM["LLM Output"]
+    end
+    
+    subgraph Processing
+        Hash["SHA-256<br/>Input Hash"]
+        Guard["Guard<br/>Verification"]
+        Proof["Symbolic<br/>Proof Steps"]
+    end
+    
+    subgraph Output
+        Receipt["Verification<br/>Receipt"]
+        Log["Audit<br/>Log"]
+    end
+    
+    LLM --> Hash
+    LLM --> Guard
+    Guard --> Proof
+    Hash --> Receipt
+    Proof --> Receipt
+    Receipt --> Log
 ```
 
-**Features:**
+### Cross-Guard Pipeline
 
-* **Audit trails:** Log every verification attempt
-* **Retry with exponential backoff:** Handle transient LLM errors
-* **Alert systems:** Notify on repeated failures
-* **Fallback values:** User-defined safe defaults
+```mermaid
+flowchart TD
+    Input["SWIFT MT103 Message"]
+    
+    subgraph "Cross-Guard Pipeline"
+        Step1["1. Message Guard<br/>Validate MT103 Format"]
+        Step2["2. Extract Entities<br/>Debtor/Creditor Names"]
+        Step3["3. Compliance Guard<br/>Sanctions Screening"]
+        Step4["4. Query Guard<br/>Database Lookup Safety"]
+    end
+    
+    Output1["✅ All Clear"]
+    Output2["❌ Sanctions Hit"]
+    Output3["⚠️ Format Error"]
+    
+    Input --> Step1
+    Step1 -->|Valid| Step2
+    Step1 -->|Invalid| Output3
+    Step2 --> Step3
+    Step3 -->|Clear| Step4
+    Step3 -->|Hit| Output2
+    Step4 --> Output1
+```
 
-**Rationale:** Production systems need resilience. Total failure is worse than controlled degradation with visibility.
+## Engine Selection Matrix
 
----
+```mermaid
+quadrantChart
+    title Guard-to-Engine Mapping
+    x-axis "Numeric Precision" --> "Logical Completeness"
+    y-axis "Simple" --> "Complex"
+    
+    quadrant-1 "Formal Proofs"
+    quadrant-2 "Calculations"
+    quadrant-3 "Parsing"
+    quadrant-4 "Validation"
+    
+    "Compliance (Z3)": [0.8, 0.7]
+    "Calendar (SymPy)": [0.3, 0.4]
+    "Derivatives (Math)": [0.2, 0.6]
+    "Message (XML)": [0.6, 0.3]
+    "Query (AST)": [0.7, 0.5]
+```
 
-## Design Decision 7: PII Masking Strategy
+## Class Diagram
 
-### The Trade-off
+```mermaid
+classDiagram
+    class FinanceVerifier {
+        +verify_npv(cashflows, rate)
+        +verify_irr(cashflows)
+        +verify_loan_payment(principal, rate, months)
+    }
+    
+    class ComplianceGuard {
+        -z3_solver: Solver
+        +verify_aml_flag(amount, country)
+        +verify_kyc_complete(documents)
+        +verify_sanctions_check(entity)
+    }
+    
+    class MessageGuard {
+        +verify_iso20022_xml(xml, type)
+        +verify_swift_mt(message, type)
+        +validate_bic(bic)
+        +validate_iban(iban)
+    }
+    
+    class QueryGuard {
+        -allowed_tables: Set
+        -blocked_columns: Set
+        +verify_readonly_safety(sql)
+        +verify_table_access(sql)
+        +verify_no_injection(sql)
+    }
+    
+    class VerificationReceipt {
+        +receipt_id: str
+        +timestamp: str
+        +input_hash: str
+        +verified: bool
+        +proof_steps: List
+        +to_json()
+        +get_signature()
+    }
+    
+    class CrossGuard {
+        -compliance: ComplianceGuard
+        -message: MessageGuard
+        -query: QueryGuard
+        +verify_swift_with_sanctions()
+        +verify_iso_with_rules()
+    }
+    
+    ComplianceGuard --> VerificationReceipt : generates
+    MessageGuard --> VerificationReceipt : generates
+    QueryGuard --> VerificationReceipt : generates
+    CrossGuard --> ComplianceGuard : uses
+    CrossGuard --> MessageGuard : uses
+    CrossGuard --> QueryGuard : uses
+```
 
-**Option A: No PII handling** (user responsibility)
+## Deployment Architecture
 
-* Pros: Simpler architecture
-* Cons: Privacy risk, compliance issues
-
-**Option B: Built-in PII masking** ← **CHOSEN**
-
-* Pros: HIPAA/GDPR compliance, privacy by default
-* Cons: Performance overhead, false positives
-
-### The Decision
-
-**Chosen:** Optional built-in PII masking
-
-**Implementation:**
-
-* Uses Microsoft Presidio for entity detection
-* Masks before sending to LLM
-* Unmasks in verification step
-* Logs PII detection events
-
-**Rationale:** Healthcare, finance, legal sectors require PII protection. Making it built-in lowers adoption barrier for regulated industries.
-
----
-
-## Design Decision 8: Calculator vs Wikipedia Analogy
-
-### The Mental Model
-
-**Why this matters:** Helps users understand QWED's scope
-
-**Calculator (Deterministic):**
-
-* Input: 2 + 2
-* Output: 4 (always)
-* Verifiable: ✅
-
-**Wikipedia (Knowledge Base):**
-
-* Input: "Who is the president?"
-* Output: Depends on edit history
-* Verifiable: ❌ (subjective, changes)
-
-**QWED is a calculator, not Wikipedia:**
-
-* ✅ Math: Provable
-* ✅ Logic: Provable
-* ✅ Code syntax: Provable
-* ❌ Opinions: Not provable
-* ❌ Creative content: Not provable
-
----
-
-## What QWED Is NOT
-
-### Rejected Design Paths
-
-**1. Novel Research**
-
-* **Not claiming:** New verification algorithms
-* **Claiming:** Practical integration of existing solvers
-
-**2. LLM Improvement**
-
-* **Not claiming:** Making LLMs more accurate
-* **Claiming:** Catching LLM errors deterministically
-
-**3. General AI Safety**
-
-* **Not claiming:** Solving jailbreaks, toxicity, bias
-* **Claiming:** Verifying mathematical/logical correctness
-
----
-
-## Development Transparency
-
-### AI Assistance
-
-This project was developed with assistance from generative AI tools:
-
-**Tools used:**
-
-* **Antigravity IDE** with **Claude Sonnet 4.5**
-* **Scope:** Code implementation, documentation, test generation
-
-**Human contributions:**
-
-* All architectural decisions documented above
-* Trade-off analysis and solver selection
-* API design and integration patterns
-* Error handling philosophy
-* Domain modeling and verification workflows
-
-**Validation:** All AI-generated code was reviewed, tested against benchmarks, and validated through comprehensive testing.
-
----
-
-## Lessons Learned
-
-### What Worked
-
-1. **Specialized engines:** Better than trying to build one general verifier
-2. **Developer-friendly API:** Easier adoption than low-level solver access
-3. **TF-IDF for grounding:** Deterministic evidence > semantic vibes
-4. **Open development:** Community contributions improved design
-
-### What We'd Change
-
-1. **Earlier framework integrations:** Should have built LangChain support sooner
-2. **More domain tutorials:** Users needed more examples per domain
-3. **Clearer scope communication:** "Calculator not Wikipedia" analogy should be upfront
-
----
-
-## References
-
-**Academic validation for design decisions:**
-
-1. **TF-IDF for fact verification:**
-   * FEVER Shared Task (2018): Fact verification benchmark
-   * AAAI 2019: Combining fact extraction and verification
-   * Neurocomputing 2023: Information retrieval for fact-checking
-
-2. **Neurosymbolic AI:**
-   * Kautz (2020): The third AI summer
-   * Marcus (2020): The next decade in AI
-
-3. **LLM verification challenges:**
-   * Ji et al. (2023): Survey of hallucination in NLP
-   * OpenAI (2023): GPT-4 technical report
+```mermaid
+flowchart TB
+    subgraph "Production Environment"
+        subgraph "API Layer"
+            FastAPI["FastAPI Server"]
+            Express["Express Middleware"]
+        end
+        
+        subgraph "QWED-Finance"
+            Guards["10 Guards"]
+            Audit["Audit Log"]
+        end
+        
+        subgraph "Storage"
+            Redis["Redis<br/>(Receipt Cache)"]
+            S3["S3/GCS<br/>(Audit Archive)"]
+        end
+    end
+    
+    subgraph "External"
+        LLM["LLM API"]
+        Bank["Bank API"]
+    end
+    
+    LLM --> FastAPI
+    LLM --> Express
+    FastAPI --> Guards
+    Express --> Guards
+    Guards --> Audit
+    Audit --> Redis
+    Audit --> S3
+    Guards --> Bank
+```
 
 ---
 
-## Contributing to Design
+## Design Principles
 
-Have suggestions on design improvements? Open an issue on GitHub to discuss!
+### 1. Determinism First
 
-**Questions welcome:**
+Every verification produces the **same result** for the same input. No randomness.
 
-* Why this solver over alternatives?
-* Trade-offs we should reconsider?
-* New design patterns?
+### 2. Symbolic Over Statistical
 
-GitHub Discussions: https://github.com/QWED-AI/qwed-verification/discussions
+Use mathematical proofs (Z3, SymPy) instead of probabilistic confidence scores.
+
+### 3. Audit by Default
+
+Every verification generates a receipt. No silent failures.
+
+### 4. Defense in Depth
+
+Cross-Guard combines multiple guards for layered security.
+
+---
+
+## Related Pages
+
+* [Overview](/finance/overview) — Introduction and quick start
+* [The 10 Guards](/finance/guards) — Guard implementation details
+* [Compliance & Auditing](/finance/compliance) — Receipt and audit log details
