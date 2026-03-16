@@ -1,7 +1,7 @@
 ---
 sidebar_position: "9"
 title: "Taint Analysis Engine"
-description: "QWED's Taint Analysis Engine tracks untrusted user input through code to prevent it from reaching sensitive sinks without sanitization. Critical for LLM security."
+description: "The Taint Analysis Engine tracks untrusted input through code to prevent unsanitized data from reaching sensitive sinks."
 ---
 
 The **Taint Analysis Engine** creates a security firewall by tracking "tainted" (untrusted) user input as it flows through generated code. It ensures that untrusted data never reaches sensitive "sinks" like file system access, network calls, or SQL execution without proper sanitization.
