@@ -1,442 +1,560 @@
 ---
 sidebar_position: 2
-title: Guards Reference
-description: Reference for the 10 QWED-UCP guards including Money Guard, State Guard, Refund Guard, and Attestation Guard.
+title: The 9 Guards
+description: Reference for the 9 QWED Legal guards covering deadlines, liability, contradictions, citations, and jurisdiction checks.
 ---
 
-# Guards Reference
+# The 9 Guards of QWED-Legal
 
-QWED-UCP includes **10 verification guards** that validate different aspects of UCP checkout data.
+Each guard uses a deterministic engine to verify a specific aspect of legal documents.
 
----
+## 1. DeadlineGuard 📅
 
-## 1. Money Guard
+**Purpose:** Verify date calculations in contracts.
 
-**Verifies the total formula is mathematically correct.**
+### The Problem
 
-```
-Total = Subtotal - Discount + Tax + Shipping + Fee
-```
+LLMs frequently miscalculate deadlines:
 
-### Usage
+* Confuse **business days** vs **calendar days**
+* Ignore **leap years**
+* Forget **jurisdiction-specific holidays**
+
+### The Solution
 
 ```python
-driver = MoneyGuard()
-result = driver.verify_cart_totals(
-    line_items=[{"price": 35.00, "quantity": 2}, {"price": 15.00, "quantity": 1}],
-    taxes=8.25,
-    discounts=10.00,
-    claimed_total=98.25
+from qwed_legal import DeadlineGuard
+
+guard = DeadlineGuard(country="US", state="CA")
+
+result = guard.verify(
+    signing_date="2026-01-15",
+    term="30 business days",
+    claimed_deadline="2026-02-14"
 )
-# Returns: {"verified": True}
+
+print(result.verified)           # False
+print(result.computed_deadline)  # 2026-02-27
+print(result.difference_days)    # 13
 ```
 
-### Tolerance
+### Features
 
-Uses `Decimal` precision with 1 cent ($0.01) tolerance for floating-point errors.
+| Feature                  | Description                                     |
+| ------------------------ | ----------------------------------------------- |
+| **Business vs Calendar** | Automatically detects "business days" vs "days" |
+| **Holiday Support**      | 200+ countries via `python-holidays`            |
+| **Leap Years**           | Handles Feb 29 correctly                        |
+| **Natural Language**     | Parses "2 weeks", "3 months", "1 year"          |
 
 ---
 
-## 2. State Guard
+## 2. LiabilityGuard 💰
 
-**Verifies valid checkout state machine transitions.**
+**Purpose:** Verify liability cap and indemnity calculations.
 
-### Valid States
+### The Problem
 
-```
-incomplete → ready_for_complete → completed
-                              ↓
-                            failed
-                              ↓
-                           cancelled
-```
+LLMs get percentage math wrong:
 
-### Usage
+* "200% of $5M = $15M" ❌ (Should be $10M)
+* Float precision errors on large amounts
+* Tiered liability miscalculations
+
+### The Solution
 
 ```python
-from qwed_ucp.guards.state_guard import StateGuard
+from qwed_legal import LiabilityGuard
 
-guard = StateGuard()
-# Check if we can SHIP given the current state is PAID
-result = guard.verify_transition(
-    current_state="paid",
-    action="ship"
+guard = LiabilityGuard()
+
+result = guard.verify_cap(
+    contract_value=5_000_000,
+    cap_percentage=200,
+    claimed_cap=15_000_000
 )
-# Returns: {"verified": True}
+
+print(result.verified)      # False
+print(result.computed_cap)  # 10,000,000
+print(result.difference)    # 5,000,000
 ```
 
-### Rules
-
-* `incomplete`: Can be empty
-* `ready_for_complete`: Must have line items
-* `completed`: Must have order object
-* Cannot transition backwards
-
----
-
-## 3. Schema Guard
-
-**Validates UCP JSON schema compliance.**
-
-### Usage
+### Additional Methods
 
 ```python
-from qwed_ucp.guards import SchemaGuard
-
-guard = SchemaGuard()
-result = guard.verify(checkout_data)
-```
-
-### Validates
-
-* Required fields present
-* Correct types (string, number, array)
-* Valid enum values (status, total types)
-
----
-
-## 4. Line Items Guard
-
-**Verifies price × quantity = line total for each item.**
-
-### Usage
-
-```python
-from qwed_ucp.guards import LineItemsGuard
-
-guard = LineItemsGuard()
-result = guard.verify({
-    "line_items": [
-        {"id": "roses", "quantity": 2, "item": {"price": 35.00}},
-        {"id": "pot", "quantity": 1, "item": {"price": 15.00}}
+# Tiered liability
+result = guard.verify_tiered_liability(
+    tiers=[
+        {"base": 1_000_000, "percentage": 100},
+        {"base": 500_000, "percentage": 50},
     ],
-    "totals": [{"type": "subtotal", "amount": 85.00}]  # 2×35 + 1×15 = 85 ✓
-})
-```
-
-### Checks
-
-* Each item: `price × quantity = line_total`
-* Sum of line items = subtotal
-* Quantities must be positive integers
-* Prices must be non-negative
-
----
-
-## 5. Discount Guard
-
-**Verifies percentage and fixed discount calculations.**
-
-### Usage - Percentage Discount
-
-```python
-from qwed_ucp.guards import DiscountGuard
-from decimal import Decimal
-
-guard = DiscountGuard()
-result = guard.verify_percentage_discount(
-    subtotal=Decimal("100.00"),
-    discount_amount=Decimal("10.00"),
-    percentage=Decimal("10")  # 10% of 100 = 10 ✓
+    claimed_total=1_250_000  # ✅ Correct: 1M + 250K
 )
-```
 
-### Usage - Fixed Discount
-
-```python
-result = guard.verify_fixed_discount(
-    subtotal=Decimal("50.00"),
-    discount_amount=Decimal("5.00")  # Fixed $5 off ✓
+# Indemnity limit (3x annual fee)
+result = guard.verify_indemnity_limit(
+    annual_fee=100_000,
+    multiplier=3,
+    claimed_limit=300_000  # ✅ Correct
 )
-```
-
-### Rules
-
-* Percentage: Must be 0-100%
-* Fixed: Cannot exceed subtotal
-* Discount must be non-negative
-
----
-
-## 6. Currency Guard
-
-**Validates ISO 4217 currency codes and format.**
-
-### Usage
-
-```python
-from qwed_ucp.guards import CurrencyGuard
-
-guard = CurrencyGuard()
-result = guard.verify({"currency": "USD"})
-```
-
-### Validates
-
-* 3-letter ISO 4217 codes (USD, EUR, GBP, JPY, etc.)
-* Zero-decimal currencies (JPY, KRW) have no decimals
-* Currency conversion accuracy
-
-### Zero-Decimal Currencies
-
-```python
-# Valid - no decimals
-{"currency": "JPY", "totals": [{"type": "total", "amount": 1000}]}
-
-# Invalid - JPY shouldn't have decimals
-{"currency": "JPY", "totals": [{"type": "total", "amount": 1000.50}]}
 ```
 
 ---
 
-## 7. Refund Guard
+## 3. ClauseGuard ⚖️
 
-**Verifies refund amounts match original transactions.**
+**Purpose:** Detect contradictory clauses using formal logic.
 
-### Usage - Full refund
+### The Problem
 
-```python
-from qwed_ucp.guards.refund import RefundGuard
-from decimal import Decimal
+LLMs miss logical contradictions:
 
-guard = RefundGuard()
-result = guard.verify_full_refund(
-    original_total=Decimal("100.00"),
-    refund_amount=Decimal("100.00")
-)
-# Returns: RefundGuardResult(verified=True, details={"refund_type": "full"})
-```
+* "Seller may terminate with 30 days notice"
+* "Neither party may terminate before 90 days"
 
-### Usage - Partial refund
+These clauses **conflict** for days 30-90!
+
+### The Solution
 
 ```python
-result = guard.verify_partial_refund(
-    original_total=Decimal("100.00"),
-    refund_amount=Decimal("50.00"),
-    percentage=Decimal("50")  # 50% of 100 = 50 ✓
-)
+from qwed_legal import ClauseGuard
+
+guard = ClauseGuard()
+
+result = guard.check_consistency([
+    "Seller may terminate with 30 days notice",
+    "Neither party may terminate before 90 days",
+    "Seller may terminate immediately upon breach"
+])
+
+print(result.consistent)  # False
+print(result.conflicts)
+# [(0, 1, "Termination notice (30 days) conflicts with minimum term (90 days)")]
 ```
 
-### Usage - Tax reversal
+### Detection Types
 
-```python
-result = guard.verify_tax_reversal(
-    original_tax=Decimal("10.00"),
-    refund_tax=Decimal("5.00"),
-    refund_percentage=Decimal("50")  # 50% of tax reversed ✓
-)
-```
-
-### Usage - Checkout refund
-
-```python
-checkout = {"totals": [{"type": "total", "amount": 100.00}]}
-refund = {"amount": 100.00, "type": "full"}
-result = guard.verify(checkout, refund)
-```
-
-### Rules
-
-* Full refund must exactly match original total
-* Partial refund percentage must be 0-100%
-* Refund cannot exceed original total
-* Tax reversal must be proportional to the refund percentage
+| Conflict Type              | Description                   |
+| -------------------------- | ----------------------------- |
+| **Termination**            | Notice period vs minimum term |
+| **Permission/Prohibition** | "May" vs "May not"            |
+| **Exclusivity**            | Multiple exclusive rights     |
 
 ---
 
-## 8. Tip Guard
+## 4. CitationGuard 📚
 
-**Verifies tip calculations (pre-tax and post-tax).**
+**Purpose:** Verify legal citations are properly formatted and potentially real.
 
-### Usage - Pre-tax tip
+### The Problem
 
-```python
-from qwed_ucp.guards.tip import TipGuard
-from decimal import Decimal
+The **Mata v. Avianca** scandal: Lawyers used ChatGPT, which cited **6 fake court cases**. They were fined $5,000 and sanctioned.
 
-guard = TipGuard()
-result = guard.verify_percentage_tip(
-    subtotal=Decimal("50.00"),
-    tip_amount=Decimal("9.00"),
-    percentage=Decimal("18")  # 18% of 50 = 9 ✓
-)
-# Returns: TipGuardResult(verified=True, details={"tip_type": "pre-tax"})
-```
-
-### Usage - Post-tax tip
+### The Solution
 
 ```python
-result = guard.verify_post_tax_tip(
-    total=Decimal("108.00"),
-    tip_amount=Decimal("21.60"),
-    percentage=Decimal("20")  # 20% of 108 = 21.60 ✓
-)
-# Returns: TipGuardResult(verified=True, details={"tip_type": "post-tax"})
+from qwed_legal import CitationGuard
+
+guard = CitationGuard()
+
+# Valid citation
+result = guard.verify("Brown v. Board of Education, 347 U.S. 483 (1954)")
+print(result.valid)  # True
+print(result.parsed_components)
+# {'plaintiff': 'Brown', 'defendant': 'Board of Education', 
+#  'volume': 347, 'reporter': 'U.S.', 'page': 483, 'year': 1954}
+
+# Invalid citation (fake reporter)
+result = guard.verify("Smith v. Jones, 999 FAKE 123 (2020)")
+print(result.valid)   # False
+print(result.issues)  # ["Unknown reporter abbreviation: 'FAKE'"]
 ```
 
-### Usage - Bounds check
+### Supported Reporters
+
+| Category          | Examples                            |
+| ----------------- | ----------------------------------- |
+| **Supreme Court** | U.S., S.Ct., L.Ed., L.Ed.2d         |
+| **Federal**       | F., F.2d, F.3d, F.4th, F.Supp.      |
+| **State**         | Cal., N.Y., Tex., Ill., Pa.         |
+| **Regional**      | A., N.E., N.W., P., S.E., S.W., So. |
+
+### Batch Verification
 
 ```python
-result = guard.verify_tip_bounds(
-    tip_amount=Decimal("20.00"),
-    base_amount=Decimal("100.00")
-)
+result = guard.verify_batch([
+    "Brown v. Board, 347 U.S. 483 (1954)",
+    "Fake v. Case, 999 X.Y.Z. 123",
+])
+
+print(result.total)    # 2
+print(result.valid)    # 1
+print(result.invalid)  # 1
 ```
 
-### Rules
+### Statute Citations
 
-* Tip percentage must be 0-100%
-* Tip cannot be negative
-* Tip cannot exceed 100% of the base amount
-* Supports both pre-tax (subtotal) and post-tax (total) calculations
+```python
+result = guard.check_statute_citation("42 U.S.C. § 1983")
+print(result.valid)  # True
+print(result.parsed_components)
+# {'title': 42, 'code': 'U.S.C.', 'section': '1983'}
+```
 
 ---
 
-## 9. Fee Guard
+## 5. JurisdictionGuard 🌍
 
-**Verifies fee calculations (service, delivery, platform).**
+**Purpose:** Verify choice of law and forum selection clauses.
 
-### Usage - Service fee
+### The Problem
 
-```python
-from qwed_ucp.guards.fee import FeeGuard
-from decimal import Decimal
+LLMs miss jurisdiction conflicts:
 
-guard = FeeGuard()
-result = guard.verify_service_fee(
-    subtotal=Decimal("100.00"),
-    fee_amount=Decimal("5.00"),
-    percentage=Decimal("5")  # 5% of 100 = 5 ✓
-)
-# Returns: FeeGuardResult(verified=True, details={"fee_type": "service"})
-```
+* Governing law in one country, forum in another
+* Missing CISG applicability warnings
+* Cross-border legal system mismatches
 
-### Usage - Delivery fee
+### The Solution
 
 ```python
-# Formula: base_fee + (distance × rate_per_km)
-result = guard.verify_delivery_fee(
-    claimed_fee=Decimal("13.00"),
-    distance_km=Decimal("5"),
-    rate_per_km=Decimal("2.00"),
-    base_fee=Decimal("3.00")  # 3 + 5×2 = 13 ✓
+from qwed_legal import JurisdictionGuard
+
+guard = JurisdictionGuard()
+
+result = guard.verify_choice_of_law(
+    parties_countries=["US", "UK"],
+    governing_law="Delaware",
+    forum="London"
 )
-# Returns: FeeGuardResult(verified=True, details={"fee_type": "delivery"})
+
+print(result.verified)   # False - mismatch detected
+print(result.conflicts)  # ["Governing law 'Delaware' (US state) but forum 'London' is non-US..."]
 ```
 
-### Usage - Platform fee
+### Features
+
+| Feature              | Description                                         |
+| -------------------- | --------------------------------------------------- |
+| **Choice of Law**    | Validates governing law makes sense for parties     |
+| **Forum Selection**  | Checks forum vs governing law alignment             |
+| **CISG Detection**   | Warns about international sale of goods conventions |
+| **Convention Check** | Verifies Hague, NY Convention applicability         |
+
+### Convention Check
 
 ```python
-result = guard.verify_platform_fee(
-    fee_amount=Decimal("15.00"),
-    subtotal=Decimal("100.00"),
-    max_percentage=Decimal("30")  # 15% < 30% max ✓
+result = guard.check_convention_applicability(
+    parties_countries=["US", "DE"],
+    convention="CISG"
 )
+print(result.verified)  # True - both are CISG members
 ```
-
-### Rules
-
-* Fee percentage cannot be negative
-* Distance and rate cannot be negative
-* Platform fee cannot be negative
-* Platform fee cannot exceed the configured maximum percentage (default 30%)
 
 ---
 
-## 10. Attestation Guard
+## 6. StatuteOfLimitationsGuard ⏰
 
-**Generates cryptographic proofs (JWTs) for verification results.**
+**Purpose:** Verify claim limitation periods by jurisdiction.
 
-### Usage - Sign a checkout
+### The Problem
+
+LLMs don't track jurisdiction-specific limitation periods:
+
+* California breach of contract: 4 years
+* New York breach of contract: 6 years
+* Different periods for negligence, fraud, etc.
+
+### The Solution
 
 ```python
-from qwed_ucp.guards.attestation import AttestationGuard
+from qwed_legal import StatuteOfLimitationsGuard
 
-# Production: provide a secret key or set QWED_ATTESTATION_SECRET env var
-guard = AttestationGuard(secret_key="your-secret-key")
+guard = StatuteOfLimitationsGuard()
 
-# Dev mode: use allow_insecure=True (generates a random secret)
-guard = AttestationGuard(allow_insecure=True)
-
-result = guard.sign_checkout(
-    checkout={"currency": "USD", "totals": [{"type": "total", "amount": 82.79}]},
-    verification_result={"verified": True},
-    guards_passed=["MoneyGuard", "StateGuard", "LineItemsGuard"]
+result = guard.verify(
+    claim_type="breach_of_contract",
+    jurisdiction="California",
+    incident_date="2020-01-15",
+    filing_date="2026-06-01"
 )
 
-print(result.token)    # JWT token string
-print(result.verified) # True
-print(result.details)  # {"checkout_hash": "...", "issued_at": ..., "expires_at": ...}
+print(result.verified)          # False - 4 year limit exceeded!
+print(result.expiration_date)   # 2024-01-15
+print(result.days_remaining)    # -867 (negative = expired)
 ```
 
-### Usage - Verify an attestation
+### Supported Jurisdictions
+
+| Jurisdiction | Breach of Contract | Negligence | Fraud    |
+| ------------ | ------------------ | ---------- | -------- |
+| California   | 4 years            | 2 years    | 3 years  |
+| New York     | 6 years            | 3 years    | 6 years  |
+| Texas        | 4 years            | 2 years    | 4 years  |
+| UK/England   | 6 years            | 6 years    | 6 years  |
+| Germany      | 3 years            | 3 years    | 10 years |
+| India        | 3 years            | 3 years    | 3 years  |
+
+### Compare Jurisdictions
 
 ```python
-result = guard.verify_attestation(token="eyJ...")
-
-print(result.verified)  # True if valid and not expired
-print(result.details)   # Decoded JWT payload
+comparison = guard.compare_jurisdictions(
+    "breach_of_contract",
+    ["California", "New York", "Delaware"]
+)
+# {'California': 4.0, 'New York': 6.0, 'Delaware': 3.0}
 ```
 
-### Usage - Create a receipt
+---
+
+## 7. IRACGuard 📝
+
+**Purpose:** Verify that legal reasoning follows the IRAC framework (Issue, Rule, Application, Conclusion).
+
+### The Problem
+
+LLMs produce legal advice that lacks structured reasoning:
+
+* Missing clear identification of the legal issue
+* No citation of applicable rules or statutes
+* Conclusions without proper application of law to facts
+
+### The Solution
 
 ```python
-receipt = guard.create_receipt(
-    checkout=checkout_data,
-    verification_result={"verified": True}
+from qwed_legal import IRACGuard
+
+guard = IRACGuard()
+
+llm_output = """
+Issue: Whether the defendant breached the employment contract.
+Rule: Under California Labor Code § 2922, employment is presumed at-will.
+Application: The defendant terminated employment without the 30-day notice 
+required by the contract, which modified the at-will presumption.
+Conclusion: The defendant breached the employment contract.
+"""
+
+result = guard.verify_structure(llm_output)
+
+print(result["verified"])    # True
+print(result["components"])  # {'issue': '...', 'rule': '...', 'application': '...', 'conclusion': '...'}
+```
+
+### Detection Types
+
+| Check                  | Description                                         |
+| ---------------------- | --------------------------------------------------- |
+| **Structure**          | Verifies all 4 IRAC components are present          |
+| **Logical Disconnect** | Detects when Application doesn't reference the Rule |
+| **Missing Steps**      | Identifies which IRAC components are missing        |
+
+### Error Response
+
+```python
+result = guard.verify_structure("The defendant should pay damages.")
+
+print(result["verified"])  # False
+print(result["error"])     # "Failed Reasoned Elaboration. Missing steps: issue, rule, application, conclusion..."
+print(result["missing"])   # ['issue', 'rule', 'application', 'conclusion']
+```
+
+---
+
+## 8. FairnessGuard ⚖️
+
+**Purpose:** Detect algorithmic bias using counterfactual testing.
+
+### The Problem
+
+AI legal systems can exhibit bias based on protected attributes:
+
+* Different sentencing recommendations based on gender
+* Inconsistent contract assessments based on party names
+* Discriminatory loan approval reasoning
+
+### The Solution
+
+```python
+from qwed_legal import FairnessGuard
+
+# Requires an LLM client for counterfactual generation
+guard = FairnessGuard(llm_client=my_llm)
+
+result = guard.verify_decision_fairness(
+    original_prompt="Should John Smith receive parole given his rehabilitation record?",
+    original_decision="Parole recommended based on positive rehabilitation.",
+    protected_attribute_swap={"John": "Jane", "his": "her"}
 )
 
-print(receipt["receipt_id"])          # "QWED-A1B2C3D4..."
-print(receipt["verified"])            # True
-print(receipt["engine"])              # "QWED-Deterministic-v1"
-print(receipt["verification_mode"])   # "deterministic"
+print(result["verified"])  # True if decision is consistent
+print(result["status"])    # "FAIRNESS_VERIFIED" or "JUDICIAL_BIAS_DETECTED"
 ```
 
-### JWT payload fields
+### How It Works
 
-| Field               | Type     | Description                                  |
-| ------------------- | -------- | -------------------------------------------- |
-| `iss`               | `string` | Always `"qwed-ucp-attestation"`              |
-| `iat`               | `int`    | Issued-at Unix timestamp                     |
-| `exp`               | `int`    | Expiration timestamp (1 hour after issuance) |
-| `checkout_hash`     | `string` | SHA-256 hash of the checkout object          |
-| `verified`          | `bool`   | Whether the checkout passed verification     |
-| `guards_passed`     | `array`  | List of guard names that passed              |
-| `errors`            | `array`  | List of errors (if any)                      |
-| `engine`            | `string` | `"QWED-Deterministic-v1"`                    |
-| `verification_mode` | `string` | `"deterministic"`                            |
+1. **Early exit** - If `protected_attribute_swap` is empty (`{}`), returns immediately with `NO_SWAP_REQUIRED` without calling the LLM
+2. **Counterfactual Generation** - Swaps protected attributes (names, pronouns) while preserving case
+3. **Re-evaluation** - Runs the modified prompt through the LLM
+4. **Deterministic Comparison** - Checks if outcomes match exactly
+
+### Detection Types
+
+| Status                   | Description                                         |
+| ------------------------ | --------------------------------------------------- |
+| `FAIRNESS_VERIFIED`      | Decision unchanged after attribute swap             |
+| `JUDICIAL_BIAS_DETECTED` | Decision changed based on protected attributes      |
+| `NO_SWAP_REQUIRED`       | No protected attributes to swap (empty dict passed) |
 
 <Warning>
-In production, set `QWED_ATTESTATION_SECRET` as an environment variable or pass `secret_key` directly. Without a secret, initialization raises a `ValueError` unless `allow_insecure=True` or the `QWED_DEV_MODE=1` env var is set.
+FairnessGuard requires an LLM client at initialization. Without it, `verify_decision_fairness()` will raise a `ValueError`.
 </Warning>
 
 ---
 
-## Verification result fields
+## 9. ContradictionGuard 🔍
 
-All guard results and `UCPVerificationResult` include:
+**Purpose:** Detect logical contradictions in contracts using Z3 SMT Solver.
 
-| Field               | Type     | Description                                |
-| ------------------- | -------- | ------------------------------------------ |
-| `verified`          | `bool`   | Whether verification passed                |
-| `engine`            | `string` | `"QWED-Deterministic-v1"`                  |
-| `verification_mode` | `string` | `"deterministic"`                          |
-| `error`             | `string` | Error message (when `verified` is `false`) |
+### The Problem
+
+Contracts can contain mathematically impossible combinations:
+
+* "Liability capped at $10,000" + "Minimum penalty of $50,000"
+* "Term is exactly 12 months" + "Minimum duration of 24 months"
+
+Text-based heuristics (ClauseGuard) miss these formal logic conflicts.
+
+### The Solution
+
+```python
+from qwed_legal import ContradictionGuard, Clause
+
+guard = ContradictionGuard()
+
+clauses = [
+    Clause(id="1", text="Liability capped at 10000", category="LIABILITY", value=10000),
+    Clause(id="2", text="Penalty shall be 50000", category="LIABILITY", value=50000),
+]
+
+result = guard.verify_consistency(clauses)
+
+print(result["verified"])  # False
+print(result["message"])   # "❌ LOGIC CONTRADICTION: Clauses are mutually exclusive..."
+```
+
+### Clause Structure
+
+The `Clause` dataclass requires:
+
+| Field      | Type  | Description                                    |
+| ---------- | ----- | ---------------------------------------------- |
+| `id`       | `str` | Unique clause identifier                       |
+| `text`     | `str` | Human-readable clause text                     |
+| `category` | `str` | `DURATION`, `LIABILITY`, or `TERMINATION`      |
+| `value`    | `int` | Normalized numeric value (days, dollars, etc.) |
+
+### Supported Categories
+
+| Category    | Detects                                     |
+| ----------- | ------------------------------------------- |
+| `DURATION`  | Conflicting term lengths (exact vs min/max) |
+| `LIABILITY` | Cap vs penalty contradictions               |
+
+### Z3 vs ClauseGuard
+
+| Feature      | ClauseGuard          | ContradictionGuard           |
+| ------------ | -------------------- | ---------------------------- |
+| **Input**    | Raw text strings     | Structured `Clause` objects  |
+| **Method**   | Text heuristics      | Z3 SMT Solver                |
+| **Detects**  | Permission conflicts | Mathematical impossibilities |
+| **Use Case** | Quick checks         | Formal verification          |
 
 ---
 
-## Running all guards
+## SACProcessor (RAG Helper) 📄
 
-Use `UCPVerifier` to run all guards at once:
+**Purpose:** Prevent Document-Level Retrieval Mismatch (DRM) in legal RAG systems.
+
+### The Problem
+
+Standard RAG chunking causes >95% retrieval mismatch in legal databases because:
+
+* Legal documents share nearly identical boilerplate
+* Chunk-level embeddings lose document context
+* NDAs, contracts, and agreements look alike at the chunk level
+
+### The Solution
 
 ```python
-from qwed_ucp import UCPVerifier
+from qwed_legal import SACProcessor
 
-verifier = UCPVerifier()
-result = verifier.verify_checkout(checkout_data)
+sac = SACProcessor(llm_client=my_llm)
 
-print(f"Verified: {result.verified}")
-print(f"Engine: {result.engine}")                     # "QWED-Deterministic-v1"
-print(f"Mode: {result.verification_mode}")             # "deterministic"
-print(f"Guards passed: {len([g for g in result.guards if g.verified])}")
+# Your existing chunks
+chunks = naive_split(contract_text)
+
+# Augment with document fingerprint
+augmented = sac.generate_sac_chunks(
+    document_text=contract_text,
+    chunks=chunks,
+    document_id="NDA-2026-001"
+)
+
+# Each chunk now includes global context
+print(augmented[0])
+# DOCUMENT CONTEXT [NDA-2026-001]: NDA between Acme Corp and Beta Inc...
+# CHUNK CONTENT [1/10]: Original chunk text here...
 ```
+
+### Configuration
+
+| Parameter               | Default | Description                              |
+| ----------------------- | ------- | ---------------------------------------- |
+| `target_summary_length` | 150     | Character limit for document fingerprint |
+| `preview_chars`         | 5000    | Max chars sent to LLM for summarization  |
+
+### Methods
+
+| Method                        | Description                                  |
+| ----------------------------- | -------------------------------------------- |
+| `generate_sac_chunks()`       | Augment all chunks with document fingerprint |
+| `generate_fingerprint_only()` | Get just the fingerprint for caching         |
+
+<Note>
+SACProcessor requires an LLM client. Generic (automated) summaries outperform expert-guided ones for retrieval.
+</Note>
+
+---
+
+## All-in-One: LegalGuard
+
+For convenience, use the unified `LegalGuard` class:
+
+```python
+from qwed_legal import LegalGuard
+
+# Optional: provide llm_client for FairnessGuard
+guard = LegalGuard(llm_client=my_llm)
+
+# All 9 guards available
+guard.verify_deadline(...)
+guard.verify_liability_cap(...)
+guard.check_clause_consistency(...)          # ClauseGuard (text heuristics)
+guard.verify_citation(...)
+guard.verify_jurisdiction(...)
+guard.verify_statute_of_limitations(...)
+guard.verify_irac_structure(...)             # NEW in v0.3.0
+guard.verify_fairness(...)                   # NEW in v0.3.0 (requires llm_client)
+guard.verify_contradiction(...)              # NEW in v0.3.0 (Z3 SMT Solver)
+```
+
+<Info>
+Most guards are fully deterministic. Only `verify_fairness()` requires an LLM client.
+</Info>
+
+---
+
+## Next Steps
+
+* [Examples](/legal/examples) - Real-world scenarios
+* [Troubleshooting](/legal/troubleshooting) - Common issues
