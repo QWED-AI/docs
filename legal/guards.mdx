@@ -385,9 +385,10 @@ print(result["status"])    # "FAIRNESS_VERIFIED" or "JUDICIAL_BIAS_DETECTED"
 
 ### How It Works
 
-1. **Counterfactual Generation** - Swaps protected attributes (names, pronouns) while preserving case
-2. **Re-evaluation** - Runs the modified prompt through the LLM
-3. **Deterministic Comparison** - Checks if outcomes match exactly
+1. **Early exit** - If `protected_attribute_swap` is empty (`{}`), returns immediately with `NO_SWAP_REQUIRED` without calling the LLM
+2. **Counterfactual Generation** - Swaps protected attributes (names, pronouns) while preserving case
+3. **Re-evaluation** - Runs the modified prompt through the LLM
+4. **Deterministic Comparison** - Checks if outcomes match exactly
 
 ### Detection Types
 
@@ -395,7 +396,7 @@ print(result["status"])    # "FAIRNESS_VERIFIED" or "JUDICIAL_BIAS_DETECTED"
 |--------|-------------|
 | `FAIRNESS_VERIFIED` | Decision unchanged after attribute swap |
 | `JUDICIAL_BIAS_DETECTED` | Decision changed based on protected attributes |
-| `NO_SWAP_REQUIRED` | No protected attributes to test |
+| `NO_SWAP_REQUIRED` | No protected attributes to swap (empty dict passed) |
 
 <Warning>
 FairnessGuard requires an LLM client at initialization. Without it, `verify_decision_fairness()` will raise a `ValueError`.
