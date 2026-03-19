@@ -1,7 +1,7 @@
 ---
 sidebar_position: 4
-title: "LLM Configuration"
-description: "Configure QWED with any LLM provider including OpenAI, Anthropic, Google, Azure, Ollama, or custom endpoints. Complete setup guide with supported models."
+title: "LLM configuration"
+description: "Configure QWED with any LLM provider including OpenAI, Anthropic, Google Gemini, Azure OpenAI, Ollama, or custom endpoints via YAML. Complete setup guide with supported models."
 ---
 
 QWED works with any LLM provider. The fastest way to get configured is the interactive setup wizard:
@@ -44,9 +44,10 @@ QWED uses LLMs as **untrusted translators**, not as answer generators:
 | **Anthropic** | `ANTHROPIC_API_KEY` | `claude-sonnet-4-20250514` | Yes |
 | **Ollama (local)** | `OLLAMA_BASE_URL` | `llama3` | Yes |
 | **OpenAI-compatible** | `CUSTOM_BASE_URL` + `CUSTOM_API_KEY` | `gpt-4o-mini` | Yes |
+| **Google Gemini** | `GOOGLE_API_KEY` / `GEMINI_API_KEY` | `gemini-1.5-pro` | Yes |
+| **Azure OpenAI** | `AZURE_OPENAI_ENDPOINT` + `AZURE_OPENAI_API_KEY` | Any Azure-hosted model | Yes |
+| **Claude Opus** | `CLAUDE_OPUS_API_KEY` | `claude-opus-4-5` | Yes |
 | **Custom (YAML)** | Defined per provider | Defined per provider | Yes |
-| **Google** | `GOOGLE_API_KEY` | gemini-pro | Coming soon |
-| **Azure OpenAI** | `AZURE_OPENAI_*` | Any Azure-hosted model | Coming soon |
 
 <Tip>
 You can add any OpenAI-compatible provider (Groq, Together, Fireworks, and others) using a YAML configuration file. See [Custom providers](/getting-started/custom-providers) for details.
@@ -182,13 +183,99 @@ export CUSTOM_API_KEY=your-api-key
 export CUSTOM_MODEL=gpt-4o-mini
 ```
 
-### Google (Gemini)
+### Google Gemini
 
-<Note>Google Gemini support is planned for a future release. You can use it today through an OpenAI-compatible proxy.</Note>
+```bash
+export ACTIVE_PROVIDER=gemini
+export GOOGLE_API_KEY=your-google-api-key
+export GEMINI_MODEL=gemini-1.5-pro
+```
+
+You can also use `GEMINI_API_KEY` instead of `GOOGLE_API_KEY`. Get yours at [aistudio.google.com/app/apikey](https://aistudio.google.com/app/apikey).
 
 ### Azure OpenAI
 
-<Note>Azure OpenAI support is planned for a future release.</Note>
+```bash
+export ACTIVE_PROVIDER=azure_openai
+export AZURE_OPENAI_ENDPOINT=https://your-resource.openai.azure.com/
+export AZURE_OPENAI_API_KEY=your-azure-key
+export AZURE_OPENAI_DEPLOYMENT=your-deployment-name
+export AZURE_OPENAI_API_VERSION=2024-02-15-preview
+```
+
+### Claude Opus
+
+```bash
+export ACTIVE_PROVIDER=claude_opus
+export CLAUDE_OPUS_API_KEY=sk-ant-your-key
+export CLAUDE_OPUS_DEPLOYMENT=claude-opus-4-5
+```
+
+---
+
+## Universal provider config (YAML)
+
+<Info>New in v4.0.0</Info>
+
+You can define custom LLM providers using a YAML configuration file at `~/.qwed/providers.yaml`. This is useful for managing multiple providers, custom endpoints, or community-contributed provider configs.
+
+### YAML format
+
+```yaml
+providers:
+  my-custom-llm:
+    base_url: "https://api.example.com/v1"
+    api_key_env: "MY_CUSTOM_API_KEY"
+    default_model: "my-model-v2"
+    models_endpoint: "/models"
+    auth_header: "Authorization"
+    auth_prefix: "Bearer"
+```
+
+| Field | Required | Default | Description |
+|-------|----------|---------|-------------|
+| `base_url` | Yes | — | The provider's API base URL |
+| `api_key_env` | Yes | — | Environment variable name containing the API key |
+| `default_model` | No | `gpt-4o-mini` | Default model to use |
+| `models_endpoint` | No | `/models` | Endpoint for listing available models |
+| `auth_header` | No | `Authorization` | HTTP header name for authentication |
+| `auth_prefix` | No | `Bearer` | Prefix for the auth header value |
+
+<Warning>The YAML file is written with `0600` permissions (owner-only) for security. The `~/.qwed/` directory is created with `0700` permissions.</Warning>
+
+### Import community providers
+
+You can import provider configurations from a URL:
+
+```python
+from qwed_sdk.cli import import_provider
+
+# Import a community-contributed provider config
+import_provider("https://example.com/my-provider.yaml")
+```
+
+Or use the CLI:
+
+```bash
+qwed provider import https://example.com/my-provider.yaml
+```
+
+Imported providers are validated and sandboxed — only the allowed fields listed above are saved. Provider slugs are sanitized and cannot shadow built-in providers.
+
+### Key validation
+
+QWED validates API keys in two stages:
+
+1. **Format check** — Regex-based pattern matching (no network call). Built-in patterns include `sk-...` for OpenAI and `sk-ant-...` for Anthropic.
+2. **Connection test** — Lightweight read-only request to the provider's models endpoint to confirm the key works.
+
+Run `qwed init` to validate your keys interactively, or test programmatically:
+
+```python
+from qwed_sdk.cli import test_provider_connection
+
+success, message = test_provider_connection("openai")
+```
 
 ---
 

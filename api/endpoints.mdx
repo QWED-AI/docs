@@ -1,7 +1,7 @@
 ---
 sidebar_position: 2
-title: "API Endpoints"
-description: "Complete QWED API endpoint reference. Includes health check, verification endpoints with auto-detection, math, logic, code, SQL, and batch operations."
+title: "API endpoints"
+description: "Complete QWED API endpoint reference. Includes health check, verification endpoints with auto-detection, math, logic, code, SQL, fact, consensus, image, stats, batch, agent, observability, and admin operations."
 ---
 
 ## Base URL
@@ -164,14 +164,143 @@ Validate SQL queries.
 
 ### POST /verify/fact
 
-Verify factual claims.
+Verify factual claims against a provided context.
 
 **Request:**
 
 ```json
 {
   "claim": "Paris is the capital of France",
-  "context": "France is a country in Western Europe. Its capital is Paris."
+  "context": "France is a country in Western Europe. Its capital is Paris.",
+  "provider": "openai"
+}
+```
+
+**Response:**
+
+```json
+{
+  "status": "VERIFIED",
+  "verified": true,
+  "engine": "fact",
+  "result": {
+    "is_valid": true,
+    "confidence": 0.98,
+    "message": "Claim is supported by the provided context"
+  }
+}
+```
+
+---
+
+### POST /verify/consensus
+
+<Info>New in v4.0.0</Info>
+
+Multi-engine consensus verification. Runs the query through multiple verification engines and requires agreement above a confidence threshold.
+
+**Request:**
+
+```json
+{
+  "query": "The square root of 144 is 12",
+  "verification_mode": "high",
+  "min_confidence": 0.8
+}
+```
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `query` | string | Yes | The claim to verify |
+| `verification_mode` | string | No | `single`, `high`, or `maximum` (default: `single`) |
+| `min_confidence` | float | No | Minimum confidence threshold, 0–1 (default: `0.8`) |
+
+**Response:**
+
+```json
+{
+  "status": "VERIFIED",
+  "verified": true,
+  "engine": "consensus",
+  "result": {
+    "confidence": 0.95,
+    "engines_used": ["math", "logic"],
+    "agreement_rate": 1.0
+  }
+}
+```
+
+---
+
+### POST /verify/image
+
+<Info>New in v4.0.0</Info>
+
+Verify claims about image content. Accepts multipart form data with an image file (max 10 MB).
+
+**Request:**
+
+```bash
+curl -X POST https://api.qwedai.com/v1/verify/image \
+  -H "X-API-Key: qwed_your_key" \
+  -F "image=@photo.jpg" \
+  -F "claim=This image contains a cat"
+```
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `image` | file | Yes | Image file (max 10 MB) |
+| `claim` | string | Yes | The claim about the image to verify |
+
+**Response:**
+
+```json
+{
+  "status": "VERIFIED",
+  "verified": true,
+  "engine": "image",
+  "result": {
+    "is_valid": true,
+    "confidence": 0.92,
+    "message": "Claim is consistent with image content"
+  }
+}
+```
+
+---
+
+### POST /verify/stats
+
+<Info>New in v4.0.0</Info>
+
+Verify statistical claims against CSV data. Accepts multipart form data with a CSV file.
+
+**Request:**
+
+```bash
+curl -X POST https://api.qwedai.com/v1/verify/stats \
+  -H "X-API-Key: qwed_your_key" \
+  -F "file=@data.csv" \
+  -F "query=The average salary is above 50000"
+```
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `file` | file | Yes | CSV data file |
+| `query` | string | Yes | Statistical claim to verify |
+
+**Response:**
+
+```json
+{
+  "status": "VERIFIED",
+  "verified": true,
+  "engine": "stats",
+  "result": {
+    "is_valid": true,
+    "computed_value": 52340.5,
+    "message": "Statistical claim verified against dataset"
+  }
 }
 ```
 
@@ -213,44 +342,101 @@ Verify multiple items at once.
 
 ---
 
-## Agent Endpoints
+## Agent endpoints
 
-### POST /agent/register
+### POST /agents/register
 
-Register a new AI agent.
+Register a new AI agent with QWED for verified agentic workflows.
 
 **Request:**
 
 ```json
 {
   "name": "MyAgent",
-  "type": "supervised",
-  "principal_id": "user_123",
-  "permissions": {
-    "allowed_engines": ["math", "logic"]
-  },
-  "budget": {
-    "max_daily_cost_usd": 100,
-    "max_requests_per_hour": 1000
+  "agent_type": "supervised",
+  "description": "Financial analysis agent",
+  "permissions": ["math", "logic", "code"],
+  "max_cost_per_day": 100.0
+}
+```
+
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `name` | string | Yes | — | Agent display name |
+| `agent_type` | string | Yes | — | Agent type (e.g., `supervised`, `autonomous`) |
+| `description` | string | No | — | Agent description |
+| `permissions` | array | No | `[]` | Allowed verification engines |
+| `max_cost_per_day` | float | No | `100.0` | Daily budget cap in USD |
+
+**Response:**
+
+```json
+{
+  "agent_id": "agent_abc123",
+  "token": "qwed_agent_...",
+  "status": "registered"
+}
+```
+
+---
+
+### POST /agents/{agent_id}/verify
+
+Verify a claim using an agent token. Creates an auditable record tied to the agent.
+
+**Request:**
+
+```json
+{
+  "query": "2+2=4",
+  "provider": "openai"
+}
+```
+
+**Headers:**
+
+```text
+Authorization: Bearer qwed_agent_...
+```
+
+---
+
+### POST /agents/{agent_id}/tools/{tool_name}
+
+Submit an agent tool call for risk evaluation before execution.
+
+**Request:**
+
+```json
+{
+  "tool_params": {
+    "query": "SELECT * FROM users",
+    "dialect": "postgresql"
   }
 }
 ```
 
 ---
 
-### POST /agent/verify-action
+### GET /agents/{agent_id}/activity
 
-Verify an agent action before execution.
+Retrieve the audit log for a specific agent.
 
-**Request:**
+**Query params:** `limit` (default: 50)
+
+**Response:**
 
 ```json
 {
   "agent_id": "agent_abc123",
-  "action": {
-    "type": "execute_sql",
-    "query": "SELECT * FROM users"
-  }
+  "activity": [
+    {
+      "timestamp": "2026-03-20T12:00:00Z",
+      "action": "verify",
+      "engine": "math",
+      "status": "VERIFIED"
+    }
+  ]
 }
 ```
 
@@ -276,7 +462,65 @@ Verify an attestation JWT.
 
 ---
 
-## Badge Endpoints
+## Observability endpoints
+
+<Info>New in v4.0.0</Info>
+
+### GET /metrics
+
+Returns global system metrics (request counts, latencies, engine usage).
+
+### GET /metrics/{organization_id}
+
+Returns per-tenant metrics scoped to a specific organization.
+
+### GET /metrics/prometheus
+
+Returns metrics in Prometheus scrape format for integration with monitoring infrastructure.
+
+### GET /logs
+
+Returns verification logs for the authenticated tenant. Supports pagination.
+
+---
+
+## Admin endpoints
+
+<Info>New in v4.0.0</Info>
+
+These endpoints require the `admin:all` API key scope.
+
+### GET /admin/compliance/export/csv
+
+Export the full audit trail as a CSV file.
+
+### GET /admin/compliance/verify/{log_id}
+
+Cryptographically verify a specific audit log entry using HMAC and hash chain validation.
+
+### GET /admin/compliance/report/soc2/{org_id}
+
+Generate a SOC 2 Type II compliance report for an organization.
+
+### GET /admin/security/threats/{org_id}
+
+Returns a real-time threat summary for an organization, including blocked injection attempts and anomalous patterns.
+
+### POST /admin/keys/rotate
+
+Rotate an API key. Available to admin and member roles.
+
+**Request:**
+
+```json
+{
+  "key_id": "key_abc123"
+}
+```
+
+---
+
+## Badge endpoints
 
 ### GET /badge/verified
 

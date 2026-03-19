@@ -76,14 +76,77 @@ for vuln in result.vulnerabilities:
     print(f"{vuln.severity}: {vuln.message}")
 ```
 
-### verify_sql(query, schema)
+### verify_sql(query, schema_ddl, dialect)
 
-Validate SQL queries.
+Validate SQL queries against a schema.
 
 ```python
 result = client.verify_sql(
     query="SELECT * FROM users WHERE id = 1",
-    schema="CREATE TABLE users (id INT, name TEXT)"
+    schema_ddl="CREATE TABLE users (id INT, name TEXT)",
+    dialect="postgresql"
+)
+```
+
+### verify_fact(claim, context)
+
+<Info>New in v4.0.0</Info>
+
+Verify factual claims against a provided context. Includes client-side PII pre-check.
+
+```python
+result = client.verify_fact(
+    claim="The company was founded in 2020",
+    context="Acme Corp was established in 2020 in San Francisco."
+)
+print(result.verified)  # True
+```
+
+### verify_stats(query, file_path)
+
+<Info>New in v4.0.0</Info>
+
+Verify statistical claims against CSV data.
+
+```python
+result = client.verify_stats(
+    query="The average salary is above 50000",
+    file_path="data.csv"
+)
+```
+
+### verify_consensus(query, mode, min_confidence)
+
+<Info>New in v4.0.0</Info>
+
+Multi-engine consensus verification.
+
+```python
+result = client.verify_consensus(
+    query="The square root of 144 is 12",
+    mode="high",
+    min_confidence=0.8
+)
+print(result.verified)     # True
+print(result.confidence)   # 0.95
+```
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `query` | str | — | Claim to verify |
+| `mode` | str | `"single"` | `single`, `high`, or `maximum` |
+| `min_confidence` | float | `0.8` | Minimum confidence threshold |
+
+### verify_image(image_path, claim)
+
+<Info>New in v4.0.0</Info>
+
+Verify claims about image content.
+
+```python
+result = client.verify_image(
+    image_path="photo.jpg",
+    claim="This image contains a cat"
 )
 ```
 
@@ -126,6 +189,8 @@ from qwed_sdk.guards import (
     MCPPoisonGuard,
     SelfInitiatedCoTGuard,
     SovereigntyGuard,
+    SystemGuard,
+    ConfigGuard,
 )
 
 # Prevent RAG hallucinations from wrong document chunks
@@ -145,6 +210,14 @@ result = exfil_guard.verify_outbound_call(
 # Detect poisoned MCP tool definitions
 mcp_guard = MCPPoisonGuard()
 result = mcp_guard.verify_tool_definition(tool_schema)
+
+# Block dangerous shell commands (v4.0.0)
+sys_guard = SystemGuard()
+result = sys_guard.verify_shell_command("rm -rf /")
+
+# Detect plaintext secrets in config (v4.0.0)
+cfg_guard = ConfigGuard()
+result = cfg_guard.verify_config_safety(config_data)
 ```
 
 See the [SDK Guards reference](/sdks/guards) for complete documentation.
