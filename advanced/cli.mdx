@@ -17,7 +17,76 @@ The `qwed` CLI is automatically available after installation.
 
 ## Commands
 
-### `qwed verify` - One-Shot Verification
+### `qwed init` - Secure LLM configuration
+
+Interactive wizard that configures your LLM provider and writes credentials to a `.env` file with restrictive permissions (0600 on Unix).
+
+```bash
+qwed init
+```
+
+The wizard walks you through:
+
+1. **Provider selection** — choose from OpenAI, Anthropic, Ollama, or any OpenAI-compatible endpoint (Groq, Together, LM Studio, etc.)
+2. **Credential entry** — API keys are entered with hidden input and validated against provider-specific patterns
+3. **Connection test** — optional lightweight connectivity check against the provider's read-only `/models` endpoint (5 s timeout)
+4. **Default provider** — set the selected provider as `ACTIVE_PROVIDER` so `qwed verify` auto-detects it
+5. **`.gitignore` protection** — verifies `.env` is in `.gitignore`; offers to add it if missing, and aborts if you decline
+
+**Supported providers:**
+
+| Provider | Slug | Auth type | Key hint |
+|---|---|---|---|
+| OpenAI | `openai` | API key | `sk-...` or `sk-proj-...` |
+| Anthropic | `anthropic` | API key | `sk-ant-...` |
+| Ollama (Local) | `ollama` | None (local) | No key needed |
+| OpenAI-Compatible | `openai-compatible` | Endpoint + key | Any bearer token |
+
+**Example session:**
+
+```
+$ qwed init
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🔬 QWED — Secure LLM Configuration
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Select your LLM provider:
+
+  1. OpenAI (sk-... or sk-proj-...)
+  2. Anthropic (sk-ant-...)
+  3. Ollama (Local) (No API key needed — runs locally)
+  4. OpenAI-Compatible (DO, Groq, Together, LM Studio, etc.)
+
+Enter number: 1
+✓ Selected: OpenAI
+
+  🔑 Your OpenAI API key: ****
+  Model name [gpt-4o-mini]:
+
+✅ Key format valid: sk-proj-****
+
+🔍 Would you like to test the connection? [y/N]: y
+   Testing... ✅ Connected to OpenAI API.
+
+⚙️  Set OpenAI as default active provider? [Y/n]: y
+
+🔒 Verified: .gitignore includes .env
+
+📁 Written to /path/to/project/.env
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🚀 Ready! Try: qwed verify "What is 2+2?"
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+```
+
+<Note>
+API keys are never logged or displayed in full. The wizard masks keys to the first 8 characters (e.g., `sk-proj-****`). The `.env` file is written atomically with owner-only permissions and symlink protection.
+</Note>
+
+---
+
+### `qwed verify` - One-shot verification
 
 Verify a query and exit.
 
@@ -34,6 +103,7 @@ qwed verify "Is (p AND q) satisfiable?" --model llama3
 - `--api-key` - API key (or use `QWED_API_KEY` env var)
 - `--no-cache` - Disable caching
 - `--quiet, -q` - Minimal output (for scripts)
+- `--mask-pii` - Mask PII (emails, phone numbers, etc.) before sending queries to the LLM
 
 **Examples:**
 
@@ -122,15 +192,67 @@ Are you sure you want to clear the cache? [y/N]: y
 
 ---
 
-## Environment Variables
+### `qwed pii` - PII detection
+
+Test PII detection on arbitrary text. Requires the `qwed[pii]` extra.
+
+```bash
+qwed pii "My email is john@example.com"
+qwed pii "Card: 4532-1234-5678-9010"
+```
+
+**Example output:**
+
+```
+Original: My email is john@example.com
+Masked:   My email is [EMAIL_REDACTED]
+
+Detected: 1 entities
+  - EMAIL: 1
+```
+
+<Note>
+Install PII support with `pip install 'qwed[pii]'` and download the spaCy model: `python -m spacy download en_core_web_lg`.
+</Note>
+
+---
+
+## Environment variables
+
+### `ACTIVE_PROVIDER`
+
+Set by `qwed init`. Tells the CLI which provider to use when no `--provider` or `--base-url` flag is given.
+
+```bash
+# Set automatically by qwed init, or manually:
+export ACTIVE_PROVIDER=openai
+```
+
+Valid values: `openai`, `anthropic`, `ollama`, `openai_compat`.
+
+### Provider-specific variables
+
+These are written to `.env` by `qwed init` and loaded automatically via `python-dotenv`:
+
+| Variable | Provider | Description |
+|---|---|---|
+| `OPENAI_API_KEY` | OpenAI | Your OpenAI API key |
+| `OPENAI_MODEL` | OpenAI | Model name (default: `gpt-4o-mini`) |
+| `ANTHROPIC_API_KEY` | Anthropic | Your Anthropic API key |
+| `ANTHROPIC_MODEL` | Anthropic | Model name (default: `claude-sonnet-4-20250514`) |
+| `OLLAMA_BASE_URL` | Ollama | Endpoint URL (default: `http://localhost:11434/v1`) |
+| `OLLAMA_MODEL` | Ollama | Model name (default: `llama3`) |
+| `CUSTOM_BASE_URL` | OpenAI-compatible | Endpoint URL (required) |
+| `CUSTOM_API_KEY` | OpenAI-compatible | API key for the endpoint |
+| `CUSTOM_MODEL` | OpenAI-compatible | Model name (default: `gpt-4o-mini`) |
 
 ### `QWED_API_KEY`
 
-Set default API key (useful for scripts).
+Fallback API key when a provider-specific key is not set.
 
 ```bash
 export QWED_API_KEY="sk-proj-..."
-qwed verify "2+2"  # Uses env var API key
+qwed verify "2+2"
 ```
 
 ### `QWED_QUIET`
@@ -146,22 +268,22 @@ qwed verify "2+2"  # Minimal output
 
 ## Configuration
 
-### Provider Priority
+### Provider priority
 
-QWED auto-detects providers in this order:
+When you run `qwed verify` without explicit flags, the CLI resolves the provider in this order:
 
-1. **Command-line flags** (`--provider`, `--base-url`)
-2. **Environment variables** (`QWED_API_KEY`)
-3. **Ollama default** (tries `http://localhost:11434/v1`)
+1. **Command-line flags** — `--provider` or `--base-url` take highest precedence
+2. **`ACTIVE_PROVIDER` env var** — set by `qwed init` or manually in `.env`
+3. **Ollama default** — falls back to `http://localhost:11434/v1` with model `llama3`
 
-### Default Models
+### Default models
 
 | Provider | Default Model |
-|----------|--------------|
+|---|---|
 | Ollama | `llama3` |
-| OpenAI | `gpt-3.5-turbo` |
-| Anthropic | `claude-3-haiku` |
-| Gemini | `gemini-pro` |
+| OpenAI | `gpt-4o-mini` |
+| Anthropic | `claude-sonnet-4-20250514` |
+| OpenAI-Compatible | `gpt-4o-mini` |
 
 ---
 
@@ -297,12 +419,8 @@ qwed verify "2+2" --provider anthropic
 
 ---
 
-## Related Docs
+## Related docs
 
-- **[QWEDLocal Guide](/advanced/qwed-local)** - Python API
-- **[Ollama Integration](/advanced/ollama)** - FREE local LLMs
-- **[Full Documentation](https://docs.qwedai.com)** - Complete docs
-
----
-
-**Made with 💜 by the QWED team**
+- [QWEDLocal guide](/advanced/qwed-local) — Python API for local verification
+- [Ollama integration](/advanced/ollama) — use free local LLMs
+- [LLM configuration](/getting-started/llm-configuration) — provider setup details
