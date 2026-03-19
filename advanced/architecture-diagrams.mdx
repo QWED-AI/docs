@@ -1,228 +1,162 @@
 ---
 sidebar_position: 99
 title: "Architecture Diagrams"
-description: "Visual Mermaid diagrams showing QWED's system architecture including client layer, control plane, verification engines (Math, Logic, Code, SQL), and storage."
+description: "Reference diagrams for QWED system topology, request lifecycle, trust boundary, and consensus verification."
 ---
+
 # Architecture Diagrams
 
+Use this page as a reference companion to [Architecture Overview](/architecture).
 
-Visual representations of QWED's architecture and data flow.
+<Tip>
+If you are new to QWED, start with the high-level architecture page first.  
+This page is optimized for implementation and operations teams.
+</Tip>
 
-## System Overview
+## 1) System topology
+
+**Use this when:** you need a full map of components and external dependencies.
 
 ```mermaid
 graph TB
     subgraph "Client Layer"
-        SDK[SDKs<br/>Python/TS/Go/Rust]
-        API[REST API<br/>FastAPI]
+        SDK[SDKs: Python, TS, Go, Rust]
+        APIClient[REST and middleware clients]
     end
-    
+
     subgraph "Control Plane"
-        CP[Control Plane]
-        RL[Rate Limiter]
-        AUTH[Auth/Multi-tenancy]
+        Gateway[API Gateway]
+        Auth[Auth and tenancy]
+        Limits[Rate limiter]
+        Router[Domain router]
     end
-    
-    subgraph "Verification Engines"
-        MATH[🔢 Math<br/>SymPy]
-        LOGIC[🧠 Logic<br/>Z3]
-        CODE[💻 Code<br/>AST]
-        SQL[🗃️ SQL<br/>SQLGlot]
-        STATS[📊 Stats<br/>Wasm Sandbox]
-        FACT[📚 Fact<br/>TF-IDF]
-        IMAGE[🖼️ Image<br/>Metadata]
-        REASON[💭 Reasoning<br/>Multi-LLM]
+
+    subgraph "Verification Plane"
+        Math[Math Engine]
+        Logic[Logic Engine]
+        Code[Code Engine]
+        SQL[SQL Engine]
+        Others[Other deterministic engines]
     end
-    
-    subgraph "LLM Providers"
-        CLAUDE[Anthropic Claude]
-        GPT[OpenAI GPT]
-        GEMINI[Google Gemini]
+
+    subgraph "Guard Plane"
+        RAG[RAGGuard]
+        Exfil[ExfiltrationGuard]
+        MCP[MCPPoisonGuard]
+        Policy[Sovereignty and policy guards]
     end
-    
-    subgraph "Storage"
-        DB[(SQLite/Postgres)]
-        REDIS[(Redis Cache)]
+
+    subgraph "Evidence Plane"
+        Attest[Attestation signer]
+        Audit[Immutable audit log]
     end
-    
-    SDK --> API
-    API --> CP
-    CP --> RL
-    CP --> AUTH
-    CP --> MATH
-    CP --> LOGIC
-    CP --> CODE
-    CP --> SQL
-    CP --> STATS
-    CP --> FACT
-    CP --> IMAGE
-    CP --> REASON
-    
-    REASON --> CLAUDE
-    REASON --> GPT
-    REASON --> GEMINI
-    
-    CP --> DB
-    CP --> REDIS
+
+    SDK --> APIClient
+    APIClient --> Gateway
+    Gateway --> Auth
+    Gateway --> Limits
+    Gateway --> Router
+    Router --> Math
+    Router --> Logic
+    Router --> Code
+    Router --> SQL
+    Router --> Others
+    Router --> RAG
+    Router --> Exfil
+    Router --> MCP
+    Router --> Policy
+    Math --> Attest
+    Logic --> Attest
+    Code --> Attest
+    SQL --> Attest
+    Others --> Attest
+    Attest --> Audit
 ```
 
-## Verification Flow
+## 2) Request lifecycle
+
+**Use this when:** you want to understand where decisions happen in the request path.
 
 ```mermaid
 sequenceDiagram
     participant User
-    participant API
-    participant Control as Control Plane
-    participant Detector as Domain Detector
-    participant Engine as Verification Engine
-    participant LLM as LLM Provider
-    
-    User->>API: POST /verify {"query": "2+2=4"}
-    API->>Control: Check auth & rate limits
-    Control->>Detector: Detect domain
-    Detector-->>Control: Domain: MATH
-    Control->>Engine: Route to MathVerifier
-    
-    alt Deterministic Verification
-        Engine->>Engine: SymPy symbolic solve
-        Engine-->>Control: {verified: true, confidence: 1.0}
-    else Requires LLM Translation
-        Engine->>LLM: Translate to symbolic
-        LLM-->>Engine: Symbolic expression
-        Engine->>Engine: Verify with SymPy
-        Engine-->>Control: {verified: true, confidence: 0.95}
-    end
-    
-    Control-->>API: Verification result
-    API-->>User: {status: "VERIFIED", answer: 4}
+    participant API as Gateway
+    participant Detect as Domain Detector
+    participant LLM as Translator
+    participant Engine as Deterministic Engine
+    participant Guard as Security Guards
+    participant Attest as Attestation
+
+    User->>API: Submit query or action
+    API->>Detect: Infer domain and route
+    Detect-->>API: Selected verification path
+    API->>LLM: Optional translation request
+    LLM-->>API: Untrusted structured claim
+    API->>Engine: Deterministic verification
+    Engine-->>API: VERIFIED / FAILED / BLOCKED
+    API->>Guard: Tool/policy checks (if needed)
+    Guard-->>API: Allow or deny execution
+    API->>Attest: Optional signed evidence
+    API-->>User: Result + proof metadata
 ```
 
-## Multi-Engine Architecture
+## 3) Trust boundary
+
+**Use this when:** you need to explain security posture to reviewers or compliance teams.
 
 ```mermaid
 flowchart LR
-    subgraph Input
-        QUERY[User Query]
+    subgraph Untrusted["Untrusted Zone"]
+        NL[Natural language query]
+        TR[LLM translation output]
     end
-    
-    subgraph Detection
-        DD[Domain Detector]
+
+    subgraph Trusted["Trusted Zone"]
+        PARSE[Parser and schema checks]
+        VERIFY[Deterministic engines]
+        GUARD[Security guard decisions]
+        SIGN[Attestation signing]
     end
-    
-    subgraph "Deterministic Engines"
-        MATH[🔢 Math Engine<br/>━━━━━━━━<br/>SymPy + Decimal<br/>Calculus<br/>Matrix Ops<br/>Finance NPV/IRR]
-        
-        LOGIC[🧠 Logic Engine<br/>━━━━━━━━<br/>Z3 SMT Solver<br/>ForAll/Exists<br/>BitVectors<br/>Array Theory]
-        
-        CODE[💻 Code Engine<br/>━━━━━━━━<br/>AST Analysis<br/>Python/JS/Java/Go<br/>Security Patterns<br/>Vulnerability Detection]
-        
-        SQL[🗃️ SQL Engine<br/>━━━━━━━━<br/>SQLGlot Parser<br/>Complexity Limits<br/>Injection Detection<br/>Schema Validation]
-    end
-    
-    subgraph "Data Engines"
-        STATS[📊 Stats Engine<br/>━━━━━━━━<br/>Wasm Sandbox<br/>Docker Fallback<br/>AST Validation]
-        
-        FACT[📚 Fact Engine<br/>━━━━━━━━<br/>TF-IDF Similarity<br/>Entity Matching<br/>Citation Extraction]
-        
-        IMAGE[🖼️ Image Engine<br/>━━━━━━━━<br/>Metadata Parse<br/>Size Verification<br/>VLM Fallback]
-    end
-    
-    subgraph "Orchestration"
-        REASON[💭 Reasoning<br/>━━━━━━━━<br/>Multi-LLM<br/>Result Caching<br/>CoT Validation]
-        
-        CONSENSUS[🤝 Consensus<br/>━━━━━━━━<br/>Async Execution<br/>Circuit Breaker<br/>Weighted Voting]
-    end
-    
-    QUERY --> DD
-    DD --> MATH
-    DD --> LOGIC
-    DD --> CODE
-    DD --> SQL
-    DD --> STATS
-    DD --> FACT
-    DD --> IMAGE
-    DD --> REASON
-    DD --> CONSENSUS
+
+    NL --> TR
+    TR --> PARSE
+    PARSE --> VERIFY
+    VERIFY --> GUARD
+    GUARD --> SIGN
 ```
 
-## Trust Architecture
+## 4) Consensus verification path
 
-```mermaid
-graph TB
-    subgraph "Untrusted Zone"
-        LLM[LLM Translator<br/>Probabilistic]
-    end
-    
-    subgraph "Trusted Zone"
-        SYMPY[SymPy<br/>Symbolic Math]
-        Z3[Z3 Prover<br/>SAT/SMT]
-        AST[AST Parser<br/>Code Analysis]
-        SQLGLOT[SQLGlot<br/>Query Parser]
-    end
-    
-    subgraph "Verification Protocol"
-        VP1[1. LLM translates query]
-        VP2[2. Symbolic engine verifies]
-        VP3[3. Result is deterministic]
-        VP4[4. Attestation signed]
-    end
-    
-    LLM -->|"Translate"| VP1
-    VP1 --> SYMPY
-    VP1 --> Z3
-    VP1 --> AST
-    VP1 --> SQLGLOT
-    SYMPY --> VP2
-    Z3 --> VP2
-    AST --> VP2
-    SQLGLOT --> VP2
-    VP2 --> VP3
-    VP3 --> VP4
-    
-    style LLM fill:#ff6b6b,stroke:#333,stroke-width:2px
-    style SYMPY fill:#51cf66,stroke:#333,stroke-width:2px
-    style Z3 fill:#51cf66,stroke:#333,stroke-width:2px
-    style AST fill:#51cf66,stroke:#333,stroke-width:2px
-    style SQLGLOT fill:#51cf66,stroke:#333,stroke-width:2px
-```
-
-## Consensus Engine Flow
+**Use this when:** you want resilience through multi-engine cross-checking.
 
 ```mermaid
 flowchart TD
-    INPUT[Verification Request]
-    
-    subgraph "Parallel Execution"
-        E1[Engine 1<br/>SymPy]
-        E2[Engine 2<br/>Python Eval]
-        E3[Engine 3<br/>Z3 Cross-check]
-    end
-    
-    subgraph "Circuit Breaker"
-        CB{Error Rate<br/>< 50%?}
-        HEALTHY[Healthy]
-        DEGRADED[Degraded]
-    end
-    
-    subgraph "Consensus"
-        VOTE[Weighted Voting]
-        W1["Weight: 1.00"]
-        W2["Weight: 0.99"]
-        W3["Weight: 0.995"]
-    end
-    
-    OUTPUT[Final Result]
-    
-    INPUT --> E1 & E2 & E3
-    E1 --> CB
-    E2 --> CB
-    E3 --> CB
-    CB -->|Yes| HEALTHY
-    CB -->|No| DEGRADED
-    HEALTHY --> VOTE
-    E1 --> W1 --> VOTE
-    E2 --> W2 --> VOTE
-    E3 --> W3 --> VOTE
-    VOTE --> OUTPUT
+    In[Verification request] --> P1[Engine A]
+    In --> P2[Engine B]
+    In --> P3[Engine C]
+
+    P1 --> H{Health threshold met?}
+    P2 --> H
+    P3 --> H
+
+    H -->|Yes| Vote[Weighted consensus]
+    H -->|No| Degraded[Degraded mode policy]
+    Degraded --> Vote
+    Vote --> Out[Final deterministic verdict]
 ```
 
+## Diagram usage guide
+
+| Need | Diagram |
+|---|---|
+| Component map and ownership | System topology |
+| Per-request execution flow | Request lifecycle |
+| Security/compliance explanation | Trust boundary |
+| Reliability and fallback behavior | Consensus verification path |
+
+## Related pages
+
+1. [Architecture Overview](/architecture)
+2. [Determinism Guarantee](/advanced/determinism-guarantee)
+3. [Agent Verification](/advanced/agent-verification)
+4. [SDK Guards](/sdks/guards)
