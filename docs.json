@@ -49,6 +49,7 @@
                 "group": "Configure and understand",
                 "pages": [
                   "getting-started/llm-configuration",
+                  "getting-started/custom-providers",
                   "architecture",
                   "faq"
                 ]
