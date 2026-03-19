@@ -3,14 +3,10 @@ sidebar_position: 2
 title: "API Endpoints"
 description: "Complete QWED API endpoint reference. Includes health check, verification endpoints with auto-detection, math, logic, code, SQL, and batch operations."
 ---
-# API Endpoints
-
-
-Complete reference for all QWED API endpoints.
 
 ## Base URL
 
-```
+```text
 https://api.qwedai.com/v1
 ```
 
@@ -25,6 +21,7 @@ curl https://api.qwedai.com/v1/health
 ```
 
 **Response:**
+
 ```json
 {
   "status": "healthy",
@@ -42,6 +39,7 @@ curl https://api.qwedai.com/v1/health
 Auto-detect and verify any claim.
 
 **Request:**
+
 ```json
 {
   "query": "Is 2+2=4?",
@@ -52,6 +50,7 @@ Auto-detect and verify any claim.
 ```
 
 **Response:**
+
 ```json
 {
   "status": "VERIFIED",
@@ -74,6 +73,7 @@ Auto-detect and verify any claim.
 Verify mathematical expressions.
 
 **Request:**
+
 ```json
 {
   "expression": "x**2 + 2*x + 1 = (x+1)**2"
@@ -87,6 +87,7 @@ Verify mathematical expressions.
 Verify logical constraints.
 
 **Request:**
+
 ```json
 {
   "query": "(AND (GT x 5) (LT y 10))",
@@ -95,6 +96,7 @@ Verify logical constraints.
 ```
 
 **Response:**
+
 ```json
 {
   "status": "VERIFIED",
@@ -114,6 +116,7 @@ Verify logical constraints.
 Check code for security vulnerabilities.
 
 **Request:**
+
 ```json
 {
   "code": "import os\nos.system('rm -rf /')",
@@ -122,6 +125,7 @@ Check code for security vulnerabilities.
 ```
 
 **Response:**
+
 ```json
 {
   "status": "BLOCKED",
@@ -147,6 +151,7 @@ Check code for security vulnerabilities.
 Validate SQL queries.
 
 **Request:**
+
 ```json
 {
   "query": "SELECT * FROM users WHERE id = 1",
@@ -162,6 +167,7 @@ Validate SQL queries.
 Verify factual claims.
 
 **Request:**
+
 ```json
 {
   "claim": "Paris is the capital of France",
@@ -176,6 +182,7 @@ Verify factual claims.
 Verify multiple items at once.
 
 **Request:**
+
 ```json
 {
   "items": [
@@ -191,6 +198,7 @@ Verify multiple items at once.
 ```
 
 **Response:**
+
 ```json
 {
   "results": [...],
@@ -212,6 +220,7 @@ Verify multiple items at once.
 Register a new AI agent.
 
 **Request:**
+
 ```json
 {
   "name": "MyAgent",
@@ -234,6 +243,7 @@ Register a new AI agent.
 Verify an agent action before execution.
 
 **Request:**
+
 ```json
 {
   "agent_id": "agent_abc123",
@@ -257,6 +267,7 @@ Get an attestation by ID.
 Verify an attestation JWT.
 
 **Request:**
+
 ```json
 {
   "jwt": "eyJhbGciOiJFUzI1NiIs..."
@@ -280,4 +291,3 @@ Get a badge for any status.
 Generate a custom badge.
 
 **Query params:** `label`, `message`, `color`, `logo`
-

@@ -1,23 +1,21 @@
 ---
 sidebar_position: 6
-title: Monitoring
+title: "Monitoring"
 description: "Track QWED verification success rate, response time, and errors in production. Includes Datadog integration examples and key metrics to monitor for health."
 ---
-
-# Monitoring QWED in Production
-
-Track QWED's performance, errors, and usage in your production environment.
 
 ## Key Metrics to Track
 
 ### 1. Verification Success Rate
 
 **What to track:**
+
 - Percentage of successful verifications
 - Number of failed verifications
 - Failure reasons
 
 **Example logging:**
+
 ```python
 from datadog import statsd
 
@@ -30,13 +28,14 @@ else:
     statsd.increment(f'qwed.failure.{result.reason}')
 ```
 
-**Target:** >99% success rate
+**Target:** \>99% success rate
 
 ---
 
 ### 2. Response Time
 
 **What to track:**
+
 - Average response time
 - p50, p95, p99 latency
 - Slow queries
@@ -55,13 +54,14 @@ if duration > 5:  # Slow query threshold
     logger.warning(f"Slow QWED query: {duration}s")
 ```
 
-**Target:** p95 < 3 seconds
+**Target:** p95 \< 3 seconds
 
 ---
 
 ### 3. API Quota Usage
 
 **What to track:**
+
 - Daily API calls
 - Remaining quota
 - Quota usage trend
@@ -82,6 +82,7 @@ if current_quota.remaining < 1000:
 ### 4. Error Rates
 
 **What to track:**
+
 - Network errors
 - Timeout errors
 - Authentication errors
@@ -102,7 +103,7 @@ except Exception as e:
     logger.error(f"QWED error: {e}")
 ```
 
-**Target:** Error rate < 0.1%
+**Target:** Error rate \< 0.1%
 
 ---
 
@@ -151,6 +152,7 @@ except Exception as e:
 ### Critical Alerts
 
 **1. High Error Rate**
+
 ```yaml
 - alert: QWEDHighErrorRate
   expr: rate(qwed_error_total[5m]) > 0.01
@@ -163,6 +165,7 @@ except Exception as e:
 ```
 
 **2. Slow Response Time**
+
 ```yaml
 - alert: QWEDSlowResponses
   expr: histogram_quantile(0.95, qwed_response_time_bucket) > 5
@@ -174,6 +177,7 @@ except Exception as e:
 ```
 
 **3. Quota Low**
+
 ```yaml
 - alert: QWEDQuotaLow
   expr: qwed_quota_remaining < 1000

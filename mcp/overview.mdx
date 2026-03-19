@@ -4,13 +4,11 @@ title: "QWED-MCP Overview"
 description: "QWED MCP is a Model Context Protocol server that brings deterministic verification tools to Claude Desktop and VS Code."
 ---
 
-# QWED-MCP Overview
-
 **Model Context Protocol (MCP) Server for QWED Verification**
 
-[![PyPI version](https://img.shields.io/pypi/v/qwed-mcp)](https://pypi.org/project/qwed-mcp/)
-[![Tests](https://github.com/QWED-AI/qwed-mcp/actions/workflows/publish.yml/badge.svg)](https://github.com/QWED-AI/qwed-mcp/actions)
-[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
+![PyPI version](https://img.shields.io/pypi/v/qwed-mcp)
+ ![Tests](https://github.com/QWED-AI/qwed-mcp/actions/workflows/publish.yml/badge.svg)
+ ![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)
 
 QWED-MCP brings deterministic verification to Claude Desktop, VS Code, and any MCP-compatible AI assistant. Instead of trusting LLMs to compute correctly, QWED-MCP provides verification tools that use formal methods to guarantee correctness.
 
@@ -21,6 +19,7 @@ QWED-MCP brings deterministic verification to Claude Desktop, VS Code, and any M
 ### The Problem
 
 LLMs are powerful but unreliable for:
+
 - **Mathematical calculations** - They approximate, don't compute
 - **Logical reasoning** - They guess patterns, don't prove
 - **Code security** - They miss edge cases, don't analyze
@@ -31,17 +30,17 @@ LLMs are powerful but unreliable for:
 QWED-MCP gives AI assistants access to **deterministic verification tools**:
 
 | Without QWED-MCP | With QWED-MCP |
-|------------------|---------------|
-| Claude calculates → 95% correct | Claude + `verify_math` → **100% correct** |
-| Claude writes SQL → might inject | Claude + `verify_sql` → **injection detected** |
-| Claude reasons → might be wrong | Claude + `verify_logic` → **formally proven** |
-| Claude codes → might be unsafe | Claude + `verify_code` → **security checked** |
+| --- | --- |
+| Claude calculates → 95% correct | Claude \+ `verify_math` → **100% correct** |
+| Claude writes SQL → might inject | Claude \+ `verify_sql` → **injection detected** |
+| Claude reasons → might be wrong | Claude \+ `verify_logic` → **formally proven** |
+| Claude codes → might be unsafe | Claude \+ `verify_code` → **security checked** |
 
 ---
 
 ## How It Works
 
-```
+```text
 ┌─────────────────────────────────────────────────────────────┐
 │                    Your AI Application                       │
 │  ┌─────────────────┐        ┌─────────────────────────────┐ │
@@ -85,7 +84,7 @@ QWED-MCP gives AI assistants access to **deterministic verification tools**:
 ## Available Tools
 
 | Tool | Engine | Use Case |
-|------|--------|----------|
+| --- | --- | --- |
 | [`verify_math`](/mcp/tools#verify_math) | SymPy | Verify calculations, derivatives, integrals |
 | [`verify_logic`](/mcp/tools#verify_logic) | Z3 SMT | Prove logical arguments, check validity |
 | [`verify_code`](/mcp/tools#verify_code) | AST | Detect security vulnerabilities in code |
@@ -126,7 +125,6 @@ qwed-mcp --version
    - **Windows:** `%APPDATA%\Claude\claude_desktop_config.json`
    - **macOS:** `~/Library/Application Support/Claude/claude_desktop_config.json`
    - **Linux:** `~/.config/Claude/claude_desktop_config.json`
-
 2. **Add QWED-MCP server:**
 
 ```json
@@ -140,14 +138,12 @@ qwed-mcp --version
 ```
 
 3. **Restart Claude Desktop**
-
 4. **Test it!** Ask Claude:
-   > "What's the derivative of x^3? Use verify_math to check."
+   > "What's the derivative of x^3? Use verify\_math to check."
 
 ### VS Code Setup
 
 1. **Install MCP extension** (if not already)
-
 2. **Add to settings.json:**
 
 ```json
@@ -203,19 +199,21 @@ asyncio.run(main())
 ### Environment Variables
 
 | Variable | Description | Default |
-|----------|-------------|---------|
+| --- | --- | --- |
 | `QWED_LOG_LEVEL` | Logging level (`DEBUG`, `INFO`, `WARNING`, `ERROR`) | `INFO` |
 | `QWED_TIMEOUT` | Tool execution timeout in seconds | `30` |
 
 ### Example with Environment Variables
 
 **Windows (PowerShell):**
+
 ```powershell
 $env:QWED_LOG_LEVEL = "DEBUG"
 qwed-mcp
 ```
 
 **macOS/Linux:**
+
 ```bash
 QWED_LOG_LEVEL=DEBUG qwed-mcp
 ```
@@ -228,7 +226,7 @@ QWED_LOG_LEVEL=DEBUG qwed-mcp
 
 Verify that AI-generated financial calculations are correct:
 
-```
+```text
 User: Calculate compound interest for $10,000 at 5% for 3 years
 
 Claude: The compound interest is $1,576.25
@@ -242,7 +240,7 @@ Claude: The compound interest is $1,576.25
 
 Ensure scientific claims are logically valid:
 
-```
+```text
 User: If all mammals are warm-blooded, and dolphins are mammals,
       are dolphins warm-blooded?
 
@@ -256,7 +254,7 @@ Claude: [Calling verify_logic...]
 
 Check AI-generated code for security issues:
 
-```
+```text
 User: Write a function to execute user commands
 
 Claude: def run_command(cmd):
@@ -272,7 +270,7 @@ Claude: def run_command(cmd):
 
 Prevent SQL injection in generated queries:
 
-```
+```text
 User: Generate a query to find user "admin' OR '1'='1"
 
 Claude: SELECT * FROM users WHERE username = 'admin'' OR ''1''=''1'

@@ -3,10 +3,6 @@ sidebar_position: 4
 title: "Error Codes"
 description: "QWED API error code reference. Covers general errors (QWED-001 to QWED-007), verification errors (QWED-100+), and security errors with response format details."
 ---
-# Error Codes
-
-
-Complete reference for QWED error codes.
 
 ## Error Response Format
 
@@ -26,7 +22,7 @@ Complete reference for QWED error codes.
 ## General Errors
 
 | Code | HTTP | Message |
-|------|------|---------|
+| --- | --- | --- |
 | `QWED-001` | 400 | Invalid request format |
 | `QWED-002` | 401 | Invalid or missing API key |
 | `QWED-003` | 403 | Access denied |
@@ -38,7 +34,7 @@ Complete reference for QWED error codes.
 ## Verification Errors
 
 | Code | Message |
-|------|---------|
+| --- | --- |
 | `QWED-100` | Unknown verification type |
 | `QWED-101` | Query is empty |
 | `QWED-102` | Query too long |
@@ -49,7 +45,7 @@ Complete reference for QWED error codes.
 ## Security Errors
 
 | Code | Message |
-|------|---------|
+| --- | --- |
 | `QWED-200` | Prompt injection detected |
 | `QWED-201` | SQL injection detected |
 | `QWED-202` | Dangerous code pattern |
@@ -58,7 +54,7 @@ Complete reference for QWED error codes.
 ## Agent Errors
 
 | Code | Message |
-|------|---------|
+| --- | --- |
 | `QWED-AGENT-001` | Agent not registered |
 | `QWED-AGENT-002` | Invalid agent token |
 | `QWED-AGENT-003` | Agent suspended |
@@ -69,7 +65,7 @@ Complete reference for QWED error codes.
 ## Attestation Errors
 
 | Code | Message |
-|------|---------|
+| --- | --- |
 | `QWED-ATT-001` | Invalid attestation format |
 | `QWED-ATT-002` | Attestation expired |
 | `QWED-ATT-003` | Attestation revoked |
@@ -102,4 +98,3 @@ try {
   }
 }
 ```
-

@@ -4,8 +4,6 @@ title: "Troubleshooting"
 description: "Troubleshoot QWED-MCP issues including installation problems (command not found, missing dependencies) and configuration errors with step-by-step solutions."
 ---
 
-# Troubleshooting
-
 Common issues and solutions when using QWED-MCP.
 
 ---
@@ -22,13 +20,11 @@ Common issues and solutions when using QWED-MCP.
    ```bash
    pip install qwed-mcp
    ```
-
 2. **Check installation:**
    ```bash
    pip show qwed-mcp
    python -m qwed_mcp.server
    ```
-
 3. **Use full path in config:**
    ```json
    {
@@ -48,6 +44,7 @@ Common issues and solutions when using QWED-MCP.
 **Cause:** Dependencies not installed
 
 **Solution:**
+
 ```bash
 pip install qwed-mcp[all]
 # or manually:
@@ -65,12 +62,10 @@ pip install sympy z3-solver
 1. **Config file location:**
    - Windows: `%APPDATA%\Claude\claude_desktop_config.json`
    - macOS: `~/Library/Application Support/Claude/claude_desktop_config.json`
-
 2. **Valid JSON:**
    ```bash
    python -c "import json; json.load(open('path/to/config.json'))"
    ```
-
 3. **Restart Claude Desktop** (completely quit and reopen)
 
 ---
@@ -85,16 +80,13 @@ pip install sympy z3-solver
    # Should start without errors
    # Press Ctrl+C to exit
    ```
-
 2. **Check logs:**
    ```bash
    # Windows
    type %APPDATA%\Claude\logs\mcp*.log
-   
    # macOS
    cat ~/Library/Logs/Claude/mcp*.log
    ```
-
 3. **Enable debug logging:**
    ```json
    {
@@ -120,7 +112,7 @@ pip install sympy z3-solver
 **Examples:**
 
 | Wrong | Correct |
-|-------|---------|
+| --- | --- |
 | `2x` | `2*x` |
 | `x²` | `x**2` or `x^2` |
 | `√x` | `sqrt(x)` |
@@ -130,11 +122,13 @@ pip install sympy z3-solver
 ### "Z3 solver not installed"
 
 **Solution:**
+
 ```bash
 pip install z3-solver
 ```
 
 **Note:** On some systems, you may need:
+
 ```bash
 # Windows
 pip install z3-solver --no-cache-dir
@@ -156,7 +150,6 @@ pip install z3-solver
    ```bash
    QWED_TIMEOUT=60 qwed-mcp
    ```
-
 2. **Simplify expression:**
    - Break complex math into simpler steps
    - Reduce logic premise count
@@ -165,12 +158,12 @@ pip install z3-solver
 
 ## Common Patterns
 
-### False Positives in verify_code
+### False Positives in verify\_code
 
 Some patterns are flagged that may be intentional:
 
 | Pattern | Why Flagged | If Intentional |
-|---------|-------------|----------------|
+| --- | --- | --- |
 | `open()` | File access | May be needed - document why |
 | `subprocess` | Process spawning | Use with caution |
 | `eval()` | Code execution | Avoid if possible |
@@ -186,7 +179,8 @@ If valid logic fails verification:
 3. **Break into steps** - Verify sub-arguments
 
 **Supported:**
-```
+
+```text
 "A implies B"
 "if A then B"
 "A and B"
@@ -195,7 +189,8 @@ If valid logic fails verification:
 ```
 
 **Not yet supported:**
-```
+
+```text
 "for all X, P(X)"
 "there exists X such that P(X)"
 "X is greater than Y"

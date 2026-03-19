@@ -3,10 +3,6 @@ sidebar_position: "5"
 title: "Rust SDK"
 description: "QWED Rust SDK documentation. Add via Cargo, use async/await with tokio runtime, and integrate deterministic verification into your Rust applications."
 ---
-# Rust SDK
-
-
-The official Rust SDK for QWED.
 
 ## Installation
 
@@ -41,21 +37,21 @@ async fn main() -> Result<(), qwed::Error> {
 let result = client.verify("2+2=4").await?;
 ```
 
-### verify_math
+### verify\_math
 
 ```rust
 let result = client.verify_math("x**2 + 2*x + 1 = (x+1)**2").await?;
 println!("{}", result.verified);  // true
 ```
 
-### verify_logic
+### verify\_logic
 
 ```rust
 let result = client.verify_logic("(AND (GT x 5) (LT y 10))").await?;
 println!("{:?}", result.model);  // Some({"x": 6, "y": 9})
 ```
 
-### verify_code
+### verify\_code
 
 ```rust
 let result = client.verify_code(code, "python").await?;
@@ -64,13 +60,13 @@ for vuln in &result.vulnerabilities {
 }
 ```
 
-### verify_sql
+### verify\_sql
 
 ```rust
 let result = client.verify_sql(query, schema, "postgresql").await?;
 ```
 
-### verify_batch
+### verify\_batch
 
 ```rust
 let items = vec![

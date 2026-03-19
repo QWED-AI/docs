@@ -3,19 +3,16 @@ sidebar_position: 1
 title: "API Overview"
 description: "QWED RESTful API reference. Learn about base URLs, authentication via API keys, core verification endpoints, and request formats for LLM output verification."
 ---
-# API Overview
-
-
-QWED provides a RESTful API for verification.
 
 ## Base URL
 
-```
+```text
 https://api.qwedai.com/v1
 ```
 
 Or for local development:
-```
+
+```text
 http://localhost:8000
 ```
 
@@ -30,7 +27,7 @@ curl -H "X-API-Key: qwed_your_key" https://api.qwedai.com/v1/health
 ## Core Endpoints
 
 | Method | Endpoint | Description |
-|--------|----------|-------------|
+| --- | --- | --- |
 | GET | `/health` | Health check |
 | POST | `/verify` | Auto-detect verification |
 | POST | `/verify/math` | Math verification |
@@ -75,7 +72,7 @@ curl -H "X-API-Key: qwed_your_key" https://api.qwedai.com/v1/health
 ## Status Codes
 
 | Code | Meaning |
-|------|---------|
+| --- | --- |
 | 200 | Success |
 | 400 | Bad request |
 | 401 | Unauthorized |
@@ -85,7 +82,7 @@ curl -H "X-API-Key: qwed_your_key" https://api.qwedai.com/v1/health
 ## Rate Limits
 
 | Plan | Requests/min | Requests/day |
-|------|--------------|--------------|
+| --- | --- | --- |
 | Free | 60 | 1,000 |
 | Pro | 600 | 50,000 |
 | Enterprise | Unlimited | Unlimited |
@@ -96,4 +93,3 @@ curl -H "X-API-Key: qwed_your_key" https://api.qwedai.com/v1/health
 - [Authentication](/api/authentication)
 - [Error Codes](/api/errors)
 - [Rate Limits](/api/rate-limits)
-

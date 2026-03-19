@@ -1,30 +1,27 @@
 ---
 sidebar_position: 5
-title: Production Deployment
+title: "Production Deployment"
 description: "QWED production deployment checklist covering integration testing, API key management, error handling best practices, and performance optimization tips."
 ---
-
-# Production Deployment Checklist
-
-Ready to deploy QWED to production? Follow this comprehensive checklist.
 
 ## Pre-Deployment Checklist
 
 ### ✅ 1. Integration Testing Complete
 
-- [ ] All integration tests pass (`test_qwed_integration.py`)
-- [ ] Performance tests meet requirements
-- [ ] Error handling tested
-- [ ] Batch processing tested (if applicable)
+- All integration tests pass (`test_qwed_integration.py`)
+- Performance tests meet requirements
+- Error handling tested
+- Batch processing tested (if applicable)
 
 ### ✅ 2. API Key Management
 
-- [ ] API keys stored in environment variables
-- [ ] Different keys for dev/staging/production
-- [ ] Key rotation plan in place
-- [ ] API keys NOT in Git/version control
+- API keys stored in environment variables
+- Different keys for dev/staging/production
+- Key rotation plan in place
+- API keys NOT in Git/version control
 
 **Example `.env` file:**
+
 ```bash
 # Production
 QWED_API_KEY=qwed_prod_...
@@ -38,12 +35,13 @@ QWED_API_KEY=qwed_prod_...
 
 ### ✅ 3. Error Handling
 
-- [ ] All QWED calls wrapped in try/except
-- [ ] Fallback mechanisms in place
-- [ ] Error logging configured
-- [ ] Alerts for critical failures
+- All QWED calls wrapped in try/except
+- Fallback mechanisms in place
+- Error logging configured
+- Alerts for critical failures
 
 **Example:**
+
 ```python
 from qwed.exceptions import QWEDError
 import logging
@@ -65,17 +63,17 @@ except QWEDError as e:
 
 ### ✅ 4. Rate Limiting
 
-- [ ] Understood quota limits for your plan
-- [ ] Rate limiting logic implemented
-- [ ] Backoff/retry logic in place
-- [ ] Monitoring quota usage
+- Understood quota limits for your plan
+- Rate limiting logic implemented
+- Backoff/retry logic in place
+- Monitoring quota usage
 
 ### ✅ 5. Logging & Monitoring
 
-- [ ] All QWED calls logged
-- [ ] Verification results tracked
-- [ ] Error rates monitored
-- [ ] Performance metrics captured
+- All QWED calls logged
+- Verification results tracked
+- Error rates monitored
+- Performance metrics captured
 
 ---
 
@@ -84,6 +82,7 @@ except QWEDError as e:
 ### Option 1: Gradual Rollout (Recommended)
 
 **Week 1: Canary (5% traffic)**
+
 ```python
 import random
 
@@ -96,8 +95,7 @@ else:
     result = legacy_method(query)
 ```
 
-**Week 2-3: Increase to 25%, then 50%**
-**Week 4: Full rollout (100%)**
+**Week 2-3: Increase to 25%, then 50%** **Week 4: Full rollout (100%)**
 
 ### Option 2: Shadow Mode
 
@@ -184,12 +182,14 @@ def get_qwed_client():
 ### 1. API Key Security
 
 ✅ **DO:**
+
 - Use environment variables
 - Rotate keys regularly (every 90 days)
 - Use different keys per environment
 - Revoke compromised keys immediately
 
 ❌ **DON'T:**
+
 - Commit keys to Git
 - Share keys via email/Slack
 - Use same key across environments
@@ -287,6 +287,7 @@ CREATE TABLE verification_logs (
 ```
 
 **Logging example:**
+
 ```python
 def verify_and_log(query, user_id):
     start = time.time()
@@ -310,10 +311,10 @@ def verify_and_log(query, user_id):
 
 ### Requirements
 
-- [ ] All verifications logged
-- [ ] Logs retained for compliance period
-- [ ] Audit trail accessible
-- [ ] Failed verifications flagged
+- All verifications logged
+- Logs retained for compliance period
+- Audit trail accessible
+- Failed verifications flagged
 
 ### Audit Log Format
 
@@ -338,29 +339,29 @@ def verify_and_log(query, user_id):
 
 ### Before Deploy:
 
-- [ ] All tests pass
-- [ ] API keys configured
-- [ ] Error handling in place
-- [ ] Logging configured
-- [ ] Monitoring dashboards ready
-- [ ] Rollback plan documented
-- [ ] Team notified
+- All tests pass
+- API keys configured
+- Error handling in place
+- Logging configured
+- Monitoring dashboards ready
+- Rollback plan documented
+- Team notified
 
 ### During Deploy:
 
-- [ ] Deploy to staging first
-- [ ] Run smoke tests
-- [ ] Check logs for errors
-- [ ] Monitor metrics
-- [ ] Gradual traffic ramp-up
+- Deploy to staging first
+- Run smoke tests
+- Check logs for errors
+- Monitor metrics
+- Gradual traffic ramp-up
 
 ### After Deploy:
 
-- [ ] Verify no error rate increase
-- [ ] Check performance metrics
-- [ ] Review audit logs
-- [ ] Update documentation
-- [ ] Team retrospective
+- Verify no error rate increase
+- Check performance metrics
+- Review audit logs
+- Update documentation
+- Team retrospective
 
 ---
 
@@ -369,6 +370,7 @@ def verify_and_log(query, user_id):
 If issues occur:
 
 **1. Immediate Rollback:**
+
 ```python
 # Feature flag
 feature_flags.disable('qwed_verification')
@@ -379,11 +381,13 @@ git push
 ```
 
 **2. Investigate:**
+
 - Check error logs
 - Review verification failures
 - Analyze performance metrics
 
 **3. Fix & Redeploy:**
+
 - Patch issue
 - Test thoroughly
 - Gradual re-rollout
@@ -394,13 +398,13 @@ git push
 
 **Final checks before 100% rollout:**
 
-- [ ] 7 days of stable canary deployment
-- [ ] Error rate < 0.1%
-- [ ] Performance acceptable (p95 < 3s)
-- [ ] No security incidents
-- [ ] Team trained on troubleshooting
-- [ ] Monitoring dashboards operational
-- [ ] Runbook documented
+- 7 days of stable canary deployment
+- Error rate \< 0.1%
+- Performance acceptable (p95 \< 3s)
+- No security incidents
+- Team trained on troubleshooting
+- Monitoring dashboards operational
+- Runbook documented
 
 ---
 
@@ -414,4 +418,4 @@ Once deployed:
 
 ---
 
-**Questions?** Contact support@qwedai.com
+**Questions?** Contact [support@qwedai.com](mailto:support@qwedai.com)
