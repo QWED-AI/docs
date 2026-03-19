@@ -1,28 +1,24 @@
 ---
 sidebar_position: 1
 title: "Verification Engines"
-description: "Explore QWED's 11 specialized verification engines. Each uses deterministic methods first with LLM fallback for math, logic, code, SQL, and more."
+description: "QWED provides 11 specialized verification engines, each using deterministic methods first and LLM only as fallback."
 ---
-
-# Verification Engines
-
-QWED provides **11 specialized verification engines**, each using deterministic methods first and LLM only as fallback.
 
 ## Engine Overview
 
 | Engine | Technology | Key Features |
-|--------|------------|--------------|
-| **Math** | SymPy + Decimal | Calculus, Matrix ops, NPV/IRR, Statistics |
+| --- | --- | --- |
+| **Math** | SymPy \+ Decimal | Calculus, Matrix ops, NPV/IRR, Statistics |
 | **Logic** | Z3 Theorem Prover | ForAll/Exists quantifiers, BitVectors, Arrays |
-| **Reasoning** | Multi-LLM + Cache | Chain-of-thought validation, Result caching |
+| **Reasoning** | Multi-LLM \+ Cache | Chain-of-thought validation, Result caching |
 | **Stats** | Wasm/Docker Sandbox | Secure code execution with AST validation |
-| **Fact** | TF-IDF + NLP | Semantic similarity, Entity matching, Citations |
+| **Fact** | TF-IDF \+ NLP | Semantic similarity, Entity matching, Citations |
 | **Graph** | Knowledge Graph | Triple verification (Subject-Predicate-Object) |
 | **Code** | Multi-Lang AST | Python, JavaScript, Java, Go security analysis |
 | **SQL** | SQLGlot AST | Complexity limits, Cost estimation, Schema validation |
 | **Taint** | Data Flow Analysis | Trace untrusted inputs to sensitive sinks |
-| **Image** | Deterministic + VLM | Metadata extraction, Size verification, Multi-VLM |
-| **Schema** | Pydantic + Math | JSON structure + embedded calculation checks |
+| **Image** | Deterministic \+ VLM | Metadata extraction, Size verification, Multi-VLM |
+| **Schema** | Pydantic \+ Math | JSON structure \+ embedded calculation checks |
 
 ## Deterministic-First Philosophy
 
@@ -49,13 +45,13 @@ result = client.verify_fact(
 QWED auto-detects the appropriate engine:
 
 | Content Pattern | Detected Engine |
-|-----------------|-----------------|
+| --- | --- |
 | `2+2=4`, `sqrt(16)`, `derivative` | Math |
 | `(AND ...)`, `ForAll`, `Exists` | Logic |
 | `SELECT`, `INSERT`, `DROP` | SQL |
-| ` ```python `, `import`, `function` | Code |
+| ````python`, `import`, `function` | Code |
 | Claims with context | Fact |
-| Image bytes + claim | Image |
+| Image bytes \+ claim | Image |
 
 Or specify explicitly:
 
@@ -66,22 +62,25 @@ result = client.verify(query, type="math")
 ## Engine Documentation
 
 ### Deterministic Engines
+
 - [Math Engine](/engines/math) - Calculus, Matrix, Financial
 - [Logic Engine](/engines/logic) - Quantifiers, Theorem Proving
 - [Schema Engine](/engines/schema) - JSON Structure & Math
 
 ### Security Engines
+
 - [Code Engine](/engines/code) - Multi-language Security
 - [SQL Engine](/engines/sql) - Complexity Limits
 - [Taint Engine](/engines/taint) - Data Flow Analysis
 
 ### Data Verification Engines
+
 - [Stats Engine](/engines/stats) - Wasm Sandbox Execution
-- [Fact Engine](/engines/fact) - TF-IDF + Citations
+- [Fact Engine](/engines/fact) - TF-IDF \+ Citations
 - [Graph Engine](/engines/graph) - Knowledge Graph Triples
 - [Image Engine](/engines/image) - Deterministic Verification
 
 ### Orchestration Engines
+
 - [Reasoning Engine](/engines/reasoning) - Multi-LLM Validation
 - [Consensus Engine](/engines/consensus) - Parallel Execution
-
