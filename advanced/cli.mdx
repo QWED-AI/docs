@@ -19,7 +19,7 @@ The `qwed` CLI is automatically available after installation.
 
 ### `qwed init` - Secure LLM configuration
 
-Interactive wizard that configures your LLM provider and writes credentials to a `.env` file with restrictive permissions (0600 on Unix).
+Interactive wizard that configures your LLM provider and writes credentials to a `.env` file with restrictive permissions (0600 on Unix). Run this once after installing QWED.
 
 ```bash
 qwed init
@@ -27,11 +27,12 @@ qwed init
 
 The wizard walks you through:
 
-1. **Provider selection** — choose from OpenAI, Anthropic, Ollama, or any OpenAI-compatible endpoint (Groq, Together, LM Studio, etc.)
-2. **Credential entry** — API keys are entered with hidden input and validated against provider-specific patterns
-3. **Connection test** — optional lightweight connectivity check against the provider's read-only `/models` endpoint (5 s timeout)
-4. **Default provider** — set the selected provider as `ACTIVE_PROVIDER` so `qwed verify` auto-detects it
-5. **`.gitignore` protection** — verifies `.env` is in `.gitignore`; offers to add it if missing, and aborts if you decline
+1. **Provider selection** — choose from OpenAI, Anthropic, Ollama (local), or any OpenAI-compatible endpoint (Groq, Together, LM Studio, etc.)
+2. **Credential entry** — API keys are entered with hidden input and never displayed on screen
+3. **Key format validation** — checks that your key matches the provider's expected format before making any network call
+4. **Connection test** — optional lightweight connectivity check against the provider's read-only `/models` endpoint (5 s timeout)
+5. **Default provider** — sets the chosen provider as `ACTIVE_PROVIDER` so `qwed verify` auto-detects it
+6. **`.gitignore` protection** — confirms `.env` is gitignored before writing secrets, and offers to add it if missing, aborting if you decline
 
 **Supported providers:**
 
@@ -56,7 +57,7 @@ Select your LLM provider:
   1. OpenAI (sk-... or sk-proj-...)
   2. Anthropic (sk-ant-...)
   3. Ollama (Local) (No API key needed — runs locally)
-  4. OpenAI-Compatible (DO, Groq, Together, LM Studio, etc.)
+  4. OpenAI-Compatible (DO, Groq, Together, LM Studio, etc.) (Any bearer token format)
 
 Enter number: 1
 ✓ Selected: OpenAI
@@ -83,6 +84,16 @@ Enter number: 1
 <Note>
 API keys are never logged or displayed in full. The wizard masks keys to the first 8 characters (e.g., `sk-proj-****`). The `.env` file is written atomically with owner-only permissions and symlink protection.
 </Note>
+
+**Security guarantees:**
+
+- Keys are never displayed on screen (masked input)
+- Keys are never written to logs (redacted to `sk-proj-****`)
+- `.env` is written with `0600` permissions (owner-read/write only on Unix)
+- Atomic file writes prevent partial credential exposure
+- Symlink targets are refused to prevent path traversal
+
+**Re-running `qwed init`:** Running the wizard again merges new values into your existing `.env` file. Existing variables that you don't reconfigure are preserved.
 
 ---
 
@@ -246,6 +257,17 @@ These are written to `.env` by `qwed init` and loaded automatically via `python-
 | `CUSTOM_API_KEY` | OpenAI-compatible | API key for the endpoint |
 | `CUSTOM_MODEL` | OpenAI-compatible | Model name (default: `gpt-4o-mini`) |
 
+The recommended way to set these is via `qwed init`, which writes them to a `.env` file automatically. You can also export them manually.
+
+### `ACTIVE_PROVIDER`
+
+Determines which provider `qwed verify` uses by default. Set automatically by `qwed init`.
+
+```bash
+# Options: openai, anthropic, ollama, openai_compat
+ACTIVE_PROVIDER=openai
+```
+
 ### `QWED_API_KEY`
 
 Fallback API key when a provider-specific key is not set.
@@ -276,7 +298,9 @@ When you run `qwed verify` without explicit flags, the CLI resolves the provider
 2. **`ACTIVE_PROVIDER` env var** — set by `qwed init` or manually in `.env`
 3. **Ollama default** — falls back to `http://localhost:11434/v1` with model `llama3`
 
-### Default models
+If you have run `qwed init`, the `ACTIVE_PROVIDER` value in your `.env` determines which provider and credentials are used automatically.
+
+### Default Models
 
 | Provider | Default Model |
 |---|---|

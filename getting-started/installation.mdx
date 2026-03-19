@@ -12,6 +12,14 @@ Get QWED up and running in minutes.
 pip install qwed
 ```
 
+After installing, run the setup wizard to configure your LLM provider:
+
+```bash
+qwed init
+```
+
+This walks you through selecting a provider (OpenAI, Anthropic, Ollama, or any OpenAI-compatible endpoint), entering your API key securely, and writing a `.env` file with the correct permissions. See the [CLI reference](/advanced/cli) for details.
+
 ### Requirements
 - Python 3.10+
 - Optional: Redis (for caching)

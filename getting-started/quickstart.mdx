@@ -98,20 +98,19 @@ results = client.verify_batch([
 print(f"Success rate: {results.summary.success_rate}%")
 ```
 
-## 7. CLI Usage
+## 7. CLI usage
+
+Set up your LLM provider, then verify from the command line:
 
 ```bash
+# One-time setup — configures your provider and API key
+qwed init
+
 # Verify from command line
 qwed verify "Is 2+2=5?"
 
-# Verify logic
-qwed verify-logic "(AND (GT x 5) (LT y 10))"
-
-# Verify code file
-qwed verify-code -f script.py
-
-# Batch from file
-qwed batch -f queries.json
+# Verify with a specific provider
+qwed verify "derivative of x^2" --provider openai
 ```
 
 ## Next Steps
