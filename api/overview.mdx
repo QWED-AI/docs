@@ -24,7 +24,7 @@ All requests require an API key:
 curl -H "X-API-Key: qwed_your_key" https://api.qwedai.com/v1/health
 ```
 
-## Core Endpoints
+## Core endpoints
 
 | Method | Endpoint | Description |
 | --- | --- | --- |
@@ -35,7 +35,14 @@ curl -H "X-API-Key: qwed_your_key" https://api.qwedai.com/v1/health
 | POST | `/verify/code` | Code security |
 | POST | `/verify/sql` | SQL validation |
 | POST | `/verify/fact` | Fact checking |
+| POST | `/verify/consensus` | Multi-engine consensus |
+| POST | `/verify/image` | Image claim verification |
+| POST | `/verify/stats` | Statistical claim verification |
 | POST | `/verify/batch` | Batch verification |
+| POST | `/agents/register` | Register an AI agent |
+| POST | `/agents/{id}/verify` | Agent verification |
+| GET | `/metrics` | System metrics |
+| GET | `/metrics/prometheus` | Prometheus scrape |
 
 ## Request Format
 
