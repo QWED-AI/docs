@@ -44,8 +44,13 @@ QWED uses LLMs as **untrusted translators**, not as answer generators:
 | **Anthropic** | `ANTHROPIC_API_KEY` | `claude-sonnet-4-20250514` | Yes |
 | **Ollama (local)** | `OLLAMA_BASE_URL` | `llama3` | Yes |
 | **OpenAI-compatible** | `CUSTOM_BASE_URL` + `CUSTOM_API_KEY` | `gpt-4o-mini` | Yes |
+| **Custom (YAML)** | Defined per provider | Defined per provider | Yes |
 | **Google** | `GOOGLE_API_KEY` | gemini-pro | Coming soon |
 | **Azure OpenAI** | `AZURE_OPENAI_*` | Any Azure-hosted model | Coming soon |
+
+<Tip>
+You can add any OpenAI-compatible provider (Groq, Together, Fireworks, and others) using a YAML configuration file. See [Custom providers](/getting-started/custom-providers) for details.
+</Tip>
 
 ---
 
@@ -262,8 +267,9 @@ We set `temperature=0` for reproducibility, but LLMs are inherently probabilisti
 
 ---
 
-## Next Steps
+## Next steps
 
 - [Quick Start Tutorial](/getting-started/quickstart)
+- [Custom providers](/getting-started/custom-providers) — add any OpenAI-compatible endpoint via YAML
 - [QWED-Logic DSL Reference](/api/dsl-reference)
 - [Self-Hosting Guide](/advanced/self-hosting)

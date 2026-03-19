@@ -343,6 +343,34 @@ If you have run `qwed init`, the `ACTIVE_PROVIDER` value in your `.env` determin
 
 ---
 
+### `qwed provider` - Custom provider management
+
+Manage custom LLM providers defined in `~/.qwed/providers.yaml`. See [Custom providers](/getting-started/custom-providers) for the full guide.
+
+#### `qwed provider import <url>`
+
+Import a community provider definition from a URL. The YAML file is downloaded, validated, and saved locally.
+
+```bash
+qwed provider import https://raw.githubusercontent.com/my-org/qwed-providers/main/groq.yaml
+```
+
+**Example output:**
+
+```
+ℹ️  Downloading provider from https://raw.githubusercontent.com/my-org/qwed-providers/main/groq.yaml...
+✅ Successfully imported provider 'groq'!
+   You can now run 'qwed init' and select it from the interactive menu.
+```
+
+After importing, the new provider appears as a selectable option when you run `qwed init`.
+
+<Note>
+Only `http` and `https` URLs are accepted. The imported YAML must contain `base_url` and `api_key_env` fields. Downloads time out after 10 seconds.
+</Note>
+
+---
+
 ## Use Cases
 
 ### 1. Quick Verification
