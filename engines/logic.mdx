@@ -41,13 +41,17 @@ QWED uses a secure S-expression DSL for logic expressions.
 
 ### Operators
 
-| Category        | Operators                 | Example               |
-| --------------- | ------------------------- | --------------------- |
-| **Logic**       | AND, OR, NOT              | `(AND a b)`           |
-| **Comparison**  | GT, LT, EQ, GTE, LTE, NEQ | `(GT x 5)`            |
-| **Implication** | IMPLIES, IFF              | `(IMPLIES a b)`       |
-| **Quantifiers** | FORALL, EXISTS            | `(FORALL x (GT x 0))` |
-| **Arithmetic**  | PLUS, MINUS, MULT, DIV    | `(PLUS x y)`          |
+| Category        | Operators                           | Example               |
+| --------------- | ----------------------------------- | --------------------- |
+| **Logic**       | AND, OR, NOT                        | `(AND a b)`           |
+| **Comparison**  | GT, LT, EQ, NE, GE, LE, GTE, LTE, NEQ | `(GT x 5)`        |
+| **Implication** | IMPLIES, IFF                        | `(IMPLIES a b)`       |
+| **Quantifiers** | FORALL, EXISTS                      | `(FORALL x (GT x 0))` |
+| **Arithmetic**  | PLUS, MINUS, MUL, MULT, DIV, MOD, POW | `(PLUS x y)`       |
+
+<Tip>
+Comparison and arithmetic operators accept multiple aliases for convenience. For example, `GTE` and `GE` both mean "greater than or equal to", `NEQ` and `NE` both mean "not equal", and `MUL` and `MULT` both mean multiplication.
+</Tip>
 
 ### Examples
 
@@ -173,6 +177,20 @@ The DSL uses a **strict whitelist** - only approved operators are allowed:
 "(EVAL 'print(1)')"         ✗
 # Error: SECURITY BLOCK: Unknown operator 'EVAL'
 ```
+
+---
+
+## Provider tracking
+
+When you verify a natural-language logic query, QWED translates it to DSL using the configured LLM provider. The response includes a `provider_used` field so you can see which provider handled the translation — even when the request falls back to a different provider or ends in an error.
+
+```python
+result = client.verify_logic("x must be greater than 5 and less than 3")
+print(result.provider_used)  # "openai_compat"
+print(result.status)         # "UNSAT"
+```
+
+This field also appears in error responses, which helps you debug provider-related issues without inspecting server logs.
 
 ---
 
