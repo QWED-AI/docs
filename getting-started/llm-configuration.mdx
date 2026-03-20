@@ -187,6 +187,8 @@ export CUSTOM_API_KEY=your-api-key
 export CUSTOM_MODEL=gpt-4o-mini
 ```
 
+Only `CUSTOM_BASE_URL` is required. If your endpoint does not require authentication (for example, a local vLLM or LM Studio server), you can omit `CUSTOM_API_KEY` entirely — QWED automatically supplies a placeholder token so the underlying client initializes correctly.
+
 ### Google Gemini
 
 ```bash

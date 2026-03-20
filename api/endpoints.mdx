@@ -112,6 +112,16 @@ Verify logical constraints.
 
 The `provider_used` field indicates which LLM provider handled the translation step. This field is included in both success and error responses, which helps with debugging provider routing issues.
 
+**Error response:**
+
+```json
+{
+  "status": "ERROR",
+  "error": "Internal verification error",
+  "provider_used": "openai_compat"
+}
+```
+
 ---
 
 ### POST /verify/code
