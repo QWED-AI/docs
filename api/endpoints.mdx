@@ -102,12 +102,15 @@ Verify logical constraints.
   "status": "VERIFIED",
   "verified": true,
   "verification_mode": "SYMBOLIC",
+  "provider_used": "openai_compat",
   "result": {
     "satisfiability": "SAT",
     "model": {"x": 6, "y": 9}
   }
 }
 ```
+
+The `provider_used` field indicates which LLM provider handled the translation step. This field is included in both success and error responses, which helps with debugging provider routing issues.
 
 ---
 

