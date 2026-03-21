@@ -12,13 +12,13 @@ Get QWED up and running in minutes.
 pip install qwed
 ```
 
-After installing, run the setup wizard to configure your LLM provider:
+After installing, run the onboarding command to verify engine readiness, configure your LLM provider, and bootstrap a local API key:
 
 ```bash
 qwed init
 ```
 
-This walks you through selecting a provider (OpenAI, Anthropic, Ollama, or any OpenAI-compatible endpoint), entering your API key securely, and writing a `.env` file with the correct permissions. See the [CLI reference](/advanced/cli) for details.
+This runs a 3-step flow: engine checks (SymPy, Z3, AST, SQLGlot), LLM provider setup (NVIDIA NIM, OpenAI, Anthropic, Gemini, or custom), and local API key generation. See the [CLI reference](/advanced/cli) for the full walkthrough and CI/CD flags.
 
 ### Requirements
 - Python 3.10+
