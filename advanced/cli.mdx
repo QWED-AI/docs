@@ -17,81 +17,136 @@ The `qwed` CLI is automatically available after installation.
 
 ## Commands
 
-### `qwed init` - Secure LLM configuration
+### `qwed init` - Onboarding and bootstrap
 
-Interactive wizard that configures your LLM provider and writes credentials to a `.env` file with restrictive permissions (0600 on Unix). Run this once after installing QWED.
+Production-grade onboarding wizard that sets up verification engines, configures your LLM provider, and bootstraps a local API key — all in a single command. Run this once after installing QWED.
 
 ```bash
 qwed init
 ```
 
-The wizard walks you through:
+The wizard runs three steps:
 
-1. **Provider selection** — choose from OpenAI, Anthropic, Ollama (local), or any OpenAI-compatible endpoint (Groq, Together, LM Studio, etc.)
-2. **Credential entry** — API keys are entered with hidden input and never displayed on screen
-3. **Key format validation** — checks that your key matches the provider's expected format before making any network call
-4. **Connection test** — optional lightweight connectivity check against the provider's read-only `/models` endpoint (5 s timeout)
-5. **Default provider** — sets the chosen provider as `ACTIVE_PROVIDER` so `qwed verify` auto-detects it
-6. **`.gitignore` protection** — confirms `.env` is gitignored before writing secrets, and offers to add it if missing, aborting if you decline
+1. **Engine readiness** — checks that core verification engines (SymPy, Z3, AST, SQLGlot) are installed, then runs deterministic smoke tests to confirm they work correctly
+2. **LLM provider setup** — select a provider, enter credentials with masked input, validate the key format, and test the connection with retry support
+3. **API key bootstrap** — starts a local QWED server, creates an organization, and generates a one-time API key you can use immediately
 
 **Supported providers:**
 
 | Provider | Slug | Auth type | Key hint |
 |---|---|---|---|
+| NVIDIA NIM | `nvidia` | API key | Any key format |
 | OpenAI | `openai` | API key | `sk-...` or `sk-proj-...` |
 | Anthropic | `anthropic` | API key | `sk-ant-...` |
-| Ollama (Local) | `ollama` | None (local) | No key needed |
-| OpenAI-Compatible | `openai-compatible` | Endpoint + key | Any bearer token |
+| Google Gemini | `gemini` | API key | Google API key |
+| Custom (OpenAI-compatible) | `custom` | Endpoint + key | Any bearer token |
 
 **Example session:**
 
 ```
 $ qwed init
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-🔬 QWED — Secure LLM Configuration
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+[QWED] Initializing verification engines...
+  [ok] SymPy    math engine ready
+  [ok] Z3       logic engine ready
+  [ok] AST      code engine ready
+  [ok] SQLGlot  sql engine ready
 
-Select your LLM provider:
+Running verification suite...
+  [ok] 2+2=5                     -> BLOCKED
+  [ok] x>5 AND x<3              -> UNSAT
+  [ok] SELECT * FROM users ...   -> BLOCKED
+  [ok] os.system(...)            -> BLOCKED
 
-  1. OpenAI (sk-... or sk-proj-...)
-  2. Anthropic (sk-ant-...)
-  3. Ollama (Local) (No API key needed — runs locally)
-  4. OpenAI-Compatible (DO, Groq, Together, LM Studio, etc.) (Any bearer token format)
+All engines verified. QWED is operational.
 
-Enter number: 1
-✓ Selected: OpenAI
+-----------------------------------------
+Step 1/3: LLM Provider Setup
+-----------------------------------------
+QWED uses an LLM for natural language translation.
+The LLM is treated as an untrusted translator.
+All outputs are verified deterministically.
 
-  🔑 Your OpenAI API key: ****
-  Model name [gpt-4o-mini]:
+Select provider:
+  1. NVIDIA NIM       (recommended)
+  2. OpenAI
+  3. Anthropic Claude
+  4. Google Gemini
+  5. Custom Provider  (any OpenAI-compatible API)
 
-✅ Key format valid: sk-proj-****
+Provider: 2
 
-🔍 Would you like to test the connection? [y/N]: y
-   Testing... ✅ Connected to OpenAI API.
+-----------------------------------------
+Step 2/3: API Key
+-----------------------------------------
+OpenAI API key: ****
+  Testing connection...
+  [ok] Provider connected
+  [ok] Model responding
+  [ok] Credentials stored (.env, mode 0600)
 
-⚙️  Set OpenAI as default active provider? [Y/n]: y
+-----------------------------------------
+Step 3/3: Generate QWED API Key
+-----------------------------------------
+  Starting local server...
+  [ok] Local server initialized
+  [ok] Organization created
 
-🔒 Verified: .gitignore includes .env
+  Your API key: qwed_xxxxxxxxxxxxxxxx
+  Warning: Save this key. It is shown only once.
 
-📁 Written to /path/to/project/.env
+-----------------------------------------
+QWED is ready.
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-🚀 Ready! Try: qwed verify "What is 2+2?"
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Verify an output:
+  curl -X POST http://localhost:8000/verify/math \
+    -H "x-api-key: qwed_xxxxxxxxxxxxxxxx" \
+    -H "Content-Type: application/json" \
+    -d '{"expression": "2+2=4"}'
+
+Documentation: https://docs.qwedai.com
+-----------------------------------------
 ```
 
+#### Non-interactive mode (CI/CD)
+
+Use `--non-interactive` to run `qwed init` without prompts. This is useful in CI pipelines, Docker builds, or automated provisioning scripts.
+
+```bash
+qwed init \
+  --non-interactive \
+  --provider openai \
+  --api-key "$OPENAI_API_KEY" \
+  --model gpt-4o-mini \
+  --organization-name my-team \
+  --skip-tests
+```
+
+**All flags:**
+
+| Flag | Description | Default |
+|---|---|---|
+| `--provider` | Provider to configure (`nvidia`, `openai`, `anthropic`, `gemini`, `custom`) | Interactive prompt (or `nvidia` in non-interactive mode) |
+| `--api-key` | Provider API key | Read from environment |
+| `--base-url` | Base URL for custom/OpenAI-compatible providers | Provider default |
+| `--model` | Default model for the provider | Provider default |
+| `--organization-name` | Organization name for API key bootstrap | Interactive prompt (or auto-generated) |
+| `--server-url` | Local QWED server URL | `http://localhost:8000` |
+| `--non-interactive` | Run without prompts (CI-friendly) | `false` |
+| `--skip-tests` | Skip the engine smoke tests | `false` |
+
 <Note>
-API keys are never logged or displayed in full. The wizard masks keys to the first 8 characters (e.g., `sk-proj-****`). The `.env` file is written atomically with owner-only permissions and symlink protection.
+API keys are never logged or displayed in full. The `.env` file is written atomically with owner-only permissions (`0600` on Unix) and symlink protection. A `QWED_JWT_SECRET_KEY` is generated automatically for local server authentication.
 </Note>
 
 **Security guarantees:**
 
-- Keys are never displayed on screen (masked input)
-- Keys are never written to logs (redacted to `sk-proj-****`)
+- Keys are entered with masked input and never displayed in full
+- Keys are never written to logs
 - `.env` is written with `0600` permissions (owner-read/write only on Unix)
 - Atomic file writes prevent partial credential exposure
 - Symlink targets are refused to prevent path traversal
+- `.gitignore` protection is enforced before writing secrets
 
 **Re-running `qwed init`:** Running the wizard again merges new values into your existing `.env` file. Existing variables that you don't reconfigure are preserved.
 
@@ -239,7 +294,7 @@ Set by `qwed init`. Tells the CLI which provider to use when no `--provider` or 
 export ACTIVE_PROVIDER=openai
 ```
 
-Valid values: `openai`, `anthropic`, `ollama`, `openai_compat`.
+Valid values: `openai`, `anthropic`, `gemini`, `openai_compat`.
 
 ### Provider-specific variables
 
@@ -251,22 +306,14 @@ These are written to `.env` by `qwed init` and loaded automatically via `python-
 | `OPENAI_MODEL` | OpenAI | Model name (default: `gpt-4o-mini`) |
 | `ANTHROPIC_API_KEY` | Anthropic | Your Anthropic API key |
 | `ANTHROPIC_MODEL` | Anthropic | Model name (default: `claude-sonnet-4-20250514`) |
-| `OLLAMA_BASE_URL` | Ollama | Endpoint URL (default: `http://localhost:11434/v1`) |
-| `OLLAMA_MODEL` | Ollama | Model name (default: `llama3`) |
-| `CUSTOM_BASE_URL` | OpenAI-compatible | Endpoint URL (required) |
-| `CUSTOM_API_KEY` | OpenAI-compatible | API key for the endpoint |
-| `CUSTOM_MODEL` | OpenAI-compatible | Model name (default: `gpt-4o-mini`) |
+| `GOOGLE_API_KEY` | Google Gemini | Your Google API key |
+| `GEMINI_MODEL` | Google Gemini | Model name (default: `gemini-1.5-pro`) |
+| `CUSTOM_BASE_URL` | NVIDIA NIM / Custom | Endpoint URL (required for custom; default `https://integrate.api.nvidia.com/v1` for NVIDIA) |
+| `CUSTOM_API_KEY` | NVIDIA NIM / Custom | API key for the endpoint |
+| `CUSTOM_MODEL` | NVIDIA NIM / Custom | Model name (default: `nvidia/nemotron-3-super-120b-a12b` for NVIDIA, `gpt-4o-mini` for custom) |
+| `QWED_JWT_SECRET_KEY` | All | JWT secret for local server authentication (auto-generated by `qwed init`) |
 
 The recommended way to set these is via `qwed init`, which writes them to a `.env` file automatically. You can also export them manually.
-
-### `ACTIVE_PROVIDER`
-
-Determines which provider `qwed verify` uses by default. Set automatically by `qwed init`.
-
-```bash
-# Options: openai, anthropic, ollama, openai_compat
-ACTIVE_PROVIDER=openai
-```
 
 ### `QWED_API_KEY`
 
@@ -300,14 +347,15 @@ When you run `qwed verify` without explicit flags, the CLI resolves the provider
 
 If you have run `qwed init`, the `ACTIVE_PROVIDER` value in your `.env` determines which provider and credentials are used automatically.
 
-### Default Models
+### Default models
 
 | Provider | Default Model |
 |---|---|
-| Ollama | `llama3` |
+| NVIDIA NIM | `nvidia/nemotron-3-super-120b-a12b` |
 | OpenAI | `gpt-4o-mini` |
 | Anthropic | `claude-sonnet-4-20250514` |
-| OpenAI-Compatible | `gpt-4o-mini` |
+| Google Gemini | `gemini-1.5-pro` |
+| Custom (OpenAI-compatible) | `gpt-4o-mini` |
 
 ---
 
