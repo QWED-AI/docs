@@ -139,6 +139,19 @@ qwed init \
 API keys are never logged or displayed in full. The `.env` file is written atomically with owner-only permissions (`0600` on Unix) and symlink protection. A `QWED_JWT_SECRET_KEY` is generated automatically for local server authentication.
 </Note>
 
+**Local server runtime directory:**
+
+During Step 3, `qwed init` starts a local API server and needs a writable location for the SQLite bootstrap database (`qwed.db`). The CLI resolves the runtime directory as follows:
+
+1. **Current working directory** — used if it is writable
+2. **`~/qwed-demo/`** — created and used as a fallback when the current directory is read-only (e.g., inside a container, a mounted volume, or a system-managed path)
+
+The server process starts with its working directory set to this runtime directory, and `DATABASE_URL` is explicitly set to `sqlite:///<runtime_dir>/qwed.db`. This ensures bootstrap writes never target a read-only path.
+
+<Note>
+If you previously encountered `sqlite3.OperationalError: attempt to write a readonly database` during `qwed init`, upgrade to v4.0.0 or later. The fix automatically resolves a writable directory so Step 3 succeeds regardless of where you run the command.
+</Note>
+
 **Security guarantees:**
 
 - Keys are entered with masked input and never displayed in full

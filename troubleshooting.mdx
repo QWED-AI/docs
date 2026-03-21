@@ -105,6 +105,33 @@ Error: Verification timeout after 30s
 
 ---
 
+## CLI Issues
+
+### `qwed init` fails with "attempt to write a readonly database"
+
+```
+sqlite3.OperationalError: attempt to write a readonly database
+```
+
+This error occurs during Step 3 of `qwed init` when the local server tries to create a bootstrap SQLite database in a directory that is not writable (e.g., a read-only mount, a container filesystem, or a system-managed path).
+
+**Solution:** Upgrade to QWED v4.0.0 or later:
+
+```bash
+pip install --upgrade qwed
+```
+
+Starting with v4.0.0, `qwed init` automatically resolves a writable runtime directory for the database. It uses the current working directory if writable, otherwise falls back to `~/qwed-demo/`. No manual intervention is needed.
+
+If you cannot upgrade, run `qwed init` from a writable directory:
+
+```bash
+cd ~/my-project
+qwed init
+```
+
+---
+
 ## SDK Issues
 
 ### Import Error
