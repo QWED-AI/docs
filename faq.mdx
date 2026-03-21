@@ -21,6 +21,10 @@ QWED is a deterministic verification protocol for Large Language Models (LLMs). 
 
 **QWED complements these tools** - use RAG for knowledge, QWED for verification.
 
+### Do I need to run `qwed init` every time?
+
+No. Once initialized, QWED reads your provider credentials and configuration from the `.env` file that `qwed init` creates. You only need to re-run it when you want to switch LLM providers or rotate API keys. Running `qwed init` again merges new values into your existing `.env` — it does not overwrite settings you don't change.
+
 ---
 
 ## Integration
