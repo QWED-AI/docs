@@ -18,8 +18,9 @@ Error: 401 Unauthorized - Invalid API key
 
 **Solution:**
 1. Check your API key is correct: `echo $QWED_API_KEY`
-2. Regenerate key at [cloud.qwedai.com](https://cloud.qwedai.com)
-3. Ensure no extra spaces or newlines
+2. Make sure the value is not a placeholder — `qwed init` ignores common dummy values like `your-api-key`, `changeme`, `placeholder`, and `xxx`. Replace them with a real key.
+3. Regenerate key at [cloud.qwedai.com](https://cloud.qwedai.com)
+4. Ensure no extra spaces or newlines
 
 ```python
 # Correct
