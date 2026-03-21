@@ -20,6 +20,15 @@ qwed init
 
 The wizard checks that core engines (SymPy, Z3, AST, SQLGlot) are installed, walks you through selecting a provider (NVIDIA NIM, OpenAI, Anthropic, Google Gemini, or any OpenAI-compatible endpoint), validates your credentials, and bootstraps a ready-to-use API key. For CI pipelines, use `--non-interactive`. See the [CLI reference](/advanced/cli) for all options.
 
+After init, verify your setup and run the built-in test suite:
+
+```bash
+qwed doctor  # system health check — engines, provider, server, database
+qwed test    # 12 deterministic tests — all must pass before production
+```
+
+`qwed doctor` reports the status of verification engines, LLM provider connectivity, and the database. `qwed test` runs deterministic tests across Math, Logic, SQL, and Code engines to confirm everything works correctly. See the [CLI reference](/advanced/cli) for details on both commands.
+
 ### Requirements
 - Python 3.10+
 - Optional: Redis (for caching)
