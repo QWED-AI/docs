@@ -153,6 +153,162 @@ API keys are never logged or displayed in full. The `.env` file is written atomi
 
 ---
 
+### `qwed doctor` - System health check
+
+Run a local health check that reports the status of verification engines, LLM provider connectivity, the QWED server, and the database. Use this after installation or when verification calls fail unexpectedly.
+
+```bash
+qwed doctor
+```
+
+**What it checks:**
+
+| Check | Description |
+|---|---|
+| Required engines | SymPy (math), Z3 (logic), AST (code), SQLGlot (SQL) |
+| Optional engines | OpenCV (image verification) |
+| Provider | Connectivity to the configured LLM provider |
+| Server | Whether the QWED API server is reachable |
+| Database | Health of the configured database |
+
+The command exits with code `0` when all required checks pass (status `OPERATIONAL`) and code `1` when any required check fails (status `DEGRADED`). Optional engines that are missing do not cause a degraded status.
+
+**Example output:**
+
+```
+$ qwed doctor
+
+[QWED] System Health Check
+
+Engines:
+  [ok] SymPy    1.13.3   math engine ready
+  [ok] Z3       4.13.4   logic engine ready
+  [ok] AST      built-in code engine ready
+  [ok] SQLGlot  26.30.0  sql engine ready
+  [x]  OpenCV   missing  image verification
+    -> pip install qwed[vision]
+
+Provider:
+  [ok] OpenAI - Connected (gpt-4o-mini)
+
+Server:
+  [ok] Running on http://localhost:8000
+
+Database:
+  [ok] src/qwed.db (healthy)
+
+Status: OPERATIONAL (1 optional engine missing)
+```
+
+#### JSON output (CI/CD)
+
+Use `--json` for machine-readable output. Useful in CI pipelines or monitoring scripts.
+
+```bash
+qwed doctor --json
+```
+
+```json
+{
+  "status": "OPERATIONAL",
+  "optional_missing_count": 1,
+  "engines": [
+    { "name": "SymPy", "ready": true, "detail": "math engine ready", "version": "1.13.3" },
+    { "name": "Z3", "ready": true, "detail": "logic engine ready", "version": "4.13.4" }
+  ],
+  "provider": { "ok": true, "label": "OpenAI", "message": "Connected (gpt-4o-mini)" },
+  "server": { "running": true, "url": "http://localhost:8000" },
+  "database": { "healthy": true, "location": "src/qwed.db" }
+}
+```
+
+**Options:**
+
+| Flag | Description | Default |
+|---|---|---|
+| `--json` | Print the full report as JSON instead of the human-readable table | `false` |
+
+<Tip>
+Run `qwed doctor --json` in CI to gate deployments on system health. A non-zero exit code means at least one required component is degraded.
+</Tip>
+
+---
+
+### `qwed test` - Deterministic verification tests
+
+Run the built-in deterministic test suite across the Math, Logic, SQL, and Code engines. Every test case has a known expected result and does not depend on an LLM, so outcomes are fully reproducible.
+
+```bash
+qwed test
+```
+
+Use this command to confirm that verification engines are working correctly after installation, upgrades, or environment changes.
+
+**What it tests:**
+
+| Engine | Test cases |
+|---|---|
+| Math | Valid expression (`2+2=4`), invalid expression (`2+2=5`), large computation |
+| Logic | Contradictions (`x>5 AND x<3`), satisfiable constraints, conflicting assignments |
+| SQL | Valid SELECT, `OR 1=1` injection detection, stacked `DROP TABLE` detection |
+| Code | Safe function, `eval(input())` detection, `curl \| bash` detection |
+
+The command exits with code `0` when all tests pass and code `1` when any test fails.
+
+**Example output:**
+
+```
+$ qwed test
+
+[QWED] Running verification test suite...
+
+Math:
+  [ok] 2+2=4                  -> VALID
+  [ok] 2+2=5                  -> BLOCKED
+  [ok] 997*997-3*997+2        -> 994010994 (verified)
+
+Logic:
+  [ok] x>5 AND x<3            -> UNSAT (contradiction)
+  [ok] x>3 AND x<10           -> SAT {x=4}
+  [ok] approval=1 AND approval=0 -> UNSAT (contradiction)
+
+SQL:
+  [ok] Valid SELECT            -> SAFE
+  [ok] OR 1=1 injection       -> BLOCKED
+  [ok] DROP TABLE stacked     -> BLOCKED
+
+Code:
+  [ok] Safe function           -> SAFE
+  [ok] eval(input)             -> BLOCKED (CRITICAL)
+  [ok] curl | bash             -> BLOCKED (CRITICAL)
+
+12/12 tests passed. All engines operational.
+```
+
+#### Verbose mode
+
+Use `--verbose` to show additional detail per test case, such as computed values and internal status codes.
+
+```bash
+qwed test --verbose
+```
+
+```
+Math:
+  [ok] 2+2=4                  -> VALID
+    computed=4
+  [ok] 2+2=5                  -> BLOCKED
+    computed=4
+```
+
+**Options:**
+
+| Flag | Description | Default |
+|---|---|---|
+| `--verbose` | Show per-case detail (computed values, status codes) | `false` |
+
+---
+
 ### `qwed verify` - One-shot verification
 
 Verify a query and exit.
