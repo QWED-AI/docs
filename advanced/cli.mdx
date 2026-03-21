@@ -33,7 +33,7 @@ The wizard runs three steps:
 
 **Supported providers:**
 
-| Provider | Slug | Auth type | Key hint |
+| Provider | Slug | Default model | Key env variable |
 |---|---|---|---|
 | NVIDIA NIM | `nvidia` | API key | Any key format |
 | OpenAI | `openai` | API key | `sk-...` or `sk-proj-...` |
@@ -144,11 +144,12 @@ API keys are never logged or displayed in full. The `.env` file is written atomi
 - Keys are entered with masked input and never displayed in full
 - Keys are never written to logs
 - `.env` is written with `0600` permissions (owner-read/write only on Unix)
+- `.gitignore` protection is enforced before writing secrets — the command aborts if `.env` cannot be gitignored
 - Atomic file writes prevent partial credential exposure
 - Symlink targets are refused to prevent path traversal
 - `.gitignore` protection is enforced before writing secrets
 
-**Re-running `qwed init`:** Running the wizard again merges new values into your existing `.env` file. Existing variables that you don't reconfigure are preserved.
+**Re-running `qwed init`:** Running the command again merges new values into your existing `.env` file. Existing variables that you don't reconfigure are preserved.
 
 ---
 

@@ -4,13 +4,13 @@ title: "LLM configuration"
 description: "Configure QWED with any LLM provider including OpenAI, Anthropic, Google Gemini, Azure OpenAI, Ollama, or custom endpoints via YAML. Complete setup guide with supported models."
 ---
 
-QWED works with any LLM provider. The fastest way to get configured is the interactive setup wizard:
+QWED works with any LLM provider. The fastest way to get configured is the onboarding command:
 
 ```bash
 qwed init
 ```
 
-This walks you through provider selection, secure key entry, and writes a `.env` file with the correct permissions. See the [CLI reference](/advanced/cli) for the full walkthrough.
+This verifies your verification engines are operational, walks you through provider selection and secure key entry, and bootstraps a local API key — all in a single command. For CI/CD pipelines, pass `--non-interactive` with `--provider` and `--api-key` flags. See the [CLI reference](/advanced/cli) for the full walkthrough.
 
 The rest of this page covers manual configuration and advanced options.
 
@@ -40,13 +40,14 @@ QWED uses LLMs as **untrusted translators**, not as answer generators:
 
 | Provider | Env variable | Default model | `qwed init` support |
 |----------|-------------|---------------|---------------------|
+| **NVIDIA NIM** | `CUSTOM_API_KEY` + `CUSTOM_BASE_URL` | `nvidia/nemotron-3-super-120b-a12b` | Yes |
 | **OpenAI** | `OPENAI_API_KEY` | `gpt-4o-mini` | Yes |
 | **Anthropic** | `ANTHROPIC_API_KEY` | `claude-sonnet-4-20250514` | Yes |
+| **Google Gemini** | `GOOGLE_API_KEY` / `GEMINI_API_KEY` | `gemini-1.5-pro` | Yes |
 | **Ollama (local)** | `OLLAMA_BASE_URL` | `llama3` | Yes |
 | **OpenAI-compatible** | `CUSTOM_BASE_URL` + `CUSTOM_API_KEY` | `gpt-4o-mini` | Yes |
-| **Google Gemini** | `GOOGLE_API_KEY` / `GEMINI_API_KEY` | `gemini-1.5-pro` | Yes |
-| **Azure OpenAI** | `AZURE_OPENAI_ENDPOINT` + `AZURE_OPENAI_API_KEY` | Any Azure-hosted model | Yes |
-| **Claude Opus** | `CLAUDE_OPUS_API_KEY` | `claude-opus-4-5` | Yes |
+| **Azure OpenAI** | `AZURE_OPENAI_ENDPOINT` + `AZURE_OPENAI_API_KEY` | Any Azure-hosted model | Manual |
+| **Claude Opus** | `CLAUDE_OPUS_API_KEY` | `claude-opus-4-5` | Manual |
 | **Custom (YAML)** | Defined per provider | Defined per provider | Yes |
 
 <Tip>
