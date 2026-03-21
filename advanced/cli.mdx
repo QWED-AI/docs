@@ -68,7 +68,7 @@ The LLM is treated as an untrusted translator.
 All outputs are verified deterministically.
 
 Select provider:
-  1. NVIDIA NIM       (recommended)
+  1. NVIDIA NIM
   2. OpenAI
   3. Anthropic Claude
   4. Google Gemini
@@ -127,7 +127,7 @@ qwed init \
 | Flag | Description | Default |
 |---|---|---|
 | `--provider` | Provider to configure (`nvidia`, `openai`, `anthropic`, `gemini`, `custom`) | Interactive prompt (or `nvidia` in non-interactive mode) |
-| `--api-key` | Provider API key | Read from environment |
+| `--api-key` | Provider API key (placeholder values are ignored) | Read from environment |
 | `--base-url` | Base URL for custom/OpenAI-compatible providers | Provider default |
 | `--model` | Default model for the provider | Provider default |
 | `--organization-name` | Organization name for API key bootstrap | Interactive prompt (or auto-generated) |
@@ -148,6 +148,17 @@ API keys are never logged or displayed in full. The `.env` file is written atomi
 - Atomic file writes prevent partial credential exposure
 - Symlink targets are refused to prevent path traversal
 - `.gitignore` protection is enforced before writing secrets
+
+**Placeholder API key detection:** During onboarding, `qwed init` automatically detects and ignores common placeholder or dummy API key values. If your environment variable or `--api-key` argument contains a value like `your-api-key`, `changeme`, `placeholder`, `xxx`, or a short NVIDIA key such as `nvapi-xxxx`, QWED treats it as empty and prompts you for a real key. This prevents silent failures caused by example values left in `.env` files or CI templates.
+
+The following patterns are rejected:
+
+- Generic placeholders: `test`, `dummy`, `sample`, `example`, `placeholder`, `changeme`, `null`, `none`
+- Wildcard-style values: strings made entirely of `x`, `*`, or `.` characters (e.g. `xxx`, `****`)
+- Template values: strings starting with `your-` or `replace-` that contain `key`
+- Short NVIDIA keys: `nvapi-` prefixed values shorter than 20 characters
+
+In non-interactive mode, if every key source (CLI argument, environment variable, and NVIDIA fallback) resolves to a placeholder, the command reports that the key is required and exits — so you get a clear error instead of a cryptic provider failure downstream.
 
 **Re-running `qwed init`:** Running the command again merges new values into your existing `.env` file. Existing variables that you don't reconfigure are preserved.
 
