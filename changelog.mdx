@@ -8,6 +8,12 @@ description: "All notable changes to QWED Protocol — releases, features, secur
 
 > **147 commits** since v3.0.1 — the largest update in QWED history.
 
+### 🔧 v4.0.0 patch — Provider fallbacks, .env loading, and Gemini stability
+
+- **Native Gemini provider** — Gemini now runs through a dedicated provider with native support for math, logic, stats, fact, and image verification. All API calls enforce a 30-second timeout and automatically strip Markdown code fences from responses.
+- **Centralized .env loading** — Environment variables now load in a deterministic priority order: project `.env` first, then `~/.qwed/.env`. This prevents configuration drift between CLI and server contexts.
+- **Gemini AST stability** — Fixed intermittent JSON parse failures when Gemini returns code-fenced responses during logic translation.
+
 ### 🆕 Agentic Security Guards (Phase 17)
 
 A brand-new guard subsystem for securing AI agent tool chains and RAG pipelines:

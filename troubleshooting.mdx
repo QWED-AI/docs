@@ -132,6 +132,56 @@ qwed init
 
 ---
 
+## Gemini provider issues
+
+### Missing `google-generativeai` package
+
+```
+ImportError: google-generativeai package required for Gemini integration.
+```
+
+**Solution:** Install the Gemini SDK alongside QWED:
+
+```bash
+pip install qwed google-generativeai
+```
+
+### Gemini API key not found
+
+```
+ValueError: Gemini API key not found. Set GOOGLE_API_KEY env var or run: qwed init
+```
+
+**Solution:** Set either `GOOGLE_API_KEY` or `GEMINI_API_KEY`:
+
+```bash
+export GOOGLE_API_KEY=your-google-api-key
+```
+
+Or run the setup wizard:
+
+```bash
+qwed init
+```
+
+### Gemini timeout errors
+
+All Gemini API calls have a 30-second timeout. If your requests time out consistently:
+
+1. Check your network connection to Google's API servers
+2. Break large inputs into smaller parts
+3. For image verification, ensure images are under 10 MB
+
+### Gemini JSON parse errors
+
+```
+ValueError: Failed to parse JSON from Gemini endpoint.
+```
+
+This can happen when Gemini returns malformed JSON for complex queries. QWED automatically strips Markdown code fences from responses, but edge cases may still occur. **Solution:** Retry the request — the error is usually transient. If it persists, simplify your input or switch to a different provider temporarily.
+
+---
+
 ## SDK Issues
 
 ### Import Error
