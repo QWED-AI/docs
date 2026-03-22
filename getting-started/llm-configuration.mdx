@@ -124,6 +124,10 @@ OPENAI_MODEL=gpt-4o-mini
 # OLLAMA_BASE_URL=http://localhost:11434/v1
 # OLLAMA_MODEL=llama3
 
+# OR Google Gemini
+# GOOGLE_API_KEY=your-google-api-key
+# GEMINI_MODEL=gemini-1.5-pro
+
 # OR OpenAI-compatible endpoint (Groq, Together, LM Studio, etc.)
 # CUSTOM_BASE_URL=https://inference.do-ai.run/v1
 # CUSTOM_API_KEY=your-key
@@ -134,14 +138,7 @@ OPENAI_MODEL=gpt-4o-mini
 When `ACTIVE_PROVIDER` is not set, QWED defaults to **Ollama** as a safe local fallback. Set `ACTIVE_PROVIDER` explicitly if you want to use a cloud provider.
 </Note>
 
-#### .env loading order
-
-QWED loads environment variables from two locations in a specific priority order:
-
-1. **Project `.env`** — `<current working directory>/.env` (highest priority)
-2. **Global `.env`** — `~/.qwed/.env` (fallback)
-
-Values from your project `.env` take precedence. This means you can set global defaults in `~/.qwed/.env` and override them per-project. If `python-dotenv` is not installed, QWED skips `.env` loading silently and relies on environment variables you set directly.
+QWED loads `.env` files in a specific order: the project-level `.env` (in the current working directory) takes precedence, followed by the global `~/.qwed/.env`. This ensures your project-specific configuration always overrides global defaults. If `python-dotenv` is not installed, `.env` loading is skipped gracefully with a warning.
 
 ---
 
@@ -201,6 +198,14 @@ Only `CUSTOM_BASE_URL` is required. If your endpoint does not require authentica
 
 ### Google Gemini
 
+Gemini uses a native `GeminiProvider` powered by the `google-generativeai` SDK. Install the dependency first:
+
+```bash
+pip install google-generativeai
+```
+
+Then configure your environment:
+
 ```bash
 export ACTIVE_PROVIDER=gemini
 export GOOGLE_API_KEY=your-google-api-key
@@ -209,29 +214,7 @@ export GEMINI_MODEL=gemini-1.5-pro
 
 You can also use `GEMINI_API_KEY` instead of `GOOGLE_API_KEY`. Get yours at [aistudio.google.com/app/apikey](https://aistudio.google.com/app/apikey).
 
-Gemini uses the `google-generativeai` Python package. Install it alongside QWED:
-
-```bash
-pip install qwed google-generativeai
-```
-
-#### Native engine support
-
-The Gemini provider natively supports all major QWED engine types:
-
-| Engine | Method | Notes |
-|--------|--------|-------|
-| Math | `translate` | Converts natural language to formal math expressions |
-| Logic | `translate_logic`, `refine_logic` | Translates to Z3-compatible constraints with automatic refinement on error |
-| Stats | `translate_stats` | Generates Pandas code from natural language queries |
-| Fact | `verify_fact` | Citation-backed fact verification against context |
-| Image | `verify_image` | Multimodal image claim verification (JPEG, PNG, WebP) |
-
-All Gemini API calls enforce a **30-second timeout** to prevent indefinite hangs. If you encounter timeout errors with large inputs, consider breaking your request into smaller parts.
-
-<Note>
-Gemini JSON responses are automatically cleaned of Markdown code fences that models sometimes emit. You do not need to handle this in your own code.
-</Note>
+The Gemini provider supports math translation, logic verification, stats query generation, fact verification, and image claim verification. All API calls use a 30-second timeout and `temperature=0.0` for deterministic output. If `google-generativeai` is not installed, QWED returns a structured `ImportError` instead of crashing.
 
 ### Azure OpenAI
 
