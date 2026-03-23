@@ -323,7 +323,7 @@ curl -X POST https://api.qwedai.com/v1/verify/stats \
 
 <Info>New in v4.0.1</Info>
 
-Glass-box reasoning process verifier. Checks IRAC structural compliance or validates custom milestone completion rates with decimal scoring.
+Verify the structural integrity of AI reasoning traces. Supports IRAC structural compliance checking and custom milestone validation with decimal scoring.
 
 **Request (IRAC mode):**
 
@@ -338,17 +338,17 @@ Glass-box reasoning process verifier. Checks IRAC structural compliance or valid
 
 ```json
 {
-  "trace": "Risk assessment complete. Compliance verified. Implementation planned.",
+  "trace": "Risk assessment complete. Compliance check passed. Implementation timeline defined.",
   "mode": "milestones",
-  "milestones": ["risk assessment", "compliance", "implementation"]
+  "milestones": ["risk assessment", "compliance check", "implementation"]
 }
 ```
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
 | `trace` | string | Yes | — | The AI reasoning trace to validate |
-| `mode` | string | No | `irac` | Verification mode: `irac` or `milestones` |
-| `milestones` | array | Conditional | — | List of required milestone strings (required when `mode` is `milestones`) |
+| `mode` | string | No | `irac` | `irac` or `milestones` |
+| `milestones` | string[] | Conditional | — | Required when `mode` is `milestones` |
 
 **Response (IRAC mode):**
 
@@ -357,7 +357,7 @@ Glass-box reasoning process verifier. Checks IRAC structural compliance or valid
   "verified": true,
   "score": 1.0,
   "missing_steps": [],
-  "status": "VERIFIED"
+  "mechanism": "Regex Pattern Matching (Deterministic)"
 }
 ```
 
@@ -367,12 +367,9 @@ Glass-box reasoning process verifier. Checks IRAC structural compliance or valid
 {
   "verified": true,
   "process_rate": 1.0,
-  "missed_milestones": [],
-  "status": "VERIFIED"
+  "missed_milestones": []
 }
 ```
-
-**Error responses:**
 
 | Status | Description |
 |--------|-------------|
@@ -384,7 +381,7 @@ Glass-box reasoning process verifier. Checks IRAC structural compliance or valid
 
 <Info>New in v4.0.1</Info>
 
-Document-level retrieval mismatch defender. Verifies that retrieved RAG chunks originate from the expected source document, preventing DRM hallucinations in RAG pipelines.
+Verify that retrieved RAG chunks originate from the expected source document. Prevents Document-Level Retrieval Mismatch (DRM) hallucinations in RAG pipelines.
 
 **Request:**
 
@@ -401,9 +398,11 @@ Document-level retrieval mismatch defender. Verifies that retrieved RAG chunks o
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
-| `target_document_id` | string | Yes | — | Expected source document ID (non-empty) |
-| `chunks` | array | Yes | — | Array of chunk objects with metadata (non-empty) |
+| `target_document_id` | string | Yes | — | Expected source document ID |
+| `chunks` | object[] | Yes | — | Array of chunk objects with metadata |
 | `max_drm_rate` | string | No | `"0"` | Maximum tolerable mismatch fraction as a `Fraction`-compatible string (e.g. `"0"`, `"1/10"`) |
+
+<Note>`max_drm_rate` accepts only string values for symbolic precision. Use fraction notation like `"1/10"` instead of `0.1`.</Note>
 
 **Response:**
 
@@ -417,11 +416,9 @@ Document-level retrieval mismatch defender. Verifies that retrieved RAG chunks o
 }
 ```
 
-**Error responses:**
-
 | Status | Description |
 |--------|-------------|
-| 400 | Invalid payload — empty `target_document_id`, empty `chunks`, or `max_drm_rate` not a valid `Fraction` string between 0 and 1 |
+| 400 | Invalid request payload (empty `target_document_id`, empty `chunks`, or invalid `max_drm_rate` value) |
 
 ---
 
