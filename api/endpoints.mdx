@@ -319,6 +319,112 @@ curl -X POST https://api.qwedai.com/v1/verify/stats \
 
 ---
 
+### POST /verify/process
+
+<Info>New in v4.0.1</Info>
+
+Glass-box reasoning process verifier. Checks IRAC structural compliance or validates custom milestone completion rates with decimal scoring.
+
+**Request (IRAC mode):**
+
+```json
+{
+  "trace": "The issue is whether the contract was breached. The rule is Article 2 of the UCC. Applying this rule, the defendant failed to deliver on time. In conclusion, breach occurred.",
+  "mode": "irac"
+}
+```
+
+**Request (milestones mode):**
+
+```json
+{
+  "trace": "Risk assessment complete. Compliance verified. Implementation planned.",
+  "mode": "milestones",
+  "milestones": ["risk assessment", "compliance", "implementation"]
+}
+```
+
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `trace` | string | Yes | — | The AI reasoning trace to validate |
+| `mode` | string | No | `irac` | Verification mode: `irac` or `milestones` |
+| `milestones` | array | Conditional | — | List of required milestone strings (required when `mode` is `milestones`) |
+
+**Response (IRAC mode):**
+
+```json
+{
+  "verified": true,
+  "score": 1.0,
+  "missing_steps": [],
+  "status": "VERIFIED"
+}
+```
+
+**Response (milestones mode):**
+
+```json
+{
+  "verified": true,
+  "process_rate": 1.0,
+  "missed_milestones": [],
+  "status": "VERIFIED"
+}
+```
+
+**Error responses:**
+
+| Status | Description |
+|--------|-------------|
+| 400 | Invalid mode or missing `milestones` when `mode` is `milestones` |
+
+---
+
+### POST /verify/rag
+
+<Info>New in v4.0.1</Info>
+
+Document-level retrieval mismatch defender. Verifies that retrieved RAG chunks originate from the expected source document, preventing DRM hallucinations in RAG pipelines.
+
+**Request:**
+
+```json
+{
+  "target_document_id": "contract_nda_v2",
+  "chunks": [
+    { "id": "c1", "metadata": { "document_id": "contract_nda_v2" } },
+    { "id": "c2", "metadata": { "document_id": "contract_nda_v1" } }
+  ],
+  "max_drm_rate": "0"
+}
+```
+
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `target_document_id` | string | Yes | — | Expected source document ID (non-empty) |
+| `chunks` | array | Yes | — | Array of chunk objects with metadata (non-empty) |
+| `max_drm_rate` | string | No | `"0"` | Maximum tolerable mismatch fraction as a `Fraction`-compatible string (e.g. `"0"`, `"1/10"`) |
+
+**Response:**
+
+```json
+{
+  "verified": false,
+  "risk": "DOCUMENT_RETRIEVAL_MISMATCH",
+  "drm_rate": 0.5,
+  "chunks_checked": 2,
+  "mismatched_count": 1
+}
+```
+
+**Error responses:**
+
+| Status | Description |
+|--------|-------------|
+| 400 | Invalid payload — empty `target_document_id`, empty `chunks`, or `max_drm_rate` not a valid `Fraction` string between 0 and 1 |
+
+---
+
 ### POST /verify/batch
 
 Verify multiple items at once.
