@@ -319,6 +319,109 @@ curl -X POST https://api.qwedai.com/v1/verify/stats \
 
 ---
 
+### POST /verify/process
+
+<Info>New in v4.0.1</Info>
+
+Verify the structural integrity of AI reasoning traces. Supports IRAC structural compliance checking and custom milestone validation with decimal scoring.
+
+**Request (IRAC mode):**
+
+```json
+{
+  "trace": "The issue is whether the contract was breached. The rule is Article 2 of the UCC. Applying this rule, the defendant failed to deliver on time. In conclusion, breach occurred.",
+  "mode": "irac"
+}
+```
+
+**Request (milestones mode):**
+
+```json
+{
+  "trace": "Risk assessment complete. Compliance check passed. Implementation timeline defined.",
+  "mode": "milestones",
+  "milestones": ["risk assessment", "compliance check", "implementation"]
+}
+```
+
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `trace` | string | Yes | — | The AI reasoning trace to validate |
+| `mode` | string | No | `irac` | `irac` or `milestones` |
+| `milestones` | string[] | Conditional | — | Required when `mode` is `milestones` |
+
+**Response (IRAC mode):**
+
+```json
+{
+  "verified": true,
+  "score": 1.0,
+  "missing_steps": [],
+  "mechanism": "Regex Pattern Matching (Deterministic)"
+}
+```
+
+**Response (milestones mode):**
+
+```json
+{
+  "verified": true,
+  "process_rate": 1.0,
+  "missed_milestones": []
+}
+```
+
+| Status | Description |
+|--------|-------------|
+| 400 | Invalid mode or missing `milestones` when `mode` is `milestones` |
+
+---
+
+### POST /verify/rag
+
+<Info>New in v4.0.1</Info>
+
+Verify that retrieved RAG chunks originate from the expected source document. Prevents Document-Level Retrieval Mismatch (DRM) hallucinations in RAG pipelines.
+
+**Request:**
+
+```json
+{
+  "target_document_id": "contract_nda_v2",
+  "chunks": [
+    { "id": "c1", "metadata": { "document_id": "contract_nda_v2" } },
+    { "id": "c2", "metadata": { "document_id": "contract_nda_v1" } }
+  ],
+  "max_drm_rate": "0"
+}
+```
+
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `target_document_id` | string | Yes | — | Expected source document ID |
+| `chunks` | object[] | Yes | — | Array of chunk objects with metadata |
+| `max_drm_rate` | string | No | `"0"` | Maximum tolerable mismatch fraction as a `Fraction`-compatible string (e.g. `"0"`, `"1/10"`) |
+
+<Note>`max_drm_rate` accepts only string values for symbolic precision. Use fraction notation like `"1/10"` instead of `0.1`.</Note>
+
+**Response:**
+
+```json
+{
+  "verified": false,
+  "risk": "DOCUMENT_RETRIEVAL_MISMATCH",
+  "drm_rate": 0.5,
+  "chunks_checked": 2,
+  "mismatched_count": 1
+}
+```
+
+| Status | Description |
+|--------|-------------|
+| 400 | Invalid request payload (empty `target_document_id`, empty `chunks`, or invalid `max_drm_rate` value) |
+
+---
+
 ### POST /verify/batch
 
 Verify multiple items at once.
