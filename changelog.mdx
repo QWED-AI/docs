@@ -3,28 +3,38 @@ title: "Changelog"
 description: "All notable changes to QWED Protocol — releases, features, security fixes, and improvements."
 ---
 
-## v4.0.1 — Sentinel Guard Sync
-**Released: March 23, 2026** · [GitHub Release](https://github.com/QWED-AI/qwed-verification/releases/tag/v4.0.1)
+## v4.0.1 — Sentinel Guard Sync 🔄
+**Released: March 23, 2026** · [GitHub Release](https://github.com/QWED-AI/qwed-verification/releases/tag/v4.0.1) · [PyPI](https://pypi.org/project/qwed/4.0.1/)
 
-Syncs the TypeScript SDK, backend API schemas, and security fixes identified during the v4.0.0 rollout.
+> Patch release aligning the TypeScript SDK, backend API schemas, and security guard integrations introduced in v4.0.0.
 
-### New endpoints
+### 🆕 New Endpoints
 
-- **`POST /verify/process`** — Glass-box reasoning process verifier with IRAC structural compliance and custom milestone validation. See [API reference](/api/endpoints) and [Process Verifier engine](/engines/process).
-- **`POST /verify/rag`** — Document-Level Retrieval Mismatch (DRM) defender for RAG pipelines. See [API reference](/api/endpoints).
-- **Agent security checks** — `POST /agents/{id}/verify` now accepts `security_checks` with `exfiltration` and `mcp_poison` options to run `ExfiltrationGuard` and `MCPPoisonGuard` before verification. See [API reference](/api/endpoints).
+- **`POST /verify/process`** — Glass-box reasoning process verifier with IRAC structural compliance and custom milestone validation.
+- **Agent Security Checks** — `POST /agents/{id}/verify` now accepts `security_checks: { exfiltration, mcp_poison }` to run `ExfiltrationGuard` and `MCPPoisonGuard` before verification.
 
-### Security fixes
+### 🔒 Security Fixes
 
-- **Information disclosure** — Removed raw exception details from `/verify/rag` error responses. Exceptions are now redacted via `redact_pii()` and clients receive only a generic `INTERNAL_VERIFICATION_ERROR` message.
-- **Symbolic precision** — `RAGVerifyRequest.max_drm_rate` changed from `float | str` to `str` only, with a `field_validator` enforcing `Fraction`-compatible values (e.g. `"0"`, `"1/10"`).
+- **Information Disclosure** — Removed raw exception messages from `/verify/rag` error responses; clients receive only `INTERNAL_VERIFICATION_ERROR`.
+- **Symbolic Precision** — `RAGVerifyRequest.max_drm_rate` changed from `float | str` → `str` with `field_validator` enforcing Fraction-compatible values.
+- **Response Consistency** — RAG error responses now return `"verified": false` matching the success path schema.
 
-### SDK changes (`@qwed-ai/sdk@4.0.1`)
+### 🛠️ SDK Changes (`@qwed-ai/sdk@4.0.1`)
 
-- **`verifyProcess()`** — Validates AI reasoning traces using IRAC or custom milestone lists. See [TypeScript SDK](/sdks/typescript).
-- **`verifyRAG()`** — `maxDrmRate` type changed from `number` to `string` for symbolic precision.
-- **`verifyAgent()`** — Returns `AgentVerificationResponse` with payload aligned to backend schema. Agent IDs are URL-encoded.
-- **Type fixes** — `VerificationResultData.risk` and `risk_level` separated. Added `Process`, `RAG`, `Security` to `VerificationType` enum.
+- Added `verifyProcess()` method for IRAC/milestone validation.
+- `verifyRAG()` — `maxDrmRate` type changed from `number` to `string`.
+- `verifyAgent()` — Payload aligned with backend schema, agent IDs URL-encoded.
+- New types: `Process`, `RAG`, `Security` in `VerificationType` enum.
+
+### 🧪 Tests
+
+- `test_api_phase17_endpoints.py` — covers `/verify/process`, `/verify/rag` exception masking, and agent security check blocking.
+
+```bash
+pip install qwed==4.0.1
+docker pull qwedai/qwed-verification:4.0.1
+npm install @qwed-ai/sdk@4.0.1
+```
 
 ---
 
