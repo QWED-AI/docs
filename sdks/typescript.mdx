@@ -16,7 +16,7 @@ yarn add @qwed-ai/sdk
 pnpm add @qwed-ai/sdk
 ```
 
-## Quick Start
+## Quick start
 
 ```typescript
 import { QWEDClient } from '@qwed-ai/sdk';
@@ -38,15 +38,19 @@ const client = new QWEDClient({
 });
 ```
 
-## Methods
+## Verification methods
 
 ### verify(query)
+
+Auto-detect and verify any claim.
 
 ```typescript
 const result = await client.verify('What is 15% of 200?');
 ```
 
 ### verifyMath(expression)
+
+Verify mathematical expressions.
 
 ```typescript
 const result = await client.verifyMath('x**2 + 2*x + 1 = (x+1)**2');
@@ -55,21 +59,39 @@ console.log(result.verified);  // true
 
 ### verifyLogic(query)
 
+Verify logical constraints using QWED-Logic DSL.
+
 ```typescript
 const result = await client.verifyLogic('(AND (GT x 5) (LT y 10))');
-console.log(result.model);  // { x: 6, y: 9 }
+console.log(result.result?.model);  // { x: 6, y: 9 }
 ```
 
-### verifyCode(code, language)
+### verifyCode(code, options)
+
+Check code for security vulnerabilities.
 
 ```typescript
-const result = await client.verifyCode(code, 'python');
-for (const vuln of result.vulnerabilities) {
+const result = await client.verifyCode(code, { language: 'python' });
+for (const vuln of result.result?.vulnerabilities ?? []) {
   console.log(`${vuln.severity}: ${vuln.message}`);
 }
 ```
 
+### verifyFact(claim, context)
+
+Verify factual claims against a provided context.
+
+```typescript
+const result = await client.verifyFact(
+  'The company was founded in 2020',
+  'Acme Corp was established in 2020 in San Francisco.'
+);
+console.log(result.verified);  // true
+```
+
 ### verifySQL(query, schema)
+
+Validate SQL queries against a schema.
 
 ```typescript
 const result = await client.verifySQL(
@@ -78,38 +100,235 @@ const result = await client.verifySQL(
 );
 ```
 
+### verifyProcess(reasoningTrace, options)
+
+<Info>New in v4.0.1</Info>
+
+Validate the structural integrity of AI reasoning traces. Use this to ensure workflows follow deterministic process steps with IRAC pattern matching or custom milestone validation.
+
+```typescript
+// Verify IRAC structure in a reasoning trace
+const result = await client.verifyProcess(
+  `The issue is whether the contract was breached.
+   The rule is Article 2 of the UCC.
+   Applying this rule, the defendant failed to deliver on time.
+   In conclusion, breach occurred.`,
+  { mode: 'irac' }
+);
+
+console.log(result.verified);             // true
+console.log(result.result?.score);         // 1.0
+console.log(result.result?.missing_steps); // []
+```
+
+You can also verify custom milestones:
+
+```typescript
+const result = await client.verifyProcess(
+  'Risk assessment complete. Compliance verified. Implementation planned.',
+  {
+    mode: 'milestones',
+    keyMilestones: ['risk assessment', 'compliance', 'implementation'],
+  }
+);
+
+console.log(result.result?.process_rate);       // 1.0
+console.log(result.result?.missed_milestones);  // []
+```
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `reasoningTrace` | `string` | — | The AI reasoning trace to validate |
+| `options.mode` | `'irac' \| 'milestones'` | `'irac'` | Verification mode |
+| `options.keyMilestones` | `string[]` | — | Required milestones (milestones mode only) |
+
+### verifyRAG(targetDocumentId, retrievedChunks, options)
+
+<Info>New in v4.0.1</Info>
+
+Verify that retrieved RAG chunks originate from the expected source document. This prevents Document-Level Retrieval Mismatch (DRM) hallucinations in RAG pipelines.
+
+```typescript
+const result = await client.verifyRAG(
+  'contract_nda_v2',
+  [
+    { id: 'c1', metadata: { document_id: 'contract_nda_v2' } },
+    { id: 'c2', metadata: { document_id: 'contract_nda_v1' } }, // Wrong doc
+  ],
+  { maxDrmRate: '0' } // Zero tolerance
+);
+
+console.log(result.verified);                // false
+console.log(result.result?.drm_rate);        // 0.5
+console.log(result.result?.chunks_checked);  // 2
+console.log(result.result?.mismatched_count); // 1
+```
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `targetDocumentId` | `string` | — | Expected source document ID |
+| `retrievedChunks` | `Record<string, unknown>[]` | — | Array of chunk objects with metadata |
+| `options.maxDrmRate` | `string` | — | Maximum tolerable mismatch fraction (e.g. `'0'` or `'1/10'`) |
+
 ### verifyBatch(items)
+
+Verify multiple items at once.
 
 ```typescript
 const results = await client.verifyBatch([
-  { query: '2+2=4', type: 'math' },
-  { query: '3*3=9', type: 'math' },
+  { query: '2+2=4', type: VerificationType.Math },
+  { query: '3*3=9', type: VerificationType.Math },
 ]);
-console.log(results.summary.successRate);
+console.log(results.summary.success_rate);
 ```
 
-## TypeScript Types
+## Agent verification
+
+<Info>New in v4.0.1</Info>
+
+The TypeScript SDK supports the QWED Agent API for registering AI agents and verifying their actions with per-tenant rate limiting and optional security checks.
+
+### registerAgent(registration)
+
+Register an agent and receive credentials for subsequent verification calls.
+
+```typescript
+const { agent_id, agent_token } = await client.registerAgent({
+  agent: {
+    name: 'research-assistant',
+    type: 'supervised',
+    principal_id: 'user-123',
+    framework: 'langchain',
+  },
+  permissions: {
+    allowed_engines: [VerificationType.Fact, VerificationType.Code],
+  },
+  budget: {
+    max_daily_cost_usd: 5.0,
+    max_requests_per_hour: 100,
+  },
+});
+```
+
+### verifyAgent(agentId, agentToken, query, options)
+
+Verify an agent action with optional exfiltration and MCP poisoning checks.
+
+```typescript
+const response = await client.verifyAgent(
+  agent_id,
+  agent_token,
+  'Summarize the Q3 revenue report',
+  {
+    provider: 'openai',
+    checkExfiltration: true,
+    checkMcpPoison: true,
+    toolSchema: {
+      name: 'fetch_report',
+      description: 'Fetch quarterly report data',
+    },
+  }
+);
+
+console.log(response.decision);  // "APPROVED" | "DENIED" | "CORRECTED"
+console.log(response.verification?.risk_level);  // "low"
+console.log(response.budget_remaining);
+```
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `agentId` | `number` | — | Agent ID from registration |
+| `agentToken` | `string` | — | Agent token from registration |
+| `query` | `string` | — | The action or query to verify |
+| `options.provider` | `string` | — | LLM provider name |
+| `options.checkExfiltration` | `boolean` | — | Enable exfiltration detection |
+| `options.checkMcpPoison` | `boolean` | — | Enable MCP poisoning detection |
+| `options.toolSchema` | `object` | — | MCP tool schema to scan |
+
+### getAgentBudget(agentId, agentToken)
+
+Check the remaining budget for a registered agent.
+
+```typescript
+const budget = await client.getAgentBudget(agent_id, agent_token);
+console.log(budget.cost.current_daily_usd);
+console.log(budget.requests.max_per_hour);
+```
+
+## IRAC audit fields
+
+All guard-related verification responses include IRAC-compliant audit fields for compliance reporting:
+
+```typescript
+const result = await client.verifyProcess(reasoningTrace, { mode: 'irac' });
+
+console.log(result.result?.['irac.issue']);       // What was evaluated
+console.log(result.result?.['irac.rule']);         // The rule being enforced
+console.log(result.result?.['irac.application']); // How the rule was applied
+console.log(result.result?.['irac.conclusion']);   // Final verdict
+```
+
+## Risk codes
+
+Security-related responses may include a `risk` field indicating the type of threat detected:
+
+| Risk code | Description |
+|-----------|-------------|
+| `DOCUMENT_RETRIEVAL_MISMATCH` | RAG chunks from wrong source document |
+| `EXFILTRATION_ATTEMPT` | Data exfiltration to unauthorized endpoint |
+| `MCP_POISONING` | Poisoned MCP tool definition detected |
+| `TOXIC_CHAIN` | Unsafe reasoning chain detected |
+| `SOVEREIGNTY_VIOLATION` | Data residency policy violation |
+| `FABRICATED_REASONING` | Fabricated reasoning path detected |
+
+## TypeScript types
 
 ```typescript
 import {
-  VerificationResult,
   VerificationType,
   VerificationStatus,
-  BatchResult,
+  VerificationResponse,
+  BatchResponse,
+  AgentRegistration,
+  AgentVerificationResponse,
+  AgentDecision,
 } from '@qwed-ai/sdk';
 ```
 
-## Error Handling
+### VerificationType enum
 
 ```typescript
-import { QWEDError } from '@qwed-ai/sdk';
+enum VerificationType {
+  NaturalLanguage = 'natural_language',
+  Math = 'math',
+  Logic = 'logic',
+  Stats = 'stats',
+  Fact = 'fact',
+  Code = 'code',
+  SQL = 'sql',
+  Image = 'image',
+  Reasoning = 'reasoning',
+  Process = 'process',   // New in v4.0.1
+  RAG = 'rag',           // New in v4.0.1
+  Security = 'security', // New in v4.0.1
+}
+```
+
+## Error handling
+
+```typescript
+import { QWEDError, QWEDAuthError, QWEDRateLimitError } from '@qwed-ai/sdk';
 
 try {
   const result = await client.verify('test');
 } catch (error) {
-  if (error instanceof QWEDError) {
-    console.log(error.code);    // "QWED-001"
-    console.log(error.message); // "Verification failed"
+  if (error instanceof QWEDRateLimitError) {
+    console.log(error.retryAfter);  // seconds until retry
+  } else if (error instanceof QWEDAuthError) {
+    console.log('Invalid API key');
+  } else if (error instanceof QWEDError) {
+    console.log(error.code);     // "QWED-001"
+    console.log(error.message);  // "Verification failed"
   }
 }
 ```
