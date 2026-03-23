@@ -3,6 +3,31 @@ title: "Changelog"
 description: "All notable changes to QWED Protocol — releases, features, security fixes, and improvements."
 ---
 
+## v4.0.1 — Sentinel Guard Sync
+**Released: March 23, 2026** · [GitHub Release](https://github.com/QWED-AI/qwed-verification/releases/tag/v4.0.1)
+
+Syncs the TypeScript SDK, backend API schemas, and security fixes identified during the v4.0.0 rollout.
+
+### New endpoints
+
+- **`POST /verify/process`** — Glass-box reasoning process verifier with IRAC structural compliance and custom milestone validation. See [API reference](/api/endpoints) and [Process Verifier engine](/engines/process).
+- **`POST /verify/rag`** — Document-Level Retrieval Mismatch (DRM) defender for RAG pipelines. See [API reference](/api/endpoints).
+- **Agent security checks** — `POST /agents/{id}/verify` now accepts `security_checks` with `exfiltration` and `mcp_poison` options to run `ExfiltrationGuard` and `MCPPoisonGuard` before verification. See [API reference](/api/endpoints).
+
+### Security fixes
+
+- **Information disclosure** — Removed raw exception details from `/verify/rag` error responses. Exceptions are now redacted via `redact_pii()` and clients receive only a generic `INTERNAL_VERIFICATION_ERROR` message.
+- **Symbolic precision** — `RAGVerifyRequest.max_drm_rate` changed from `float | str` to `str` only, with a `field_validator` enforcing `Fraction`-compatible values (e.g. `"0"`, `"1/10"`).
+
+### SDK changes (`@qwed-ai/sdk@4.0.1`)
+
+- **`verifyProcess()`** — Validates AI reasoning traces using IRAC or custom milestone lists. See [TypeScript SDK](/sdks/typescript).
+- **`verifyRAG()`** — `maxDrmRate` type changed from `number` to `string` for symbolic precision.
+- **`verifyAgent()`** — Returns `AgentVerificationResponse` with payload aligned to backend schema. Agent IDs are URL-encoded.
+- **Type fixes** — `VerificationResultData.risk` and `risk_level` separated. Added `Process`, `RAG`, `Security` to `VerificationType` enum.
+
+---
+
 ## v4.0.0 — Sentinel Edition 🛡️
 **Released: March 12, 2026** · [GitHub Release](https://github.com/QWED-AI/qwed-verification/releases/tag/v4.0.0) · [PyPI](https://pypi.org/project/qwed/4.0.0/)
 
