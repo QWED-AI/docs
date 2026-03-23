@@ -365,52 +365,80 @@ Register a new AI agent with QWED for verified agentic workflows.
 
 ```json
 {
-  "name": "MyAgent",
+  "name": "FinanceBot",
   "agent_type": "supervised",
   "description": "Financial analysis agent",
   "permissions": ["math", "logic", "code"],
-  "max_cost_per_day": 100.0
+  "max_cost_per_day": 50.0
 }
 ```
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
 | `name` | string | Yes | — | Agent display name |
-| `agent_type` | string | Yes | — | Agent type (e.g., `supervised`, `autonomous`) |
+| `agent_type` | string | No | `autonomous` | `supervised`, `autonomous`, or `trusted` |
 | `description` | string | No | — | Agent description |
-| `permissions` | array | No | `[]` | Allowed verification engines |
+| `permissions` | array | No | `[]` | Allowed verification engine names (e.g., `math`, `logic`, `code`) |
 | `max_cost_per_day` | float | No | `100.0` | Daily budget cap in USD |
 
 **Response:**
 
 ```json
 {
-  "agent_id": "agent_abc123",
-  "token": "qwed_agent_...",
-  "status": "registered"
+  "agent_id": 42,
+  "agent_token": "qwed_agent_...",
+  "name": "FinanceBot",
+  "type": "supervised",
+  "status": "active",
+  "max_cost_per_day": 50.0,
+  "message": "Agent registered successfully. Store the agent_token securely."
 }
 ```
+
+<Warning>Store the `agent_token` immediately — it cannot be retrieved again after registration.</Warning>
 
 ---
 
 ### POST /agents/{agent_id}/verify
 
-Verify a claim using an agent token. Creates an auditable record tied to the agent.
+Verify a claim using an agent token. Creates an auditable record tied to the agent. Optionally runs Sentinel Guard security checks (exfiltration detection, MCP poisoning) before verification.
 
 **Request:**
 
 ```json
 {
-  "query": "2+2=4",
-  "provider": "openai"
+  "query": "What is 15% of 200?",
+  "provider": "openai",
+  "security_checks": {
+    "exfiltration": true,
+    "mcp_poison": false
+  },
+  "tool_schema": null
 }
 ```
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `query` | string | Yes | The claim to verify |
+| `provider` | string | No | LLM provider preference |
+| `security_checks.exfiltration` | boolean | No | Run `ExfiltrationGuard` on the query payload |
+| `security_checks.mcp_poison` | boolean | No | Run `MCPPoisonGuard` on the `tool_schema` |
+| `tool_schema` | object | No | MCP tool definition to scan (required when `mcp_poison` is `true`) |
 
 **Headers:**
 
 ```text
-Authorization: Bearer qwed_agent_...
+X-Agent-Token: qwed_agent_...
 ```
+
+**Error responses:**
+
+| Status | Description |
+|--------|-------------|
+| 400 | Invalid security check configuration or payload |
+| 401 | Invalid agent token |
+| 403 | Agent budget exceeded or request blocked by security checks |
+| 500 | Internal agent verification error |
 
 ---
 

@@ -69,6 +69,20 @@ for (const vuln of result.vulnerabilities) {
 }
 ```
 
+### verifyFact(claim, context)
+
+<Info>New in v4.0.0</Info>
+
+Verify a factual claim against a provided context.
+
+```typescript
+const result = await client.verifyFact(
+  'Paris is the capital of France',
+  'France is a country in Western Europe. Its capital is Paris.'
+);
+console.log(result.verified); // true
+```
+
 ### verifySQL(query, schema)
 
 ```typescript
@@ -78,38 +92,203 @@ const result = await client.verifySQL(
 );
 ```
 
+### verifyProcess(reasoningTrace, options)
+
+<Info>New in v4.0.0</Info>
+
+Validate IRAC structure and milestone completion in reasoning traces.
+
+```typescript
+const result = await client.verifyProcess(
+  'The issue is whether the contract was breached. The rule is Article 2...',
+  { mode: 'irac' }
+);
+console.log(result.result?.score);          // 1.0
+console.log(result.result?.missing_steps);  // []
+```
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `reasoningTrace` | string | Yes | The reasoning trace to validate |
+| `options.mode` | string | No | `irac` or `milestones` (default: `irac`) |
+| `options.keyMilestones` | string[] | No | Required milestones when using `milestones` mode |
+
+### verifyRAG(targetDocumentId, retrievedChunks, options)
+
+<Info>New in v4.0.0</Info>
+
+Verify that retrieved RAG chunks originate from the expected source document.
+
+```typescript
+const result = await client.verifyRAG(
+  'contract_nda_v2',
+  [
+    { id: 'c1', metadata: { document_id: 'contract_nda_v2' } },
+    { id: 'c2', metadata: { document_id: 'contract_nda_v2' } },
+  ]
+);
+console.log(result.result?.drm_rate);       // 0
+console.log(result.result?.chunks_checked); // 2
+```
+
 ### verifyBatch(items)
 
 ```typescript
 const results = await client.verifyBatch([
-  { query: '2+2=4', type: 'math' },
-  { query: '3*3=9', type: 'math' },
+  { query: '2+2=4', type: VerificationType.Math },
+  { query: '3*3=9', type: VerificationType.Math },
 ]);
-console.log(results.summary.successRate);
+console.log(results.summary.success_rate);
 ```
 
-## TypeScript Types
+## Agent methods
+
+<Info>New in v4.0.0</Info>
+
+### registerAgent(registration)
+
+Register a new AI agent with QWED for verified agentic workflows.
+
+```typescript
+const agent = await client.registerAgent({
+  agent: {
+    name: 'FinanceBot',
+    type: 'supervised',
+    description: 'Financial analysis agent',
+    principal_id: 'user_123',
+    framework: 'langchain',
+  },
+  permissions: {
+    allowed_engines: [VerificationType.Math, VerificationType.Logic],
+    allowed_tools: ['calculator', 'search'],
+  },
+  budget: {
+    max_daily_cost_usd: 50.0,
+    max_requests_per_hour: 100,
+  },
+  trust_level: 1,
+});
+
+console.log(agent.agent_id);    // 42
+console.log(agent.agent_token); // "qwed_agent_..."
+```
+
+### verifyAgent(agentId, agentToken, query, options)
+
+Verify a claim using an agent identity. Creates an auditable record tied to the agent.
+
+```typescript
+const result = await client.verifyAgent(
+  42,
+  'qwed_agent_...',
+  'What is 15% of 200?',
+  {
+    provider: 'openai',
+    checkExfiltration: true,
+    checkMcpPoison: false,
+  }
+);
+console.log(result.decision);                 // "APPROVED"
+console.log(result.verification?.risk_level); // "low"
+```
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `agentId` | number | Yes | Agent ID returned from registration |
+| `agentToken` | string | Yes | Agent authentication token |
+| `query` | string | Yes | The claim to verify |
+| `options.provider` | string | No | LLM provider preference |
+| `options.checkExfiltration` | boolean | No | Run exfiltration guard on the query |
+| `options.checkMcpPoison` | boolean | No | Run MCP poison guard on tool schema |
+| `options.toolSchema` | object | No | MCP tool schema to scan for poisoning |
+
+### getAgentBudget(agentId, agentToken)
+
+Retrieve the remaining budget for an agent.
+
+```typescript
+const budget = await client.getAgentBudget(42, 'qwed_agent_...');
+console.log(budget.cost.current_daily_usd);  // 12.50
+console.log(budget.cost.max_daily_usd);      // 50.0
+console.log(budget.requests.current_hour);   // 23
+console.log(budget.requests.max_per_hour);   // 100
+```
+
+## Helper functions
+
+### isVerified(response)
+
+Check if a verification response was successful.
+
+```typescript
+import { isVerified } from '@qwed-ai/sdk';
+
+const result = await client.verify('2+2=4');
+if (isVerified(result)) {
+  console.log('Claim verified');
+}
+```
+
+### getErrorMessage(response)
+
+Extract the error message from a failed verification response.
+
+```typescript
+import { getErrorMessage } from '@qwed-ai/sdk';
+
+const result = await client.verify('invalid query');
+const error = getErrorMessage(result);
+if (error) {
+  console.error(error);
+}
+```
+
+### parseAttestation(jwt)
+
+Parse a QWED attestation JWT into its header, payload, and signature.
+
+```typescript
+import { parseAttestation } from '@qwed-ai/sdk';
+
+const result = await client.verify('2+2=4', { includeAttestation: true });
+if (result.attestation) {
+  const parsed = parseAttestation(result.attestation);
+  console.log(parsed?.payload); // { iss: "qwed", sub: "verification", ... }
+}
+```
+
+## TypeScript types
 
 ```typescript
 import {
-  VerificationResult,
+  VerificationResponse,
   VerificationType,
   VerificationStatus,
-  BatchResult,
+  BatchResponse,
+  AgentRegistration,
+  AgentVerificationRequest,
+  AgentVerificationResponse,
 } from '@qwed-ai/sdk';
 ```
 
-## Error Handling
+## Error handling
+
+The SDK provides typed error classes for common failure modes:
 
 ```typescript
-import { QWEDError } from '@qwed-ai/sdk';
+import { QWEDError, QWEDAuthError, QWEDRateLimitError } from '@qwed-ai/sdk';
 
 try {
   const result = await client.verify('test');
 } catch (error) {
-  if (error instanceof QWEDError) {
-    console.log(error.code);    // "QWED-001"
-    console.log(error.message); // "Verification failed"
+  if (error instanceof QWEDRateLimitError) {
+    console.log(error.retryAfter); // seconds until retry
+  } else if (error instanceof QWEDAuthError) {
+    console.log('Invalid API key');
+  } else if (error instanceof QWEDError) {
+    console.log(error.code);       // "QWED-SYS-001"
+    console.log(error.statusCode); // 500
+    console.log(error.message);    // "Verification failed"
   }
 }
 ```
