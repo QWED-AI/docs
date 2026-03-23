@@ -4,13 +4,9 @@ title: "MCP Tools Reference"
 description: "Complete QWED-MCP verification tools reference. Includes verify_math, verify_sql, verify_logic, and verify_code with detailed parameters and examples."
 ---
 
-# MCP Tools Reference
-
-Complete reference for all QWED-MCP verification tools with detailed examples and parameters.
-
 ---
 
-## verify_math
+## verify\_math
 
 Verify mathematical calculations using the SymPy symbolic mathematics engine.
 
@@ -21,7 +17,7 @@ The `verify_math` tool performs symbolic computation to verify that a claimed ma
 ### Parameters
 
 | Parameter | Type | Required | Default | Description |
-|-----------|------|----------|---------|-------------|
+| --- | --- | --- | --- | --- |
 | `expression` | string | Yes | - | Mathematical expression (e.g., `x^2`, `sin(x)`, `3x + 5`) |
 | `claimed_result` | string | Yes | - | The result to verify |
 | `operation` | enum | No | `evaluate` | One of: `derivative`, `integral`, `simplify`, `solve`, `evaluate` |
@@ -29,7 +25,7 @@ The `verify_math` tool performs symbolic computation to verify that a claimed ma
 ### Operations
 
 | Operation | Description | Example |
-|-----------|-------------|---------|
+| --- | --- | --- |
 | `derivative` | Compute derivative with respect to x | `d/dx(x^2) = 2x` |
 | `integral` | Compute indefinite integral | `∫x dx = x^2/2` |
 | `simplify` | Simplify expression | `(x^2-1)/(x-1) = x+1` |
@@ -49,7 +45,8 @@ The `verify_math` tool performs symbolic computation to verify that a claimed ma
 ```
 
 **Response:**
-```
+
+```text
 ✅ VERIFIED
 Result: Calculation verified
 Expected: 3*x**2
@@ -68,7 +65,8 @@ Operation: derivative
 ```
 
 **Response:**
-```
+
+```text
 ✅ VERIFIED
 Result: Calculation verified
 Expected: x**2
@@ -87,7 +85,8 @@ Operation: integral
 ```
 
 **Response:**
-```
+
+```text
 ❌ FAILED
 Result: Calculation incorrect
 Expected: 2*x
@@ -106,7 +105,8 @@ Operation: derivative
 ```
 
 **Response:**
-```
+
+```text
 ✅ VERIFIED
 Result: Calculation verified
 Expected: 1
@@ -117,7 +117,7 @@ Operation: simplify
 ### Supported Syntax
 
 | Notation | Meaning |
-|----------|---------|
+| --- | --- |
 | `x^2` or `x**2` | x squared |
 | `sqrt(x)` | Square root |
 | `sin(x)`, `cos(x)`, `tan(x)` | Trigonometric functions |
@@ -128,7 +128,7 @@ Operation: simplify
 
 ---
 
-## verify_logic
+## verify\_logic
 
 Verify logical arguments using the Z3 SMT solver.
 
@@ -139,14 +139,14 @@ The `verify_logic` tool uses satisfiability modulo theories (SMT) to determine i
 ### Parameters
 
 | Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `premises` | array[string] | Yes | List of premise statements |
+| --- | --- | --- | --- |
+| `premises` | array\[string\] | Yes | List of premise statements |
 | `conclusion` | string | Yes | The conclusion to verify |
 
 ### Supported Logic Formats
 
 | Pattern | Example | Meaning |
-|---------|---------|---------|
+| --- | --- | --- |
 | `A implies B` | "rain implies wet" | If A then B |
 | `if A then B` | "if rain then wet" | If A then B |
 | `A and B` | "hot and sunny" | Both A and B |
@@ -170,7 +170,8 @@ The `verify_logic` tool uses satisfiability modulo theories (SMT) to determine i
 ```
 
 **Response:**
-```
+
+```text
 ✅ VERIFIED
 Message: The conclusion logically follows from the premises
 Method: proof by contradiction (Z3 SMT solver)
@@ -189,7 +190,8 @@ Method: proof by contradiction (Z3 SMT solver)
 ```
 
 **Response:**
-```
+
+```text
 ✅ VERIFIED
 Message: The conclusion logically follows from the premises
 ```
@@ -207,7 +209,8 @@ Message: The conclusion logically follows from the premises
 ```
 
 **Response:**
-```
+
+```text
 ❌ FAILED
 Message: The conclusion does not logically follow from the premises
 Counterexample: A counterexample exists where premises are true but conclusion is false
@@ -227,14 +230,15 @@ Counterexample: A counterexample exists where premises are true but conclusion i
 ```
 
 **Response:**
-```
+
+```text
 ✅ VERIFIED
 Message: The conclusion logically follows from the premises
 ```
 
 ---
 
-## verify_code
+## verify\_code
 
 Check code for security vulnerabilities using AST (Abstract Syntax Tree) analysis.
 
@@ -245,7 +249,7 @@ The `verify_code` tool performs static analysis on code to detect dangerous patt
 ### Parameters
 
 | Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
+| --- | --- | --- | --- |
 | `code` | string | Yes | Code to analyze |
 | `language` | enum | Yes | One of: `python`, `javascript`, `sql` |
 
@@ -254,7 +258,7 @@ The `verify_code` tool performs static analysis on code to detect dangerous patt
 #### Python
 
 | Pattern | Severity | Why Dangerous |
-|---------|----------|---------------|
+| --- | --- | --- |
 | `eval()` | 🔴 Critical | Executes arbitrary code |
 | `exec()` | 🔴 Critical | Executes arbitrary code |
 | `compile()` | 🔴 Critical | Can compile malicious code |
@@ -267,7 +271,7 @@ The `verify_code` tool performs static analysis on code to detect dangerous patt
 #### JavaScript
 
 | Pattern | Severity | Why Dangerous |
-|---------|----------|---------------|
+| --- | --- | --- |
 | `eval()` | 🔴 Critical | Executes arbitrary code |
 | `Function()` | 🔴 Critical | Creates executable code |
 | `innerHTML =` | 🟠 High | XSS vulnerability |
@@ -277,7 +281,7 @@ The `verify_code` tool performs static analysis on code to detect dangerous patt
 #### SQL
 
 | Pattern | Severity | Why Dangerous |
-|---------|----------|---------------|
+| --- | --- | --- |
 | String concatenation | 🟠 High | SQL injection risk |
 | `--` comments | 🟡 Medium | May indicate injection |
 | `UNION SELECT` | 🔴 Critical | Data exfiltration |
@@ -294,7 +298,8 @@ The `verify_code` tool performs static analysis on code to detect dangerous patt
 ```
 
 **Response:**
-```
+
+```text
 ❌ FAILED
 Message: Found 1 security issue(s)
 Issues: ["Dangerous function call: eval()"]
@@ -310,7 +315,8 @@ Issues: ["Dangerous function call: eval()"]
 ```
 
 **Response:**
-```
+
+```text
 ❌ FAILED
 Message: Found 3 security issue(s)
 Issues: [
@@ -330,7 +336,8 @@ Issues: [
 ```
 
 **Response:**
-```
+
+```text
 ✅ VERIFIED
 Message: No security issues detected
 Issues: []
@@ -346,7 +353,8 @@ Issues: []
 ```
 
 **Response:**
-```
+
+```text
 ❌ FAILED
 Message: Found 1 security issue(s)
 Issues: ["Potential XSS: Direct innerHTML assignment"]
@@ -354,7 +362,7 @@ Issues: ["Potential XSS: Direct innerHTML assignment"]
 
 ---
 
-## verify_sql
+## verify\_sql
 
 Detect SQL injection vulnerabilities and validate queries.
 
@@ -365,16 +373,16 @@ The `verify_sql` tool analyzes SQL queries for injection patterns, dangerous ope
 ### Parameters
 
 | Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
+| --- | --- | --- | --- |
 | `query` | string | Yes | SQL query to verify |
-| `allowed_tables` | array[string] | No | Optional whitelist of allowed table names |
+| `allowed_tables` | array\[string\] | No | Optional whitelist of allowed table names |
 
 ### Detected Patterns
 
 #### Injection Patterns
 
 | Pattern | Description |
-|---------|-------------|
+| --- | --- |
 | `' OR '1'='1` | Classic always-true injection |
 | `' OR 1=1` | Numeric tautology |
 | `'; --` | Comment injection |
@@ -384,7 +392,7 @@ The `verify_sql` tool analyzes SQL queries for injection patterns, dangerous ope
 #### Dangerous Operations
 
 | Pattern | Description |
-|---------|-------------|
+| --- | --- |
 | `DROP TABLE` | Table deletion |
 | `DROP DATABASE` | Database deletion |
 | `TRUNCATE TABLE` | Data deletion |
@@ -403,7 +411,8 @@ The `verify_sql` tool analyzes SQL queries for injection patterns, dangerous ope
 ```
 
 **Response:**
-```
+
+```text
 ❌ FAILED
 Message: Found 2 issue(s) in SQL query
 Issues: [
@@ -421,7 +430,8 @@ Issues: [
 ```
 
 **Response:**
-```
+
+```text
 ❌ FAILED
 Message: Found 1 issue(s) in SQL query
 Issues: ["Warning: DELETE without WHERE clause"]
@@ -437,7 +447,8 @@ Issues: ["Warning: DELETE without WHERE clause"]
 ```
 
 **Response:**
-```
+
+```text
 ❌ FAILED
 Message: Found 1 issue(s) in SQL query
 Issues: ["Unauthorized table access: admin_secrets"]
@@ -453,7 +464,8 @@ Issues: ["Unauthorized table access: admin_secrets"]
 ```
 
 **Response:**
-```
+
+```text
 ✅ VERIFIED
 Message: SQL query passed verification
 Issues: []
@@ -461,7 +473,7 @@ Issues: []
 
 ---
 
-## verify_banking_compliance
+## verify\_banking\_compliance
 
 Verify banking logic (loans, tax, forex) using QWED Finance Guard.
 
@@ -472,7 +484,7 @@ The `verify_banking_compliance` tool checks financial calculations for regulator
 ### Parameters
 
 | Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
+| --- | --- | --- | --- |
 | `scenario` | string | Yes | The banking scenario description (e.g., "Senior Citizen Loan approval") |
 | `llm_output` | string | Yes | The LLM's reasoning or calculation to verify |
 
@@ -488,7 +500,8 @@ The `verify_banking_compliance` tool checks financial calculations for regulator
 ```
 
 **Response:**
-```
+
+```text
 🛑 BLOCKED by QWED Finance: Senior Citizen Premium (0.50%) applied incorrectly. Logic Trap Detected.
 ```
 
@@ -502,14 +515,15 @@ The `verify_banking_compliance` tool checks financial calculations for regulator
 ```
 
 **Response:**
-```
+
+```text
 ✅ VERIFIED
 Result: Calculation verified. Base rate 8% for 5-year term. Monthly payment: $202.76 is compliant.
 ```
 
 ---
 
-## verify_commerce_transaction
+## verify\_commerce\_transaction
 
 Verify e-commerce transactions for "Penny Slicing" attacks and tax errors using QWED UCP.
 
@@ -520,7 +534,7 @@ The `verify_commerce_transaction` tool parses JSON cart data and verifies that t
 ### Parameters
 
 | Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
+| --- | --- | --- | --- |
 | `cart_json` | string | Yes | Complete cart/checkout state as JSON string |
 
 ### Cart JSON Schema
@@ -549,7 +563,8 @@ The `verify_commerce_transaction` tool parses JSON cart data and verifies that t
 ```
 
 **Response:**
-```
+
+```text
 🛑 QWED UCP: BLOCKED. Tax mismatch: expected 8.00, got 7.99. Penny slicing detected.
 ```
 
@@ -562,13 +577,14 @@ The `verify_commerce_transaction` tool parses JSON cart data and verifies that t
 ```
 
 **Response:**
-```
+
+```text
 ✅ QWED UCP: Transaction Approved. Tax and Totals are exact.
 ```
 
 ---
 
-## verify_legal_deadline
+## verify\_legal\_deadline
 
 Verify contract deadlines and durations using LegalGuard.
 
@@ -579,14 +595,14 @@ Checks if a claimed deadline matches the term specified in a contract signer dat
 ### Parameters
 
 | Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
+| --- | --- | --- | --- |
 | `signing_date` | string | Yes | Date of signing (YYYY-MM-DD) |
 | `term` | string | Yes | Duration string (e.g. "2 years", "18 months") |
 | `claimed_deadline` | string | Yes | The deadline date to verify |
 
 ---
 
-## verify_legal_citation
+## verify\_legal\_citation
 
 Verify legal citations format and validity.
 
@@ -597,12 +613,12 @@ Validates legal citations against standard formats (Bluebook, etc.) using regex 
 ### Parameters
 
 | Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
+| --- | --- | --- | --- |
 | `citation` | string | Yes | The legal citation string |
 
 ---
 
-## verify_legal_liability
+## verify\_legal\_liability
 
 Verify liability cap calculations.
 
@@ -613,14 +629,14 @@ Ensures liability caps are correctly calculated as a percentage of contract valu
 ### Parameters
 
 | Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
+| --- | --- | --- | --- |
 | `contract_value` | number | Yes | Total contract value |
 | `cap_percentage` | number | Yes | Cap percentage (0.0-1.0) |
 | `claimed_cap` | number | Yes | The calculated cap amount |
 
 ---
 
-## verify_system_command
+## verify\_system\_command
 
 **100% Deterministic** shell command verification.
 
@@ -631,12 +647,12 @@ Blocks dangerous shell commands (`rm`, `sudo`, `curl | bash`, etc.) using a pred
 ### Parameters
 
 | Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
+| --- | --- | --- | --- |
 | `command` | string | Yes | The shell command to check |
 
 ---
 
-## verify_file_path
+## verify\_file\_path
 
 **100% Deterministic** file path sandbox verification.
 
@@ -647,13 +663,13 @@ Ensures file paths are within allowed directories (e.g. `/tmp`, `./workspace`) a
 ### Parameters
 
 | Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
+| --- | --- | --- | --- |
 | `filepath` | string | Yes | Path to verify |
-| `allowed_paths` | array[string] | No | Whitelist of allowed dirs (default: /tmp, ./workspace) |
+| `allowed_paths` | array\[string\] | No | Whitelist of allowed dirs (default: /tmp, ./workspace) |
 
 ---
 
-## verify_config_secrets
+## verify\_config\_secrets
 
 **100% Deterministic** secret scanning.
 
@@ -664,7 +680,7 @@ Scans configuration JSON for exposed secrets (API keys, private keys, tokens) us
 ### Parameters
 
 | Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
+| --- | --- | --- | --- |
 | `config_json` | string | Yes | Configuration data as JSON string |
 
 ---
@@ -709,7 +725,7 @@ print(bom["components"])
 ### Parameters
 
 | Parameter | Type | Required | Default | Description |
-|-----------|------|----------|---------|-------------|
+| --- | --- | --- | --- | --- |
 | `llm_model` | `str` | Yes | - | Name of the LLM model used (e.g., `"gpt-4o"`, `"claude-3-opus"`) |
 | `qwed_engines_used` | `list[str]` | No | `[]` | QWED verification engines used in this pipeline |
 | `mcp_tools_used` | `list[str]` | No | `[]` | MCP tools invoked during this session |
@@ -717,7 +733,7 @@ print(bom["components"])
 ### Manifest fields
 
 | Field | Type | Description |
-|-------|------|-------------|
+| --- | --- | --- |
 | `timestamp` | `string` | ISO 8601 UTC timestamp of generation |
 | `components.models` | `array` | LLM models used (`type: "generator"`) |
 | `components.verification_engines` | `array` | QWED engines used (`type: "qwed_deterministic"`) |
@@ -726,7 +742,7 @@ print(bom["components"])
 | `manifest_hash` | `string` | SHA-256 hash of the manifest (excluding timestamp) |
 
 <Note>
-The `manifest_hash` is deterministic for identical inputs — the timestamp is excluded from the hash computation so that two manifests with the same components always produce the same hash.
+  The `manifest_hash` is deterministic for identical inputs — the timestamp is excluded from the hash computation so that two manifests with the same components always produce the same hash.
 </Note>
 
 ---
@@ -746,7 +762,7 @@ All tools return consistent error responses:
 ### Common Errors
 
 | Error | Cause | Solution |
-|-------|-------|----------|
+| --- | --- | --- |
 | `Could not parse expression` | Invalid math syntax | Check expression format |
 | `SymPy not installed` | Missing dependency | Run `pip install sympy` |
 | `Z3 solver not installed` | Missing dependency | Run `pip install z3-solver` |

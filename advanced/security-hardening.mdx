@@ -89,17 +89,15 @@ export CORS_ALLOWED_ORIGINS="https://app.yourcompany.com,https://admin.yourcompa
 
 ## 3. Authentication Hardening
 
-### API Key Rotation
+### API key rotation
 Regularly rotate API keys to minimize the impact of a potential leak.
-QWED provides a built-in rotation mechanism:
-- Use the `rotate_key` function in `src/qwed_new/core/key_rotation.py` or the administrative API endpoint to issue new keys.
-- Old keys should be revoked immediately after the rotation window.
+QWED provides a built-in rotation mechanism via the `POST /admin/keys/rotate` endpoint. Old keys should be revoked immediately after the rotation window.
 
-### Password Policies
+### Password policies
 If you integrate QWED with a custom user database:
 - Enforce a minimum length of 12 characters.
 - Require a mix of uppercase, lowercase, numbers, and special characters.
-- Use the built-in `bcrypt` hashing (already implemented in `src/qwed_new/auth/security.py`).
+- Use the built-in `bcrypt` hashing provided by QWED's authentication module.
 
 ### Session Management
 Control the lifetime of access tokens to reduce the window of opportunity for session hijacking.
@@ -116,7 +114,49 @@ export JWT_ACCESS_TOKEN_EXPIRE_MINUTES=30
 
 ---
 
-## 4. OWASP LLM Top 10 Compliance
+## 4. Enhanced prompt injection defense
+
+<Info>New in v4.0.0</Info>
+
+QWED v4.0.0 introduces a multi-layer `EnhancedSecurityGateway` (OWASP LLM01:2025 compliant) that screens all inputs through seven defense layers:
+
+| Layer | Defense | Description |
+|-------|---------|-------------|
+| 1 | Pattern detection | Heuristic matching against 14 known injection patterns |
+| 2 | Length limiting | Strict 2,000-character limit (blocks ~70% of injection attacks) |
+| 3 | Base64 decoding | Detects and decodes base64-encoded payloads, then scans for injection keywords |
+| 4 | Semantic similarity | Uses sequence matching against system prompt (threshold: 0.6) |
+| 5 | Keyword detection | 28 advanced keywords: `disregard`, `override`, `bypass`, `jailbreak`, etc. |
+| 6 | Unicode script mixing | Detects Cyrillic/Arabic/Greek characters mixed with Latin (homoglyph attacks) |
+| 7 | Zero-width characters | Detects invisible characters (`\u200B`, `\u200C`, `\u200D`, `\uFEFF`) used to hide payloads |
+
+The gateway is enabled by default for all API endpoints. It also includes a block counter for monitoring injection attempt frequency.
+
+### PII redaction
+
+All API error paths now use a centralized `redact_pii()` function that masks email addresses, phone numbers, SSNs, and IP addresses before they reach logs. Stack traces are suppressed in error responses (`exc_info=False`) to prevent data leakage.
+
+### Safe code evaluation
+
+All `eval()` calls have been replaced with AST-compiled execution using a restricted namespace. The safe evaluator:
+
+- Sets `__builtins__` to `{}` (blocks `open`, `import`, `exec`)
+- Only allows whitelisted Z3 functions (`And`, `Or`, `Not`, `Implies`, `If`, `Int`, `Bool`, `Real`)
+- Blocks any expression containing `__` (double underscore) to prevent attribute access attacks
+
+### Credential store security
+
+The `qwed init` wizard and YAML provider config system write `.env` files with strict security guarantees:
+
+- `.env` files written with `0600` permissions (owner-only on Unix)
+- Atomic writes via `tempfile` + `os.replace` to prevent partial writes
+- Symlink attack prevention (`O_NOFOLLOW` on Unix)
+- Automatic `.gitignore` verification ensures `.env` is excluded from version control
+- API keys are never printed in full — only the first 8 characters are shown in logs
+
+---
+
+## 5. OWASP LLM Top 10 compliance
 
 QWED implements technical defenses for the [OWASP LLM Top 10](https://owasp.org/www-project-top-10-for-large-language-model-applications/). However, security is a shared responsibility.
 

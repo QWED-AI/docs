@@ -11,34 +11,49 @@ icon: "shield-check"
 
 ## What is QWED?
 
-**QWED** (Query With Evidence & Determinism) is a **model-agnostic trust boundary** for AI systems.
+QWED (Query With Evidence & Determinism) is a trust boundary for AI systems:
 
-> **"Don't fix the liar. Verify the lie."** — QWED verifies outputs, processes, and tool interactions before they enter production. It doesn't reduce hallucinations — it makes them irrelevant.
+- LLMs can translate user intent into structured claims.
+- QWED verifies those claims with deterministic engines before execution or response.
+- You get proof-backed outcomes instead of probability-only confidence.
 
-<Tip>
-**Where QWED fits first:** Verify AI-generated math, logic, SQL, code, and schemas before execution. Protect RAG pipelines against prompt injection. Inspect agent tool calls before they reach external systems. Enforce deterministic process steps in high-stakes workflows.
-</Tip>
+> **"Do not trust generated output. Verify it."**
 
 ```mermaid
 flowchart LR
-    U[User Query] --> L[LLM Translator]
-    L --> Q[QWED Verifier]
-    Q --> V[✅ Verified Response]
+    U[User Query] --> L[LLM Translation]
+    L --> Q[QWED Verification]
+    Q --> R[Verified Result]
 
-    L -. Probabilistic .- E1["2+2 = 5"]
-    Q -. Deterministic .- E2["Corrected → 4"]
+    L -. Untrusted output .-> X[Possible hallucination]
+    Q -. Deterministic proof .-> Y[Accepted or rejected]
 
     classDef untrusted fill:#fff4e5,stroke:#f59e0b,color:#92400e;
     classDef trusted fill:#ecfeff,stroke:#06b6d4,color:#155e75;
     classDef result fill:#ecfdf5,stroke:#22c55e,color:#166534;
-    class L,E1 untrusted;
-    class Q,E2 trusted;
-    class V result;
+    class L,X untrusted;
+    class Q,Y trusted;
+    class R result;
 ```
 
----
+## When to use QWED first
 
-## Quick Start
+<CardGroup cols={2}>
+  <Card title="Math and Logic" icon="square-root-variable">
+    Verify equations, constraints, and logical claims before they reach users.
+  </Card>
+  <Card title="Code and SQL" icon="code">
+    Catch unsafe patterns, injection risks, and structural errors before execution.
+  </Card>
+  <Card title="Agent Tool Calls" icon="toolbox">
+    Inspect actions and payloads before external systems are touched.
+  </Card>
+  <Card title="High-Stakes Workflows" icon="shield-halved">
+    Add deterministic checkpoints for finance, legal, tax, and regulated systems.
+  </Card>
+</CardGroup>
+
+## Quick Start (5 minutes)
 
 <CodeGroup>
 
@@ -53,171 +68,72 @@ docker pull qwedai/qwed-verification:latest
 </CodeGroup>
 
 ```bash
-# Verify math
+# Verify a simple claim
 qwed verify "Is 2+2=5?"
-# → ❌ CORRECTED: The answer is 4, not 5.
+# -> CORRECTED: The answer is 4
 
-# Verify logic
+# Verify logic constraints
 qwed verify-logic "(AND (GT x 5) (LT y 10))"
-# → ✅ SAT: {x=6, y=9}
+# -> SAT: {x=6, y=9}
 ```
 
----
-
-## Why QWED?
-
-<CardGroup cols={2}>
-  <Card title="LLMs hallucinate math" icon="calculator">
-    QWED uses **SymPy** for symbolic verification — algebraic proof, not pattern matching.
-  </Card>
-  <Card title="LLMs break logic" icon="microchip">
-    **Z3 SAT solver** provides formal satisfiability checks with model generation.
-  </Card>
-  <Card title="LLMs generate unsafe code" icon="bug">
-    **AST analysis** + pattern detection catches vulnerabilities before execution.
-  </Card>
-  <Card title="LLMs produce SQL injection" icon="database">
-    **Query parsing** + schema validation catches injections and malformed queries.
-  </Card>
-</CardGroup>
-
----
-
-## 11 Verification Engines
-
-<CardGroup cols={3}>
-  <Card title="Math" icon="square-root-variable" href="/engines/math">
-    Symbolic algebra with SymPy
-  </Card>
-  <Card title="Logic" icon="microchip" href="/engines/logic">
-    SAT/SMT solving with Z3
-  </Card>
-  <Card title="Code" icon="code" href="/engines/code">
-    AST security analysis
-  </Card>
-  <Card title="SQL" icon="database" href="/engines/sql">
-    Query validation & injection detection
-  </Card>
-  <Card title="Fact" icon="magnifying-glass" href="/engines/fact">
-    NLI-based fact checking
-  </Card>
-  <Card title="Stats" icon="chart-bar" href="/engines/stats">
-    Statistical claim verification
-  </Card>
-  <Card title="Reasoning" icon="brain" href="/engines/reasoning">
-    Chain-of-Thought verification
-  </Card>
-  <Card title="Image" icon="image" href="/engines/image">
-    Visual content verification
-  </Card>
-  <Card title="Graph" icon="diagram-project" href="/engines/graph">
-    Knowledge graph fact checking
-  </Card>
-  <Card title="Schema" icon="brackets-curly" href="/engines/schema">
-    JSON/API schema validation
-  </Card>
-  <Card title="Taint" icon="shield-halved" href="/engines/taint">
-    Data flow taint analysis
-  </Card>
-</CardGroup>
-
----
-
-## Model Agnostic = Your Choice
-
-<Tip>
-QWED works with **ANY LLM** — OpenAI, Anthropic, Gemini, Llama (via Ollama), or any local model. Same verification quality, your choice of cost.
-</Tip>
-
 <Steps>
-  <Step title="Choose your LLM">
-    Use any provider — cloud or local. QWED stays neutral. No vendor lock-in.
+  <Step title="Install and configure">
+    Follow [Installation](/getting-started/installation) and set your provider with [LLM Configuration](/getting-started/llm-configuration).
   </Step>
-  <Step title="Send queries through QWED">
-    QWED routes LLM responses through the appropriate symbolic engine for verification.
+  <Step title="Run first verification">
+    Use [Quick Start](/getting-started/quickstart) to validate math, logic, code, and SQL.
   </Step>
-  <Step title="Get verified results">
-    Receive deterministic, provably-correct responses with optional cryptographic attestations.
+  <Step title="Integrate into production flow">
+    Use [Integration Getting Started](/integration/getting-started) and [Production Deployment](/integration/production).
   </Step>
 </Steps>
 
----
-
-## Ecosystem & SDKs
-
-<CardGroup cols={2}>
-  <Card title="Python SDK" icon="python" href="/sdks/python">
-    `pip install qwed` — Full-featured SDK with CLI.
-  </Card>
-  <Card title="TypeScript SDK" icon="js" href="/sdks/typescript">
-    `npm install @qwed-ai/sdk` — Browser and Node.js support.
-  </Card>
-  <Card title="Go SDK" icon="golang" href="/sdks/go">
-    Lightweight Go module for backend services.
-  </Card>
-  <Card title="Rust SDK" icon="rust" href="/sdks/rust">
-    `cargo add qwed` — Zero-cost abstractions.
-  </Card>
-</CardGroup>
+## Verification engines at a glance
 
 <CardGroup cols={3}>
-  <Card title="LangChain" icon="link" href="/integrations/langchain">
-    Drop-in verification guard
+  <Card title="Math" icon="square-root-variable" href="/engines/math">
+    SymPy-based symbolic verification.
   </Card>
-  <Card title="LlamaIndex" icon="llama" href="/integrations/llamaindex">
-    Query engine integration
+  <Card title="Logic" icon="microchip" href="/engines/logic">
+    Z3 SAT/SMT verification with models.
   </Card>
-  <Card title="CrewAI" icon="users" href="/integrations/crewai">
-    Multi-agent verification
+  <Card title="Code" icon="code" href="/engines/code">
+    AST and symbolic checks for risky behavior.
+  </Card>
+  <Card title="SQL" icon="database" href="/engines/sql">
+    Parser-backed SQL safety and validation.
+  </Card>
+  <Card title="Schema" icon="brackets-curly" href="/engines/schema">
+    Type and shape validation for structured outputs.
+  </Card>
+  <Card title="Taint" icon="shield-halved" href="/engines/taint">
+    Data-flow tracking for untrusted inputs.
   </Card>
 </CardGroup>
 
----
+<Card title="See all engines" icon="book" href="/engines/overview">
+  Explore core, analysis, and specialized engines.
+</Card>
 
-## 🆕 What's New in v4.0.0: Sentinel Edition
-
-The **v4.0.0 Sentinel Release** introduces **Agentic Security Guards**, **Process Determinism**, and critical security hardening. 147 commits — the largest update in QWED history.
+## What's new in v4.0.0
 
 <AccordionGroup>
-  <Accordion title="Agentic Security Guards (Phase 17)" icon="shield-halved" defaultOpen>
-    - **RAGGuard** — Detects prompt injection and data poisoning in RAG pipelines.
-    - **ExfiltrationGuard** — Prevents data exfiltration through agent tool calls.
-    - **MCP Poison Guard** — Detects poisoned MCP tool definitions.
-  </Accordion>
-  <Accordion title="New Standalone Guards" icon="tower-observation">
-    - **SovereigntyGuard** — Data residency and local routing enforcement.
-    - **ToxicFlowGuard** — Stateful toxic tool-chaining detection.
-    - **SelfInitiatedCoTGuard** — Reasoning integrity verification.
+  <Accordion title="Agentic Security Guards" icon="shield-halved" defaultOpen>
+    RAGGuard, ExfiltrationGuard, MCP Poison Guard, and additional guard hardening.
   </Accordion>
   <Accordion title="Process Determinism" icon="list-check">
-    - **ProcessVerifier** — IRAC/milestone-based verification with decimal scoring, budget-aware timeouts, and structured compliance reporting.
+    ProcessVerifier for milestone-driven deterministic validation and compliance reporting.
   </Accordion>
   <Accordion title="Security Hardening" icon="lock">
-    - Replaced all `eval()` with AST-compiled execution.
-    - Patched sandbox escape, SymPy injection, and protocol bypass vulnerabilities.
-    - Resolved CVE-2026-24049 (Critical), 19 Snyk findings, and CodeQL alerts.
+    Critical hardening updates across execution safety, parser boundaries, and protocol checks.
   </Accordion>
 </AccordionGroup>
 
-<Card title="Full Changelog" icon="list-timeline" href="/changelog">
-  See the complete release history including v3.0.1 Ironclad and v2.4.1 Reasoning Engine.
-</Card>
+## Recommended learning path
 
----
-
-## Next Steps
-
-<CardGroup cols={2}>
-  <Card title="Installation" icon="download" href="/getting-started/installation">
-    Install QWED via pip, Docker, or from source.
-  </Card>
-  <Card title="Quick Start" icon="rocket" href="/getting-started/quickstart">
-    Verify your first LLM output in 5 minutes.
-  </Card>
-  <Card title="SDK Documentation" icon="book" href="/sdks/overview">
-    Choose your language — Python, TypeScript, Go, or Rust.
-  </Card>
-  <Card title="Specifications" icon="file-lines" href="/specs/overview">
-    Read the formal protocol specification.
-  </Card>
-</CardGroup>
+1. [Core Concepts](/getting-started/concepts)
+2. [Architecture Overview](/architecture)
+3. [SDKs Overview](/sdks/overview)
+4. [API Overview](/api/overview)
+5. [Integration Guide](/integration/getting-started)

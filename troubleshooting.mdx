@@ -18,8 +18,9 @@ Error: 401 Unauthorized - Invalid API key
 
 **Solution:**
 1. Check your API key is correct: `echo $QWED_API_KEY`
-2. Regenerate key at [cloud.qwedai.com](https://cloud.qwedai.com)
-3. Ensure no extra spaces or newlines
+2. Make sure the value is not a placeholder — `qwed init` ignores common dummy values like `your-api-key`, `changeme`, `placeholder`, and `xxx`. Replace them with a real key.
+3. Regenerate key at [cloud.qwedai.com](https://cloud.qwedai.com)
+4. Ensure no extra spaces or newlines
 
 ```python
 # Correct
@@ -101,6 +102,83 @@ Error: Verification timeout after 30s
 1. Increase timeout: `client.verify_code(code, timeout=60)`
 2. Simplify code (reduce loops, recursion)
 3. Use bounded verification
+
+---
+
+## CLI Issues
+
+### `qwed init` fails with "attempt to write a readonly database"
+
+```
+sqlite3.OperationalError: attempt to write a readonly database
+```
+
+This error occurs during Step 3 of `qwed init` when the local server tries to create a bootstrap SQLite database in a directory that is not writable (e.g., a read-only mount, a container filesystem, or a system-managed path).
+
+**Solution:** Upgrade to QWED v4.0.0 or later:
+
+```bash
+pip install --upgrade qwed
+```
+
+Starting with v4.0.0, `qwed init` automatically resolves a writable runtime directory for the database. It uses the current working directory if writable, otherwise falls back to `~/qwed-demo/`. No manual intervention is needed.
+
+If you cannot upgrade, run `qwed init` from a writable directory:
+
+```bash
+cd ~/my-project
+qwed init
+```
+
+---
+
+## Gemini provider issues
+
+### Missing `google-generativeai` package
+
+```
+ImportError: google-generativeai package required for Gemini integration.
+```
+
+**Solution:** Install the Gemini SDK alongside QWED:
+
+```bash
+pip install qwed google-generativeai
+```
+
+### Gemini API key not found
+
+```
+ValueError: Gemini API key not found. Set GOOGLE_API_KEY env var or run: qwed init
+```
+
+**Solution:** Set either `GOOGLE_API_KEY` or `GEMINI_API_KEY`:
+
+```bash
+export GOOGLE_API_KEY=your-google-api-key
+```
+
+Or run the setup wizard:
+
+```bash
+qwed init
+```
+
+### Gemini timeout errors
+
+All Gemini API calls have a 30-second timeout. If your requests time out consistently:
+
+1. Check your network connection to Google's API servers
+2. Break large inputs into smaller parts
+3. For image verification, ensure images are under 10 MB
+
+### Gemini JSON parse errors
+
+```
+ValueError: Failed to parse JSON from Gemini endpoint.
+```
+
+This can happen when Gemini returns malformed JSON for complex queries. QWED automatically strips Markdown code fences from responses, but edge cases may still occur. **Solution:** Retry the request — the error is usually transient. If it persists, simplify your input or switch to a different provider temporarily.
 
 ---
 

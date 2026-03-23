@@ -1,10 +1,8 @@
 ---
 sidebar_position: 2
-title: The 10 Guards
+title: "The 10 Guards"
 description: "QWED-Finance verification guards including ComplianceGuard (Z3 for AML/KYC), CalendarGuard, DerivativesGuard, MessageGuard, and QueryGuard with code examples."
 ---
-
-# The 10 Guards
 
 QWED-Finance uses **Neurosymbolic AI** - combining neural (LLM) outputs with symbolic (math/logic) verification.
 
@@ -30,8 +28,8 @@ result = guard.verify_aml_flag(
 ### Methods
 
 | Method | Description |
-|--------|-------------|
-| `verify_aml_flag()` | Check CTR threshold ($10,000) |
+| --- | --- |
+| `verify_aml_flag()` | Check CTR threshold (\$10,000) |
 | `verify_kyc_complete()` | Validate KYC document requirements |
 | `verify_transaction_limit()` | Enforce daily limits |
 | `verify_sanctions_check()` | OFAC sanctions screening |
@@ -72,7 +70,7 @@ result = guard.verify_day_count(
 ### Supported Conventions
 
 | Convention | Use Case |
-|------------|----------|
+| --- | --- |
 | `ACTUAL_ACTUAL` | US Treasury bonds |
 | `ACTUAL_360` | T-Bills, Commercial paper |
 | `ACTUAL_365` | UK Gilts |
@@ -106,7 +104,7 @@ result = guard.verify_black_scholes(
 ### Methods
 
 | Method | Description |
-|--------|-------------|
+| --- | --- |
 | `verify_black_scholes()` | Options pricing with Greeks |
 | `verify_delta()` | Delta calculation |
 | `verify_margin_call()` | Margin call decision |
@@ -135,7 +133,7 @@ result = guard.verify_iso20022_xml(
 ### Supported Formats
 
 | Format | Description |
-|--------|-------------|
+| --- | --- |
 | `PACS_008` | Customer Credit Transfer |
 | `CAMT_053` | Bank Statement |
 | `PAIN_001` | Payment Initiation |
@@ -178,6 +176,7 @@ result = guard.verify_payment_message(
 ```
 
 ### Why JSON vs XML?
+
 While `MessageGuard` handles traditional XML SWIFT messages, `ISOGuard` enables **Modern Banking Agents** to speak the same standard using lightweight JSON.
 
 ---
@@ -202,7 +201,7 @@ result = guard.verify_readonly_safety(
 ### Methods
 
 | Method | Description |
-|--------|-------------|
+| --- | --- |
 | `verify_readonly_safety()` | Block INSERT/UPDATE/DELETE/DROP |
 | `verify_table_access()` | Whitelist allowed tables |
 | `verify_column_access()` | Block PII columns |
@@ -306,7 +305,4 @@ result = guard.verify_sharpe_ratio(
 
 ---
 
-:::tip PyPI Package
-All 10 guards are available via `pip install qwed-finance`
-:::
-
+:::tip PyPI Package All 10 guards are available via `pip install qwed-finance` :::

@@ -1,12 +1,8 @@
 ---
 sidebar_position: 2
-title: Common Pitfalls
+title: "Common Pitfalls"
 description: "Avoid common QWED integration mistakes like calling LLM directly instead of through QWED. Includes correct and incorrect code examples for reference."
 ---
-
-# Common Integration Pitfalls
-
-Learn from others' mistakes! This guide covers the most common integration errors.
 
 ## ❌ Pitfall #1: Calling LLM Directly
 
@@ -117,6 +113,7 @@ if result.blocked:
 ```
 
 **Available methods:**
+
 - `verify()` - General (auto-detects domain)
 - `verify_math()` - Mathematical expressions
 - `verify_logic()` - Logical statements
@@ -297,6 +294,7 @@ for item_result in result.items:
 ```
 
 **Performance comparison:**
+
 - Individual: 100 queries × 2s = 200s
 - Batch: 1 request × 5s = 5s
 - **40x faster!**
@@ -337,6 +335,7 @@ result = client.verify(
 ```
 
 **Recommended timeouts:**
+
 - Simple queries: 10-15s
 - Complex queries: 30-60s
 - Batch processing: 60-120s
@@ -376,6 +375,7 @@ python your_app.py
 ```
 
 **Correct SDK usage:**
+
 ```python
 from qwed import QWEDClient
 
@@ -389,7 +389,8 @@ result = client.verify("2+2=4")
 ```
 
 **Architecture:**
-```
+
+```text
 Your App → SDK → Backend Server (YOU run) → LLM (YOUR key) → Verifiers
 ```
 
@@ -401,17 +402,17 @@ Your App → SDK → Backend Server (YOU run) → LLM (YOUR key) → Verifiers
 
 Before deploying to production, verify:
 
-- [ ] **Backend server is running** with your LLM API key configured
-- [ ] Not calling LLM directly (QWED handles it)
-- [ ] Using correct verification methods for each domain
-- [ ] Checking `result.verified` before using output
-- [ ] Proper error handling (try/except blocks)
-- [ ] API key in environment variable (not hardcoded)
-- [ ] Using batch processing for multiple queries
-- [ ] Reasonable timeout settings
-- [ ] Logging verification results for audit trails  
-- [ ] Testing integration (see [Testing Guide](./testing))
-- [ ] Monitoring QWED in production (see [Monitoring](./monitoring))
+- **Backend server is running** with your LLM API key configured
+- Not calling LLM directly (QWED handles it)
+- Using correct verification methods for each domain
+- Checking `result.verified` before using output
+- Proper error handling (try/except blocks)
+- API key in environment variable (not hardcoded)
+- Using batch processing for multiple queries
+- Reasonable timeout settings
+- Logging verification results for audit trails
+- Testing integration (see [Testing Guide](./testing))
+- Monitoring QWED in production (see [Monitoring](./monitoring))
 
 ---
 
@@ -421,4 +422,4 @@ Still stuck? We're here to help:
 
 - 📖 [Testing Guide](./testing) - Validate your integration
 - 💬 [Community Support](https://github.com/QWED-AI/qwed-verification/discussions)
-- 📧 Enterprise Support: support@qwedai.com
+- 📧 Enterprise Support: [support@qwedai.com](mailto:support@qwedai.com)

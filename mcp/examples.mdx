@@ -4,10 +4,6 @@ title: "Examples & Tutorials"
 description: "Real-world QWED-MCP examples including financial calculations with compound interest verification. Step-by-step tutorials for common verification scenarios."
 ---
 
-# Examples & Tutorials
-
-Real-world examples of using QWED-MCP for verification in different scenarios.
-
 ---
 
 ## Example 1: Financial Calculations
@@ -30,10 +26,11 @@ You're building an AI-powered financial advisor. Users ask for compound interest
 
 ### Conversation
 
-**User:** Calculate the future value of $10,000 invested at 5% annual interest, compounded monthly, for 10 years.
+**User:** Calculate the future value of \$10,000 invested at 5% annual interest, compounded monthly, for 10 years.
 
 **Claude's Process:**
-1. Calculate: FV = P(1 + r/n)^(nt) = 10000(1 + 0.05/12)^(12×10)
+
+1. Calculate: FV = P(1 \+ r/n)^(nt) = 10000(1 \+ 0.05/12)^(12×10)
 2. Call `verify_math` to confirm:
 
 ```json
@@ -46,7 +43,7 @@ You're building an AI-powered financial advisor. Users ask for compound interest
 
 **Result:** ✅ VERIFIED
 
-**Claude's Response:** The future value is **$16,470.09** (verified).
+**Claude's Response:** The future value is **\$16,470.09** (verified).
 
 ---
 
@@ -61,6 +58,7 @@ An AI legal assistant needs to verify that conclusions follow from legal premise
 **User:** Under contract law: If both parties agree and consideration is exchanged, a contract is formed. Alice agreed and paid Bob. Is there a valid contract?
 
 **Claude's Process:**
+
 1. Formalize the logic
 2. Call `verify_logic`:
 
@@ -99,6 +97,7 @@ def login(username, password):
 ```
 
 **Claude's Process:**
+
 1. Call `verify_code`:
 
 ```json
@@ -109,7 +108,8 @@ def login(username, password):
 ```
 
 **Result:**
-```
+
+```text
 ❌ FAILED - Found 2 security issues
 Issues:
   - Dangerous function call: eval()
@@ -142,7 +142,7 @@ Verifying statistical claims in AI-assisted research paper review.
 
 ### Conversation
 
-**User:** The paper claims: "If the p-value < 0.05, we reject the null hypothesis. Our p-value was 0.03. Therefore, we reject the null hypothesis."
+**User:** The paper claims: "If the p-value \< 0.05, we reject the null hypothesis. Our p-value was 0.03. Therefore, we reject the null hypothesis."
 
 **Claude's Process:**
 
@@ -171,6 +171,7 @@ An AI data analyst generates SQL queries. You need to ensure they're safe before
 **User:** Get all orders for user input "admin' OR '1'='1"
 
 **Claude's Process:**
+
 1. Generate query
 2. Call `verify_sql` before responding:
 
@@ -182,7 +183,8 @@ An AI data analyst generates SQL queries. You need to ensure they're safe before
 ```
 
 **Result:**
-```
+
+```text
 ❌ FAILED - Potential SQL injection detected
 Issues:
   - Suspicious tautology pattern: 1=1
@@ -194,6 +196,7 @@ Issues:
 ⚠️ **Security Warning:** The input appears to be a SQL injection attempt. I cannot generate this query safely.
 
 **Safe Alternative:** Use parameterized queries:
+
 ```sql
 SELECT * FROM orders WHERE user_id = ?
 -- Pass user_id as parameter
@@ -247,7 +250,7 @@ result = executor.invoke({
 
 ### 1. Always Verify Before Responding
 
-```
+```text
 User asks → AI calculates → AI verifies → AI responds
                             ↓ (if fails)
                         AI recalculates
@@ -256,7 +259,7 @@ User asks → AI calculates → AI verifies → AI responds
 ### 2. Use Appropriate Tools
 
 | Task | Tool |
-|------|------|
+| --- | --- |
 | Math/calculations | `verify_math` |
 | Logic/reasoning | `verify_logic` |
 | Code review | `verify_code` |
@@ -265,6 +268,7 @@ User asks → AI calculates → AI verifies → AI responds
 ### 3. Handle Verification Failures
 
 When verification fails:
+
 1. Acknowledge the error
 2. Recalculate
 3. Verify again
@@ -272,7 +276,7 @@ When verification fails:
 
 ### 4. Explain Verification to Users
 
-```
+```text
 "I calculated X. Let me verify this is correct...
 ✅ Verified using symbolic mathematics.
 The answer is definitely X."

@@ -4,8 +4,6 @@ title: "Self-Hosting"
 description: "Run QWED on your own infrastructure using Docker Compose. Quick start guide with services overview including API, PostgreSQL, Redis, and Grafana monitoring."
 ---
 
-Run QWED on your own infrastructure.
-
 ## Quick Start
 
 ```bash
@@ -23,7 +21,7 @@ docker-compose ps
 ## Services
 
 | Service | Port | Purpose |
-|---------|------|---------|
+| --- | --- | --- |
 | QWED API | 8000 | Main API |
 | PostgreSQL | 5432 | Database |
 | Redis | 6379 | Cache & rate limiting |
@@ -107,7 +105,7 @@ spec:
               key: api-key
 ```
 
-> 🏢 **Enterprise Support Coming Soon:** Managed hosting, dedicated support, and SLA guarantees. Contact support@qwedai.com
+> 🏢 **Enterprise Support Coming Soon:** Managed hosting, dedicated support, and SLA guarantees. Contact [support@qwedai.com](mailto:support@qwedai.com)
 
 ## Scaling
 
@@ -137,7 +135,7 @@ curl http://localhost:8000/health
 
 ### Prometheus Metrics
 
-```
+```text
 qwed_verification_total{engine="math", status="verified"}
 qwed_verification_latency_seconds
 qwed_cache_hit_rate
@@ -150,4 +148,3 @@ qwed_cache_hit_rate
 3. **Enable rate limiting**
 4. **Use network isolation**
 5. **Rotate secrets regularly**
-

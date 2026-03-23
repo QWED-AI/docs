@@ -1,12 +1,8 @@
 ---
 sidebar_position: 2
-title: Open Responses
+title: "Open Responses"
 description: "Intercept and verify LLM tool calls in agentic loops with QWED-Finance. OpenAI-compatible tool schemas and verified results with cryptographic receipts."
 ---
-
-# Open Responses Integration
-
-Intercept and verify LLM tool calls in your **agentic loop**.
 
 ## Quick Start
 
@@ -31,7 +27,7 @@ print(result.result)  # {"npv": "$180.42", "verified": True}
 
 ## Tool Call Flow
 
-```
+```text
 ┌─────────────┐     ┌─────────────┐     ┌─────────────┐
 │    LLM      │────▶│    QWED     │────▶│   Verified  │
 │  Tool Call  │     │  Intercept  │     │   Result    │
@@ -47,7 +43,7 @@ print(result.result)  # {"npv": "$180.42", "verified": True}
 ## Available Tools
 
 | Tool | Description | Engine |
-|------|-------------|--------|
+| --- | --- | --- |
 | `calculate_npv` | Net Present Value | SymPy |
 | `calculate_loan_payment` | Monthly loan payment | SymPy |
 | `check_aml_compliance` | AML threshold check | Z3 |

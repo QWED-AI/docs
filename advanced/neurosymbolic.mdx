@@ -2,20 +2,20 @@
 title: "What is Neurosymbolic AI?"
 description: "Neurosymbolic AI combines neural networks with symbolic reasoning. Learn how QWED bridges both for verified results."
 ---
-# What is Neurosymbolic AI?
-
 
 **Neurosymbolic AI** is the convergence of **Neural Networks** (deep learning, LLMs) and **Symbolic Reasoning** (logic, mathematics, formal methods).
 
 ## The Two Paradigms
 
 ### 1. Neural (Subsymbolic)
+
 - **Examples:** GPT-4, Claude, Llama
 - **Strength:** Pattern recognition, language understanding, creativity
 - **Weakness:** Cannot prove correctness, prone to hallucinations
 - **Output:** Probabilistic (maybe correct)
 
 ### 2. Symbolic
+
 - **Examples:** Z3 (SAT Solver), SymPy (Computer Algebra), Prolog (Logic Programming)
 - **Strength:** Deterministic reasoning, mathematical proof
 - **Weakness:** Cannot understand natural language
@@ -25,7 +25,7 @@ description: "Neurosymbolic AI combines neural networks with symbolic reasoning.
 
 **QWED bridges both worlds:**
 
-```
+```text
 Natural Language Query
          ↓
     LLM (Neural)
@@ -42,7 +42,8 @@ Natural Language Query
 **User Query:** "What is the derivative of x²?"
 
 **Neural Step (GPT-4):**
-```
+
+```text
 LLM translates to SymPy code:
 >>> from sympy import symbols, diff
 >>> x = symbols('x')
@@ -50,6 +51,7 @@ LLM translates to SymPy code:
 ```
 
 **Symbolic Step (SymPy):**
+
 ```python
 Result: 2*x  # Mathematically proven
 ```
@@ -64,7 +66,7 @@ Result: 2*x  # Mathematically proven
 
 **Scenario:** Healthcare AI diagnoses patient
 
-```
+```text
 GPT-4: "Give aspirin (contraindicated with warfarin)"
       ↓
  NO VERIFICATION
@@ -74,7 +76,7 @@ GPT-4: "Give aspirin (contraindicated with warfarin)"
 
 ### Solution: QWED (Neurosymbolic)
 
-```
+```text
 GPT-4: "Give aspirin"
       ↓
 Medical Logic Engine: Checks drug interaction database
@@ -101,12 +103,14 @@ Z3 Solver: Proves "aspirin + warfarin = contraindicated"
 ## QWED's Neurosymbolic Architecture
 
 ### Neural Components (Untrusted Translators):
+
 - OpenAI GPT-4
 - Anthropic Claude
 - Google Gemini
 - Ollama (Local LLMs)
 
 ### Symbolic Components (Trusted Verifiers):
+
 - **SymPy** → Math verification
 - **Z3** → Logic verification
 - **Python AST** → Code security verification
@@ -114,7 +118,7 @@ Z3 Solver: Proves "aspirin + warfarin = contraindicated"
 ### The Contract:
 
 | Component | Role | Trust Level |
-|-----------|------|-------------|
+| --- | --- | --- |
 | **LLM** | Translate natural language → formal logic | ⚠️ Untrusted |
 | **Symbolic Solver** | Execute logic, prove result | ✅ Trusted |
 
@@ -123,7 +127,7 @@ Z3 Solver: Proves "aspirin + warfarin = contraindicated"
 ## Comparison: Symbolic vs Neural vs **Neurosymbolic**
 
 | Approach | Understands Language? | Proves Correctness? | QWED Uses |
-|----------|----------------------|---------------------|-----------|
+| --- | --- | --- | --- |
 | **Symbolic Only** | ❌ No | ✅ Yes | Verification engines |
 | **Neural Only** | ✅ Yes | ❌ No | Translation step |
 | **Neurosymbolic** | ✅ Yes | ✅ Yes | ✅ **Both combined!** |
@@ -135,14 +139,16 @@ Z3 Solver: Proves "aspirin + warfarin = contraindicated"
 ### Finance Example:
 
 **Old Way (LLM-only):**
-```
+
+```text
 GPT: "Investment return = 12.5%"
 → Trust blindly
 → $12,889 error (from benchmark)
 ```
 
 **QWED Way (Neurosymbolic):**
-```
+
+```text
 GPT: "Investment return = 12.5%"
 → SymPy calculates: 11.8%
 → 🛑 Mismatch detected!
@@ -152,22 +158,23 @@ GPT: "Investment return = 12.5%"
 ### Code Security Example:
 
 **Old Way:**
-```
+
+````text
 GPT: "Here's the code"
 ```python
 eval(user_input)  # Dangerous!
-```
-→ No check
-→ 🔓 Security breach
-```
+````
+
+→ No check → 🔓 Security breach
+
+```text
 
 **QWED Way:**
 ```
-GPT: "Here's the code"
-→ AST analyzer detects 'eval'
-→ 🛑 UNSAFE CODE
-→ ✅ Blocked before execution
-```
+
+GPT: "Here's the code" → AST analyzer detects 'eval' → 🛑 UNSAFE CODE → ✅ Blocked before execution
+
+```text
 
 ---
 
@@ -197,3 +204,4 @@ GPT: "Here's the code"
 ---
 
 **QWED: Where Neural Networks meet Mathematical Proof.** 🧠🔬
+```

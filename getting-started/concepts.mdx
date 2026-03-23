@@ -1,178 +1,107 @@
 ---
 sidebar_position: 3
 title: "Core Concepts"
-description: "Understand QWED's trust model philosophy. LLMs are probabilistic translators, not reasoning engines. Learn how QWED verifies translations deterministically."
+description: "Understand QWED's trust model. LLMs translate intent, and deterministic engines verify claims before execution."
 ---
 
-Understand the philosophy behind QWED.
+Understand the core mental model behind QWED in one page.
 
-## The Trust Model
+## The trust boundary
 
-QWED is built on a fundamental insight:
+QWED is built on a simple idea:
 
-> **LLMs are probabilistic translators, not reasoning engines.**
+> **LLMs are useful translators, not final authorities.**
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                    QWED TRUST MODEL                         │
-├─────────────────────────────────────────────────────────────┤
-│                                                             │
-│  ┌─────────────┐        ┌─────────────┐        ┌─────────┐ │
-│  │   USER      │        │     LLM     │        │  QWED   │ │
-│  │  (Trusted)  │───────▶│ (Untrusted) │───────▶│(Trusted)│ │
-│  └─────────────┘        └─────────────┘        └─────────┘ │
-│        │                      │                     │      │
-│     Query                Probabilistic          Verified   │
-│                            Output               Result     │
-│                                                             │
-└─────────────────────────────────────────────────────────────┘
+```mermaid
+flowchart LR
+    U[User Intent] --> L[LLM Translation]
+    L --> C[Structured Claim]
+    C --> V[QWED Verifier]
+    V --> O[Verified Outcome]
+
+    classDef untrusted fill:#fff4e5,stroke:#f59e0b,color:#92400e;
+    classDef trusted fill:#ecfeff,stroke:#06b6d4,color:#155e75;
+    class L,C untrusted;
+    class V,O trusted;
 ```
 
-## How Translation Works
+The important boundary is between translation and verification:
 
-This is the key to understanding QWED. Let's walk through a real example:
+- Before verification: output is untrusted.
+- After deterministic verification: output is accepted, corrected, or blocked.
 
-### Example: Verifying a Mathematical Claim
+## How verification actually works
 
-**User asks:** *"Is it true that the sum of interior angles in a triangle equals 180 degrees?"*
+<Steps>
+  <Step title="1) Receive natural language input">
+    Example: "Is the sum of triangle angles 180 degrees?"
+  </Step>
+  <Step title="2) Translate to a structured form">
+    LLM maps intent into DSL, symbolic expression, or typed schema.
+  </Step>
+  <Step title="3) Verify with deterministic engine">
+    QWED uses engines like SymPy, Z3, AST analyzers, and SQL parsers.
+  </Step>
+  <Step title="4) Return a proof-backed result">
+    Final status is returned with evidence, not just confidence.
+  </Step>
+</Steps>
 
-```
-┌─────────────────────────────────────────────────────────────────────┐
-│  STEP 1: Natural Language Query                                     │
-│  ────────────────────────────────────────────────────────────────── │
-│  "Is it true that the sum of interior angles in a triangle          │
-│   equals 180 degrees?"                                               │
-└────────────────────────────────────────────────────────────────────┘
-                                    │
-                                    ▼
-┌─────────────────────────────────────────────────────────────────────┐
-│  STEP 2: LLM Translation (Untrusted)                                │
-│  ────────────────────────────────────────────────────────────────── │
-│  LLM converts to QWED-Logic DSL:                                    │
-│                                                                     │
-│  (EQ (PLUS angle_a angle_b angle_c) 180)                           │
-│                                                                     │
-│  ⚠️ This translation MIGHT be wrong - LLM is not trusted!          │
-└─────────────────────────────────────────────────────────────────────┘
-                                    │
-                                    ▼
-┌─────────────────────────────────────────────────────────────────────┐
-│  STEP 3: QWED Verification (Deterministic)                          │
-│  ────────────────────────────────────────────────────────────────── │
-│  Z3 Solver: Given angle_a + angle_b + angle_c = 180                 │
-│             Is this satisfiable? → YES (SAT)                        │
-│             Model: {angle_a: 60, angle_b: 60, angle_c: 60}          │
-│                                                                     │
-│  ✅ Mathematically proven. Deterministic. Repeatable.               │
-└─────────────────────────────────────────────────────────────────────┘
-                                    │
-                                    ▼
-┌─────────────────────────────────────────────────────────────────────┐
-│  STEP 4: Response                                                   │
-│  ────────────────────────────────────────────────────────────────── │
-│  {                                                                  │
-│    "verified": true,                                                │
-│    "status": "SAT",                                                 │
-│    "model": {"angle_a": 60, "angle_b": 60, "angle_c": 60},          │
-│    "proof": "Sum of angles = 60 + 60 + 60 = 180 ✓"                  │
-│  }                                                                  │
-└─────────────────────────────────────────────────────────────────────┘
-```
-
-### Translation Examples
-
-| Natural Language | QWED-Logic DSL | Engine |
-|------------------|----------------|--------|
-| "x is greater than 5" | `(GT x 5)` | Z3 |
-| "Is 2+2 equal to 5?" | `(EQ (PLUS 2 2) 5)` | SymPy |
-| "x squared plus y squared = 25" | `(EQ (PLUS (POW x 2) (POW y 2)) 25)` | Z3 |
-| "If raining, take umbrella" | `(IMPLIES raining umbrella)` | Z3 |
-
-## Key Principles
-
-### 1. Determinism over Probability
-
-QWED uses **symbolic engines** (Z3, SymPy) that provide mathematical guarantees:
-
-| Engine | Technology | Guarantee |
-|--------|------------|-----------|
-| Math | SymPy | Algebraic correctness |
-| Logic | Z3 | SAT/UNSAT proof |
-| Code | AST | Pattern matching |
-| SQL | Parser | Syntax validity |
-
-### 2. Verification, Not Generation
-
-QWED doesn't generate answers—it verifies them:
+## One concrete example
 
 ```python
-# ❌ Wrong approach (generation)
-answer = llm.ask("What is 2+2?")  # Might hallucinate
+from qwed_sdk import QWEDClient
 
-# ✅ QWED approach (verification)
-answer = llm.ask("What is 2+2?")
-verified = qwed.verify(answer)  # Deterministic check
+client = QWEDClient(api_key="qwed_your_key")
+
+result = client.verify_logic("(AND (GT x 5) (LT y 10))")
+print(result.status)  # SAT
+print(result.model)   # {"x": 6, "y": 9}
 ```
 
-### 3. Transparent Proofs
+## Determinism vs probability
 
-Every verification produces a verifiable proof:
+| Characteristic | LLM-only flow | QWED flow |
+|---|---|---|
+| Output consistency | Varies by run/prompt | Stable for same input |
+| Correctness basis | Statistical likelihood | Formal or rule-based verification |
+| Failure visibility | Often implicit | Explicit statuses and proofs |
+| Production safety | Risky without guards | Built for verification gates |
 
-```python
-result = client.verify("x^2 - 1 = (x-1)(x+1)")
-print(result.proof)
-# {
-#   "type": "algebraic_identity",
-#   "steps": [...],
-#   "hash": "sha256:abc123..."
-# }
-```
-
-## Verification Statuses
+## Verification statuses
 
 | Status | Meaning |
-|--------|---------|
-| `VERIFIED` | Claim is correct, proof generated |
-| `FAILED` | Claim is incorrect |
-| `CORRECTED` | Claim was wrong, correction provided |
-| `BLOCKED` | Security violation detected |
-| `ERROR` | Verification engine failed |
+|---|---|
+| `VERIFIED` | Claim is valid and accepted |
+| `FAILED` | Claim is invalid |
+| `CORRECTED` | Claim was wrong and corrected |
+| `BLOCKED` | Security or policy violation detected |
+| `ERROR` | Engine could not complete verification |
 
-## Attestations
+## Where each engine fits
 
-QWED can produce **cryptographic attestations** (signed JWTs) that prove a verification occurred:
+| Engine | Typical use |
+|---|---|
+| Math (SymPy) | Equations, identities, numeric claims |
+| Logic (Z3) | Constraints, SAT/UNSAT, model generation |
+| Code (AST/symbolic) | Vulnerability and unsafe pattern detection |
+| SQL (parser/rules) | Injection prevention and query validation |
+| Schema | Structured output integrity |
+
+## Attestations and auditability
+
+QWED can generate signed attestations so downstream systems can verify that a check occurred:
 
 ```python
 result = client.verify("2+2=4", include_attestation=True)
-print(result.attestation)
-# eyJhbGciOiJFUzI1NiIs...
+print(result.attestation)  # signed token
 ```
 
-Attestations can be:
-- Embedded in documents
-- Stored on blockchain
-- Verified by third parties
+Use this for compliance, audit logs, and third-party verification.
 
-## Agent Verification
+## Next steps
 
-For AI agents, QWED provides **pre-execution verification**:
-
-```python
-# Agent wants to execute SQL
-decision = agent_service.verify_action({
-    "type": "execute_sql",
-    "query": "DELETE FROM users"
-})
-
-if decision == "APPROVED":
-    execute(query)
-elif decision == "DENIED":
-    abort("Dangerous query blocked")
-```
-
-## Next Steps
-
-- [Verification Engines](/engines/overview)
-- [Attestation Spec](/specs/attestation)
-- [Agent Spec](/specs/agent)
-
+1. [Quick Start](/getting-started/quickstart)
+2. [Architecture Overview](/architecture)
+3. [Verification Engines](/engines/overview)
+4. [Attestation Spec](/specs/attestation)

@@ -4,8 +4,6 @@ title: "Cryptographic Attestations"
 description: "Generate and verify cryptographically signed JWT proofs of verification using ES256 signatures. Store attestations on-chain or verify independently."
 ---
 
-Generate and verify cryptographic proofs of verification.
-
 ## What are Attestations?
 
 An **attestation** is a cryptographically signed proof that a verification occurred. It:
@@ -88,7 +86,7 @@ is_valid = verify_attestation(
 QWED maintains a registry of trusted attestation issuers:
 
 | Issuer DID | Name | Status |
-|------------|------|--------|
+| --- | --- | --- |
 | `did:qwed:node:production` | QWED Production | ✅ Active |
 | `did:qwed:node:staging` | QWED Staging | ✅ Active |
 
@@ -121,4 +119,3 @@ Embed attestation badges:
 ```markdown
 ![Verified](https://api.qwedai.com/badge/attestation/att_xyz789)
 ```
-

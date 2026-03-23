@@ -1,16 +1,15 @@
 ---
 sidebar_position: 4
-title: Testing Your Integration
+title: "Testing Your Integration"
 description: "Validate QWED integration with a comprehensive checklist. Python code examples for testing API connectivity, error detection, and math engine functionality."
 ---
-
-# Testing Your Integration
 
 This guide helps you verify that QWED is integrated correctly into your application.
 
 ## Why Test Your Integration?
 
 Without proper testing, you might:
+
 - ❌ Call LLM directly (bypassing verification)
 - ❌ Miss security vulnerabilities
 - ❌ Get incorrect verification results
@@ -351,7 +350,7 @@ python test_qwed_integration.py
 
 **Expected output:**
 
-```
+```text
 ============================================================
 QWED Integration Test Suite
 ============================================================
@@ -397,11 +396,13 @@ You can now use QWED in production with confidence.
 ### Problem: Authentication Fails
 
 **Symptoms:**
-```
+
+```text
 ❌ Authentication failed: Invalid API key
 ```
 
 **Solutions:**
+
 1. Check API key is correct
 2. Verify API key is active (not revoked)
 3. Check for extra spaces in key
@@ -412,24 +413,24 @@ You can now use QWED in production with confidence.
 ### Problem: Math Verification Returns Wrong Results
 
 **Symptoms:**
+
 ```python
 result = client.verify_math("2+2=4")
 assert result.verified == True  # Fails!
 ```
 
 **Solutions:**
+
 1. Check verbose mode to see internal flow:
    ```python
    client = QWEDClient(api_key="...", verbose=True)
    result = client.verify_math("2+2=4")
    ```
-
 2. Check trace to debug:
    ```python
    result = client.verify_math("2+2=4", return_trace=True)
    print(result.trace)
    ```
-
 3. Verify expression format is correct
 
 ---
@@ -437,12 +438,14 @@ assert result.verified == True  # Fails!
 ### Problem: Security Detection Misses Vulnerabilities
 
 **Symptoms:**
+
 ```python
 result = client.verify_code("eval(user_input)", language="python")
 assert result.blocked == True  # Fails!
 ```
 
 **Solutions:**
+
 1. Check language parameter is correct
 2. Verify code string is properly formatted
 3. Enable strict mode:
@@ -467,7 +470,7 @@ print(f"Response time: {duration:.2f}s")
 assert duration < 5.0, "Response too slow!"
 ```
 
-**Expected:** < 5 seconds for simple queries
+**Expected:** \< 5 seconds for simple queries
 
 ---
 
@@ -530,9 +533,9 @@ jobs:
 
 Once all tests pass:
 
-✅ [Production Deployment](./production) - Deploy with confidence  
-✅ [Monitoring](./monitoring) - Track QWED in production  
-✅ [Troubleshooting](./troubleshooting) - Debug common issues  
+✅ [Production Deployment](./production) - Deploy with confidence\
+✅ [Monitoring](./monitoring) - Track QWED in production\
+✅ [Troubleshooting](./troubleshooting) - Debug common issues
 
 ---
 
@@ -541,5 +544,5 @@ Once all tests pass:
 Can't get tests to pass? We're here to help:
 
 - 💬 [Community Support](https://github.com/QWED-AI/qwed-verification/discussions)
-- 📧 Enterprise Support: support@qwedai.com
+- 📧 Enterprise Support: [support@qwedai.com](mailto:support@qwedai.com)
 - 📖 [FAQ](../faq)

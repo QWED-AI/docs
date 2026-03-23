@@ -100,18 +100,39 @@ print(f"Success rate: {results.summary.success_rate}%")
 
 ## 7. CLI usage
 
-Set up your LLM provider, then verify from the command line:
+Run the onboarding wizard once to set up engines, configure your provider, and generate an API key:
 
 ```bash
-# One-time setup — configures your provider and API key
+# One-time setup — engines, provider, and API key bootstrap
 qwed init
+```
 
-# Verify from command line
+After init, verify your setup and confirm all engines work:
+
+```bash
+# System health check — engines, provider, server, database
+qwed doctor
+
+# 12 deterministic tests — all must pass before production
+qwed test
+```
+
+Then verify from the command line:
+
+```bash
 qwed verify "Is 2+2=5?"
 
 # Verify with a specific provider
 qwed verify "derivative of x^2" --provider openai
 ```
+
+For CI pipelines, use `--non-interactive` to skip prompts:
+
+```bash
+qwed init --non-interactive --provider openai --api-key "$OPENAI_API_KEY" --skip-tests
+```
+
+You only need to run `qwed init` once. After that, QWED reads from `.env`. Re-run only when changing providers or rotating keys.
 
 ## Next Steps
 

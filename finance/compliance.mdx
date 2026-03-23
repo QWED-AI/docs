@@ -1,10 +1,8 @@
 ---
 sidebar_position: 3
-title: Compliance & Auditing
+title: "Compliance & Auditing"
 description: "How QWED-Finance generates cryptographic verification receipts with tamper-proof signatures and audit trails for compliance."
 ---
-
-# Compliance & Auditing
 
 QWED-Finance generates **cryptographic proof** of every verification for regulatory compliance.
 
@@ -31,7 +29,7 @@ print(receipt.to_json())
 ### Receipt Fields
 
 | Field | Description | Example |
-|-------|-------------|---------|
+| --- | --- | --- |
 | `receipt_id` | Unique identifier | `"a1b2c3d4-..."` |
 | `timestamp` | ISO 8601 UTC | `"2026-01-18T14:30:00Z"` |
 | `input_hash` | SHA-256 of LLM output | `"7f83b1657..."` |
@@ -104,7 +102,7 @@ for receipt in failures:
 ## Regulatory Alignment
 
 | Regulation | QWED Feature |
-|------------|--------------|
+| --- | --- |
 | **RBI FREE-AI** | Audit trail with receipts |
 | **BSA/FinCEN CTR** | AML threshold verification |
 | **OFAC** | Sanctions screening |
@@ -135,15 +133,15 @@ def test_mixed_case_drop():
 ### Test Suites
 
 | Suite | Tests | Coverage |
-|-------|-------|----------|
-| `test_sql_jailbreaks.py` | 20+ | SQL injection, UNION, comments |
-| `test_math_compliance_jailbreaks.py` | 15+ | Float precision, AML boundaries |
+| --- | --- | --- |
+| `test_sql_jailbreaks.py` | 20\+ | SQL injection, UNION, comments |
+| `test_math_compliance_jailbreaks.py` | 15\+ | Float precision, AML boundaries |
 
 ---
 
 ## For Compliance Officers
 
-When a regulator asks: *"How do you verify AI decisions?"*
+When a regulator asks: _"How do you verify AI decisions?"_
 
 Show them:
 
@@ -182,7 +180,4 @@ Show them:
 
 ---
 
-:::info GitHub Repository
-Source code and adversarial tests: [github.com/QWED-AI/qwed-finance](https://github.com/QWED-AI/qwed-finance)
-:::
-
+:::info GitHub Repository Source code and adversarial tests: [github.com/QWED-AI/qwed-finance](https://github.com/QWED-AI/qwed-finance) :::

@@ -2,8 +2,6 @@
 title: "QWED GitHub Action"
 description: "Integrate QWED neurosymbolic verification into CI/CD pipelines. Verify math calculations, logical reasoning, and code patterns in pull requests automatically."
 ---
-# QWED GitHub Action
-
 
 **Neurosymbolic verification for your CI/CD pipeline**
 
@@ -52,23 +50,23 @@ Use these extension-specific actions when you want domain-focused checks in your
 
 ## Inputs
 
-| Input               | Description                                    | Required | Default       |
-| ------------------- | ---------------------------------------------- | -------- | ------------- |
-| `query`             | Question or statement to verify                | ✅ Yes    | -             |
-| `provider`          | LLM provider (`openai`, `anthropic`, `gemini`) | No       | `openai`      |
-| `api-key`           | API key for LLM provider                       | No       | -             |
-| `model`             | Model name (e.g., `gpt-4o-mini`)               | No       | `gpt-4o-mini` |
-| `mask-pii`          | Enable PII masking (`true`/`false`)            | No       | `false`       |
-| `verification-type` | Type: `auto`, `math`, `logic`, `code`          | No       | `auto`        |
+| Input | Description | Required | Default |
+| --- | --- | --- | --- |
+| `query` | Question or statement to verify | ✅ Yes | - |
+| `provider` | LLM provider (`openai`, `anthropic`, `gemini`) | No | `openai` |
+| `api-key` | API key for LLM provider | No | - |
+| `model` | Model name (e.g., `gpt-4o-mini`) | No | `gpt-4o-mini` |
+| `mask-pii` | Enable PII masking (`true`/`false`) | No | `false` |
+| `verification-type` | Type: `auto`, `math`, `logic`, `code` | No | `auto` |
 
 ## Outputs
 
-| Output       | Description                          |
-| ------------ | ------------------------------------ |
-| `verified`   | Verification result (`true`/`false`) |
-| `value`      | Verified value or result             |
-| `confidence` | Confidence score (0.0-1.0)           |
-| `evidence`   | JSON evidence of verification        |
+| Output | Description |
+| --- | --- |
+| `verified` | Verification result (`true`/`false`) |
+| `value` | Verified value or result |
+| `confidence` | Confidence score (0.0-1.0) |
+| `evidence` | JSON evidence of verification |
 
 ## Examples
 
@@ -108,7 +106,7 @@ Use these extension-specific actions when you want domain-focused checks in your
 
 verification-type: "code"
 
-````
+````text
 
 ### Enterprise: PII Masking
 
@@ -131,7 +129,7 @@ verification-type: "code"
 
 ## How It Works
 
-```
+```text
 Your Query
     ↓
 LLM Response (GPT-4, Claude, etc.)

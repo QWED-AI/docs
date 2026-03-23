@@ -40,15 +40,16 @@
                 "group": "Start here",
                 "pages": [
                   "intro",
+                  "getting-started/concepts",
                   "getting-started/installation",
                   "getting-started/quickstart"
                 ]
               },
               {
-                "group": "Build your mental model",
+                "group": "Configure and understand",
                 "pages": [
-                  "getting-started/concepts",
                   "getting-started/llm-configuration",
+                  "getting-started/custom-providers",
                   "architecture",
                   "faq"
                 ]
@@ -192,14 +193,6 @@
                   "integrations/llamaindex",
                   "integrations/crewai"
                 ]
-              },
-              {
-                "group": "Protocol quickstarts",
-                "pages": [
-                  "open-responses/overview",
-                  "ucp/overview",
-                  "mcp/overview"
-                ]
               }
             ]
           },
@@ -234,13 +227,13 @@
             "tab": "Guides",
             "groups": [
               {
-                "group": "Integration Guide",
+                "group": "Production path",
                 "pages": [
                   "integration/getting-started",
+                  "integration/common-pitfalls",
                   "integration/testing",
                   "integration/production",
                   "integration/monitoring",
-                  "integration/common-pitfalls",
                   "integration/troubleshooting"
                 ]
               },

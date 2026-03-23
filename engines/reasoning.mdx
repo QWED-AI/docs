@@ -10,7 +10,7 @@ The Reasoning Engine validates LLM reasoning traces using chain-of-thought parsi
 
 - **Chain-of-Thought Validation** - Parse and verify reasoning steps
 - **Result Caching** - LRU + Redis for repeated queries
-- **Multi-Provider Support** - Anthropic, Azure OpenAI, OpenAI
+- **Multi-Provider Support** - Anthropic, Azure OpenAI, Google Gemini, OpenAI
 - **Semantic Fact Extraction** - Identify verifiable claims
 
 ## Usage
@@ -36,11 +36,11 @@ print(result.cached)       # True/False
 ```python
 result = client.verify_reasoning(
     query="Complex reasoning task...",
-    providers=["anthropic", "openai", "azure"],
+    providers=["anthropic", "openai", "gemini", "azure"],
     enable_cross_validation=True
 )
 
-print(result.provider_agreement)  # 3/3
+print(result.provider_agreement)  # 4/4
 print(result.per_provider_results)
 ```
 

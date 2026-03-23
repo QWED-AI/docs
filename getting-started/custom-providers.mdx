@@ -1,0 +1,149 @@
+---
+title: "Custom providers"
+description: "Add any OpenAI-compatible LLM provider to QWED using a portable YAML config. Share and import community provider definitions with a single command."
+---
+
+QWED ships with built-in support for OpenAI, Anthropic, Google Gemini, and Ollama. Starting in v4.0, you can also register any OpenAI-compatible endpoint as a **custom provider** through a YAML configuration file. This is useful when you work with providers like Groq, Together AI, Fireworks, Perplexity, or self-hosted inference servers that expose an OpenAI-compatible API.
+
+Custom providers are stored in `~/.qwed/providers.yaml`. Once registered, they appear as options in the `qwed init` wizard and work with `qwed verify` just like built-in providers.
+
+## How it works
+
+Custom providers follow the same security model as built-in ones:
+
+- The YAML file stores the **name** of the environment variable that holds your API key, never the key itself.
+- The file is written with `0600` permissions (owner-read/write only on Unix).
+- When you select a custom provider in `qwed init`, it maps to the `openai_compat` inference engine internally, so no changes are needed to your verification workflow.
+
+## Define a custom provider
+
+Create or edit `~/.qwed/providers.yaml`:
+
+```yaml
+providers:
+  groq:
+    base_url: "https://api.groq.com/openai/v1"
+    api_key_env: "GROQ_API_KEY"
+    default_model: "llama-3.3-70b-versatile"
+    models_endpoint: "/models"
+    auth_header: "Authorization"
+    auth_prefix: "Bearer"
+```
+
+### Required fields
+
+| Field | Description |
+|---|---|
+| `base_url` | The provider's OpenAI-compatible base URL |
+| `api_key_env` | Name of the environment variable that stores your API key |
+
+### Optional fields
+
+| Field | Default | Description |
+|---|---|---|
+| `default_model` | `gpt-4o-mini` | Model name used when none is specified |
+| `models_endpoint` | `/models` | Path to the provider's model listing endpoint |
+| `auth_header` | `Authorization` | HTTP header used for authentication |
+| `auth_prefix` | `Bearer` | Prefix added before the token value |
+
+After saving the file, run `qwed init` and your custom provider appears alongside the built-in options.
+
+## Import a community provider
+
+Instead of writing YAML by hand, you can import a provider definition from a URL:
+
+```bash
+qwed provider import https://raw.githubusercontent.com/my-org/qwed-providers/main/groq.yaml
+```
+
+This downloads the YAML file, validates its structure, and saves it to `~/.qwed/providers.yaml`. After importing, the provider is immediately available in `qwed init`.
+
+<Note>
+Only `http` and `https` URLs are accepted. The download has a 10-second timeout. The imported YAML must contain `base_url` and `api_key_env` fields or it is rejected.
+</Note>
+
+### Example community YAML
+
+A valid community provider file looks like this:
+
+```yaml
+providers:
+  fireworks:
+    base_url: "https://api.fireworks.ai/inference/v1"
+    api_key_env: "FIREWORKS_API_KEY"
+    default_model: "accounts/fireworks/models/llama-v3p3-70b-instruct"
+```
+
+Or as a flat format (without the `providers` wrapper):
+
+```yaml
+name: "together"
+base_url: "https://api.together.xyz/v1"
+api_key_env: "TOGETHER_API_KEY"
+default_model: "meta-llama/Meta-Llama-3.1-70B-Instruct-Turbo"
+```
+
+## Use a custom provider
+
+Once a custom provider is registered:
+
+<Steps>
+  <Step title="Set your API key">
+    Export the environment variable referenced in `api_key_env`:
+
+    ```bash
+    export GROQ_API_KEY="gsk_your_key_here"
+    ```
+  </Step>
+  <Step title="Run the init wizard">
+    ```bash
+    qwed init
+    ```
+
+    Your custom provider appears in the selection list as **"Groq (Auto-Configured via YAML)"**. Select it, and the wizard collects your credentials and writes them to `.env` as usual.
+  </Step>
+  <Step title="Verify">
+    ```bash
+    qwed verify "What is the derivative of x^3?"
+    ```
+
+    QWED routes the translation step through your custom provider and verifies the result with its deterministic engines.
+  </Step>
+</Steps>
+
+## Multiple providers
+
+You can define as many providers as you need in the same file:
+
+```yaml
+providers:
+  groq:
+    base_url: "https://api.groq.com/openai/v1"
+    api_key_env: "GROQ_API_KEY"
+    default_model: "llama-3.3-70b-versatile"
+
+  together:
+    base_url: "https://api.together.xyz/v1"
+    api_key_env: "TOGETHER_API_KEY"
+    default_model: "meta-llama/Meta-Llama-3.1-70B-Instruct-Turbo"
+
+  fireworks:
+    base_url: "https://api.fireworks.ai/inference/v1"
+    api_key_env: "FIREWORKS_API_KEY"
+    default_model: "accounts/fireworks/models/llama-v3p3-70b-instruct"
+```
+
+Each provider gets its own entry in the `qwed init` wizard.
+
+## Security
+
+- **No secrets in YAML.** The config file only stores the *name* of the env var (e.g., `GROQ_API_KEY`), not the actual key. Secrets live in your `.env` file, which is protected by `0600` permissions and `.gitignore`.
+- **Atomic writes.** The YAML file is written atomically with a temp-file-and-rename pattern to prevent partial writes.
+- **Slug sanitization.** Imported provider slugs are sanitized to lowercase alphanumeric characters and cannot shadow built-in provider names.
+- **Symlink protection.** File writes refuse to follow symlinks.
+
+## Related docs
+
+- [LLM configuration](/getting-started/llm-configuration) — set up built-in providers
+- [CLI reference](/advanced/cli) — full command reference including `qwed provider import`
+- [Self-hosting guide](/advanced/self-hosting) — deploy QWED with your own infrastructure

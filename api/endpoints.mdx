@@ -1,16 +1,12 @@
 ---
 sidebar_position: 2
-title: "API Endpoints"
-description: "Complete QWED API endpoint reference. Includes health check, verification endpoints with auto-detection, math, logic, code, SQL, and batch operations."
+title: "API endpoints"
+description: "Complete QWED API endpoint reference covering health checks, verification, batch operations, agent endpoints, observability, and admin routes."
 ---
-# API Endpoints
-
-
-Complete reference for all QWED API endpoints.
 
 ## Base URL
 
-```
+```text
 https://api.qwedai.com/v1
 ```
 
@@ -25,6 +21,7 @@ curl https://api.qwedai.com/v1/health
 ```
 
 **Response:**
+
 ```json
 {
   "status": "healthy",
@@ -42,6 +39,7 @@ curl https://api.qwedai.com/v1/health
 Auto-detect and verify any claim.
 
 **Request:**
+
 ```json
 {
   "query": "Is 2+2=4?",
@@ -52,6 +50,7 @@ Auto-detect and verify any claim.
 ```
 
 **Response:**
+
 ```json
 {
   "status": "VERIFIED",
@@ -74,6 +73,7 @@ Auto-detect and verify any claim.
 Verify mathematical expressions.
 
 **Request:**
+
 ```json
 {
   "expression": "x**2 + 2*x + 1 = (x+1)**2"
@@ -87,6 +87,7 @@ Verify mathematical expressions.
 Verify logical constraints.
 
 **Request:**
+
 ```json
 {
   "query": "(AND (GT x 5) (LT y 10))",
@@ -95,15 +96,29 @@ Verify logical constraints.
 ```
 
 **Response:**
+
 ```json
 {
   "status": "VERIFIED",
   "verified": true,
   "verification_mode": "SYMBOLIC",
+  "provider_used": "openai_compat",
   "result": {
     "satisfiability": "SAT",
     "model": {"x": 6, "y": 9}
   }
+}
+```
+
+The `provider_used` field indicates which LLM provider handled the translation step. This field is included in both success and error responses, which helps with debugging provider routing issues.
+
+**Error response:**
+
+```json
+{
+  "status": "ERROR",
+  "error": "Internal verification error",
+  "provider_used": "openai_compat"
 }
 ```
 
@@ -114,6 +129,7 @@ Verify logical constraints.
 Check code for security vulnerabilities.
 
 **Request:**
+
 ```json
 {
   "code": "import os\nos.system('rm -rf /')",
@@ -122,6 +138,7 @@ Check code for security vulnerabilities.
 ```
 
 **Response:**
+
 ```json
 {
   "status": "BLOCKED",
@@ -147,6 +164,7 @@ Check code for security vulnerabilities.
 Validate SQL queries.
 
 **Request:**
+
 ```json
 {
   "query": "SELECT * FROM users WHERE id = 1",
@@ -159,15 +177,248 @@ Validate SQL queries.
 
 ### POST /verify/fact
 
-Verify factual claims.
+Verify factual claims against a provided context.
 
 **Request:**
+
 ```json
 {
   "claim": "Paris is the capital of France",
-  "context": "France is a country in Western Europe. Its capital is Paris."
+  "context": "France is a country in Western Europe. Its capital is Paris.",
+  "provider": "openai"
 }
 ```
+
+**Response:**
+
+```json
+{
+  "status": "VERIFIED",
+  "verified": true,
+  "engine": "fact",
+  "result": {
+    "is_valid": true,
+    "confidence": 0.98,
+    "message": "Claim is supported by the provided context"
+  }
+}
+```
+
+---
+
+### POST /verify/consensus
+
+<Info>New in v4.0.0</Info>
+
+Multi-engine consensus verification. Runs the query through multiple verification engines and requires agreement above a confidence threshold.
+
+**Request:**
+
+```json
+{
+  "query": "The square root of 144 is 12",
+  "verification_mode": "high",
+  "min_confidence": 0.8
+}
+```
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `query` | string | Yes | The claim to verify |
+| `verification_mode` | string | No | `single`, `high`, or `maximum` (default: `single`) |
+| `min_confidence` | float | No | Minimum confidence threshold, 0–1 (default: `0.8`) |
+
+**Response:**
+
+```json
+{
+  "status": "VERIFIED",
+  "verified": true,
+  "engine": "consensus",
+  "result": {
+    "confidence": 0.95,
+    "engines_used": ["math", "logic"],
+    "agreement_rate": 1.0
+  }
+}
+```
+
+---
+
+### POST /verify/image
+
+<Info>New in v4.0.0</Info>
+
+Verify claims about image content. Accepts multipart form data with an image file (max 10 MB).
+
+**Request:**
+
+```bash
+curl -X POST https://api.qwedai.com/v1/verify/image \
+  -H "X-API-Key: qwed_your_key" \
+  -F "image=@photo.jpg" \
+  -F "claim=This image contains a cat"
+```
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `image` | file | Yes | Image file (max 10 MB) |
+| `claim` | string | Yes | The claim about the image to verify |
+
+**Response:**
+
+```json
+{
+  "status": "VERIFIED",
+  "verified": true,
+  "engine": "image",
+  "result": {
+    "is_valid": true,
+    "confidence": 0.92,
+    "message": "Claim is consistent with image content"
+  }
+}
+```
+
+---
+
+### POST /verify/stats
+
+<Info>New in v4.0.0</Info>
+
+Verify statistical claims against CSV data. Accepts multipart form data with a CSV file.
+
+**Request:**
+
+```bash
+curl -X POST https://api.qwedai.com/v1/verify/stats \
+  -H "X-API-Key: qwed_your_key" \
+  -F "file=@data.csv" \
+  -F "query=The average salary is above 50000"
+```
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `file` | file | Yes | CSV data file |
+| `query` | string | Yes | Statistical claim to verify |
+
+**Response:**
+
+```json
+{
+  "status": "VERIFIED",
+  "verified": true,
+  "engine": "stats",
+  "result": {
+    "is_valid": true,
+    "computed_value": 52340.5,
+    "message": "Statistical claim verified against dataset"
+  }
+}
+```
+
+---
+
+### POST /verify/process
+
+<Info>New in v4.0.1</Info>
+
+Verify the structural integrity of AI reasoning traces. Supports IRAC structural compliance checking and custom milestone validation with decimal scoring.
+
+**Request (IRAC mode):**
+
+```json
+{
+  "trace": "The issue is whether the contract was breached. The rule is Article 2 of the UCC. Applying this rule, the defendant failed to deliver on time. In conclusion, breach occurred.",
+  "mode": "irac"
+}
+```
+
+**Request (milestones mode):**
+
+```json
+{
+  "trace": "Risk assessment complete. Compliance check passed. Implementation timeline defined.",
+  "mode": "milestones",
+  "milestones": ["risk assessment", "compliance check", "implementation"]
+}
+```
+
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `trace` | string | Yes | — | The AI reasoning trace to validate |
+| `mode` | string | No | `irac` | `irac` or `milestones` |
+| `milestones` | string[] | Conditional | — | Required when `mode` is `milestones` |
+
+**Response (IRAC mode):**
+
+```json
+{
+  "verified": true,
+  "score": 1.0,
+  "missing_steps": [],
+  "mechanism": "Regex Pattern Matching (Deterministic)"
+}
+```
+
+**Response (milestones mode):**
+
+```json
+{
+  "verified": true,
+  "process_rate": 1.0,
+  "missed_milestones": []
+}
+```
+
+| Status | Description |
+|--------|-------------|
+| 400 | Invalid mode or missing `milestones` when `mode` is `milestones` |
+
+---
+
+### POST /verify/rag
+
+<Info>New in v4.0.1</Info>
+
+Verify that retrieved RAG chunks originate from the expected source document. Prevents Document-Level Retrieval Mismatch (DRM) hallucinations in RAG pipelines.
+
+**Request:**
+
+```json
+{
+  "target_document_id": "contract_nda_v2",
+  "chunks": [
+    { "id": "c1", "metadata": { "document_id": "contract_nda_v2" } },
+    { "id": "c2", "metadata": { "document_id": "contract_nda_v1" } }
+  ],
+  "max_drm_rate": "0"
+}
+```
+
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `target_document_id` | string | Yes | — | Expected source document ID |
+| `chunks` | object[] | Yes | — | Array of chunk objects with metadata |
+| `max_drm_rate` | string | No | `"0"` | Maximum tolerable mismatch fraction as a `Fraction`-compatible string (e.g. `"0"`, `"1/10"`) |
+
+<Note>`max_drm_rate` accepts only string values for symbolic precision. Use fraction notation like `"1/10"` instead of `0.1`.</Note>
+
+**Response:**
+
+```json
+{
+  "verified": false,
+  "risk": "DOCUMENT_RETRIEVAL_MISMATCH",
+  "drm_rate": 0.5,
+  "chunks_checked": 2,
+  "mismatched_count": 1
+}
+```
+
+| Status | Description |
+|--------|-------------|
+| 400 | Invalid request payload (empty `target_document_id`, empty `chunks`, or invalid `max_drm_rate` value) |
 
 ---
 
@@ -176,6 +427,7 @@ Verify factual claims.
 Verify multiple items at once.
 
 **Request:**
+
 ```json
 {
   "items": [
@@ -191,6 +443,7 @@ Verify multiple items at once.
 ```
 
 **Response:**
+
 ```json
 {
   "results": [...],
@@ -205,42 +458,129 @@ Verify multiple items at once.
 
 ---
 
-## Agent Endpoints
+## Agent endpoints
 
-### POST /agent/register
+### POST /agents/register
 
-Register a new AI agent.
+Register a new AI agent with QWED for verified agentic workflows.
 
 **Request:**
+
 ```json
 {
-  "name": "MyAgent",
+  "name": "FinanceBot",
+  "agent_type": "supervised",
+  "description": "Financial analysis agent",
+  "permissions": ["math", "logic", "code"],
+  "max_cost_per_day": 50.0
+}
+```
+
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `name` | string | Yes | — | Agent display name |
+| `agent_type` | string | No | `autonomous` | `supervised`, `autonomous`, or `trusted` |
+| `description` | string | No | — | Agent description |
+| `permissions` | array | No | `[]` | Allowed verification engine names (e.g., `math`, `logic`, `code`) |
+| `max_cost_per_day` | float | No | `100.0` | Daily budget cap in USD |
+
+**Response:**
+
+```json
+{
+  "agent_id": 42,
+  "agent_token": "qwed_agent_...",
+  "name": "FinanceBot",
   "type": "supervised",
-  "principal_id": "user_123",
-  "permissions": {
-    "allowed_engines": ["math", "logic"]
+  "status": "active",
+  "max_cost_per_day": 50.0,
+  "message": "Agent registered successfully. Store the agent_token securely."
+}
+```
+
+<Warning>Store the `agent_token` immediately — it cannot be retrieved again after registration.</Warning>
+
+---
+
+### POST /agents/{agent_id}/verify
+
+Verify a claim using an agent token. Creates an auditable record tied to the agent. Optionally runs Sentinel Guard security checks (exfiltration detection, MCP poisoning) before verification.
+
+**Request:**
+
+```json
+{
+  "query": "What is 15% of 200?",
+  "provider": "openai",
+  "security_checks": {
+    "exfiltration": true,
+    "mcp_poison": false
   },
-  "budget": {
-    "max_daily_cost_usd": 100,
-    "max_requests_per_hour": 1000
+  "tool_schema": null
+}
+```
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `query` | string | Yes | The claim to verify |
+| `provider` | string | No | LLM provider preference |
+| `security_checks.exfiltration` | boolean | No | Run `ExfiltrationGuard` on the query payload |
+| `security_checks.mcp_poison` | boolean | No | Run `MCPPoisonGuard` on the `tool_schema` |
+| `tool_schema` | object | No | MCP tool definition to scan (required when `mcp_poison` is `true`) |
+
+**Headers:**
+
+```text
+X-Agent-Token: qwed_agent_...
+```
+
+**Error responses:**
+
+| Status | Description |
+|--------|-------------|
+| 400 | Invalid security check configuration or payload |
+| 401 | Invalid agent token |
+| 403 | Agent budget exceeded or request blocked by security checks |
+| 500 | Internal agent verification error |
+
+---
+
+### POST /agents/{agent_id}/tools/{tool_name}
+
+Submit an agent tool call for risk evaluation before execution.
+
+**Request:**
+
+```json
+{
+  "tool_params": {
+    "query": "SELECT * FROM users",
+    "dialect": "postgresql"
   }
 }
 ```
 
 ---
 
-### POST /agent/verify-action
+### GET /agents/{agent_id}/activity
 
-Verify an agent action before execution.
+Retrieve the audit log for a specific agent.
 
-**Request:**
+**Query params:** `limit` (default: 50)
+
+**Response:**
+
 ```json
 {
   "agent_id": "agent_abc123",
-  "action": {
-    "type": "execute_sql",
-    "query": "SELECT * FROM users"
-  }
+  "activity": [
+    {
+      "timestamp": "2026-03-20T12:00:00Z",
+      "action": "verify",
+      "engine": "math",
+      "status": "VERIFIED"
+    }
+  ]
 }
 ```
 
@@ -257,6 +597,7 @@ Get an attestation by ID.
 Verify an attestation JWT.
 
 **Request:**
+
 ```json
 {
   "jwt": "eyJhbGciOiJFUzI1NiIs..."
@@ -265,7 +606,65 @@ Verify an attestation JWT.
 
 ---
 
-## Badge Endpoints
+## Observability endpoints
+
+<Info>New in v4.0.0</Info>
+
+### GET /metrics
+
+Returns global system metrics (request counts, latencies, engine usage).
+
+### GET /metrics/{organization_id}
+
+Returns per-tenant metrics scoped to a specific organization.
+
+### GET /metrics/prometheus
+
+Returns metrics in Prometheus scrape format for integration with monitoring infrastructure.
+
+### GET /logs
+
+Returns verification logs for the authenticated tenant. Supports pagination.
+
+---
+
+## Admin endpoints
+
+<Info>New in v4.0.0</Info>
+
+These endpoints require the `admin:all` API key scope.
+
+### GET /admin/compliance/export/csv
+
+Export the full audit trail as a CSV file.
+
+### GET /admin/compliance/verify/{log_id}
+
+Cryptographically verify a specific audit log entry using HMAC and hash chain validation.
+
+### GET /admin/compliance/report/soc2/{org_id}
+
+Generate a SOC 2 Type II compliance report for an organization.
+
+### GET /admin/security/threats/{org_id}
+
+Returns a real-time threat summary for an organization, including blocked injection attempts and anomalous patterns.
+
+### POST /admin/keys/rotate
+
+Rotate an API key. Available to admin and member roles.
+
+**Request:**
+
+```json
+{
+  "key_id": "key_abc123"
+}
+```
+
+---
+
+## Badge endpoints
 
 ### GET /badge/verified
 
@@ -280,4 +679,3 @@ Get a badge for any status.
 Generate a custom badge.
 
 **Query params:** `label`, `message`, `color`, `logo`
-
