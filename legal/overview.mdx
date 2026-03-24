@@ -1,7 +1,7 @@
 ---
 sidebar_position: 1
 title: Overview
-description: "QWED Legal reviews contracts with deterministic checks for dates, contradictory clauses, liability terms, and citations."
+description: "QWED Legal reviews contracts with deterministic checks for dates, contradictory clauses, liability terms, citations, and AI content provenance."
 ---
 
 # QWED-Legal
@@ -18,6 +18,7 @@ QWED-Legal is a deterministic verification layer for AI-generated legal document
 - **Contradictory clauses** (Clause A says X, Clause B says Not X)
 - **Liability miscalculations** (200% of $5M ≠ $15M)
 - **Hallucinated citations** (fake case names, invalid reporters)
+- **Provenance violations** (missing disclosures, tampered content, unauthorized models)
 
 ```bash
 pip install qwed-legal
@@ -82,7 +83,7 @@ flowchart TB
     
     subgraph QWED["🏛️ QWED-Legal v0.4.0"]
         direction TB
-        subgraph Guards["9 Verification Guards"]
+        subgraph Guards["10 Verification Guards"]
             DG["Deadline Guard<br/>(Business Days)"]
             LG["Liability Guard<br/>(Decimal Math)"]
             CG["Clause Guard<br/>(Text Heuristics)"]
@@ -90,6 +91,7 @@ flowchart TB
             IG["IRAC Guard<br/>(Reasoning)"]
             FG["Fairness Guard<br/>(Bias Detection)"]
             CDG["Contradiction Guard<br/>(Z3 Logic)"]
+            PG["Provenance Guard<br/>(SHA-256)"]
         end
         Receipt["📋 Verification Receipt"]
     end
