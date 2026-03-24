@@ -1,0 +1,128 @@
+---
+title: "StateGuard"
+sidebarTitle: "StateGuard"
+description: "Deterministic rollback for agentic file operations using shadow git snapshots. Automatically revert workspace changes when an AI agent execution fails."
+---
+
+StateGuard provides deterministic rollback capabilities for agentic file operations. It creates immutable snapshots of your workspace before an AI agent runs, and can restore the exact pre-execution state if the agent produces invalid results or fails verification.
+
+## When to use StateGuard
+
+Use StateGuard when your AI agents modify files in a git-tracked workspace and you need a safety net to undo those changes. Common scenarios include:
+
+- **Code generation agents** that write or modify source files
+- **Data processing pipelines** where agents transform files in-place
+- **Multi-step agentic workflows** where a failure at any step should revert all changes
+
+<Info>StateGuard requires a git repository. It uses `git write-tree` and `git checkout` internally, so the workspace must be initialized as a git repo.</Info>
+
+## How it works
+
+StateGuard uses a two-phase approach:
+
+1. **Snapshot** — Before the agent executes, StateGuard stages all current files and runs `git write-tree` to produce an immutable 40-character tree hash. This hash represents the exact state of every file in the workspace.
+2. **Rollback** — If the agent's output fails QWED verification, StateGuard restores the workspace to the snapshot using `git checkout <tree-hash> -- .` followed by `git clean -fd` to remove any files the agent created.
+
+All tree hashes are validated against a strict regex (`^[0-9a-f]{40}$`) to prevent command injection.
+
+## Usage
+
+### Basic snapshot and rollback
+
+```python
+from qwed_new.guards.state_guard import StateGuard
+
+# Initialize with a git-tracked workspace
+guard = StateGuard(workspace_path="/path/to/your/repo")
+
+# Take a snapshot before the agent runs
+snapshot = guard.create_pre_execution_snapshot()
+
+# ... let the agent execute and modify files ...
+
+# If verification fails, roll back
+if not verification_passed:
+    success = guard.rollback(snapshot)
+    if success:
+        print("Workspace restored to pre-execution state")
+```
+
+### Integration with QWED verification
+
+```python
+from qwed_new.guards.state_guard import StateGuard
+from qwed_sdk import QWEDClient
+
+client = QWEDClient(api_key="qwed_...")
+guard = StateGuard(workspace_path="/path/to/your/repo")
+
+# Snapshot before agent execution
+snapshot = guard.create_pre_execution_snapshot()
+
+# Agent modifies files in the workspace
+agent.execute_task()
+
+# Verify the agent's output
+result = client.verify(agent.get_output(), engine="code")
+
+if not result.verified:
+    # Revert all file changes
+    guard.rollback(snapshot)
+    raise RuntimeError(f"Agent output failed verification: {result.message}")
+```
+
+## API reference
+
+### `StateGuard(workspace_path)`
+
+Creates a new StateGuard instance.
+
+<ParamField path="workspace_path" type="str" required>
+  Absolute path to a git-tracked directory. Must be an existing directory containing a `.git` folder.
+</ParamField>
+
+Raises `ValueError` if the path does not exist or is not a directory. Raises `RuntimeError` if the directory is not a git repository or if `git` is not found in `PATH`.
+
+### `create_pre_execution_snapshot()`
+
+Stages all files and creates an immutable tree hash of the current workspace state.
+
+**Returns:** A 40-character hex string representing the git tree hash.
+
+**Raises:** `RuntimeError` if the git operation fails.
+
+### `rollback(tree_hash)`
+
+Restores the workspace to the exact state captured by a previous snapshot.
+
+<ParamField path="tree_hash" type="str" required>
+  A 40-character hex tree hash returned by `create_pre_execution_snapshot()`.
+</ParamField>
+
+**Returns:** `True` if the rollback succeeded, `False` if the hash is invalid or the git operation failed.
+
+<Warning>Rollback removes any untracked files created by the agent using `git clean -fd`. Files matched by `.gitignore` (such as `.env`) are preserved.</Warning>
+
+## Security considerations
+
+- Tree hashes are validated with `^[0-9a-f]{40}$` to prevent shell injection
+- All subprocess calls use list-based arguments (no shell expansion)
+- The workspace path is resolved to an absolute path and validated on initialization
+- `git clean` uses `-fd` instead of `-fdx` to preserve `.gitignore`-listed files
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="SDK guards" icon="shield" href="/sdks/guards">
+    All available security guards
+  </Card>
+  <Card title="Agent verification" icon="robot" href="/advanced/agent-verification">
+    Pre-execution verification for AI agents
+  </Card>
+  <Card title="Security hardening" icon="lock" href="/advanced/security-hardening">
+    Production security best practices
+  </Card>
+  <Card title="Attestations" icon="certificate" href="/advanced/attestations">
+    Cryptographic proof of verification
+  </Card>
+</CardGroup>

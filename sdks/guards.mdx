@@ -25,6 +25,7 @@ pip install qwed
 | `ProcessVerifier` | Validates IRAC structure and milestone completion |
 | `SystemGuard` | Validates shell commands |
 | `ConfigGuard` | Scans configuration for exposed secrets |
+| `StateGuard` | Deterministic rollback for agentic file operations |
 
 ---
 
@@ -316,6 +317,29 @@ print(result["process_rate"])  # 1.0
 **`verify_trace(text, key_middle)`** - Verifies presence of required milestones/keywords. Returns process rate and missed milestones.
 
 See the [Process Verifier](/engines/process) page for detailed documentation.
+
+---
+
+## StateGuard
+
+Provides deterministic rollback for agentic file operations using shadow git snapshots. Creates an immutable snapshot before agent execution and restores the workspace if verification fails.
+
+```python
+from qwed_new.guards.state_guard import StateGuard
+
+guard = StateGuard(workspace_path="/path/to/your/repo")
+
+# Snapshot before agent runs
+snapshot = guard.create_pre_execution_snapshot()
+
+# ... agent modifies files ...
+
+# Roll back if verification fails
+if not verification_passed:
+    guard.rollback(snapshot)
+```
+
+See the [StateGuard guide](/advanced/state-guard) for full API reference and integration examples.
 
 ---
 
