@@ -23,7 +23,7 @@ QWED-Legal is a deterministic verification layer for AI-generated legal document
 pip install qwed-legal
 ```
 
-## The 9 Guards of Legal Verification
+## The 10 Guards of Legal Verification
 
 | Guard | Engine | Use Case |
 |-------|--------|----------|
@@ -36,6 +36,7 @@ pip install qwed-legal
 | **IRACGuard** | Regex patterns | Legal reasoning structure verification |
 | **FairnessGuard** | Counterfactual testing | Algorithmic bias detection |
 | **ContradictionGuard** | Z3 SMT Solver | Formal logic contradiction verification |
+| **ProvenanceGuard** | SHA-256 + regex | AI content provenance and disclosure compliance |
 
 ## Quick Example
 
@@ -79,7 +80,7 @@ flowchart TB
         LLM["LLM (GPT-4, Claude)"]
     end
     
-    subgraph QWED["🏛️ QWED-Legal v0.3.0"]
+    subgraph QWED["🏛️ QWED-Legal v0.4.0"]
         direction TB
         subgraph Guards["9 Verification Guards"]
             DG["Deadline Guard<br/>(Business Days)"]
@@ -167,6 +168,6 @@ ca_guard = DeadlineGuard(country="US", state="CA")
 
 ## Next Steps
 
-- [The 9 Guards](/legal/guards) - Deep dive into each verification guard
+- [The 10 Guards](/legal/guards) - Deep dive into each verification guard
 - [Examples](/legal/examples) - Real-world contract verification scenarios
 - [Troubleshooting](/legal/troubleshooting) - Common issues and solutions
