@@ -260,7 +260,8 @@
                   "advanced/security-hardening",
                   "advanced/compliance",
                   "advanced/pii-masking",
-                  "advanced/attestations"
+                  "advanced/attestations",
+                  "advanced/state-guard"
                 ]
               }
             ]
