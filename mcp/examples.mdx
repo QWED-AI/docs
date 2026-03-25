@@ -1,12 +1,12 @@
 ---
 sidebar_position: 3
-title: "Examples & Tutorials"
-description: "Real-world QWED-MCP examples including financial calculations with compound interest verification. Step-by-step tutorials for common verification scenarios."
+title: "Examples & tutorials"
+description: "Real-world QWED-MCP examples using execute_python_code for financial verification, legal reasoning, code review, and SQL safety. Step-by-step tutorials for common verification scenarios."
 ---
 
 ---
 
-## Example 1: Financial Calculations
+## Example 1: Financial calculations
 
 ### Scenario
 
@@ -18,7 +18,10 @@ You're building an AI-powered financial advisor. Users ask for compound interest
 {
   "mcpServers": {
     "qwed-verification": {
-      "command": "qwed-mcp"
+      "command": "qwed-mcp",
+      "env": {
+        "QWED_MCP_TRUSTED_CODE_EXECUTION": "true"
+      }
     }
   }
 }
@@ -28,26 +31,31 @@ You're building an AI-powered financial advisor. Users ask for compound interest
 
 **User:** Calculate the future value of \$10,000 invested at 5% annual interest, compounded monthly, for 10 years.
 
-**Claude's Process:**
+**Claude's process:**
 
 1. Calculate: FV = P(1 \+ r/n)^(nt) = 10000(1 \+ 0.05/12)^(12×10)
-2. Call `verify_math` to confirm:
+2. Call `execute_python_code` to verify:
 
 ```json
 {
-  "expression": "10000 * (1 + 0.05/12)**(12*10)",
-  "claimed_result": "16470.09",
-  "operation": "evaluate"
+  "code": "from decimal import Decimal, ROUND_HALF_UP\n\nP = Decimal('10000')\nr = Decimal('0.05')\nn = Decimal('12')\nt = Decimal('10')\n\nFV = P * (1 + r/n) ** (n*t)\nFV = FV.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)\nprint(f'Future value: ${FV}')"
 }
 ```
 
-**Result:** ✅ VERIFIED
+**Result:**
 
-**Claude's Response:** The future value is **\$16,470.09** (verified).
+```text
+STDOUT:
+Future value: $16470.09
+
+Execution completed successfully.
+```
+
+**Claude's response:** The future value is **\$16,470.09** (verified using deterministic decimal arithmetic).
 
 ---
 
-## Example 2: Legal Reasoning
+## Example 2: Legal reasoning
 
 ### Scenario
 
@@ -57,27 +65,22 @@ An AI legal assistant needs to verify that conclusions follow from legal premise
 
 **User:** Under contract law: If both parties agree and consideration is exchanged, a contract is formed. Alice agreed and paid Bob. Is there a valid contract?
 
-**Claude's Process:**
+**Claude's process:**
 
 1. Formalize the logic
-2. Call `verify_logic`:
+2. Call `execute_python_code` with a Z3 solver script:
 
 ```json
 {
-  "premises": [
-    "if agreed and consideration then contract",
-    "Alice agreed",
-    "consideration exchanged"
-  ],
-  "conclusion": "contract formed"
+  "code": "from qwed_new.engines.logic_engine import verify_logic_statement\n\nresult = verify_logic_statement(\n    premises=[\n        'if agreed and consideration then contract',\n        'Alice agreed',\n        'consideration exchanged'\n    ],\n    conclusion='contract formed'\n)\nprint(f'Verified: {result.get(\"verified\")}')\nprint(f'Message: {result.get(\"message\", \"\")}')"
 }
 ```
 
-**Result:** ✅ VERIFIED - The conclusion logically follows.
+**Result:** Verified — the conclusion logically follows.
 
 ---
 
-## Example 3: Secure Code Review
+## Example 3: Secure code review
 
 ### Scenario
 
@@ -96,34 +99,35 @@ def login(username, password):
     return False
 ```
 
-**Claude's Process:**
+**Claude's process:**
 
-1. Call `verify_code`:
+1. Call `execute_python_code` with a CodeGuard analysis:
 
 ```json
 {
-  "code": "def login(username, password):\n    query = f\"SELECT * FROM users WHERE name='{username}'\"\n    user = db.execute(query)\n    if eval(f\"'{password}' == '{user.password}'\"):\n        return True\n    return False",
-  "language": "python"
+  "code": "from qwed_new.guards.code_guard import CodeGuard\n\ncode = '''def login(username, password):\n    query = f\"SELECT * FROM users WHERE name='{username}'\"\n    user = db.execute(query)\n    if eval(f\"'{password}' == '{user.password}'\"):\n        return True\n    return False'''\n\nguard = CodeGuard()\nresult = guard.verify_safety(code)\nprint(f'Verified: {result[\"verified\"]}')\nif result.get('violations'):\n    for v in result['violations']:\n        print(f'  - {v}')"
 }
 ```
 
 **Result:**
 
 ```text
-❌ FAILED - Found 2 security issues
-Issues:
+STDOUT:
+Verified: False
   - Dangerous function call: eval()
   - Warning: String concatenation in SQL query detected
+
+Execution completed successfully.
 ```
 
-**Claude's Response:**
+**Claude's response:**
 
-🚨 **Security Issues Found:**
+Security issues found:
 
-1. **SQL Injection** - Direct string formatting in SQL query
-2. **Code Injection** - Using `eval()` for password comparison
+1. **SQL injection** — direct string formatting in SQL query
+2. **Code injection** — using `eval()` for password comparison
 
-**Recommended Fix:**
+**Recommended fix:**
 
 ```python
 def login(username, password):
@@ -134,7 +138,7 @@ def login(username, password):
 
 ---
 
-## Example 4: Research Paper Validation
+## Example 4: Research paper validation
 
 ### Scenario
 
@@ -144,23 +148,19 @@ Verifying statistical claims in AI-assisted research paper review.
 
 **User:** The paper claims: "If the p-value \< 0.05, we reject the null hypothesis. Our p-value was 0.03. Therefore, we reject the null hypothesis."
 
-**Claude's Process:**
+**Claude's process:**
 
 ```json
 {
-  "premises": [
-    "if p_value less than 0.05 then reject_null",
-    "p_value less than 0.05"
-  ],
-  "conclusion": "reject_null"
+  "code": "from qwed_new.engines.logic_engine import verify_logic_statement\n\nresult = verify_logic_statement(\n    premises=[\n        'if p_value less than 0.05 then reject_null',\n        'p_value less than 0.05'\n    ],\n    conclusion='reject_null'\n)\nprint(f'Verified: {result.get(\"verified\")}')"
 }
 ```
 
-**Result:** ✅ VERIFIED
+**Result:** Verified.
 
 ---
 
-## Example 5: SQL Query Validation
+## Example 5: SQL query validation
 
 ### Scenario
 
@@ -170,32 +170,30 @@ An AI data analyst generates SQL queries. You need to ensure they're safe before
 
 **User:** Get all orders for user input "admin' OR '1'='1"
 
-**Claude's Process:**
+**Claude's process:**
 
 1. Generate query
-2. Call `verify_sql` before responding:
+2. Call `execute_python_code` with a SQLGuard check before responding:
 
 ```json
 {
-  "query": "SELECT * FROM orders WHERE user_id = 'admin'' OR ''1''=''1'",
-  "allowed_tables": ["orders", "users", "products"]
+  "code": "from qwed_new.guards.sql_guard import SQLGuard\n\nguard = SQLGuard()\nresult = guard.verify_query(\"SELECT * FROM orders WHERE user_id = 'admin'' OR ''1''=''1'\")\nprint(f'Verified: {result[\"verified\"]}')\nprint(f'Message: {result.get(\"message\", \"\")}')"
 }
 ```
 
 **Result:**
 
 ```text
-❌ FAILED - Potential SQL injection detected
-Issues:
-  - Suspicious tautology pattern: 1=1
-  - Potential injection characters detected
+STDOUT:
+Verified: False
+Message: Potential SQL injection detected
+
+Execution completed successfully.
 ```
 
-**Claude's Response:**
+**Claude's response:**
 
-⚠️ **Security Warning:** The input appears to be a SQL injection attempt. I cannot generate this query safely.
-
-**Safe Alternative:** Use parameterized queries:
+The input appears to be a SQL injection attempt. Use parameterized queries:
 
 ```sql
 SELECT * FROM orders WHERE user_id = ?
@@ -206,7 +204,7 @@ SELECT * FROM orders WHERE user_id = ?
 
 ## Example 6: Integration with LangChain
 
-### Python Code
+### Python code
 
 ```python
 from langchain_anthropic import ChatAnthropic
@@ -215,57 +213,57 @@ from langchain.tools import StructuredTool
 import subprocess
 import json
 
-# Create QWED tools that call MCP server
-def verify_math(expression: str, claimed_result: str, operation: str = "evaluate") -> str:
-    """Verify mathematical calculations using SymPy."""
+# Create a tool that calls execute_python_code via MCP CLI
+def run_verification(code: str) -> str:
+    """Execute Python verification code via QWED-MCP."""
     result = subprocess.run(
-        ["qwed-mcp-cli", "verify_math", 
-         "--expression", expression,
-         "--claimed_result", claimed_result,
-         "--operation", operation],
+        ["qwed-mcp-cli", "execute_python_code",
+         "--code", code],
         capture_output=True, text=True
     )
     return result.stdout
 
-math_tool = StructuredTool.from_function(
-    func=verify_math,
-    name="verify_math",
-    description="Verify mathematical calculations. Use after doing any math."
+verify_tool = StructuredTool.from_function(
+    func=run_verification,
+    name="execute_python_code",
+    description="Execute Python code to verify calculations using QWED SDKs."
 )
 
 # Create agent with verification
 llm = ChatAnthropic(model="claude-3-sonnet")
-agent = create_tool_calling_agent(llm, [math_tool], prompt)
-executor = AgentExecutor(agent=agent, tools=[math_tool])
+agent = create_tool_calling_agent(llm, [verify_tool], prompt)
+executor = AgentExecutor(agent=agent, tools=[verify_tool])
 
 # Use it
 result = executor.invoke({
-    "input": "What's the integral of 2x? Verify your answer."
+    "input": "What's the integral of 2x? Write a script to verify your answer."
 })
 ```
 
 ---
 
-## Best Practices
+## Best practices
 
-### 1. Always Verify Before Responding
+### 1. Always verify before responding
 
 ```text
-User asks → AI calculates → AI verifies → AI responds
-                            ↓ (if fails)
-                        AI recalculates
+User asks → AI calculates → AI writes verification script → AI responds
+                             ↓ (if fails)
+                         AI recalculates
 ```
 
-### 2. Use Appropriate Tools
+### 2. Use appropriate SDK imports
 
-| Task | Tool |
+| Task | SDK import |
 | --- | --- |
-| Math/calculations | `verify_math` |
-| Logic/reasoning | `verify_logic` |
-| Code review | `verify_code` |
-| SQL queries | `verify_sql` |
+| Math/calculations | `from sympy import ...` |
+| Logic/reasoning | `from qwed_new.engines.logic_engine import verify_logic_statement` |
+| Code review | `from qwed_new.guards.code_guard import CodeGuard` |
+| SQL queries | `from qwed_new.guards.sql_guard import SQLGuard` |
+| Legal deadlines | `from qwed_legal import DeadlineGuard` |
+| AI provenance | `from qwed_legal import ProvenanceGuard` |
 
-### 3. Handle Verification Failures
+### 3. Handle verification failures
 
 When verification fails:
 
@@ -274,10 +272,11 @@ When verification fails:
 3. Verify again
 4. Explain the correction to user
 
-### 4. Explain Verification to Users
+### 4. Explain verification to users
 
 ```text
 "I calculated X. Let me verify this is correct...
-✅ Verified using symbolic mathematics.
+[Runs verification script]
+✅ Verified using deterministic computation.
 The answer is definitely X."
 ```

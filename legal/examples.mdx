@@ -268,23 +268,31 @@ provenance = {
 
 ---
 
-## 8. Claude Desktop Integration (MCP)
+## 8. Claude Desktop integration (MCP)
 
 **Scenario:** A lawyer uses Claude Desktop to verify contract deadlines.
 
-When `qwed-mcp` is installed, Claude Desktop gains these tools:
-
-- `verify_legal_deadline`
-- `verify_legal_citation`
-- `verify_legal_liability`
+When `qwed-mcp` is installed, Claude Desktop gains access to all QWED SDK libraries through the `execute_python_code` tool. Claude writes a Python script that imports the relevant guard and runs the verification.
 
 **User:** "Verify: Contract signed Jan 15, 2026 with 30 business days deadline. Is Feb 14 correct?"
 
-**Claude (via MCP):**
+**Claude (via MCP):** Calls `execute_python_code` with:
+
+```python
+from qwed_legal import DeadlineGuard
+
+guard = DeadlineGuard(country="US")
+result = guard.verify("2026-01-15", "30 business days", "2026-02-14")
+print(f"Verified: {result.verified}")
+print(f"Computed deadline: {result.computed_deadline}")
+print(f"Difference: {result.difference_days} days")
 ```
-🛑 QWED Legal: BLOCKED. 
-❌ ERROR: Deadline mismatch. Expected 2026-02-27, but claimed 2026-02-14. 
-Difference: 13 days.
+
+**Output:**
+```text
+Verified: False
+Computed deadline: 2026-02-27
+Difference: 13 days
 ```
 
 ---
