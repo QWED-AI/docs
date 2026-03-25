@@ -152,7 +152,7 @@ The interceptor routes payloads based on `payload_type`:
 | PayloadType | Engine | Verification | Precision |
 |------------|--------|-------------|-----------|
 | `financial_transaction` | `finance_guard` | Decimal arithmetic — recomputes totals from line items | `Decimal("0.01")` tolerance |
-| `logic_assertion` | `logic_guard` | Set-based contradiction detection (P ∧ ¬P) | Deterministic, sorted output |
+| `logic_assertion` | `logic_guard` | Set-based contradiction detection (P AND NOT P) | Deterministic, sorted output |
 | `code_execution` | `code_guard` | Case-insensitive regex for `eval`, `exec`, `subprocess`, `os.system`, etc. | Import/alias detection |
 | `general` / `data_query` | `passthrough` | No verification — forwarded immediately | N/A |
 
