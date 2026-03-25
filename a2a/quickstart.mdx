@@ -1,0 +1,211 @@
+---
+title: "Quick Start"
+sidebarTitle: "Quick Start"
+description: "Install QWED A2A and run your first inter-agent verification in 5 minutes."
+icon: "rocket"
+---
+
+## Installation
+
+<CodeGroup>
+
+```bash pip
+pip install qwed-a2a
+```
+
+```bash from source
+git clone https://github.com/QWED-AI/qwed-a2a.git
+cd qwed-a2a
+pip install -e ".[dev]"
+```
+
+</CodeGroup>
+
+<Info>
+QWED A2A requires Python 3.10+. The `cryptography` and `PyJWT` packages are installed automatically for JWT attestation support.
+</Info>
+
+---
+
+## Your first verification
+
+<Steps>
+  <Step title="Import the interceptor">
+    ```python
+    import asyncio
+    from qwed_a2a.interceptor import A2AVerificationInterceptor
+    from qwed_a2a.protocol.schema import AgentMessage, PayloadType
+    ```
+  </Step>
+
+  <Step title="Create an interceptor">
+    ```python
+    interceptor = A2AVerificationInterceptor()
+    ```
+
+    This creates an interceptor with:
+    - All verification engines enabled
+    - Crypto attestation enabled (if packages available)
+    - `default_allow=True` trust boundary
+  </Step>
+
+  <Step title="Build a test message">
+    ```python
+    message = AgentMessage(
+        sender_agent_id="demo-sender",
+        receiver_agent_id="demo-receiver",
+        payload_type=PayloadType.FINANCIAL_TRANSACTION,
+        payload={
+            "data": {
+                "claimed_total": 150.00,
+                "line_items": [
+                    {"description": "Widget A", "amount": 50.00, "quantity": 2},
+                    {"description": "Widget B", "amount": 25.00, "quantity": 2},
+                ]
+            }
+        }
+    )
+    ```
+  </Step>
+
+  <Step title="Run verification">
+    ```python
+    async def main():
+        verdict = await interceptor.intercept(
+            message,
+            trace_id="quickstart_001"
+        )
+
+        print(f"Status:      {verdict.status.value}")
+        print(f"Engine:      {verdict.engine_used}")
+        print(f"Trace ID:    {verdict.audit_trace_id}")
+        print(f"Attestation: {verdict.attestation_jwt[:50]}...")
+
+    asyncio.run(main())
+    ```
+  </Step>
+
+  <Step title="Check the output">
+    ```text
+    Status:      forwarded ✅
+    Engine:      finance_guard
+    Trace ID:    quickstart_001
+    Attestation: eyJhbGciOiJFUzI1NiIsInR5cCI6InF3ZWQtYTJhLWF0...
+    ```
+
+    The financial totals match (50×2 + 25×2 = 150), so the message is **forwarded** with a signed attestation.
+  </Step>
+</Steps>
+
+---
+
+## Try different scenarios
+
+<AccordionGroup>
+  <Accordion title="Block a hallucinated total" icon="calculator" defaultOpen>
+    ```python
+    bad_message = AgentMessage(
+        sender_agent_id="demo-sender",
+        receiver_agent_id="demo-receiver",
+        payload_type=PayloadType.FINANCIAL_TRANSACTION,
+        payload={
+            "data": {
+                "claimed_total": 999.99,  # Wrong!
+                "line_items": [
+                    {"amount": 100.00, "quantity": 1},
+                    {"amount": 50.00, "quantity": 1},
+                ]
+            }
+        }
+    )
+
+    verdict = await interceptor.intercept(bad_message, trace_id="bad_001")
+    print(verdict.status)  # blocked
+    print(verdict.reason)  # "Mathematical hallucination detected..."
+    ```
+  </Accordion>
+
+  <Accordion title="Block dangerous code" icon="code">
+    ```python
+    code_message = AgentMessage(
+        sender_agent_id="code-agent",
+        receiver_agent_id="executor",
+        payload_type=PayloadType.CODE_EXECUTION,
+        payload={"code": "import os; os.system('rm -rf /')"}
+    )
+
+    verdict = await interceptor.intercept(code_message, trace_id="code_001")
+    print(verdict.status)  # blocked
+    print(verdict.reason)  # "Dangerous code patterns detected: os.system"
+    ```
+  </Accordion>
+
+  <Accordion title="Catch logical contradictions" icon="brain">
+    ```python
+    logic_message = AgentMessage(
+        sender_agent_id="reasoning-agent",
+        receiver_agent_id="planner",
+        payload_type=PayloadType.LOGIC_ASSERTION,
+        payload={
+            "assertions": [
+                {"claim": "budget_approved", "negated": False},
+                {"claim": "budget_approved", "negated": True},
+            ]
+        }
+    )
+
+    verdict = await interceptor.intercept(logic_message, trace_id="logic_001")
+    print(verdict.status)  # blocked
+    print(verdict.reason)  # "Logical contradiction detected..."
+    ```
+  </Accordion>
+</AccordionGroup>
+
+---
+
+## Run the FastAPI gateway
+
+QWED A2A includes a ready-to-use HTTP gateway:
+
+```python
+from fastapi import FastAPI
+from qwed_a2a.protocol.endpoints import router
+
+app = FastAPI(title="QWED A2A Gateway")
+app.include_router(router)
+
+# Run with: uvicorn main:app --host 0.0.0.0 --port 8000
+```
+
+Test it:
+
+```bash
+curl -X POST http://localhost:8000/a2a/intercept \
+  -H "Content-Type: application/json" \
+  -d '{
+    "sender_agent_id": "agent-A",
+    "receiver_agent_id": "agent-B",
+    "payload_type": "general",
+    "payload": {"message": "Hello!"}
+  }'
+```
+
+Response:
+
+```json
+{
+  "status": "forwarded",
+  "audit_trace_id": "a2a_7f3c2a1b9e4d",
+  "engine_used": "passthrough",
+  "attestation_jwt": "eyJhbGciOiJFUzI1NiIs..."
+}
+```
+
+---
+
+## Next steps
+
+- [Architecture deep-dive](/a2a/architecture) — understand the full pipeline
+- [Trust Boundary](/a2a/trust-boundary) — configure zero-trust policies
+- [Crypto Attestations](/a2a/crypto-attestations) — understand JWT signing
+- [Production Deployment](/a2a/deployment) — Docker, monitoring, CI/CD

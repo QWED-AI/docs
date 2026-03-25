@@ -1,0 +1,190 @@
+---
+title: "Verification Interceptor"
+sidebarTitle: "Interceptor"
+description: "The core A2A verification pipeline — schema validation, engine routing, and verdict generation."
+icon: "shield-check"
+---
+
+## Overview
+
+The `A2AVerificationInterceptor` is the central component of QWED A2A. Every inter-agent message passes through it before reaching the recipient.
+
+```python
+from qwed_a2a.interceptor import A2AVerificationInterceptor
+
+interceptor = A2AVerificationInterceptor(
+    config=config,              # InterceptorConfig
+    crypto_service=crypto,      # A2ACryptoService (optional)
+    trust_boundary=boundary,    # TrustBoundary (optional)
+)
+
+verdict = await interceptor.intercept(message, trace_id="a2a_trace_001")
+```
+
+<Info>
+The `trace_id` parameter is **required** and must be provided by the caller. This ensures all verdicts and JWT attestations are deterministic and auditable. The HTTP gateway (`POST /a2a/intercept`) generates this automatically.
+</Info>
+
+---
+
+## Verification pipeline
+
+<Steps>
+  <Step title="Schema Validation">
+    The incoming `AgentMessage` is validated by Pydantic:
+    - `sender_agent_id` and `receiver_agent_id` must be 1–256 chars, no control characters
+    - `payload` is required (dict)
+    - `payload_type` defaults to `GENERAL` if not specified
+    - Timestamps are timezone-aware UTC
+  </Step>
+  <Step title="Trust Boundary">
+    The trust boundary evaluates the sender→receiver pair:
+    - Global blocklist check
+    - Pair-level block check
+    - Allowlist check (in strict mode)
+    - Token-bucket rate limiting
+  </Step>
+  <Step title="Trusted Agent Bypass">
+    If the sender is in `config.trusted_agents`, the message is forwarded immediately with a `bypass` engine verdict.
+  </Step>
+  <Step title="Engine Routing">
+    Based on `payload_type`, the message is routed to the appropriate verification engine.
+  </Step>
+  <Step title="Verdict & Attestation">
+    The engine result is wrapped in a `VerificationVerdict` with an ES256 JWT attestation proving the verification took place.
+  </Step>
+</Steps>
+
+---
+
+## Verification engines
+
+### Finance Guard
+
+Verifies financial claims using **deterministic Decimal arithmetic**. Recomputes totals from line items and compares against the `claimed_total`.
+
+```python
+message = AgentMessage(
+    sender_agent_id="sales-agent",
+    receiver_agent_id="treasury-agent",
+    payload_type=PayloadType.FINANCIAL_TRANSACTION,
+    payload={
+        "data": {
+            "claimed_total": 999.99,  # Wrong!
+            "line_items": [
+                {"description": "Product X", "amount": 100.00, "quantity": 1},
+                {"description": "Product Y", "amount": 50.00, "quantity": 1},
+            ]
+        }
+    }
+)
+
+verdict = await interceptor.intercept(message, trace_id="fin_001")
+# verdict.status = "blocked"
+# verdict.reason = "Mathematical hallucination detected:
+#     claimed_total=999.99, computed_total=150.00"
+```
+
+<Warning>
+All financial comparisons use `decimal.Decimal` with `ROUND_HALF_UP` quantization to `0.01`. Floating-point arithmetic is **never** used in the verification path.
+</Warning>
+
+### Logic Guard
+
+Detects **logical contradictions** — claims where the same proposition is both asserted and negated.
+
+```python
+message = AgentMessage(
+    sender_agent_id="reasoning-agent",
+    receiver_agent_id="planner-agent",
+    payload_type=PayloadType.LOGIC_ASSERTION,
+    payload={
+        "assertions": [
+            {"claim": "sky_is_blue", "negated": False},
+            {"claim": "sky_is_blue", "negated": True},  # Contradiction!
+        ]
+    }
+)
+
+verdict = await interceptor.intercept(message, trace_id="logic_001")
+# verdict.status = "blocked"
+# verdict.reason = "Logical contradiction detected:
+#     claims both asserted and negated: ['sky_is_blue']"
+```
+
+<Tip>
+Contradictions are **sorted** before output, ensuring deterministic results regardless of Python's hash randomization (`PYTHONHASHSEED`).
+</Tip>
+
+### Code Guard
+
+Scans code payloads for **dangerous patterns** using case-insensitive compiled regex:
+
+| Pattern | Regex | Catches |
+|---------|-------|---------|
+| `eval` | `\beval\s*\(` | `eval(`, `EVAL (`, `eval\n(` |
+| `exec` | `\bexec\s*\(` | `exec(`, `Exec (` |
+| `subprocess` | `subprocess\.\|import subprocess\|from subprocess import` | `subprocess.run`, `import subprocess as sp`, `from subprocess import run` |
+| `os.system` | `\bos\.system\s*\(` | `os.system(`, `OS.SYSTEM (` |
+| `os.popen` | `\bos\.popen\s*\(` | All casing/spacing variants |
+| `__import__` | `__import__\s*\(` | Dynamic imports |
+| `compile` | `\bcompile\s*\(` | Code compilation |
+| `importlib` | `\bimportlib\s*\.` | Runtime module loading |
+
+```python
+message = AgentMessage(
+    sender_agent_id="code-agent",
+    receiver_agent_id="executor-agent",
+    payload_type=PayloadType.CODE_EXECUTION,
+    payload={"code": "import subprocess as sp\nsp.run(['ls'])"}
+)
+
+verdict = await interceptor.intercept(message, trace_id="code_001")
+# verdict.status = "blocked"
+# verdict.reason = "Dangerous code patterns detected: subprocess"
+```
+
+### Passthrough
+
+Messages with `payload_type` of `GENERAL` or `DATA_QUERY` are forwarded without verification.
+
+---
+
+## Configuration reference
+
+The `InterceptorConfig` controls which engines are active:
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `enable_financial_verification` | `bool` | `True` | Route financial payloads to math verification |
+| `enable_logic_verification` | `bool` | `True` | Route logic assertions to contradiction checks |
+| `enable_code_verification` | `bool` | `True` | Route code payloads to regex security scanning |
+| `block_on_error` | `bool` | `True` | Block forwarding if verification encounters an internal error |
+| `max_payload_size_bytes` | `int` | `1,048,576` | Maximum payload size (1 KB – 10 MB) |
+| `trusted_agents` | `List[str]?` | `None` | Allowlist of agent IDs that bypass verification |
+
+```python
+from qwed_a2a.protocol.schema import InterceptorConfig
+
+config = InterceptorConfig(
+    enable_financial_verification=True,
+    enable_code_verification=True,
+    block_on_error=True,
+    trusted_agents=["internal-orchestrator-001"],
+)
+```
+
+---
+
+## Error handling
+
+When `block_on_error=True` (default), any exception in a verification engine results in a `BLOCKED` verdict. When `False`, the message is `FORWARDED` despite the error — useful for observability-only deployments.
+
+<AccordionGroup>
+  <Accordion title="block_on_error=True (default)" icon="shield-halved">
+    Engine exception → `BLOCKED` verdict with error reason. Safe default for production.
+  </Accordion>
+  <Accordion title="block_on_error=False (observability mode)" icon="eye">
+    Engine exception → `FORWARDED` verdict. The error is logged but doesn't block communication. Use for shadow deployments.
+  </Accordion>
+</AccordionGroup>
