@@ -1,14 +1,14 @@
 ---
 sidebar_position: 4
 title: "Troubleshooting"
-description: "Troubleshoot QWED-MCP issues including installation problems (command not found, missing dependencies) and configuration errors with step-by-step solutions."
+description: "Troubleshoot QWED-MCP issues including installation problems, configuration errors, and the v0.2.0 migration from verify_* tools to execute_python_code."
 ---
 
 Common issues and solutions when using QWED-MCP.
 
 ---
 
-## Installation Issues
+## Installation issues
 
 ### "qwed-mcp: command not found"
 
@@ -41,21 +41,21 @@ Common issues and solutions when using QWED-MCP.
 
 ### "ModuleNotFoundError: No module named 'sympy'"
 
-**Cause:** Dependencies not installed
+**Cause:** QWED SDK dependencies not installed
 
 **Solution:**
 
 ```bash
 pip install qwed-mcp[all]
 # or manually:
-pip install sympy z3-solver
+pip install sympy z3-solver qwed-legal qwed-finance qwed-ucp
 ```
 
 ---
 
-## Claude Desktop Issues
+## Claude Desktop issues
 
-### Server Not Appearing in Claude
+### Server not appearing in Claude
 
 **Check:**
 
@@ -94,7 +94,8 @@ pip install sympy z3-solver
        "qwed-verification": {
          "command": "qwed-mcp",
          "env": {
-           "QWED_LOG_LEVEL": "DEBUG"
+           "QWED_LOG_LEVEL": "DEBUG",
+           "QWED_MCP_TRUSTED_CODE_EXECUTION": "true"
          }
        }
      }
@@ -103,46 +104,48 @@ pip install sympy z3-solver
 
 ---
 
-## Tool Errors
+## Tool errors
 
-### "Could not parse expression"
+### "Code execution is disabled"
 
-**Cause:** Invalid math syntax
+**Cause:** The `QWED_MCP_TRUSTED_CODE_EXECUTION` environment variable is not set.
 
-**Examples:**
+**Solution:** Set the variable in your MCP config:
 
-| Wrong | Correct |
-| --- | --- |
-| `2x` | `2*x` |
-| `x²` | `x**2` or `x^2` |
-| `√x` | `sqrt(x)` |
-
----
-
-### "Z3 solver not installed"
-
-**Solution:**
-
-```bash
-pip install z3-solver
+```json
+{
+  "mcpServers": {
+    "qwed-verification": {
+      "command": "qwed-mcp",
+      "env": {
+        "QWED_MCP_TRUSTED_CODE_EXECUTION": "true"
+      }
+    }
+  }
+}
 ```
 
-**Note:** On some systems, you may need:
+Or when running from the command line:
 
 ```bash
-# Windows
-pip install z3-solver --no-cache-dir
-
-# Linux
-sudo apt-get install libz3-dev
-pip install z3-solver
+QWED_MCP_TRUSTED_CODE_EXECUTION=true qwed-mcp
 ```
 
 ---
 
-### "Tool timeout"
+### "Unknown tool: verify\_math" (or other verify\_\* tools)
 
-**Cause:** Complex computation taking too long
+**Cause:** You are running QWED-MCP v0.2.0 or later, which replaced all individual `verify_*` tools with a single `execute_python_code` tool.
+
+**Solution:** Tell Claude: *"The verify\_\* tools have been removed. Use execute\_python\_code to write and run a Python verification script."*
+
+See the [migration guide](/mcp/tools#migrating-from-v01x) for the full tool mapping.
+
+---
+
+### "Execution timed out after 30 seconds"
+
+**Cause:** The Python script exceeded the execution time limit.
 
 **Solutions:**
 
@@ -150,55 +153,60 @@ pip install z3-solver
    ```bash
    QWED_TIMEOUT=60 qwed-mcp
    ```
-2. **Simplify expression:**
-   - Break complex math into simpler steps
-   - Reduce logic premise count
+2. **Optimize the script:**
+   - Break complex computations into smaller steps
+   - Avoid infinite loops or very large data processing
 
 ---
 
-## Common Patterns
+### ModuleNotFoundError in script output
 
-### False Positives in verify\_code
+**Cause:** The QWED SDK package used in the script is not installed.
 
-Some patterns are flagged that may be intentional:
+**Solution:** Install the required package:
 
-| Pattern | Why Flagged | If Intentional |
-| --- | --- | --- |
-| `open()` | File access | May be needed - document why |
-| `subprocess` | Process spawning | Use with caution |
-| `eval()` | Code execution | Avoid if possible |
+```bash
+# For legal verification
+pip install qwed-legal
 
----
+# For finance verification
+pip install qwed-finance
 
-### Logic Verification Failures
+# For commerce verification
+pip install qwed-ucp
 
-If valid logic fails verification:
-
-1. **Simplify premises** - Try simpler statements
-2. **Check syntax** - Use supported patterns
-3. **Break into steps** - Verify sub-arguments
-
-**Supported:**
-
-```text
-"A implies B"
-"if A then B"
-"A and B"
-"A or B"
-"not A"
-```
-
-**Not yet supported:**
-
-```text
-"for all X, P(X)"
-"there exists X such that P(X)"
-"X is greater than Y"
+# For core engines (math, logic, code, SQL)
+pip install qwed-new
 ```
 
 ---
 
-## Getting Help
+## Migration issues (v0.1.x to v0.2.0)
+
+### Claude keeps trying to call verify\_math
+
+**Cause:** Claude's context may still reference old tool names from previous conversations.
+
+**Solutions:**
+
+1. Start a new conversation
+2. Explicitly tell Claude: *"Use execute\_python\_code instead of verify\_math. Write a Python script that imports sympy to verify the calculation."*
+
+### Scripts fail with import errors
+
+**Cause:** The QWED SDK packages are not installed alongside qwed-mcp.
+
+**Solution:**
+
+```bash
+pip install qwed-mcp[all]
+```
+
+This installs all QWED SDK packages that your scripts can import.
+
+---
+
+## Getting help
 
 1. **GitHub Issues:** [github.com/QWED-AI/qwed-mcp/issues](https://github.com/QWED-AI/qwed-mcp/issues)
 2. **Documentation:** [docs.qwedai.com/mcp](https://docs.qwedai.com/docs/mcp/overview)

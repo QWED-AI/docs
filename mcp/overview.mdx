@@ -1,7 +1,7 @@
 ---
 sidebar_position: 1
-title: "QWED-MCP Overview"
-description: "QWED MCP is a Model Context Protocol server that brings deterministic verification tools to Claude Desktop and VS Code."
+title: "QWED-MCP overview"
+description: "QWED MCP is a Model Context Protocol server that brings deterministic verification to Claude Desktop and VS Code via a single execute_python_code tool."
 ---
 
 **Model Context Protocol (MCP) Server for QWED Verification**
@@ -10,13 +10,13 @@ description: "QWED MCP is a Model Context Protocol server that brings determinis
  ![Tests](https://github.com/QWED-AI/qwed-mcp/actions/workflows/publish.yml/badge.svg)
  ![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)
 
-QWED-MCP brings deterministic verification to Claude Desktop, VS Code, and any MCP-compatible AI assistant. Instead of trusting LLMs to compute correctly, QWED-MCP provides verification tools that use formal methods to guarantee correctness.
+QWED-MCP brings deterministic verification to Claude Desktop, VS Code, and any MCP-compatible AI assistant. Instead of trusting LLMs to compute correctly, QWED-MCP provides a sandboxed Python execution environment with access to all QWED SDK verification libraries.
 
 ---
 
 ## Why QWED-MCP?
 
-### The Problem
+### The problem
 
 LLMs are powerful but unreliable for:
 
@@ -25,20 +25,20 @@ LLMs are powerful but unreliable for:
 - **Code security** - They miss edge cases, don't analyze
 - **SQL queries** - They don't validate, just generate
 
-### The Solution
+### The solution
 
-QWED-MCP gives AI assistants access to **deterministic verification tools**:
+QWED-MCP gives AI assistants access to **deterministic verification** through a single `execute_python_code` tool. The LLM writes a Python script that imports the appropriate QWED SDK, and the MCP server runs it in a sandboxed subprocess.
 
 | Without QWED-MCP | With QWED-MCP |
 | --- | --- |
-| Claude calculates → 95% correct | Claude \+ `verify_math` → **100% correct** |
-| Claude writes SQL → might inject | Claude \+ `verify_sql` → **injection detected** |
-| Claude reasons → might be wrong | Claude \+ `verify_logic` → **formally proven** |
-| Claude codes → might be unsafe | Claude \+ `verify_code` → **security checked** |
+| Claude calculates → 95% correct | Executes Python script calling `qwed_new` math engine → **100% correct** |
+| Claude writes SQL → might inject | Script uses `qwed_new` SQL analyzer → **injection detected** |
+| Claude reasons → might be wrong | Z3 solver executed via SDK → **formally proven** |
+| Claude codes → might be unsafe | AST check script executed → **security checked** |
 
 ---
 
-## How It Works
+## How it works
 
 ```text
 ┌─────────────────────────────────────────────────────────────┐
@@ -54,53 +54,45 @@ QWED-MCP gives AI assistants access to **deterministic verification tools**:
             │       (JSON-RPC over stdio)     │
             ▼                                 ▼
 ┌──────────────────────────────────────────────────────────────┐
-│                     QWED-MCP Server                          │
+│                     QWED-MCP Server (v0.2.0)                 │
 ├──────────────────────────────────────────────────────────────┤
 │                                                              │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────────┐   │
-│  │ verify_math  │  │ verify_logic │  │   verify_code    │   │
-│  │    Tool      │  │    Tool      │  │      Tool        │   │
-│  └──────┬───────┘  └──────┬───────┘  └────────┬─────────┘   │
-│         │                 │                    │             │
-│  ┌──────▼───────┐  ┌──────▼───────┐  ┌────────▼─────────┐   │
-│  │    SymPy     │  │  Z3 Solver   │  │  Python AST      │   │
-│  │   Engine     │  │   Engine     │  │   Analysis       │   │
-│  └──────────────┘  └──────────────┘  └──────────────────┘   │
+│  ┌────────────────────────────────────────────────────────┐  │
+│  │              execute_python_code                       │  │
+│  │  └─► Subprocess Execution (Restricted Env)             │  │
+│  │       └─► Native QWED library execution                │  │
+│  │           ├── qwed_new (math, logic, code, SQL)        │  │
+│  │           ├── qwed_legal (deadlines, citations, ...)   │  │
+│  │           ├── qwed_finance (banking, ISO 20022)        │  │
+│  │           └── qwed_ucp (commerce verification)         │  │
+│  └────────────────────────────────────────────────────────┘  │
 │                                                              │
-│  ┌──────────────┐                                            │
-│  │ verify_sql   │                                            │
-│  │    Tool      │                                            │
-│  └──────┬───────┘                                            │
-│         │                                                    │
-│  ┌──────▼───────┐                                            │
-│  │   Pattern    │                                            │
-│  │   Matching   │                                            │
-│  └──────────────┘                                            │
 └──────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## Available Tools
+## Available tools
 
-| Tool | Engine | Use Case |
+| Tool | Description | Use case |
 | --- | --- | --- |
-| [`verify_math`](/mcp/tools#verify_math) | SymPy | Verify calculations, derivatives, integrals |
-| [`verify_logic`](/mcp/tools#verify_logic) | Z3 SMT | Prove logical arguments, check validity |
-| [`verify_code`](/mcp/tools#verify_code) | AST | Detect security vulnerabilities in code |
-| [`verify_sql`](/mcp/tools#verify_sql) | Pattern | SQL injection detection, query validation |
+| [`execute_python_code`](/mcp/tools#execute_python_code) | Subprocess execution | The single entry point for all QWED capabilities. Executes dynamically generated Python code with access to all QWED SDK libraries. |
+
+<Info>
+  In v0.1.x, QWED-MCP exposed individual tools like `verify_math`, `verify_logic`, `verify_code`, and `verify_sql`. These were consolidated into `execute_python_code` in v0.2.0 to solve context bloat (RFC-9728 compatibility). See [migration guide](/mcp/tools#migrating-from-v01x).
+</Info>
 
 ---
 
 ## Installation
 
-### From PyPI (Recommended)
+### From PyPI (recommended)
 
 ```bash
 pip install qwed-mcp
 ```
 
-### From Source
+### From source
 
 ```bash
 git clone https://github.com/QWED-AI/qwed-mcp.git
@@ -108,18 +100,18 @@ cd qwed-mcp
 pip install -e .
 ```
 
-### Verify Installation
+### Verify installation
 
 ```bash
 qwed-mcp --version
-# qwed-mcp 0.1.0
+# qwed-mcp 0.2.0
 ```
 
 ---
 
-## Quick Start
+## Quick start
 
-### Claude Desktop Setup
+### Claude Desktop setup
 
 1. **Find your config file:**
    - **Windows:** `%APPDATA%\Claude\claude_desktop_config.json`
@@ -131,7 +123,10 @@ qwed-mcp --version
 {
   "mcpServers": {
     "qwed-verification": {
-      "command": "qwed-mcp"
+      "command": "qwed-mcp",
+      "env": {
+        "QWED_MCP_TRUSTED_CODE_EXECUTION": "true"
+      }
     }
   }
 }
@@ -139,9 +134,9 @@ qwed-mcp --version
 
 3. **Restart Claude Desktop**
 4. **Test it!** Ask Claude:
-   > "What's the derivative of x^3? Use verify\_math to check."
+   > "Write a Python script that verifies a $10,000 investment at 7.5% for 5 years using the compound interest formula, and run it using execute\_python\_code."
 
-### VS Code Setup
+### VS Code setup
 
 1. **Install MCP extension** (if not already)
 2. **Add to settings.json:**
@@ -150,7 +145,10 @@ qwed-mcp --version
 {
   "mcp.servers": {
     "qwed-verification": {
-      "command": "qwed-mcp"
+      "command": "qwed-mcp",
+      "env": {
+        "QWED_MCP_TRUSTED_CODE_EXECUTION": "true"
+      }
     }
   }
 }
@@ -158,7 +156,7 @@ qwed-mcp --version
 
 3. **Restart VS Code**
 
-### Python Client
+### Python client
 
 You can also use QWED-MCP programmatically:
 
@@ -168,7 +166,10 @@ from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
 
 async def main():
-    server_params = StdioServerParameters(command="qwed-mcp")
+    server_params = StdioServerParameters(
+        command="qwed-mcp",
+        env={"QWED_MCP_TRUSTED_CODE_EXECUTION": "true"}
+    )
     
     async with stdio_client(server_params) as (read, write):
         async with ClientSession(read, write) as session:
@@ -177,14 +178,17 @@ async def main():
             # List available tools
             tools = await session.list_tools()
             print(f"Available tools: {[t.name for t in tools.tools]}")
+            # Output: Available tools: ['execute_python_code']
             
-            # Call verify_math
+            # Run a verification script
             result = await session.call_tool(
-                "verify_math",
+                "execute_python_code",
                 arguments={
-                    "expression": "x**2",
-                    "claimed_result": "2*x",
-                    "operation": "derivative"
+                    "code": (
+                        "from sympy import symbols, diff\n"
+                        "x = symbols('x')\n"
+                        "print(f'd/dx(x^3) = {diff(x**3, x)}')"
+                    )
                 }
             )
             print(result)
@@ -196,18 +200,24 @@ asyncio.run(main())
 
 ## Configuration
 
-### Environment Variables
+### Environment variables
 
 | Variable | Description | Default |
 | --- | --- | --- |
+| `QWED_MCP_TRUSTED_CODE_EXECUTION` | Enable `execute_python_code` tool (`true`/`false`) | `false` |
 | `QWED_LOG_LEVEL` | Logging level (`DEBUG`, `INFO`, `WARNING`, `ERROR`) | `INFO` |
 | `QWED_TIMEOUT` | Tool execution timeout in seconds | `30` |
 
-### Example with Environment Variables
+<Warning>
+  `QWED_MCP_TRUSTED_CODE_EXECUTION` must be set to `true` to enable code execution. The executed code runs with server privileges — ensure inputs are from trusted sources.
+</Warning>
+
+### Example with environment variables
 
 **Windows (PowerShell):**
 
 ```powershell
+$env:QWED_MCP_TRUSTED_CODE_EXECUTION = "true"
 $env:QWED_LOG_LEVEL = "DEBUG"
 qwed-mcp
 ```
@@ -215,28 +225,28 @@ qwed-mcp
 **macOS/Linux:**
 
 ```bash
-QWED_LOG_LEVEL=DEBUG qwed-mcp
+QWED_MCP_TRUSTED_CODE_EXECUTION=true QWED_LOG_LEVEL=DEBUG qwed-mcp
 ```
 
 ---
 
-## Use Cases
+## Use cases
 
-### 1. Financial Calculations
+### 1. Financial calculations
 
 Verify that AI-generated financial calculations are correct:
 
 ```text
 User: Calculate compound interest for $10,000 at 5% for 3 years
 
-Claude: The compound interest is $1,576.25
-        Final amount: $11,576.25
+Claude: Let me verify this calculation.
+        [Calls execute_python_code with a script using Decimal math]
         
-        [Calling verify_math to confirm...]
-        ✅ VERIFIED: 10000 * (1.05)^3 = 11576.25
+        STDOUT: Future value = $11576.25
+        ✅ Verified using deterministic decimal arithmetic.
 ```
 
-### 2. Research Validation
+### 2. Research validation
 
 Ensure scientific claims are logically valid:
 
@@ -244,13 +254,13 @@ Ensure scientific claims are logically valid:
 User: If all mammals are warm-blooded, and dolphins are mammals,
       are dolphins warm-blooded?
 
-Claude: [Calling verify_logic...]
-        ✅ VERIFIED: The conclusion logically follows from the premises
+Claude: [Calls execute_python_code with a Z3 solver script]
         
-        Dolphins are warm-blooded.
+        STDOUT: The conclusion logically follows from the premises.
+        ✅ Verified via Z3 SMT solver.
 ```
 
-### 3. Secure Coding
+### 3. Secure coding
 
 Check AI-generated code for security issues:
 
@@ -258,25 +268,29 @@ Check AI-generated code for security issues:
 User: Write a function to execute user commands
 
 Claude: def run_command(cmd):
-            os.system(cmd)  # Execute the command
+            os.system(cmd)
         
-        [Calling verify_code...]
-        ❌ SECURITY ISSUE: os.system() is dangerous
+        [Calls execute_python_code with a CodeGuard script]
         
-        Here's a safer alternative...
+        STDOUT: Verified: False
+          - Dangerous pattern: os.system
+        
+        ⚠️ Security issue detected. Here's a safer alternative...
 ```
 
-### 4. SQL Security
+### 4. SQL security
 
 Prevent SQL injection in generated queries:
 
 ```text
 User: Generate a query to find user "admin' OR '1'='1"
 
-Claude: SELECT * FROM users WHERE username = 'admin'' OR ''1''=''1'
+Claude: [Calls execute_python_code with a SQLGuard script]
         
-        [Calling verify_sql...]
-        ❌ SQL INJECTION DETECTED: Suspicious tautology pattern
+        STDOUT: Verified: False
+          - SQL injection pattern detected
+        
+        ❌ Injection detected. Use parameterized queries instead.
 ```
 
 ---
