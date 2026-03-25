@@ -149,7 +149,12 @@
                   "infra/examples",
                   "infra/troubleshooting"
                 ]
-              },
+              }
+            ]
+          },
+          {
+            "tab": "Protocols",
+            "groups": [
               {
                 "group": "MCP Server",
                 "pages": [
