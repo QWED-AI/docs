@@ -1,0 +1,223 @@
+---
+title: "Architecture"
+sidebarTitle: "Architecture"
+description: "Deep-dive into the QWED A2A interceptor pipeline — data flow, component relationships, and verification sequence."
+icon: "diagram-project"
+---
+
+## Pipeline overview
+
+Every inter-agent message flows through five deterministic stages:
+
+```mermaid
+flowchart LR
+    M["📨 AgentMessage"] --> S["1. Schema<br/>Validation"]
+    S --> T["2. Trust<br/>Boundary"]
+    T --> E["3. Engine<br/>Routing"]
+    E --> A["4. JWT<br/>Attestation"]
+    A --> V["5. Verdict<br/>Return"]
+
+    classDef stage fill:#ecfdf5,stroke:#10b981,color:#065f46;
+    class S,T,E,A,V stage;
+```
+
+| Stage | Component | What it does |
+|-------|-----------|-------------|
+| **1. Schema** | Pydantic `AgentMessage` | Validates sender/receiver IDs, payload type, timestamp, optional signature |
+| **2. Trust** | `TrustBoundary` | Checks blocklists, allowlists, pair blocks, rate limits — deny-all by default |
+| **3. Engine** | `_route_to_engine()` | Routes to `finance_guard`, `logic_guard`, `code_guard`, or `passthrough` |
+| **4. Attestation** | `A2ACryptoService` | Signs the verdict with ES256 JWT — includes payload hash, trace ID, engine used |
+| **5. Verdict** | `VerificationVerdict` | Returns `forwarded` or `blocked` with reason, attestation, and audit trace |
+
+---
+
+## Full verification sequence
+
+```mermaid
+sequenceDiagram
+    participant Sender as Agent A (Sender)
+    participant API as FastAPI Gateway
+    participant Int as Interceptor
+    participant TB as Trust Boundary
+    participant Eng as Verification Engine
+    participant Crypto as Crypto Service
+    participant Recv as Agent B (Receiver)
+
+    Sender->>API: POST /a2a/intercept
+    API->>API: Generate trace_id
+    API->>Int: intercept(message, trace_id)
+
+    Int->>TB: evaluate(sender, receiver)
+
+    alt Blocked by trust
+        TB-->>Int: (false, reason)
+        Int->>Crypto: sign_verdict(BLOCKED)
+        Int-->>API: VerificationVerdict(BLOCKED)
+        API-->>Sender: 200 {status: blocked}
+    else Allowed
+        TB-->>Int: (true, null)
+        Int->>Eng: route_to_engine(message)
+
+        alt Verification passes
+            Eng-->>Int: {verified: true}
+            Int->>Crypto: sign_verdict(FORWARDED)
+            Int-->>API: VerificationVerdict(FORWARDED)
+            API-->>Recv: Forward payload + attestation JWT
+        else Verification fails
+            Eng-->>Int: {verified: false, reason}
+            Int->>Crypto: sign_verdict(BLOCKED)
+            Int-->>API: VerificationVerdict(BLOCKED)
+            API-->>Sender: 200 {status: blocked, reason}
+        end
+    end
+```
+
+---
+
+## Component relationship
+
+```mermaid
+graph TB
+    subgraph Protocol["Protocol Layer"]
+        EP["endpoints.py<br/>FastAPI Router"]
+        SC["schema.py<br/>Pydantic Models"]
+    end
+
+    subgraph Core["Core Layer"]
+        INT["interceptor.py<br/>A2AVerificationInterceptor"]
+    end
+
+    subgraph Security["Security Layer"]
+        TB["trust_boundary.py<br/>TrustBoundary"]
+        CR["crypto.py<br/>A2ACryptoService"]
+    end
+
+    subgraph Utils["Utilities"]
+        TL["telemetry.py<br/>Sentry + Metrics"]
+    end
+
+    EP --> INT
+    EP --> SC
+    INT --> TB
+    INT --> CR
+    INT --> TL
+    INT --> SC
+
+    classDef protocol fill:#dbeafe,stroke:#3b82f6,color:#1e40af;
+    classDef core fill:#fef3c7,stroke:#f59e0b,color:#92400e;
+    classDef security fill:#fee2e2,stroke:#ef4444,color:#991b1b;
+    classDef utils fill:#f3e8ff,stroke:#a855f7,color:#6b21a8;
+
+    class EP,SC protocol;
+    class INT core;
+    class TB,CR security;
+    class TL utils;
+```
+
+---
+
+## Trust boundary evaluation
+
+The trust boundary evaluates **every** request through a strict sequence. Note that allowlist checks happen **before** rate-limit allocation to prevent map-spray attacks.
+
+```mermaid
+flowchart TB
+    Start["Incoming Request"] --> BL{"Sender/Receiver<br/>on blocklist?"}
+    BL -->|Yes| Block["❌ BLOCKED"]
+    BL -->|No| PB{"Pair<br/>blocked?"}
+    PB -->|Yes| Block
+    PB -->|No| DA{"default_allow<br/>= true?"}
+    DA -->|No| AL{"Both agents<br/>in allowlist?"}
+    AL -->|No| Block
+    AL -->|Yes| RL
+    DA -->|Yes| RL{"Token bucket<br/>has tokens?"}
+    RL -->|No| Block
+    RL -->|Yes| Allow["✅ ALLOWED"]
+
+    classDef blocked fill:#fee2e2,stroke:#ef4444,color:#991b1b;
+    classDef allowed fill:#ecfdf5,stroke:#10b981,color:#065f46;
+    classDef check fill:#f0f9ff,stroke:#0ea5e9,color:#0c4a6e;
+
+    class Block blocked;
+    class Allow allowed;
+    class BL,PB,DA,AL,RL check;
+```
+
+---
+
+## Engine routing
+
+The interceptor routes payloads based on `payload_type`:
+
+| PayloadType | Engine | Verification | Precision |
+|------------|--------|-------------|-----------|
+| `financial_transaction` | `finance_guard` | Decimal arithmetic — recomputes totals from line items | `Decimal("0.01")` tolerance |
+| `logic_assertion` | `logic_guard` | Set-based contradiction detection (P ∧ ¬P) | Deterministic, sorted output |
+| `code_execution` | `code_guard` | Case-insensitive regex for `eval`, `exec`, `subprocess`, `os.system`, etc. | Import/alias detection |
+| `general` / `data_query` | `passthrough` | No verification — forwarded immediately | N/A |
+
+---
+
+## Data model
+
+```mermaid
+classDiagram
+    class AgentMessage {
+        +str sender_agent_id
+        +str receiver_agent_id
+        +PayloadType payload_type
+        +Dict payload
+        +datetime timestamp
+        +str? signature
+        +Dict? metadata
+    }
+
+    class VerificationVerdict {
+        +VerdictStatus status
+        +str? reason
+        +str audit_trace_id
+        +str? attestation_jwt
+        +str? engine_used
+        +datetime verified_at
+        +Dict? details
+    }
+
+    class InterceptorConfig {
+        +bool enable_financial_verification
+        +bool enable_logic_verification
+        +bool enable_code_verification
+        +bool block_on_error
+        +int max_payload_size_bytes
+        +List? trusted_agents
+    }
+
+    AgentMessage --> VerificationVerdict : produces
+    InterceptorConfig --> AgentMessage : configures routing
+```
+
+---
+
+## JWT attestation structure
+
+Every verdict includes a signed JWT with this payload:
+
+```json
+{
+  "iss": "did:qwed:a2a:local",
+  "sub": "sha256:abc123...",
+  "iat": 1711411200,
+  "exp": 1711497600,
+  "jti": "a2a_demo_001",
+  "qwed_a2a": {
+    "version": "1.0",
+    "verdict": "forwarded",
+    "engine": "finance_guard",
+    "sender": "procurement-agent",
+    "receiver": "treasury-agent"
+  }
+}
+```
+
+<Info>
+The `sub` claim is a SHA-256 hash of the original payload, making the attestation tamper-evident. Any modification to the payload invalidates the hash match.
+</Info>

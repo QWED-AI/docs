@@ -184,6 +184,33 @@
             ]
           },
           {
+            "tab": "A2A Protocol",
+            "groups": [
+              {
+                "group": "Overview",
+                "pages": [
+                  "a2a/overview",
+                  "a2a/architecture"
+                ]
+              },
+              {
+                "group": "Core Components",
+                "pages": [
+                  "a2a/interceptor",
+                  "a2a/trust-boundary",
+                  "a2a/crypto-attestations"
+                ]
+              },
+              {
+                "group": "Guides",
+                "pages": [
+                  "a2a/quickstart",
+                  "a2a/deployment"
+                ]
+              }
+            ]
+          },
+          {
             "tab": "Integrations",
             "groups": [
               {
@@ -404,6 +431,10 @@
           {
             "label": "QWED Legal",
             "href": "/legal/overview"
+          },
+          {
+            "label": "QWED A2A",
+            "href": "/a2a/overview"
           },
           {
             "label": "QWED Learning",
