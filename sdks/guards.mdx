@@ -23,6 +23,7 @@ pip install qwed
 | `SelfInitiatedCoTGuard` | Verifies autonomous reasoning paths |
 | `SovereigntyGuard` | Enforces data residency policies |
 | `ProcessVerifier` | Validates IRAC structure and milestone completion |
+| `StateGuard` | Deterministic workspace rollback using shadow git snapshots |
 | `SystemGuard` | Validates shell commands |
 | `ConfigGuard` | Scans configuration for exposed secrets |
 | `StateGuard` | Deterministic rollback for agentic file operations |
@@ -260,6 +261,47 @@ if not result["verified"]:
 
 - Social Security Numbers (dash-separated, space-separated, contiguous)
 - `CONFIDENTIAL` markers
+
+---
+
+## StateGuard
+
+Provides deterministic rollback capabilities for agentic file operations using shadow git snapshots. Before an agent executes file-modifying actions, `StateGuard` captures an immutable snapshot of the workspace. If the agent's execution causes a failure, you can roll back to the exact pre-execution state.
+
+```python
+from qwed_new.guards.state_guard import StateGuard
+
+guard = StateGuard(workspace_path="/path/to/workspace")
+
+# Capture state before agent acts
+snapshot = guard.create_pre_execution_snapshot()
+print(snapshot)  # "a1b2c3d4e5f6..."  (40-char SHA-1 tree hash)
+
+# ... agent performs file operations ...
+
+# Roll back if something went wrong
+success = guard.rollback(snapshot)
+if success:
+    print("Workspace restored to pre-execution state")
+```
+
+### Parameters
+
+<ParamField path="workspace_path" type="str" required>
+  Absolute path to a directory that is a valid git repository. The directory must exist and contain a `.git` folder. `StateGuard` resolves the path and validates it on initialization.
+</ParamField>
+
+### Methods
+
+**`create_pre_execution_snapshot()`** — Stages all current changes (`git add .`) and runs `git write-tree` to produce an immutable 40-character SHA-1 tree hash. Returns the hash as a `str`. Raises `RuntimeError` if the snapshot fails.
+
+**`rollback(tree_hash)`** — Restores the workspace to the exact state captured by the given tree hash. Checks out the tree (`git checkout <hash> -- .`) and cleans untracked files (`git clean -fd`). Gitignored files (e.g., `.env`) are preserved. Returns `True` on success, `False` on failure.
+
+### Security
+
+- Tree hashes are validated against the regex `^[0-9a-f]{40}$` to prevent command injection.
+- All subprocess calls are scoped to the validated `workspace_path`.
+- Exceptions propagate gracefully — a failed snapshot does not leave the workspace in a dirty state.
 
 ---
 
