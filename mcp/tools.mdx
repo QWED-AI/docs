@@ -20,9 +20,10 @@ The tool captures `stdout` and `stderr` from the subprocess and returns them as 
 
 ### Parameters
 
-| Parameter | Type | Required | Description |
-| --- | --- | --- | --- |
-| `code` | string | Yes | Python code to execute in a subprocess |
+| Parameter | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `code` | string | Yes | - | Python code to execute in a subprocess |
+| `background` | boolean | No | `false` | When `true`, the job runs asynchronously in the background and returns a `job_id` immediately. Use the [`verification_status`](#verification_status) tool to poll for results. Recommended for heavy or long-running verification scripts. |
 
 ### Environment
 
@@ -32,11 +33,16 @@ The server admin must set `QWED_MCP_TRUSTED_CODE_EXECUTION=true` to enable this 
 
 ### Execution limits
 
-| Limit | Value |
-| --- | --- |
-| **Timeout** | 30 seconds |
-| **Output cap** | 1 MB (stdout and stderr each) |
-| **Process isolation** | New subprocess per invocation |
+| Limit | Synchronous (`background=false`) | Background (`background=true`) |
+| --- | --- | --- |
+| **Timeout** | 30 seconds | No timeout (runs until completion) |
+| **Output cap** | 1 MB (stdout and stderr each) | 1 MB (stdout and stderr each) |
+| **Process isolation** | New subprocess per invocation | New subprocess per invocation |
+| **Concurrency** | Sequential | Up to 5 concurrent background jobs |
+
+<Note>
+  When the 1 MB output cap is reached, the subprocess is terminated and the output is truncated with a warning message.
+</Note>
 
 ### Examples
 
@@ -117,6 +123,32 @@ Execution completed successfully.
 }
 ```
 
+#### Run a heavy verification in the background
+
+```json
+{
+  "code": "from qwed_legal import LegalGuard\n\nguard = LegalGuard()\n# ... long-running multi-guard verification\nprint('All checks passed')",
+  "background": true
+}
+```
+
+**Response:**
+
+```text
+Verification order is being placed for the request 3f8a1b2c-... Check back using the 'verification_status' tool.
+```
+
+Then poll for results:
+
+```json
+{
+  "name": "verification_status",
+  "arguments": {
+    "job_id": "3f8a1b2c-..."
+  }
+}
+```
+
 ### Error responses
 
 | Scenario | Response |
@@ -125,6 +157,67 @@ Execution completed successfully.
 | No code provided | `Error: No code provided.` |
 | Script raises exception | `STDERR` contains the traceback; return code is non-zero |
 | Timeout exceeded | `Execution timed out after 30 seconds.` |
+
+---
+
+## verification\_status
+
+Check the execution status and output of a background verification task dispatched via `execute_python_code` with `background=true`.
+
+### Parameters
+
+| Parameter | Type | Required | Description |
+| --- | --- | --- | --- |
+| `job_id` | string | Yes | The UUID returned by `execute_python_code` when `background=true` |
+
+### Response format
+
+The response text depends on the job state:
+
+| Job state | Response |
+| --- | --- |
+| `queued` | `Status: queued...` |
+| `running` | `Status: running...` |
+| `success` | `Status: success\n\nResult:\n<stdout/stderr output>` |
+| `failed` | `Status: failed\n\nResult:\n<error details>` |
+| `cancelled` | `Status: cancelled\n\nResult:\nJob was cancelled.` |
+| Not found / expired | `Error: Job ID '<id>' not found or expired.` |
+
+### Example
+
+```json
+{
+  "job_id": "3f8a1b2c-4d5e-6f7a-8b9c-0d1e2f3a4b5c"
+}
+```
+
+**Response (while running):**
+
+```text
+Status: running...
+```
+
+**Response (completed):**
+
+```text
+Status: success
+
+Result:
+STDOUT:
+All checks passed
+
+Execution completed successfully.
+```
+
+### Job lifecycle
+
+- Background jobs expire after **1 hour** (3600 seconds). Expired jobs are pruned automatically.
+- A maximum of **5 jobs** can run concurrently. Additional jobs are queued until a slot opens.
+- Once a job completes (`success`, `failed`, or `cancelled`), its result is available until the TTL expires.
+
+<Warning>
+  Background job state is held in memory on the MCP server. If the server restarts, all pending and completed jobs are lost.
+</Warning>
 
 ---
 
