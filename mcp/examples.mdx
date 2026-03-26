@@ -202,7 +202,65 @@ SELECT * FROM orders WHERE user_id = ?
 
 ---
 
-## Example 6: Integration with LangChain
+## Example 6: Background verification
+
+### Scenario
+
+You need to run a complex, multi-guard verification that may exceed the default 30-second timeout. Use `background=true` to dispatch the job asynchronously, then poll for results with `verification_status`.
+
+### Conversation
+
+**User:** Run a full legal contract review including deadline, liability, and provenance checks on this 50-page NDA.
+
+**Claude's process:**
+
+1. Call `execute_python_code` with `background=true`:
+
+```json
+{
+  "code": "from qwed_legal import LegalGuard\nimport hashlib\n\nguard = LegalGuard(provenance_config={'require_disclosure': True})\n\n# Deadline check\nd = guard.verify_deadline('2026-01-15', '90 business days', '2026-05-01')\nprint(f'Deadline verified: {d.verified}')\n\n# Liability check\nl = guard.verify_liability_cap(5000000, 200, 10000000)\nprint(f'Liability verified: {l.verified}')\n\n# Provenance check\ncontent = 'This AI-generated contract review...'\nh = hashlib.sha256(content.encode()).hexdigest()\np = guard.verify_provenance(content, {'content_hash': h, 'model_id': 'gpt-4', 'generation_timestamp': '2026-03-25T10:00:00+00:00'})\nprint(f'Provenance verified: {p[\"verified\"]}')",
+  "background": true
+}
+```
+
+**Response:**
+
+```text
+Verification order is being placed for the request a1b2c3d4-e5f6-7890-abcd-ef1234567890. Check back using the 'verification_status' tool.
+```
+
+2. Poll for results using `verification_status`:
+
+```json
+{
+  "name": "verification_status",
+  "arguments": {
+    "job_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+  }
+}
+```
+
+**Response:**
+
+```text
+Status: success
+
+Result:
+STDOUT:
+Deadline verified: True
+Liability verified: True
+Provenance verified: True
+
+Execution completed successfully.
+```
+
+<Note>
+  Background jobs are ideal for multi-guard verification pipelines, large document analysis, or any script that may exceed the 30-second synchronous timeout.
+</Note>
+
+---
+
+## Example 7: Integration with LangChain
 
 ### Python code
 
@@ -252,7 +310,11 @@ User asks → AI calculates → AI writes verification script → AI responds
                          AI recalculates
 ```
 
-### 2. Use appropriate SDK imports
+### 2. Use background mode for heavy tasks
+
+Set `background=true` when running scripts that may take longer than 30 seconds. Poll results using `verification_status` with the returned `job_id`.
+
+### 3. Use appropriate SDK imports
 
 | Task | SDK import |
 | --- | --- |
@@ -263,7 +325,7 @@ User asks → AI calculates → AI writes verification script → AI responds
 | Legal deadlines | `from qwed_legal import DeadlineGuard` |
 | AI provenance | `from qwed_legal import ProvenanceGuard` |
 
-### 3. Handle verification failures
+### 4. Handle verification failures
 
 When verification fails:
 
@@ -272,7 +334,7 @@ When verification fails:
 3. Verify again
 4. Explain the correction to user
 
-### 4. Explain verification to users
+### 5. Explain verification to users
 
 ```text
 "I calculated X. Let me verify this is correct...

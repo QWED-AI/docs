@@ -59,12 +59,17 @@ QWED-MCP gives AI assistants access to **deterministic verification** through a 
 │                                                              │
 │  ┌────────────────────────────────────────────────────────┐  │
 │  │              execute_python_code                       │  │
-│  │  └─► Subprocess Execution (Restricted Env)             │  │
-│  │       └─► Native QWED library execution                │  │
-│  │           ├── qwed_new (math, logic, code, SQL)        │  │
-│  │           ├── qwed_legal (deadlines, citations, ...)   │  │
-│  │           ├── qwed_finance (banking, ISO 20022)        │  │
-│  │           └── qwed_ucp (commerce verification)         │  │
+│  │  ├─► Synchronous Execution (30s timeout)               │  │
+│  │  └─► Background Execution (background=true)            │  │
+│  │       └─► Async Job Queue (up to 5 concurrent)         │  │
+│  │           └─► Native QWED library execution            │  │
+│  │               ├── qwed_new (math, logic, code, SQL)    │  │
+│  │               ├── qwed_legal (deadlines, citations,..) │  │
+│  │               ├── qwed_finance (banking, ISO 20022)    │  │
+│  │               └── qwed_ucp (commerce verification)     │  │
+│  ├────────────────────────────────────────────────────────┤  │
+│  │              verification_status                       │  │
+│  │  └─► Poll background job results by job_id             │  │
 │  └────────────────────────────────────────────────────────┘  │
 │                                                              │
 └──────────────────────────────────────────────────────────────┘
@@ -76,7 +81,8 @@ QWED-MCP gives AI assistants access to **deterministic verification** through a 
 
 | Tool | Description | Use case |
 | --- | --- | --- |
-| [`execute_python_code`](/mcp/tools#execute_python_code) | Subprocess execution | The single entry point for all QWED capabilities. Executes dynamically generated Python code with access to all QWED SDK libraries. |
+| [`execute_python_code`](/mcp/tools#execute_python_code) | Subprocess execution | The primary entry point for all QWED capabilities. Executes dynamically generated Python code with access to all QWED SDK libraries. Supports optional `background=true` for async execution. |
+| [`verification_status`](/mcp/tools#verification_status) | Job status polling | Check the status and results of background verification jobs dispatched via `execute_python_code` with `background=true`. |
 
 <Info>
   In v0.1.x, QWED-MCP exposed individual tools like `verify_math`, `verify_logic`, `verify_code`, and `verify_sql`. These were consolidated into `execute_python_code` in v0.2.0 to solve context bloat (RFC-9728 compatibility). See [migration guide](/mcp/tools#migrating-from-v01x).
@@ -178,7 +184,7 @@ async def main():
             # List available tools
             tools = await session.list_tools()
             print(f"Available tools: {[t.name for t in tools.tools]}")
-            # Output: Available tools: ['execute_python_code']
+            # Output: Available tools: ['execute_python_code', 'verification_status']
             
             # Run a verification script
             result = await session.call_tool(
