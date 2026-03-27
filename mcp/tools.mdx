@@ -156,7 +156,8 @@ Then poll for results:
 | Tool disabled | `Error: Code execution is disabled. The server admin must set QWED_MCP_TRUSTED_CODE_EXECUTION=true to enable this tool.` |
 | No code provided | `Error: No code provided.` |
 | Script raises exception | `STDERR` contains the traceback; return code is non-zero |
-| Timeout exceeded | `Execution timed out after 30 seconds.` |
+| Timeout exceeded | `Execution timed out after 30.0 seconds.` |
+| Output cap exceeded | `[WARNING: OUTPUT TRUNCATED DUE TO 1MB SIZE CAP. PROCESS TERMINATED.]` — appended to the truncated output |
 
 ---
 
@@ -451,5 +452,5 @@ All tool responses include `stdout`, `stderr`, and a return code summary. A non-
 | --- | --- | --- |
 | `Code execution is disabled` | `QWED_MCP_TRUSTED_CODE_EXECUTION` not set | Server admin sets env var to `true` |
 | `No code provided` | Empty `code` parameter | Provide Python code in the `code` field |
-| `Execution timed out after 30 seconds` | Script exceeded time limit | Optimize the script or break into smaller steps |
+| `Execution timed out after 30.0 seconds` | Script exceeded synchronous time limit | Optimize the script, break into smaller steps, or use `background=true` |
 | `ModuleNotFoundError` in stderr | Missing QWED SDK package | Install the required package (e.g., `pip install qwed-legal`) |
