@@ -1,7 +1,7 @@
 ---
-title: "Introduction to QWED"
-sidebarTitle: "Introduction to QWED"
-description: "QWED is a model-agnostic trust boundary that verifies LLM outputs and enforces determinism through symbolic engines."
+title: "QWED: deterministic verification for LLMs and AI agents"
+sidebarTitle: "Introduction"
+description: "QWED is a deterministic verification platform for LLMs and AI agents. Use formal methods, symbolic execution, and policy guards to verify AI outputs before execution."
 icon: "shield-check"
 ---
 
@@ -16,6 +16,8 @@ QWED (Query With Evidence & Determinism) is a trust boundary for AI systems:
 - LLMs can translate user intent into structured claims.
 - QWED verifies those claims with deterministic engines before execution or response.
 - You get proof-backed outcomes instead of probability-only confidence.
+
+QWED is designed for LLM verification, AI agent security, verified tool calls, prompt injection defense, and deterministic transaction verification in high-stakes workflows.
 
 > **"Do not trust generated output. Verify it."**
 
@@ -35,6 +37,23 @@ flowchart LR
     class Q,Y trusted;
     class R result;
 ```
+
+## Explore common verification problems
+
+<CardGroup cols={2}>
+  <Card title="LLM verification" icon="badge-check" href="/advanced/llm-verification">
+    Learn how formal verification for LLMs differs from prompting, RAG, and output formatting.
+  </Card>
+  <Card title="AI agent security" icon="shield-halved" href="/advanced/agent-verification">
+    Add pre-execution checks, policy enforcement, and budget controls for agent actions.
+  </Card>
+  <Card title="Prompt injection defense" icon="lock" href="/advanced/security-hardening">
+    Harden your stack against prompt injection, exfiltration, and unsafe execution paths.
+  </Card>
+  <Card title="MCP security" icon="plug" href="/mcp/overview">
+    Secure Model Context Protocol tools with deterministic verification and tool schema checks.
+  </Card>
+</CardGroup>
 
 ## When to use QWED first
 
@@ -116,7 +135,7 @@ qwed verify-logic "(AND (GT x 5) (LT y 10))"
   Explore core, analysis, and specialized engines.
 </Card>
 
-## What's new in v4.0.0
+## What's new in v4.0.1
 
 <AccordionGroup>
   <Accordion title="Agentic Security Guards" icon="shield-halved" defaultOpen>

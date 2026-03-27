@@ -1,11 +1,13 @@
 ---
 sidebar_position: 11
 title: "Architecture Overview"
-description: "How QWED separates untrusted LLM translation from deterministic verification and returns proof-backed results."
+description: "QWED architecture for deterministic verification of LLM outputs and AI agent actions using formal methods, policy guards, and signed attestations."
 ---
 
 This page gives the high-level architecture.  
 For deeper diagrams, see [Architecture Diagrams](/advanced/architecture-diagrams).
+
+QWED separates untrusted model translation from deterministic verification so you can enforce AI reliability, tool call verification, and zero-trust policy boundaries at runtime.
 
 ## Core principle
 
@@ -110,6 +112,23 @@ sequenceDiagram
 | Prompt injection | Translation may be affected, but verifier/guards enforce policy |
 | Unsafe code or SQL | Blocked by parser, AST checks, and guard rules |
 | Untrusted tool action | Guarded and policy-checked before execution |
+
+## Related verification guides
+
+<CardGroup cols={2}>
+  <Card title="LLM verification" icon="badge-check" href="/advanced/llm-verification">
+    See how QWED validates LLM outputs with formal methods instead of probability-only confidence.
+  </Card>
+  <Card title="AI agent verification" icon="shield-halved" href="/advanced/agent-verification">
+    Apply policy enforcement and pre-execution checks to autonomous agents.
+  </Card>
+  <Card title="Prompt injection defense" icon="lock" href="/advanced/security-hardening">
+    Review production guidance for prompt injection defense and OWASP LLM risks.
+  </Card>
+  <Card title="MCP security" icon="plug" href="/mcp/overview">
+    Secure Model Context Protocol integrations and verify tool execution paths.
+  </Card>
+</CardGroup>
 
 ## Deployment modes
 

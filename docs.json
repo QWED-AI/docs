@@ -8,6 +8,16 @@
     "dark": "#047857"
   },
   "favicon": "/favicon.svg",
+  "redirects": [
+    {
+      "source": "/docs",
+      "destination": "/intro"
+    },
+    {
+      "source": "/docs/:slug*",
+      "destination": "/:slug*"
+    }
+  ],
   "navigation": {
     "global": {
       "anchors": [
@@ -315,6 +325,9 @@
                 "group": "Concepts",
                 "pages": [
                   "advanced/why-cloud-llms",
+                  "advanced/llm-verification",
+                  "advanced/qwed-vs-guardrails",
+                  "advanced/qwed-vs-rag",
                   "advanced/comparison",
                   "advanced/performance-benchmarks",
                   "advanced/agent-verification"
@@ -474,7 +487,7 @@
       }
     ]
   },
-  "description": "Official documentation for QWED. Learn how to integrate model-agnostic deterministic verification for LLMs using formal symbolic safety rails.",
+  "description": "Official documentation for QWED. Learn deterministic verification for LLMs and AI agents using formal methods, symbolic execution, and policy guards.",
   "banner": {
     "content": "\u2b50 If you find QWED helpful, consider [giving us a star on GitHub](https://github.com/QWED-AI/qwed-verification)!",
     "dismissible": true
@@ -485,7 +498,10 @@
     }
   },
   "seo": {
-    "indexing": "all"
+    "indexing": "all",
+    "metatags": {
+      "canonical": "https://docs.qwedai.com"
+    }
   },
   "appearance": {
     "default": "system"
