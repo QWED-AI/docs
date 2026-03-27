@@ -1,0 +1,47 @@
+---
+title: "QWED vs RAG for LLM verification"
+sidebarTitle: "QWED vs RAG"
+description: "Compare QWED and RAG for LLM verification, grounded responses, AI reliability, and high-stakes agent workflows."
+---
+
+RAG and QWED address different failure modes.
+
+RAG improves what the model can reference. QWED verifies whether the model's final claim or action is correct.
+
+## Core difference
+
+| Tool | Primary job | Best at |
+| --- | --- | --- |
+| RAG | Retrieve context | Private knowledge, recent information, document grounding |
+| QWED | Verify outputs | Deterministic validation, policy enforcement, tool-call checks |
+
+## When RAG is enough
+
+Use RAG when the model needs:
+
+- Access to private documents
+- Recent facts or changing policies
+- Better grounding from source material
+
+## When you need QWED
+
+Use QWED when the model must:
+
+- Produce correct calculations from retrieved data
+- Obey policy and approval rules
+- Verify tool calls before execution
+- Prevent prompt injection from turning retrieved context into unsafe actions
+
+## Best-practice stack
+
+Use both together:
+
+1. RAG retrieves the relevant documents.
+2. QWED verifies the answer, decision, or action derived from those documents.
+
+## Related docs
+
+- [LLM verification with formal methods](/advanced/llm-verification)
+- [QWED vs Guardrails AI](/advanced/qwed-vs-guardrails)
+- [QWED vs Guardrails, RAG, and RLHF for LLM verification](/advanced/comparison)
+- [Prompt injection defense and QWED security hardening](/advanced/security-hardening)

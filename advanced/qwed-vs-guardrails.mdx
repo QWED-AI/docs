@@ -1,0 +1,48 @@
+---
+title: "QWED vs Guardrails AI"
+sidebarTitle: "QWED vs Guardrails"
+description: "Compare QWED and Guardrails AI for LLM verification, AI agent security, schema validation, and deterministic output checking."
+---
+
+QWED and Guardrails solve different problems in an AI stack.
+
+Guardrails helps you constrain structure. QWED helps you verify correctness.
+
+## Core difference
+
+| Tool | Primary job | Best at |
+| --- | --- | --- |
+| Guardrails | Output structure and policy rules | JSON schemas, validators, formatting constraints |
+| QWED | Deterministic verification | Math, logic, code, SQL, tool-call verification |
+
+## When Guardrails is enough
+
+Use Guardrails when you need:
+
+- Valid JSON or XML
+- Required fields and schema checks
+- Basic policy filters
+- Controlled output formats for downstream parsing
+
+## When you need QWED
+
+Use QWED when you need:
+
+- Formal verification for LLM outputs
+- AI agent security before tool execution
+- Verified tool calls and MCP security
+- Deterministic checks for numbers, logic, code, and SQL
+
+## Best-practice stack
+
+Use both together:
+
+1. Guardrails enforces the response format.
+2. QWED verifies whether the contents are actually correct.
+
+## Related docs
+
+- [LLM verification with formal methods](/advanced/llm-verification)
+- [QWED vs RAG for LLM verification](/advanced/qwed-vs-rag)
+- [QWED vs Guardrails, RAG, and RLHF for LLM verification](/advanced/comparison)
+- [QWED Open Responses: verified tool calls for AI agents](/open-responses/overview)

@@ -1,6 +1,6 @@
 ---
-title: "QWED vs. The AI Ecosystem: A Comparative Analysis"
-description: "Compare QWED's deterministic verification approach against RLHF, Guardrails, RAG, and other AI ecosystem tools."
+title: "QWED vs Guardrails, RAG, and RLHF for LLM verification"
+description: "Compare QWED against Guardrails, RAG, RLHF, and red teaming for LLM verification, AI agent security, and deterministic output validation."
 sidebarTitle: "Comparison"
 ---
 
@@ -9,6 +9,8 @@ QWED represents a new layer in the AI stack: **Deterministic Verification**.
 While many tools exist to improve LLM outputs—ranging from better training (RLHF) to context retrieval (RAG) and structural validation (Guardrails)—QWED serves a distinct purpose. It does not try to make the model "smarter" or "safer" through probability; it treats the model as an untrusted translator and verifies the output against ground-truth engines (Math, Logic, SQL, etc.).
 
 This document outlines how QWED compares to and complements other key technologies in the AI landscape.
+
+If you are evaluating formal verification for LLMs, AI agent guardrails, or runtime output validation, this is the right place to map QWED against adjacent approaches.
 
 ## 📊 Comparison Matrix
 
@@ -110,3 +112,12 @@ QWED is not a "do-it-all" solution. It is a specialized engine for **objective t
 - **General Knowledge**: "Who won the 1998 World Cup?" (Use **Search/RAG**).
 
 **Conclusion**: In the modern AI stack, **RAG** provides the knowledge, **Guardrails** provides the structure, **Red Teaming** provides the assurance, and **QWED** provides the **verification**.
+
+## Related guides
+
+- [QWED vs Guardrails AI](/advanced/qwed-vs-guardrails)
+- [QWED vs RAG for LLM verification](/advanced/qwed-vs-rag)
+- [LLM verification with formal methods](/advanced/llm-verification)
+- [AI agent verification and security](/advanced/agent-verification)
+- [Prompt injection defense and security hardening](/advanced/security-hardening)
+- [QWED MCP: Model Context Protocol security and verification](/mcp/overview)

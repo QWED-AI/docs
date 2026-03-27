@@ -1,9 +1,10 @@
 ---
-title: "QWED Security Hardening Guide"
-description: "Harden QWED for production with secret management via Kubernetes Secrets or HashiCorp Vault, network security, authentication, and OWASP LLM Top 10 compliance."
+title: "Prompt injection defense and QWED security hardening"
+sidebarTitle: "Security Hardening"
+description: "Harden QWED for production with prompt injection defense, secret management, network security, authentication, and OWASP LLM Top 10 compliance."
 ---
 
-This guide provides instructions for hardening your QWED deployment for production environments. It covers secret management, network security, authentication, and compliance with OWASP LLM Top 10.
+This guide provides instructions for hardening your QWED deployment for production environments. It covers prompt injection defense, secret management, network security, authentication, and compliance with OWASP LLM Top 10.
 
 ## 1. Secret Management
 
@@ -175,5 +176,5 @@ While QWED handles internal verification, you must implement the following "Huma
 #### LLM06: Sensitive Information Disclosure
 - **Data Minimization**: Do not send PII (Personally Identifiable Information) to QWED unless absolutely necessary. Mask or redact sensitive data *before* it reaches the API.
 
-For a full list of QWED's internal defenses, see [docs/security.md](security.md).
+For related deployment controls, see [Architecture Overview](/architecture), [SDK Guards](/sdks/guards), and [Troubleshooting Guide](/troubleshooting).
 

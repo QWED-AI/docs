@@ -1,0 +1,62 @@
+---
+title: "LLM verification with formal methods"
+sidebarTitle: "LLM verification"
+description: "Learn how QWED uses formal methods, symbolic execution, SMT solving, and policy guards for LLM verification, LLM output validation, and AI reliability."
+---
+
+LLM verification means checking whether a model output is correct before you trust it, execute it, or show it to a user.
+
+QWED approaches LLM verification as a runtime system problem. The model can translate intent, but the final answer must pass deterministic verification, policy enforcement, or both.
+
+## Why LLM verification matters
+
+Prompting, fine-tuning, and RAG can improve answers, but they do not prove correctness.
+
+You still need a verification layer when:
+
+- A wrong number can trigger a payment, refund, or approval
+- An agent can call tools or external APIs
+- A response must satisfy legal, policy, or compliance rules
+- You need evidence for audit, incident review, or downstream automation
+
+## What QWED verifies
+
+QWED uses different engines depending on the claim type:
+
+- [Math Engine](/engines/math) for arithmetic, algebra, and financial calculations
+- [Logic Engine](/engines/logic) for satisfiability, constraints, and policy reasoning
+- [Code Engine](/engines/code) for symbolic execution and static security analysis
+- [SQL Engine](/engines/sql) for query safety and structural validation
+- [SDK Guards](/sdks/guards) for prompt injection defense, exfiltration checks, and MCP tool verification
+
+## Formal verification for LLMs vs adjacent approaches
+
+Use QWED when you need correctness, not just better generation quality.
+
+| Approach | Helps with | Limitation |
+| --- | --- | --- |
+| Prompting | Better instructions | Does not prove the answer |
+| RAG | Better context | Does not prove the conclusion |
+| Guardrails | Better structure | Does not prove semantic correctness |
+| Human review | Spot checks | Does not scale to every response |
+| QWED | Deterministic verification | Requires structured claims or verifiable domains |
+
+## Where this fits in an AI stack
+
+QWED is useful for AI reliability, verified AI agents, and high-stakes automation:
+
+- Finance and payments
+- Legal review and policy checks
+- Infrastructure and deployment approval
+- AI agent tool calls
+- MCP and OpenAI-style response workflows
+
+## Related docs
+
+- [Architecture Overview](/architecture)
+- [QWED vs Guardrails AI](/advanced/qwed-vs-guardrails)
+- [QWED vs RAG for LLM verification](/advanced/qwed-vs-rag)
+- [QWED vs Guardrails, RAG, and RLHF](/advanced/comparison)
+- [AI agent verification and security](/advanced/agent-verification)
+- [Prompt injection defense and security hardening](/advanced/security-hardening)
+- [QWED Open Responses: verified tool calls for AI agents](/open-responses/overview)
