@@ -3,7 +3,7 @@ title: "SDK Guards"
 description: "Agentic security guards for protecting AI agents from prompt injection, data exfiltration, MCP poisoning, and reasoning integrity violations."
 ---
 
-The QWED SDK includes six deterministic guards for securing AI agent pipelines. Each guard provides IRAC-compliant audit trails for compliance reporting.
+The QWED SDK includes deterministic guards for securing AI agent pipelines. Each guard provides IRAC-compliant audit trails for compliance reporting.
 
 ## Installation
 
@@ -26,7 +26,7 @@ pip install qwed
 | `StateGuard` | Deterministic workspace rollback using shadow git snapshots |
 | `SystemGuard` | Validates shell commands |
 | `ConfigGuard` | Scans configuration for exposed secrets |
-| `StateGuard` | Deterministic rollback for agentic file operations |
+| `StartupHookGuard` | Detects malicious Python `.pth` startup hooks in site-packages |
 
 ---
 
@@ -302,6 +302,108 @@ if success:
 - Tree hashes are validated against the regex `^[0-9a-f]{40}$` to prevent command injection.
 - All subprocess calls are scoped to the validated `workspace_path`.
 - Exceptions propagate gracefully — a failed snapshot does not leave the workspace in a dirty state.
+
+---
+
+## StartupHookGuard
+
+Defends against supply chain attacks that inject malicious `.pth` files into Python `site-packages` directories. These files execute automatically on Python startup — before any application code runs — making them an ideal persistence mechanism for attackers (MITRE ATT&CK T1546.018).
+
+This guard was built in response to the [LiteLLM/TeamPCP supply chain attack](https://www.trendmicro.com/en_us/research/26/c/litellm-supply-chain-attack.html) (March 2026), where `litellm_init.pth` was injected to steal AWS credentials, SSH keys, and crypto wallets.
+
+```python
+from qwed_sdk.guards import StartupHookGuard
+
+guard = StartupHookGuard()
+result = guard.verify_environment_integrity()
+
+if not result["verified"]:
+    print(result["status"])           # "COMPROMISED"
+    print(result["suspicious_hooks"]) # ["/path/to/malicious.pth"]
+    print(result["content_findings"]) # ["Suspicious pattern 'exec(' in ..."]
+    print(result["message"])          # Human-readable summary
+```
+
+### Parameters
+
+<ParamField path="allowed_pth_files" type="set[str] | None" default="None">
+  Additional `.pth` filenames to add to the allowlist. The guard ships with a default allowlist covering standard Python tooling (`setuptools.pth`, `pip.pth`, `coverage.pth`, etc.). Any files you specify here are merged with the defaults.
+</ParamField>
+
+<ParamField path="scan_contents" type="bool" default="true">
+  When `True`, scans file contents for malicious patterns such as `exec(`, `eval(`, `base64`, network imports, and hex-encoded payloads. Allowlisted files are always scanned for tampering regardless of this flag (fail-closed design).
+</ParamField>
+
+### Methods
+
+**`verify_environment_integrity()`** — Scans all `site-packages` directories for unauthorized or tampered `.pth` files. Returns a dict with the following keys:
+
+<ResponseField name="verified" type="bool">
+  `True` if the environment is clean, `False` if suspicious hooks were detected.
+</ResponseField>
+
+<ResponseField name="status" type="str">
+  Either `"CLEAN_ENVIRONMENT"` or `"COMPROMISED"`.
+</ResponseField>
+
+<ResponseField name="suspicious_hooks" type="list[str]">
+  File paths of all suspicious `.pth` files found.
+</ResponseField>
+
+<ResponseField name="content_findings" type="list[str]">
+  Specific malicious patterns detected in file contents.
+</ResponseField>
+
+<ResponseField name="scan_errors" type="list[str]">
+  Any directory enumeration failures encountered during scanning.
+</ResponseField>
+
+<ResponseField name="counts" type="dict">
+  Per-category classification: `malicious` (pattern matches), `unreadable` (possible tampering), `unauthorized` (not on allowlist).
+</ResponseField>
+
+<ResponseField name="message" type="str">
+  Human-readable summary of findings.
+</ResponseField>
+
+### Detected patterns
+
+The guard scans for the following suspicious patterns inside `.pth` files:
+
+- `exec(` and `eval(` calls
+- `base64` encoding
+- Network imports: `socket`, `subprocess`, `urllib`, `requests`, `http.client`
+- Shell execution: `os.system()`, `os.popen()`
+- Dynamic imports: `__import__()`
+- Hex-encoded byte sequences
+- Credential file references (`.aws/credentials`, `cryptowallet`)
+
+It also detects suspicious `sys.path` entries that could hijack imports:
+
+- Temporary directories (`/tmp`, `/dev/shm`, `/var/tmp`)
+- Relative path traversal (`../`)
+- Home directory expansion (`~`)
+- URL-based path injection (`http://`, `https://`)
+
+### Custom allowlist example
+
+```python
+from qwed_sdk.guards import StartupHookGuard
+
+guard = StartupHookGuard(
+    allowed_pth_files={"my-internal-tool.pth", "company-hooks.pth"},
+    scan_contents=True
+)
+
+result = guard.verify_environment_integrity()
+if result["verified"]:
+    print("Environment is clean")
+else:
+    for hook in result["suspicious_hooks"]:
+        print(f"Suspicious: {hook}")
+    for finding in result["content_findings"]:
+        print(f"Finding: {finding}")
+```
 
 ---
 
