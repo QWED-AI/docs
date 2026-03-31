@@ -170,6 +170,7 @@ While QWED handles internal verification, you must implement the following "Huma
 - **Output Monitoring**: Log and randomly audit verified outputs to ensure the verification engine itself hasn't been bypassed.
 
 #### LLM05: Supply Chain Vulnerabilities
+- **Startup hook detection**: Use [`StartupHookGuard`](/sdks/guards#startuphookguard) to scan for malicious `.pth` files in Python `site-packages` before your application starts. This defends against supply chain attacks that inject code-execution hooks via compromised PyPI packages.
 - **Network Isolation**: Run the QWED backend in a VPC without direct outbound internet access, except to specific LLM provider APIs (allowlist).
 - **Dependency Scanning**: Regularly scan your deployment container for vulnerabilities in system packages.
 
