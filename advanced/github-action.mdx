@@ -52,12 +52,17 @@ Use these extension-specific actions when you want domain-focused checks in your
 
 | Input | Description | Required | Default |
 | --- | --- | --- | --- |
-| `query` | Question or statement to verify | ✅ Yes | - |
+| `query` | Question or expression to verify | Required for `math` and `logic` engines | - |
+| `llm_output` | LLM-generated output to verify | Required for `code` engine | - |
+| `engine` | Verification engine: `math`, `logic`, `code`, `sql`, `shell` | No | `math` |
 | `provider` | LLM provider (`openai`, `anthropic`, `gemini`) | No | `openai` |
 | `api-key` | API key for LLM provider | No | - |
 | `model` | Model name (e.g., `gpt-4o-mini`) | No | `gpt-4o-mini` |
 | `mask-pii` | Enable PII masking (`true`/`false`) | No | `false` |
-| `verification-type` | Type: `auto`, `math`, `logic`, `code` | No | `auto` |
+
+<Note>
+Each engine only requires the inputs it needs. The `math` and `logic` engines use `query`, while the `code` engine uses `llm_output`. You do not need to provide both for every verification.
+</Note>
 
 ## Outputs
 
@@ -70,45 +75,41 @@ Use these extension-specific actions when you want domain-focused checks in your
 
 ## Examples
 
-### Verify Math in PRs
+### Verify math in PRs
 
 ```yaml
 - name: Check Math
   uses: QWED-AI/qwed-verification@v2.2.0
   with:
     query: "What is 2^10?"
+    engine: "math"
     provider: "openai"
     api-key: ${{ secrets.OPENAI_API_KEY }}
 ```
 
-### Verify Logic
+### Verify logic
 
 ```yaml
 - name: Check Logic
   uses: QWED-AI/qwed-verification@v2.2.0
   with:
     query: "Is (A AND NOT A) satisfiable?"
+    engine: "logic"
     provider: "anthropic"
     api-key: ${{ secrets.ANTHROPIC_API_KEY }}
 ```
 
-### Check Code Security
+### Check code security
 
-````yaml
+```yaml
 - name: Security Check
   uses: QWED-AI/qwed-verification@v2.2.0
   with:
-    query: |
-      Is this code safe?
-      ```python
-      eval(user_input)
-````
+    llm_output: "eval(user_input)"
+    engine: "code"
+```
 
-verification-type: "code"
-
-````text
-
-### Enterprise: PII Masking
+### Enterprise: PII masking
 
 ```yaml
 - name: Secure Verification
@@ -118,7 +119,7 @@ verification-type: "code"
     mask-pii: "true"
     provider: "openai"
     api-key: ${{ secrets.OPENAI_API_KEY }}
-````
+```
 
 ## Privacy & Security
 
