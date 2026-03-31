@@ -214,7 +214,7 @@ print(result.value)  # 4
 **Pattern:**
 ```python
 try:
-    result = verify_math(query, llm_output)
+    result = verify_math(expression=query)
 except VerificationError as e:
     log_error(e, audit_trail=True)
     return fallback_value  # User-defined

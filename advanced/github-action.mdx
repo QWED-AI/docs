@@ -16,7 +16,7 @@ QWED combines **Neural Networks** (LLMs) with **Symbolic Reasoning** (SymPy, Z3)
 - ✅ Detect unsafe code patterns
 - ✅ Validate LLM outputs before deployment
 
-## Quick Start
+## Quick start
 
 Add this to your `.github/workflows/verify.yml`:
 
@@ -32,9 +32,10 @@ jobs:
       - name: Verify Calculation
         uses: QWED-AI/qwed-verification@v2.2.0
         with:
-          query: "What is the derivative of x^2?"
-          provider: "openai"
-          api-key: ${{ secrets.OPENAI_API_KEY }}
+          api_key: ${{ secrets.QWED_API_KEY }}
+          action: verify
+          engine: math
+          query: "x**2 + 2*x + 1 = (x+1)**2"
 ```
 
 ## Extension GitHub Actions
@@ -52,26 +53,31 @@ Use these extension-specific actions when you want domain-focused checks in your
 
 | Input | Description | Required | Default |
 | --- | --- | --- | --- |
-| `query` | Question or expression to verify | Required for `math` and `logic` engines | - |
-| `llm_output` | LLM-generated output to verify | Required for `code` engine | - |
+| `api_key` | QWED API key (optional for local mode) | No | - |
+| `action` | Action type: `verify`, `scan-secrets`, `scan-code`, `verify-shell` | No | `verify` |
+| `query` | The user query (e.g., "Derivative of x^2"). Required for `math` and `logic` engines. | Conditional | - |
+| `llm_output` | The LLM output to verify. Required for the `code` engine. | Conditional | - |
 | `engine` | Verification engine: `math`, `logic`, `code`, `sql`, `shell` | No | `math` |
-| `provider` | LLM provider (`openai`, `anthropic`, `gemini`) | No | `openai` |
-| `api-key` | API key for LLM provider | No | - |
-| `model` | Model name (e.g., `gpt-4o-mini`) | No | `gpt-4o-mini` |
-| `mask-pii` | Enable PII masking (`true`/`false`) | No | `false` |
+| `paths` | Glob patterns for files to scan (e.g., `**/*.py,**/*.env`) | No | `.` |
+| `output_format` | Output format: `text`, `json`, `sarif` | No | `text` |
+| `fail_on_findings` | Fail the action if security issues are found | No | `true` |
 
 <Note>
-Each engine only requires the inputs it needs. The `math` and `logic` engines use `query`, while the `code` engine uses `llm_output`. You do not need to provide both for every verification.
+  Each engine requires different inputs:
+  - **math** — requires `query` (passed as the expression to verify)
+  - **logic** — requires `query`
+  - **code** — requires `llm_output` (passed as the code to analyze)
 </Note>
 
 ## Outputs
 
 | Output | Description |
 | --- | --- |
-| `verified` | Verification result (`true`/`false`) |
-| `value` | Verified value or result |
-| `confidence` | Confidence score (0.0-1.0) |
-| `evidence` | JSON evidence of verification |
+| `verified` | `true` if verification passed or no issues found |
+| `explanation` | Detailed proof or error explanation |
+| `findings_count` | Number of security issues found (for scan modes) |
+| `badge_url` | URL for QWED verified badge |
+| `sarif_file` | Path to SARIF output file (if `output_format=sarif`) |
 
 ## Examples
 
@@ -81,10 +87,10 @@ Each engine only requires the inputs it needs. The `math` and `logic` engines us
 - name: Check Math
   uses: QWED-AI/qwed-verification@v2.2.0
   with:
-    query: "What is 2^10?"
-    engine: "math"
-    provider: "openai"
-    api-key: ${{ secrets.OPENAI_API_KEY }}
+    api_key: ${{ secrets.QWED_API_KEY }}
+    action: verify
+    engine: math
+    query: "2**10 = 1024"
 ```
 
 ### Verify logic
@@ -93,10 +99,10 @@ Each engine only requires the inputs it needs. The `math` and `logic` engines us
 - name: Check Logic
   uses: QWED-AI/qwed-verification@v2.2.0
   with:
-    query: "Is (A AND NOT A) satisfiable?"
-    engine: "logic"
-    provider: "anthropic"
-    api-key: ${{ secrets.ANTHROPIC_API_KEY }}
+    api_key: ${{ secrets.QWED_API_KEY }}
+    action: verify
+    engine: logic
+    query: "(AND (GT x 5) (LT x 10))"
 ```
 
 ### Check code security
@@ -105,20 +111,23 @@ Each engine only requires the inputs it needs. The `math` and `logic` engines us
 - name: Security Check
   uses: QWED-AI/qwed-verification@v2.2.0
   with:
+    api_key: ${{ secrets.QWED_API_KEY }}
+    action: verify
+    engine: code
     llm_output: "eval(user_input)"
-    engine: "code"
 ```
 
-### Enterprise: PII masking
+### Scan files with SARIF output
 
 ```yaml
-- name: Secure Verification
+- name: Scan Code
   uses: QWED-AI/qwed-verification@v2.2.0
   with:
-    query: "User email: john@example.com, calculate 2+2"
-    mask-pii: "true"
-    provider: "openai"
-    api-key: ${{ secrets.OPENAI_API_KEY }}
+    api_key: ${{ secrets.QWED_API_KEY }}
+    action: scan-code
+    paths: "**/*.py"
+    output_format: sarif
+    fail_on_findings: "true"
 ```
 
 ## Privacy & Security
