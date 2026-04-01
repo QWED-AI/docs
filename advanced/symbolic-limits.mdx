@@ -150,6 +150,18 @@ result = verifier.verify_code(
 )
 ```
 
+### Bounded model checking
+
+`verify_bounded()` applies loop and recursion bounds to the code before verification. If the bounds transform itself fails (e.g., the AST cannot be unparsed after transformation), the method returns a `bounds_transform_error` status instead of silently falling back to the original code:
+
+```python
+result = verifier.verify_bounded(code, loop_bound=50, recursion_depth=20)
+
+if result["status"] == "bounds_transform_error":
+    print(result["message"])  # Describes why the transform failed
+    print(result["issues"])   # [{"type": "error", "description": "..."}]
+```
+
 ## Summary
 
 | Question | Answer |

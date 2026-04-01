@@ -75,6 +75,8 @@ result = client.verify_math("sin(x)^2 + cos(x)^2 = 1")
 # ✓ Verified: Pythagorean identity
 ```
 
+Identity verification uses symbolic simplification first, then samples five test points as a fallback. Only points that can be successfully evaluated count toward agreement — domain-restricted expressions (e.g., `log(x)` at `x = -1`) are skipped rather than causing a false negative.
+
 ### 3. Derivatives
 
 Verify calculus derivatives:
@@ -191,7 +193,23 @@ if not result.verified:
 
 ---
 
-## Tolerance Settings
+## Decimal precision
+
+The math engine accepts `Decimal` values for exact arithmetic, which is especially useful for financial calculations:
+
+```python
+from decimal import Decimal
+
+result = client.verify_math(
+    expression="0.1 + 0.2",
+    expected_value=Decimal("0.3")  # Exact comparison, no float drift
+)
+# ✓ Verified
+```
+
+When `use_decimal=True` (the default), the engine uses `Decimal` internally regardless of whether you pass a `float` or `Decimal`.
+
+## Tolerance settings
 
 For floating-point comparisons:
 
