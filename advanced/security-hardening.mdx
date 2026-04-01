@@ -137,13 +137,21 @@ The gateway is enabled by default for all API endpoints. It also includes a bloc
 
 All API error paths now use a centralized `redact_pii()` function that masks email addresses, phone numbers, SSNs, and IP addresses before they reach logs. Stack traces are suppressed in error responses (`exc_info=False`) to prevent data leakage.
 
-### Safe code evaluation
+### Safe expression evaluation
 
-All `eval()` calls have been replaced with AST-compiled execution using a restricted namespace. The safe evaluator:
+All `eval()` calls have been fully eliminated and replaced with a custom AST-walking evaluator. Instead of compiling and executing code, the evaluator parses expressions into an AST, validates every node against a strict allow-list, and then interprets the tree directly — no `eval()` or `compile()` is ever invoked.
 
-- Sets `__builtins__` to `{}` (blocks `open`, `import`, `exec`)
-- Only allows whitelisted Z3 functions (`And`, `Or`, `Not`, `Implies`, `If`, `Int`, `Bool`, `Real`)
-- Blocks any expression containing `__` (double underscore) to prevent attribute access attacks
+The safe evaluator enforces three layers of defense:
+
+1. **AST allow-list** — only permitted node types (`Constant`, `Name`, `BinOp`, `UnaryOp`, `Call`, `Tuple`, `List`, and approved operators) pass validation. Unknown or dangerous nodes are rejected before evaluation.
+2. **CodeGuard integration** — when the full `qwed_new` package is available, expressions are additionally screened by `CodeGuard` before execution.
+3. **Restricted namespace** — the evaluator resolves symbols only from an explicit namespace. For SymPy paths, only whitelisted functions (e.g., `sqrt`, `sin`, `cos`, `log`, `Rational`, `pi`, `E`) are available. For Z3 paths, only `And`, `Or`, `Not`, `Implies`, `If`, `Int`, `Bool`, and `Real` are permitted.
+
+Additional safeguards:
+
+- Keyword unpacking (`**kwargs` via `None`-keyed keywords) is blocked in all call nodes
+- `__` (double underscore) patterns are blocked to prevent attribute access attacks
+- SymPy expressions use exact arithmetic (`sympy.Integer`, `sympy.Float`) to avoid floating-point drift during comparison
 
 ### Credential store security
 

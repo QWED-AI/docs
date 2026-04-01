@@ -3,6 +3,33 @@ title: "Changelog"
 description: "All notable changes to QWED Protocol — releases, features, security fixes, and improvements."
 ---
 
+## v4.0.2 — Security Cleanup
+**Released: April 1, 2026** · [GitHub PR #114](https://github.com/QWED-AI/qwed-verification/pull/114)
+
+> Hardens expression evaluation, improves error handling across the SDK and consensus engine, and removes unused code flagged by CodeQL.
+
+### Security
+
+- **eval() fully eliminated** — SymPy and Z3 expression evaluation now uses a custom AST-walking interpreter instead of `compile()` + `eval()`. The evaluator validates every AST node against a strict allow-list, then interprets the tree directly in a restricted namespace.
+- **CodeGuard integration** — Expressions are screened by `CodeGuard` (when available) as a second defense layer between AST validation and evaluation.
+- **Keyword unpacking blocked** — Call nodes with `**kwargs`-style keyword unpacking are now rejected during AST validation.
+
+### Improvements
+
+- **Exact SymPy arithmetic** — Numeric literals are coerced to `sympy.Integer` / `sympy.Float` during evaluation, preventing floating-point drift in intermediate math comparisons.
+- **Consensus failure recording** — Unexpected errors during async engine aggregation are now logged and recorded as an `EngineResult` entry instead of being silently dropped.
+- **Telemetry initialization** — Replaced the `_initialized` flag with `@lru_cache` for one-time cached initialization.
+- **SDK import cycle broken** — `qwed_sdk.cache` no longer imports from `qwed_sdk.qwed_local` for terminal colors; it uses `colorama` directly with a plain-text fallback.
+- **Integration imports hardened** — Optional framework imports (LangChain, CrewAI, LlamaIndex) now default to `None` explicitly instead of using bare `except: pass`.
+
+### Chores
+
+- Removed unused locals and globals across SDK, core modules, examples, and scripts.
+- Replaced module-level `print()` calls in `database.py` with `logger.debug()`.
+- Added `ast.Tuple` and `ast.List` to the safe SymPy node type allow-list.
+
+---
+
 ## v4.0.1 — Sentinel Guard Sync 🔄
 **Released: March 23, 2026** · [GitHub Release](https://github.com/QWED-AI/qwed-verification/releases/tag/v4.0.1) · [PyPI](https://pypi.org/project/qwed/4.0.1/)
 
@@ -73,7 +100,7 @@ A new class of deterministic verification:
 
 ### 🔒 Critical Security Fixes
 
-- Replaced all `eval()` with AST-compiled execution (Code Injection Prevention).
+- Replaced direct `eval()` with AST-validated execution (Code Injection Prevention). Further hardened in v4.0.2 with a full AST-walking interpreter.
 - Patched critical sandbox escape and namespace mismatch.
 - Hardened SymPy input parsing against injection.
 - Fixed URL whitespace bypass and protocol wildcard bypass.
