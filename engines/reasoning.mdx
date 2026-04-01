@@ -58,7 +58,11 @@ result2 = client.verify_reasoning(query, enable_caching=True)
 print(result2.cached)  # True (instant!)
 ```
 
-## Chain-of-Thought Validation
+## Formula equivalence
+
+When verifying whether two arithmetic formulas produce the same result, the engine uses a safe AST-based evaluator instead of Python's `eval()`. The evaluator only allows basic arithmetic operators (`+`, `-`, `*`, `/`, `**`) and numeric literals — any other expression is rejected. This prevents code-injection risks while still supporting numeric fallback checks during reasoning validation.
+
+## Chain-of-thought validation
 
 ```python
 cot_trace = """

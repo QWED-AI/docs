@@ -288,20 +288,24 @@ MEUCIQDKZnw...signature...
 
 ### 4.3 Signing Process
 
+The signing process accepts an optional `timestamp` parameter. When provided, it overrides the default `iat` value (which is `current_timestamp()`). This is useful for deterministic testing and replaying attestations.
+
 ```python
 # Pseudocode
-def create_attestation(verification_result, issuer_key):
+def create_attestation(verification_result, issuer_key, timestamp=None):
     header = {
         "alg": "ES256",
         "typ": "qwed-attestation+jwt",
         "kid": issuer_key.kid
     }
     
+    issued_at = timestamp if timestamp is not None else current_timestamp()
+    
     payload = {
         "iss": issuer_key.issuer_did,
         "sub": sha256(verification_result.query),
-        "iat": current_timestamp(),
-        "exp": current_timestamp() + VALIDITY_PERIOD,
+        "iat": issued_at,
+        "exp": issued_at + VALIDITY_PERIOD,
         "jti": generate_uuid(),
         "qwed": {
             "version": "1.0",
@@ -568,10 +572,11 @@ if is_valid:
 ### 8.4 Security Recommendations
 
 1. **Protect Private Keys** - Use HSM or secure key management
-2. **Validate Issuers** - Only trust registered issuers
-3. **Check Expiration** - Reject expired attestations
-4. **Verify Chains** - Validate all attestations in a chain
-5. **Monitor Revocations** - Check revocation status
+2. **Provide a Valid Secret** - The core `AttestationGuard` requires a `secret_key` or the `QWED_ATTESTATION_SECRET` environment variable. Insecure fallback secrets are no longer supported; initialization raises a `ValueError` if no secret is provided
+3. **Validate Issuers** - Only trust registered issuers
+4. **Check Expiration** - Reject expired attestations
+5. **Verify Chains** - Validate all attestations in a chain
+6. **Monitor Revocations** - Check revocation status
 
 ---
 

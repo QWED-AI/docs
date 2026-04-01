@@ -212,6 +212,8 @@ Verify factual claims against a provided context.
 
 Multi-engine consensus verification. Runs the query through multiple verification engines and requires agreement above a confidence threshold.
 
+Mathematical expressions are parsed and compared using `Decimal` arithmetic internally, which avoids floating-point drift when engines cross-check results.
+
 **Request:**
 
 ```json
