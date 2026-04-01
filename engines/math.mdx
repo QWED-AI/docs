@@ -193,6 +193,12 @@ if not result.verified:
 
 ---
 
+## Exact SymPy arithmetic
+
+When SymPy is available, the math engine evaluates expressions using SymPy-native types (`sympy.Integer`, `sympy.Float`) instead of Python built-in `int` and `float`. This prevents floating-point drift during intermediate computation and ensures that comparisons between LLM answers and verified results use symbolic simplification rather than string matching alone.
+
+---
+
 ## Decimal precision
 
 The math engine accepts `Decimal` values for exact arithmetic, which is especially useful for financial calculations:

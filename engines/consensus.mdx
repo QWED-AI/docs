@@ -72,7 +72,19 @@ print(health)
 client.reset_circuit_breakers()
 ```
 
-## Consensus Calculation
+## Async failure handling
+
+When an unexpected error occurs during async engine aggregation, the Consensus Engine records the failure as a dedicated `EngineResult` entry rather than silently dropping it. This ensures that:
+
+- The failure is visible in the `results` array returned to the caller
+- Aggregate confidence scores account for the failed engine
+- The error is logged via `logger.exception` for post-mortem debugging
+
+The recorded result uses `engine_name: "consensus_orchestrator"`, `method: "async_aggregation"`, `success: false`, and includes the error message in the `error` field.
+
+---
+
+## Consensus calculation
 
 The engine uses weighted voting:
 
