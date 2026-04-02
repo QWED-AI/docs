@@ -3,6 +3,23 @@ title: "Changelog"
 description: "All notable changes to QWED Protocol — releases, features, security fixes, and improvements."
 ---
 
+## v4.0.3 — Server-enforced agent security
+**Released: April 2, 2026** · [GitHub PR #116](https://github.com/QWED-AI/qwed-verification/pull/116)
+
+> Closes critical verification boundary gaps by enforcing agent security checks server-side, adding rate limiting to consensus verification, and removing unsafe fallback paths.
+
+### Breaking changes
+
+- **`security_checks` removed from agent verification** — Exfiltration and MCP poison checks are now enforced server-side on every request. The `security_checks` request field and the TypeScript SDK `checkExfiltration`/`checkMcpPoison` options have been removed. `tool_schema` remains available to trigger MCP poison inspection.
+
+### Security
+
+- **Logic verifier fail-closed** — The raw `eval()` fallback in logic constraint parsing has been removed. If `SafeEvaluator` is unavailable, the verifier raises an error instead of falling back to unrestricted evaluation.
+- **Consensus rate limiting** — The `POST /verify/consensus` endpoint is now rate-limited per API key, matching other verification endpoints.
+- **Consensus fact self-attestation removed** — The Fact engine is no longer automatically selected during consensus verification. It produced self-referential results without external context.
+
+---
+
 ## v4.0.2 — Security Cleanup
 **Released: April 1, 2026** · [GitHub PR #114](https://github.com/QWED-AI/qwed-verification/pull/114)
 
