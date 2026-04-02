@@ -442,6 +442,103 @@ print(bom["components"])
 
 ---
 
+## SkillProvenanceGuard (security)
+
+Verify MCP skill manifests before allowing dynamic tool loading. Protects against skill marketplace poisoning attacks where malicious agents upload trojanized skills to registries and inflate download counts.
+
+### Description
+
+`SkillProvenanceGuard` performs deterministic provenance verification on skill manifests. When the `QWED_SKILL_MANIFEST` environment variable points to a JSON manifest file, the MCP server validates it at startup and refuses to start if verification fails.
+
+You can also use `SkillProvenanceGuard` directly in your own code to vet skills before loading them.
+
+### Usage
+
+```python
+from qwed_mcp.security import SkillProvenanceGuard
+
+guard = SkillProvenanceGuard()
+
+result = guard.verify_skill(manifest={
+    "name": "my-skill",
+    "version": "1.0.0",
+    "source_url": "https://github.com/org/skill",
+    "registry": "github.com",
+    "digest": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "download_count": 150,
+})
+
+print(result["verified"])   # True
+print(result["status"])     # "TRUSTED"
+print(result["risk_level"]) # "none"
+```
+
+### Constructor parameters
+
+<ParamField path="trusted_registries" type="set[str] | None" default="None">
+  Strict allowlist of registry domains. When set, only skills from these registries are accepted. When `None`, the default blocklist is used instead.
+</ParamField>
+
+<ParamField path="trusted_domains" type="set[str] | None" default="None">
+  Additional source URL domains to trust, merged with the built-in trusted list (`github.com`, `gitlab.com`, `bitbucket.org`, `pypi.org`, `npmjs.com`, `qwedai.com`).
+</ParamField>
+
+<ParamField path="require_digest" type="bool" default="True">
+  Whether to enforce cryptographic digest presence in the manifest.
+</ParamField>
+
+### Manifest fields
+
+| Field | Type | Required | Description |
+| --- | --- | --- | --- |
+| `name` | `str` | Yes | Skill name |
+| `version` | `str` | Yes | Skill version |
+| `source_url` | `str` | Yes | Source repository URL (must be HTTPS and from a trusted domain) |
+| `registry` | `str` | Yes | Registry domain the skill was loaded from |
+| `digest` | `str` | Yes (configurable) | Cryptographic digest in `algorithm:hex_digest` format. Supported algorithms: `sha256`, `sha384`, `sha512` |
+| `download_count` | `int` | No | Number of downloads (used for anomaly detection) |
+
+### Verification checks
+
+The guard runs five checks on every manifest:
+
+| Check | Description |
+| --- | --- |
+| **Required fields** | `name` and `version` must be present and non-empty |
+| **Registry validation** | Blocks known untrusted registries (`clawdhub.com`, `moltbot.io`, `skillhub.ai`, `agentstore.dev`, `llm-tools.net`). When `trusted_registries` is set, acts as an allowlist instead |
+| **Source URL validation** | Domain must be in the trusted list; scheme must be HTTPS |
+| **Digest validation** | Must follow `algorithm:hex_digest` format with a supported algorithm and correct hex length |
+| **Download anomaly detection** | Flags counts below 10 (possibly planted) or counts divisible by 1000 (possible bot inflation) |
+
+Additionally, manifest values (excluding metadata fields like `name`, `description`, `source_url`) are scanned for suspicious code patterns such as `eval()`, `exec()`, `os.system()`, and credential access attempts.
+
+### Response format
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `verified` | `bool` | `True` if all checks pass |
+| `status` | `str` | `"TRUSTED"` or `"BLOCKED"` |
+| `skill_name` | `str` | Name from the manifest |
+| `risk_level` | `str` | `"none"`, `"medium"`, or `"high"` |
+| `findings` | `list[str]` | All security findings |
+| `message` | `str` | Human-readable summary |
+
+### Server-level validation
+
+When the `QWED_SKILL_MANIFEST` environment variable is set, the MCP server validates the manifest at startup:
+
+```bash
+QWED_SKILL_MANIFEST=/path/to/skill-manifest.json qwed-mcp
+```
+
+If validation fails, the server logs the error and exits immediately. This prevents poisoned skills from being loaded into the MCP pipeline.
+
+<Warning>
+  Skills from registries like `clawdhub.com` and `moltbot.io` are blocked by default due to insufficient vetting. If you need to load skills from a custom registry, use the `trusted_registries` parameter to set an explicit allowlist.
+</Warning>
+
+---
+
 ## Error handling
 
 All tool responses include `stdout`, `stderr`, and a return code summary. A non-zero return code indicates the script raised an exception or exited with an error.

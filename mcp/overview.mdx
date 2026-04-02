@@ -13,7 +13,7 @@ description: "QWED MCP is a Model Context Protocol security layer for AI agents.
 
 QWED-MCP brings deterministic verification to Claude Desktop, VS Code, and any MCP-compatible AI assistant. Instead of trusting LLMs to compute correctly, QWED-MCP provides a sandboxed Python execution environment with access to all QWED SDK verification libraries.
 
-Use QWED-MCP when you need MCP security, tool call verification, and deterministic enforcement around Model Context Protocol actions.
+Use QWED-MCP when you need MCP security, tool call verification, skill supply chain protection, and deterministic enforcement around Model Context Protocol actions.
 
 ---
 
@@ -216,6 +216,7 @@ asyncio.run(main())
 | `QWED_MCP_TRUSTED_CODE_EXECUTION` | Enable `execute_python_code` tool (`true`/`false`) | `false` |
 | `QWED_LOG_LEVEL` | Logging level (`DEBUG`, `INFO`, `WARNING`, `ERROR`) | `INFO` |
 | `QWED_TIMEOUT` | Tool execution timeout in seconds | `30` |
+| `QWED_SKILL_MANIFEST` | Path to a skill manifest JSON file. When set, the server validates the manifest at startup using [`SkillProvenanceGuard`](/mcp/tools#skillprovenanceguard-security) and refuses to start if verification fails | Not set |
 
 <Warning>
   `QWED_MCP_TRUSTED_CODE_EXECUTION` must be set to `true` to enable code execution. The executed code runs with server privileges — ensure inputs are from trusted sources.
