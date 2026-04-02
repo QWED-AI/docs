@@ -54,20 +54,29 @@ client = QWEDClient()  # Uses QWED_API_KEY env var
 4. **Set IP allowlists** for production keys
 5. **Use test keys** for development
 
-## Agent Authentication
+## Agent authentication
 
-For AI agent tokens:
+Agent tokens are separate from API keys and are used for agent-specific endpoints.
 
 ```python
-# Register agent
+# Register agent (requires API key auth)
 response = client.register_agent(name="MyBot", ...)
 agent_token = response["agent_token"]  # qwed_agent_...
 
-# Use agent token for actions
+# Use agent token via X-Agent-Token header
 client.verify_action(
     agent_id=response["agent_id"],
     action={...}
 )
+```
+
+Agent tokens are passed via the `X-Agent-Token` header:
+
+```bash
+curl -X POST https://api.qwedai.com/v1/agents/42/verify \
+  -H "X-Agent-Token: qwed_agent_..." \
+  -H "Content-Type: application/json" \
+  -d '{"query": "What is 2+2?"}'
 ```
 
 ## Scopes
@@ -80,4 +89,114 @@ API keys can have restricted scopes:
 | `agent:write` | Agent management |
 | `attestation:read` | Attestation queries |
 | `admin:all` | Full access |
+
+## Auth endpoints
+
+The following endpoints manage user accounts and API keys via JWT-based authentication.
+
+### POST /auth/signup
+
+Create a new user and organization. Returns a JWT token for immediate use.
+
+**Request:**
+
+```json
+{
+  "email": "user@example.com",
+  "password": "securepassword",
+  "organization_name": "Acme Corp"
+}
+```
+
+**Response:**
+
+```json
+{
+  "access_token": "eyJhbGciOiJIUzI1NiIs...",
+  "token_type": "bearer",
+  "user": {
+    "id": "1",
+    "email": "user@example.com",
+    "org_id": "1",
+    "role": "owner"
+  }
+}
+```
+
+### POST /auth/signin
+
+Sign in an existing user.
+
+**Request:**
+
+```json
+{
+  "email": "user@example.com",
+  "password": "securepassword"
+}
+```
+
+**Response:** Same format as `/auth/signup`.
+
+### GET /auth/me
+
+Get the current authenticated user's information. Requires a `Bearer` token in the `Authorization` header.
+
+```bash
+curl -H "Authorization: Bearer eyJhbG..." https://api.qwedai.com/v1/auth/me
+```
+
+### POST /auth/api-keys
+
+Generate a new API key for the current user's organization. Requires JWT authentication.
+
+**Request:**
+
+```json
+{
+  "name": "Production Key"
+}
+```
+
+**Response:**
+
+```json
+{
+  "id": "1",
+  "name": "Production Key",
+  "key": "qwed_live_abc123...",
+  "created_at": "2026-03-20T12:00:00Z"
+}
+```
+
+<Warning>The `key` field is only returned once at creation time. Store it securely.</Warning>
+
+### GET /auth/api-keys
+
+List all active API keys for the current user's organization.
+
+### DELETE /auth/api-keys/{key_id}
+
+Revoke an API key. Performs a soft delete.
+
+## Audit endpoints
+
+These endpoints require JWT authentication (Bearer token) and return data scoped to the authenticated user's organization.
+
+### GET /audit/logs
+
+Get audit logs for the current organization.
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `limit` | integer | `50` | Maximum records (max 200) |
+| `status` | string | — | Filter by `verified` or `blocked` |
+
+### GET /audit/logs/{log_id}
+
+Get detailed information for a single audit log entry.
+
+### GET /audit/export
+
+Export audit logs as a CSV file (up to 1,000 records).
 

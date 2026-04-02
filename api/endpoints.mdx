@@ -10,11 +10,11 @@ description: "Complete QWED API endpoint reference covering health checks, verif
 https://api.qwedai.com/v1
 ```
 
-## Health Check
+## Health check
 
 ### GET /health
 
-Check API status.
+Check API status. No authentication required.
 
 ```bash
 curl https://api.qwedai.com/v1/health
@@ -25,6 +25,7 @@ curl https://api.qwedai.com/v1/health
 ```json
 {
   "status": "healthy",
+  "service": "QWED Platform",
   "version": "1.0.0",
   "timestamp": "2024-12-20T12:00:00Z"
 }
@@ -32,85 +33,142 @@ curl https://api.qwedai.com/v1/health
 
 ---
 
-## Verification Endpoints
+## Verification endpoints
 
-### POST /verify
+### POST /verify/natural_language
 
-Auto-detect and verify any claim.
+Main entry point for verifying natural language queries. Routes through the QWED Control Plane with multi-tenancy support.
 
 **Request:**
 
 ```json
 {
-  "query": "Is 2+2=4?",
-  "options": {
-    "include_attestation": true
-  }
+  "query": "What is 15% of 200?",
+  "provider": "openai"
 }
 ```
 
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `query` | string | Yes | Natural language claim to verify |
+| `provider` | string | No | Preferred LLM provider (e.g., `openai`, `anthropic`) |
+
 **Response:**
+
+The response follows the `VerificationResult` schema:
 
 ```json
 {
   "status": "VERIFIED",
-  "verified": true,
-  "engine": "math",
-  "verification_mode": "SYMBOLIC",
-  "result": {
-    "is_valid": true
+  "user_query": "What is 15% of 200?",
+  "translation": {
+    "expression": "0.15 * 200",
+    "claimed_answer": 30.0,
+    "reasoning": "15% as decimal is 0.15, multiply by 200",
+    "confidence": 0.95
   },
-  "attestation": "eyJhbGciOiJFUzI1NiIs..."
+  "validation": {
+    "is_valid": true,
+    "checks_passed": ["syntax", "symbols", "evaluable"]
+  },
+  "verification": {
+    "calculated_value": 30.0,
+    "is_correct": true,
+    "diff": 0.0
+  },
+  "final_answer": 30.0,
+  "latency_ms": 245.3
 }
 ```
-
-> **`verification_mode`**: Indicates whether the result was proven by a deterministic solver (`SYMBOLIC`) or required LLM fallback (`HEURISTIC`). See [Determinism Guarantee](/advanced/determinism-guarantee) for details.
 
 ---
 
 ### POST /verify/math
 
-Verify mathematical expressions.
+Verify mathematical expressions or equations using SymPy symbolic computation.
 
 **Request:**
 
 ```json
 {
-  "expression": "x**2 + 2*x + 1 = (x+1)**2"
+  "expression": "x**2 + 2*x + 1 = (x+1)**2",
+  "context": {
+    "domain": "real"
+  }
 }
 ```
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `expression` | string | Yes | Mathematical expression or equation. Use `=` for equations |
+| `context` | object | No | Optional context (e.g., `{"domain": "real"}` to restrict to real numbers) |
+
+**Response (equation):**
+
+```json
+{
+  "is_valid": true,
+  "result": true,
+  "left_side": "x**2 + 2*x + 1",
+  "right_side": "(x + 1)**2",
+  "simplified_difference": "0",
+  "message": "Identity is true"
+}
+```
+
+**Response (expression):**
+
+```json
+{
+  "is_valid": true,
+  "value": 4.0,
+  "simplified": "4",
+  "original": "2 + 2"
+}
+```
+
+Symbolic expressions that cannot be evaluated to a numeric value include `is_symbolic: true`. Expressions involving complex numbers include `is_complex: true`. Ambiguous expressions (e.g., implicit multiplication after division) return a `warning: "ambiguous"` field.
+
+**Error cases:** Division by zero, `log(0)`, and square root of negative numbers in the real domain return `is_valid: false` with a descriptive `error` and `message`.
 
 ---
 
 ### POST /verify/logic
 
-Verify logical constraints.
+Verify logical constraints. Routes through the QWED Control Plane.
 
 **Request:**
 
 ```json
 {
   "query": "(AND (GT x 5) (LT y 10))",
-  "format": "dsl"
+  "provider": "openai"
 }
 ```
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `query` | string | Yes | Logical constraint in DSL or natural language |
+| `provider` | string | No | Preferred LLM provider |
 
 **Response:**
 
 ```json
 {
-  "status": "VERIFIED",
-  "verified": true,
-  "verification_mode": "SYMBOLIC",
-  "provider_used": "openai_compat",
-  "result": {
-    "satisfiability": "SAT",
-    "model": {"x": 6, "y": 9}
-  }
+  "status": "SAT",
+  "model": {"x": "6", "y": "9"},
+  "provider_used": "openai_compat"
 }
 ```
 
 The `provider_used` field indicates which LLM provider handled the translation step. This field is included in both success and error responses, which helps with debugging provider routing issues.
+
+| Status | Meaning |
+|--------|---------|
+| `SAT` | Satisfiable — a solution exists |
+| `UNSAT` | Unsatisfiable — no solution possible |
+| `BLOCKED` | Request blocked by security policy (returns HTTP 403) |
+| `ERROR` | Internal verification error |
 
 **Error response:**
 
@@ -126,7 +184,7 @@ The `provider_used` field indicates which LLM provider handled the translation s
 
 ### POST /verify/code
 
-Check code for security vulnerabilities.
+Check code for security vulnerabilities using AST analysis.
 
 **Request:**
 
@@ -137,39 +195,60 @@ Check code for security vulnerabilities.
 }
 ```
 
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `code` | string | Yes | Source code to analyze |
+| `language` | string | No | Programming language (default: `python`) |
+
 **Response:**
 
 ```json
 {
-  "status": "BLOCKED",
-  "verified": false,
-  "verification_mode": "SYMBOLIC",
-  "result": {
-    "vulnerabilities": [
-      {
-        "type": "os.system",
-        "severity": "critical",
-        "line": 2,
-        "message": "Shell command execution"
-      }
-    ]
-  }
+  "is_safe": false,
+  "vulnerabilities": [
+    {
+      "type": "os.system",
+      "severity": "critical",
+      "line": 2,
+      "message": "Shell command execution"
+    }
+  ]
 }
 ```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `is_safe` | boolean | Whether the code passed all security checks |
+| `vulnerabilities` | array | List of detected vulnerabilities with type, severity, line number, and message |
 
 ---
 
 ### POST /verify/sql
 
-Validate SQL queries.
+Validate SQL queries against a provided schema.
 
 **Request:**
 
 ```json
 {
   "query": "SELECT * FROM users WHERE id = 1",
-  "schema": "CREATE TABLE users (id INT, name TEXT)",
-  "dialect": "postgresql"
+  "schema_ddl": "CREATE TABLE users (id INT, name TEXT)",
+  "dialect": "sqlite"
+}
+```
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `query` | string | Yes | SQL query to validate |
+| `schema_ddl` | string | Yes | DDL schema definition (e.g., `CREATE TABLE` statements) |
+| `dialect` | string | No | SQL dialect (default: `sqlite`) |
+
+**Response:**
+
+```json
+{
+  "is_valid": true,
+  "message": "Query is valid against the provided schema"
 }
 ```
 
@@ -177,7 +256,7 @@ Validate SQL queries.
 
 ### POST /verify/fact
 
-Verify factual claims against a provided context.
+Verify a factual claim against a provided context.
 
 **Request:**
 
@@ -185,30 +264,35 @@ Verify factual claims against a provided context.
 {
   "claim": "Paris is the capital of France",
   "context": "France is a country in Western Europe. Its capital is Paris.",
-  "provider": "openai"
+  "provider": "anthropic"
 }
 ```
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `claim` | string | Yes | The factual statement to verify |
+| `context` | string | Yes | Reference text to verify the claim against |
+| `provider` | string | No | Preferred LLM provider |
 
 **Response:**
 
 ```json
 {
-  "status": "VERIFIED",
-  "verified": true,
-  "engine": "fact",
-  "result": {
-    "is_valid": true,
-    "confidence": 0.98,
-    "message": "Claim is supported by the provided context"
-  }
+  "verdict": "SUPPORTED",
+  "confidence": 0.98,
+  "reasoning": "The context explicitly states that the capital of France is Paris"
 }
 ```
+
+| Verdict | Meaning |
+|---------|---------|
+| `SUPPORTED` | Claim is supported by the context |
+| `REFUTED` | Claim contradicts the context |
+| `INCONCLUSIVE` | Not enough evidence in the context |
 
 ---
 
 ### POST /verify/consensus
-
-<Info>New in v4.0.0</Info>
 
 Multi-engine consensus verification. Runs the query through multiple verification engines and requires agreement above a confidence threshold.
 
@@ -220,38 +304,60 @@ Mathematical expressions are parsed and compared using `Decimal` arithmetic inte
 {
   "query": "The square root of 144 is 12",
   "verification_mode": "high",
-  "min_confidence": 0.8
+  "min_confidence": 0.95
 }
 ```
 
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `query` | string | Yes | The claim to verify |
-| `verification_mode` | string | No | `single`, `high`, or `maximum` (default: `single`) |
-| `min_confidence` | float | No | Minimum confidence threshold, 0–1 (default: `0.8`) |
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `query` | string | Yes | — | The claim to verify |
+| `verification_mode` | string | No | `single` | `single`, `high`, or `maximum` |
+| `min_confidence` | float | No | `0.95` | Minimum confidence threshold, 0–1 |
+
+**Verification modes:**
+
+| Mode | Engines | Use case |
+|------|---------|----------|
+| `single` | 1 | Fast, single engine verification |
+| `high` | 2 | Higher confidence for important claims |
+| `maximum` | 3+ | Critical domains (medical, financial) |
 
 **Response:**
 
 ```json
 {
-  "status": "VERIFIED",
-  "verified": true,
-  "engine": "consensus",
-  "result": {
-    "confidence": 0.95,
-    "engines_used": ["math", "logic"],
-    "agreement_rate": 1.0
-  }
+  "final_answer": "12",
+  "confidence": 98.5,
+  "engines_used": 2,
+  "agreement_status": "UNANIMOUS",
+  "verification_chain": [
+    {
+      "engine": "math",
+      "method": "symbolic",
+      "result": "12",
+      "confidence": 99.0,
+      "latency_ms": 12.5,
+      "success": true
+    }
+  ],
+  "total_latency_ms": 45.2,
+  "meets_requirement": true
 }
 ```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `confidence` | float | Confidence as a percentage (0–100) |
+| `verification_chain` | array | Detailed results from each engine |
+| `meets_requirement` | boolean | Whether confidence meets `min_confidence` |
+
+If the confidence score falls below the `min_confidence` threshold, the endpoint returns HTTP 422 with a descriptive error.
 
 ---
 
 ### POST /verify/image
 
-<Info>New in v4.0.0</Info>
-
-Verify claims about image content. Accepts multipart form data with an image file (max 10 MB).
+Verify claims about image content. Accepts multipart form data with an image file (max 10 MB). Supported formats: PNG, JPEG, GIF, WebP.
 
 **Request:**
 
@@ -259,34 +365,35 @@ Verify claims about image content. Accepts multipart form data with an image fil
 curl -X POST https://api.qwedai.com/v1/verify/image \
   -H "X-API-Key: qwed_your_key" \
   -F "image=@photo.jpg" \
-  -F "claim=This image contains a cat"
+  -F "claim=The image is 800x600 pixels"
 ```
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `image` | file | Yes | Image file (max 10 MB) |
+| `image` | file | Yes | Image file (max 10 MB; PNG, JPEG, GIF, WebP) |
 | `claim` | string | Yes | The claim about the image to verify |
 
 **Response:**
 
 ```json
 {
-  "status": "VERIFIED",
-  "verified": true,
-  "engine": "image",
-  "result": {
-    "is_valid": true,
-    "confidence": 0.92,
-    "message": "Claim is consistent with image content"
-  }
+  "verdict": "SUPPORTED",
+  "confidence": 0.95,
+  "reasoning": "Image dimensions match the claimed resolution",
+  "methods_used": ["metadata_analysis", "pixel_inspection"]
 }
 ```
+
+| Verdict | Meaning |
+|---------|---------|
+| `SUPPORTED` | Claim is confirmed by image analysis |
+| `REFUTED` | Claim contradicts image analysis |
+| `INCONCLUSIVE` | Cannot determine from available methods |
+| `VLM_REQUIRED` | Visual Language Model needed for deeper analysis |
 
 ---
 
 ### POST /verify/stats
-
-<Info>New in v4.0.0</Info>
 
 Verify statistical claims against CSV data. Accepts multipart form data with a CSV file.
 
@@ -308,14 +415,9 @@ curl -X POST https://api.qwedai.com/v1/verify/stats \
 
 ```json
 {
-  "status": "VERIFIED",
-  "verified": true,
-  "engine": "stats",
-  "result": {
-    "is_valid": true,
-    "computed_value": 52340.5,
-    "message": "Statistical claim verified against dataset"
-  }
+  "status": "SUCCESS",
+  "computed_value": 52340.5,
+  "message": "Statistical claim verified against dataset"
 }
 ```
 
@@ -426,28 +528,33 @@ Verify that retrieved RAG chunks originate from the expected source document. Pr
 
 ### POST /verify/batch
 
-Verify multiple items at once.
+Verify multiple items in a single request. Processes all items concurrently and returns aggregated results. Maximum 100 items per batch.
 
 **Request:**
 
 ```json
 {
   "items": [
-    {"query": "2+2=4", "type": "math"},
-    {"query": "3*3=9", "type": "math"},
-    {"query": "(GT x 5)", "type": "logic"}
-  ],
-  "options": {
-    "parallel": true,
-    "stop_on_failure": false
-  }
+    {"query": "What is 2+2?", "type": "natural_language"},
+    {"query": "(AND (GT x 5) (LT y 10))", "type": "logic"},
+    {"query": "x**2 + 2*x + 1 = (x+1)**2", "type": "math"}
+  ]
 }
 ```
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `items` | array | Yes | Array of verification items (max 100) |
+| `items[].query` | string | Yes | The claim to verify |
+| `items[].type` | string | No | Verification type: `natural_language`, `logic`, `math`, `code`, `fact`, `sql` (default: `natural_language`) |
+| `items[].params` | object | No | Additional parameters for the verification |
 
 **Response:**
 
 ```json
 {
+  "job_id": "batch_abc123",
+  "status": "completed",
   "results": [...],
   "summary": {
     "total": 3,
@@ -457,6 +564,25 @@ Verify multiple items at once.
   }
 }
 ```
+
+### GET /verify/batch/{job_id}
+
+Get the status and results of a batch verification job. Use this to poll results when processing large batches.
+
+**Response:**
+
+```json
+{
+  "job_id": "batch_abc123",
+  "status": "completed",
+  "results": [...]
+}
+```
+
+| Status | Description |
+|--------|-------------|
+| 403 | Access denied — job belongs to a different organization |
+| 404 | Job not found |
 
 ---
 
@@ -566,31 +692,50 @@ Submit an agent tool call for risk evaluation before execution.
 
 ### GET /agents/{agent_id}/activity
 
-Retrieve the audit log for a specific agent.
+Retrieve the audit log for a specific agent. Provides a full audit trail of all agent actions.
 
-**Query params:** `limit` (default: 50)
+**Headers:**
+
+```text
+X-Agent-Token: qwed_agent_...
+```
+
+**Query params:**
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `limit` | integer | `20` | Maximum number of activity records to return |
 
 **Response:**
 
 ```json
 {
-  "agent_id": "agent_abc123",
-  "activity": [
+  "agent_id": 42,
+  "agent_name": "FinanceBot",
+  "total_activities": 5,
+  "current_cost_today": 0.05,
+  "max_cost_per_day": 50.0,
+  "activities": [
     {
-      "timestamp": "2026-03-20T12:00:00Z",
-      "action": "verify",
-      "engine": "math",
-      "status": "VERIFIED"
+      "type": "verification_request",
+      "description": "Query: What is 15% of 200?",
+      "status": "success",
+      "cost": 0.01,
+      "timestamp": "2026-03-20T12:00:00Z"
     }
   ]
 }
 ```
 
+| Status | Description |
+|--------|-------------|
+| 401 | Invalid agent token |
+
 ---
 
-## Attestation Endpoints
+## Attestation endpoints
 
-### GET /attestation/:id
+### GET /attestation/{id}
 
 Get an attestation by ID.
 
@@ -610,23 +755,59 @@ Verify an attestation JWT.
 
 ## Observability endpoints
 
-<Info>New in v4.0.0</Info>
-
 ### GET /metrics
 
-Returns global system metrics (request counts, latencies, engine usage).
+Returns global system metrics and per-tenant breakdowns. In production, this should require admin authentication.
+
+**Response:**
+
+```json
+{
+  "global": { "total_requests": 1250, "avg_latency_ms": 82.3 },
+  "tenants": { "1": { "requests": 500 }, "2": { "requests": 750 } }
+}
+```
 
 ### GET /metrics/{organization_id}
 
-Returns per-tenant metrics scoped to a specific organization.
+Returns metrics scoped to a specific organization. Tenants can only view their own metrics.
+
+| Status | Description |
+|--------|-------------|
+| 403 | You can only view metrics for your own organization |
 
 ### GET /metrics/prometheus
 
-Returns metrics in Prometheus scrape format for integration with monitoring infrastructure.
+Returns metrics in Prometheus text format for scraping by monitoring infrastructure.
 
 ### GET /logs
 
-Returns verification logs for the authenticated tenant. Supports pagination.
+Returns verification logs for the authenticated tenant, ordered by most recent first.
+
+**Query params:**
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `limit` | integer | `10` | Maximum number of logs to return |
+
+**Response:**
+
+```json
+{
+  "organization_id": 1,
+  "organization_name": "Acme Corp",
+  "total_logs": 3,
+  "logs": [
+    {
+      "id": 42,
+      "query": "What is 2+2?",
+      "is_verified": true,
+      "domain": "MATH",
+      "timestamp": "2026-03-20T12:00:00Z"
+    }
+  ]
+}
+```
 
 ---
 
@@ -668,16 +849,39 @@ Rotate an API key. Available to admin and member roles.
 
 ## Badge endpoints
 
+All badge endpoints return SVG images (`image/svg+xml`). You can embed them directly in Markdown or HTML.
+
 ### GET /badge/verified
 
-Get a verified badge SVG.
+Get a verified or failed badge SVG.
 
-### GET /badge/status/:status
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `verified` | boolean | `true` | Whether to show a verified or failed badge |
 
-Get a badge for any status.
+### GET /badge/status/{status}
+
+Get a badge for any verification status (e.g., `VERIFIED`, `FAILED`, `CORRECTED`, `BLOCKED`, `PENDING`, `ERROR`).
+
+### GET /badge/attestation/{attestation_id}
+
+Get a badge for a specific attestation by ID.
+
+### GET /badge/engine/{engine}
+
+Get a badge for a specific verification engine.
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `verified` | boolean | `true` | Whether to show a verified or failed badge |
 
 ### GET /badge/custom
 
-Generate a custom badge.
+Generate a custom badge with configurable label, message, color, and logo.
 
-**Query params:** `label`, `message`, `color`, `logo`
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `label` | string | `QWED` | Left side label |
+| `message` | string | `verified` | Right side message |
+| `color` | string | — | Hex color (e.g., `#00C853`) |
+| `logo` | boolean | `true` | Include QWED logo |
