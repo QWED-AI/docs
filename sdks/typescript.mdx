@@ -186,7 +186,7 @@ console.log(results.summary.success_rate);
 
 <Info>New in v4.0.1</Info>
 
-The TypeScript SDK supports the QWED Agent API for registering AI agents and verifying their actions with per-tenant rate limiting and optional security checks.
+The TypeScript SDK supports the QWED Agent API for registering AI agents and verifying their actions with per-tenant rate limiting and server-enforced security checks.
 
 ### registerAgent(registration)
 
@@ -212,7 +212,11 @@ const { agent_id, agent_token } = await client.registerAgent({
 
 ### verifyAgent(agentId, agentToken, query, options)
 
-Verify an agent action with optional exfiltration and MCP poisoning checks.
+Verify an agent action. Exfiltration detection runs on every request. MCP poison inspection runs automatically when you provide a `toolSchema`.
+
+<Warning>
+**Breaking change (v4.0.3):** The `checkExfiltration` and `checkMcpPoison` options have been removed. Security checks are now enforced server-side and cannot be disabled. Remove these options from your code.
+</Warning>
 
 ```typescript
 const response = await client.verifyAgent(
@@ -221,8 +225,6 @@ const response = await client.verifyAgent(
   'Summarize the Q3 revenue report',
   {
     provider: 'openai',
-    checkExfiltration: true,
-    checkMcpPoison: true,
     toolSchema: {
       name: 'fetch_report',
       description: 'Fetch quarterly report data',
@@ -241,9 +243,7 @@ console.log(response.budget_remaining);
 | `agentToken` | `string` | — | Agent token from registration |
 | `query` | `string` | — | The action or query to verify |
 | `options.provider` | `string` | — | LLM provider name |
-| `options.checkExfiltration` | `boolean` | — | Enable exfiltration detection |
-| `options.checkMcpPoison` | `boolean` | — | Enable MCP poisoning detection |
-| `options.toolSchema` | `object` | — | MCP tool schema to scan |
+| `options.toolSchema` | `object` | — | MCP tool definition — triggers server-side `MCPPoisonGuard` inspection |
 
 ### getAgentBudget(agentId, agentToken)
 

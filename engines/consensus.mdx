@@ -94,6 +94,10 @@ The engine uses weighted voting:
 | Z3     | 0.995              |
 | Python | 0.99               |
 | Stats  | 0.98               |
-| Fact   | 0.85               |
+| Image  | 0.80               |
+
+<Note>
+The Fact engine is no longer selected during automatic consensus verification. It requires external fact context to produce meaningful results. If you need fact-based verification, call the [Fact engine](/engines/fact) directly.
+</Note>
 
 Final confidence = weighted average of agreeing engines.

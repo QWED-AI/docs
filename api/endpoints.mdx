@@ -506,7 +506,13 @@ Register a new AI agent with QWED for verified agentic workflows.
 
 ### POST /agents/{agent_id}/verify
 
-Verify a claim using an agent token. Creates an auditable record tied to the agent. Optionally runs Sentinel Guard security checks (exfiltration detection, MCP poisoning) before verification.
+Verify a claim using an agent token. Creates an auditable record tied to the agent.
+
+Security checks are enforced server-side on every request — `ExfiltrationGuard` always runs, and `MCPPoisonGuard` runs automatically when a `tool_schema` is provided. You do not need to opt in.
+
+<Warning>
+**Breaking change (v4.0.3):** The `security_checks` request field has been removed. Exfiltration and MCP poison checks are now enforced server-side and cannot be disabled by clients. Remove any `security_checks` fields from your request payloads.
+</Warning>
 
 **Request:**
 
@@ -514,11 +520,10 @@ Verify a claim using an agent token. Creates an auditable record tied to the age
 {
   "query": "What is 15% of 200?",
   "provider": "openai",
-  "security_checks": {
-    "exfiltration": true,
-    "mcp_poison": false
-  },
-  "tool_schema": null
+  "tool_schema": {
+    "name": "fetch_report",
+    "description": "Fetch quarterly report data"
+  }
 }
 ```
 
@@ -526,9 +531,7 @@ Verify a claim using an agent token. Creates an auditable record tied to the age
 |-----------|------|----------|-------------|
 | `query` | string | Yes | The claim to verify |
 | `provider` | string | No | LLM provider preference |
-| `security_checks.exfiltration` | boolean | No | Run `ExfiltrationGuard` on the query payload |
-| `security_checks.mcp_poison` | boolean | No | Run `MCPPoisonGuard` on the `tool_schema` |
-| `tool_schema` | object | No | MCP tool definition to scan (required when `mcp_poison` is `true`) |
+| `tool_schema` | object | No | MCP tool definition — when provided, `MCPPoisonGuard` runs automatically |
 
 **Headers:**
 
@@ -540,7 +543,6 @@ X-Agent-Token: qwed_agent_...
 
 | Status | Description |
 |--------|-------------|
-| 400 | Invalid security check configuration or payload |
 | 401 | Invalid agent token |
 | 403 | Agent budget exceeded or request blocked by security checks |
 | 500 | Internal agent verification error |
