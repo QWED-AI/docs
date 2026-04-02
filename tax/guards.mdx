@@ -2,7 +2,7 @@
 sidebar_position: 2
 title: "QWED Tax guards for AI payroll and tax verification"
 sidebarTitle: "The Guards"
-description: "Reference for QWED Tax guards covering US and India workflows including classification, nexus, payroll, and GST verification."
+description: "Reference for QWED Tax guards covering US, India, and international workflows including classification, nexus, payroll, transfer pricing, and GST verification."
 ---
 
 QWED-Tax verifies logic deterministically. No probabilities, just rules.
@@ -31,7 +31,115 @@ QWED-Tax verifies logic deterministically. No probabilities, just rules.
 **Goal:** Verify Paycheck Math. **Logic:**
 
 - **Gross-to-Net:** `Gross - Taxes - Deductions == Net` (Exact Decimal match).
-- **Soical Security Cap:** Enforces 2025 Wage Base Limit (\$176,100). Tax stops after this amount.
+- **Social Security Cap:** Enforces 2025 Wage Base Limit (\$176,100). Tax stops after this amount.
+
+### 4. ReciprocityGuard (state tax withholding)
+
+**Goal:** Verify which state receives income tax withholding when an employee lives in one state and works in another. **Logic:** Uses Z3 theorem prover to determine the correct withholding state based on reciprocity agreements.
+
+- **Same State:** If you live and work in the same state, you pay that state.
+- **Reciprocity Agreement:** If a reciprocity pair exists (e.g., NJ/PA, MD/VA), you withhold for the residence state.
+- **No Reciprocity:** If no agreement exists, you withhold for the work state.
+
+Supported reciprocity pairs include NJ-PA, PA-MD, and VA-MD.
+
+```python
+from qwed_tax.jurisdictions.us.reciprocity_guard import ReciprocityGuard
+from qwed_tax.models import WorkArrangement, Address, State
+
+guard = ReciprocityGuard()
+
+arrangement = WorkArrangement(
+    employee_id="E001",
+    residence_address=Address(
+        street="123 Main St", city="Newark", state=State.NJ, zip_code="07101"
+    ),
+    work_address=Address(
+        street="456 Market St", city="Philadelphia", state=State.PA, zip_code="19103"
+    ),
+    is_remote=False
+)
+
+result = guard.determine_withholding_state(arrangement)
+# {"verified": True, "withholding_state": "NJ", "reason": "Reciprocity Agreement exists..."}
+```
+
+### 5. WithholdingGuard (W-4 exempt status)
+
+**Goal:** Verify that employees claiming exempt status on Form W-4 meet IRS requirements. **Logic:** Uses Z3 to formally verify that the claim is consistent with IRS Publication 505 rules.
+
+- To claim exempt, you must have had **zero tax liability last year** AND expect **no tax liability this year**.
+- If either condition fails, the exempt claim is blocked.
+
+```python
+from qwed_tax.jurisdictions.us.withholding_guard import WithholdingGuard, W4Form
+
+guard = WithholdingGuard()
+
+form = W4Form(
+    employee_id="E002",
+    claim_exempt=True,
+    tax_liability_last_year=500.0,  # Had liability last year
+    expect_refund_this_year=True
+)
+
+result = guard.verify_exempt_status(form)
+# {"verified": False, "message": "Cannot claim 'Exempt' if you had tax liability last year..."}
+```
+
+### 6. ClassificationGuard (ABC Test)
+
+**Goal:** Verify worker classification using the stricter **ABC Test** used in states like California (AB5), Massachusetts, and New Jersey. **Logic:** Uses Z3 to formally prove classification. A worker is a contractor only if **all three** conditions are met:
+
+- **A — Freedom from control:** The worker is free from the company's direction and control.
+- **B — Outside usual business:** The work is outside the company's usual course of business.
+- **C — Independent trade:** The worker has an independently established trade or business.
+
+If any condition fails, the worker must be classified as an Employee (W-2).
+
+```python
+from qwed_tax.jurisdictions.us.classification_guard import ClassificationGuard
+from qwed_tax.models import WorkerClassificationParams, State
+
+guard = ClassificationGuard()
+
+params = WorkerClassificationParams(
+    worker_id="W001",
+    freedom_from_control=True,
+    work_outside_usual_business=False,  # Fails condition B
+    customarily_engaged_independently=True,
+    state=State.CA
+)
+
+result = guard.verify_classification(params, claimed_status_contractor=True)
+# {"verified": False, "classification": "Employee (W-2)",
+#  "message": "MISCLASSIFICATION: Laws in CA require Employee (W-2). Reasons: Failed B (Core Business Work)"}
+```
+
+<Note>
+  The ABC Test is stricter than the IRS Common Law test. Use `ClassificationGuard` from `qwed_tax.jurisdictions.us` for ABC Test states (CA, MA, NJ) and `ClassificationGuard` from `qwed_tax.guards` for the IRS Common Law test.
+</Note>
+
+### 7. AddressGuard (zip code validation)
+
+**Goal:** Verify that an address's zip code matches its stated state. **Logic:** Uses a deterministic prefix lookup table for major states.
+
+- Catches mismatches like a California zip code paired with a New York state designation.
+- Supported states: NY, NJ, PA, CA, TX, FL.
+
+```python
+from qwed_tax.address_guard import AddressGuard
+from qwed_tax.models import Address, State
+
+guard = AddressGuard()
+
+address = Address(
+    street="123 Broadway", city="New York", state=State.NY, zip_code="90210"
+)
+
+result = guard.verify_address(address)
+# {"verified": False, "message": "MISMATCH: Zip 90210 does not belong to NY."}
+```
 
 ## 🇮🇳 India (CBDT)
 
@@ -80,6 +188,67 @@ QWED-Tax verifies logic deterministically. No probabilities, just rules.
 <Note>
   Category matching for `InputCreditGuard` uses exact match (not substring). Ensure you pass the canonical category name (e.g., `FOOD_AND_BEVERAGE`, `MOTOR_VEHICLE`, `GIFT_TO_EMPLOYEE`).
 </Note>
+
+### 7. DepositRateGuard (bank FD rates)
+
+**Goal:** Verify bank deposit interest rates, particularly Senior Citizen premiums. **Logic:** Ensures exact rate match including age-based adjustments.
+
+- Senior Citizens (60+) receive an additional interest premium (default 0.50%).
+- Uses exact decimal comparison to catch floating-point hallucinations (e.g., "7.50000001%" instead of "7.50%").
+
+```python
+from qwed_tax.jurisdictions.india.guards.deposit_guard import DepositRateGuard
+from decimal import Decimal
+
+guard = DepositRateGuard()
+
+result = guard.verify_fd_rate(
+    age=65,
+    base_rate=Decimal("7.00"),
+    claimed_rate=Decimal("7.50"),
+    senior_premium=Decimal("0.50")
+)
+# {"verified": True, "expected_rate": 7.50, "claimed_rate": 7.50,
+#  "message": "Rate Verified (Age 65: Base 7.00% + Premium 0.50%)"}
+```
+
+| Parameter | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `age` | `int` | Yes | - | Age of the depositor |
+| `base_rate` | `Decimal` | Yes | - | Standard FD interest rate (percentage) |
+| `claimed_rate` | `Decimal` | Yes | - | Rate claimed by the AI (percentage) |
+| `senior_premium` | `Decimal` | No | `0.50` | Additional rate for Senior Citizens (percentage) |
+
+### 8. InterHeadAdjustmentGuard (loss set-off matrix)
+
+**Goal:** Enforce the complete inter-head loss set-off rules under Indian Income Tax. **Logic:** Maintains a prohibition matrix defining which loss heads cannot be set off against which profit heads.
+
+Key restrictions:
+
+- **Speculative (Intraday) losses:** Can only be set off against speculative profits.
+- **Long-term capital losses:** Can only be set off against long-term capital gains.
+- **Short-term capital losses:** Can be set off against both short-term and long-term capital gains.
+- **VDA (Crypto) losses:** Cannot be set off against any income — they lapse entirely.
+
+```python
+from qwed_tax.jurisdictions.india.guards.setoff_guard import InterHeadAdjustmentGuard, TaxHead
+
+guard = InterHeadAdjustmentGuard()
+
+# Attempt to set off intraday loss against salary
+result = guard.verify_setoff(
+    loss_head=TaxHead.BUSINESS_SPECULATIVE,
+    profit_head=TaxHead.SALARY
+)
+# {"verified": False, "message": "Illegal Set-Off: Loss from BUSINESS_SPECULATIVE cannot be set off against SALARY."}
+
+# Attempt to set off crypto loss
+result = guard.verify_setoff(
+    loss_head=TaxHead.VDA,
+    profit_head=TaxHead.BUSINESS_NON_SPECULATIVE
+)
+# {"verified": False, "message": "Illegal Set-Off: Loss from VDA cannot be set off against anything (it lapses)."}
+```
 
 ## 🌐 International (DTAA)
 
@@ -158,3 +327,90 @@ result = guard.verify_filing_requirement(payment)
 <Note>
   Payment types without a defined filing rule return `{"filing_required": False, "form": None}` with a descriptive reason.
 </Note>
+
+## 🌐 Transfer pricing
+
+### TransferPricingGuard (arm's length price)
+
+**Goal:** Verify that cross-border or related party transactions are priced within the arm's length range. **Logic:** Calculates a safe harbour range around the benchmark price and flags deviations that could trigger tax authority adjustments.
+
+- Supports multiple transfer pricing methods (CUP, TNMM, etc.).
+- Configurable tolerance percentage (default 3%, aligned with India's safe harbour rules).
+- Reports the potential primary adjustment amount when a transaction falls outside the range.
+
+References: OECD Transfer Pricing Guidelines, US Section 482, India Section 92C.
+
+```python
+from qwed_tax.guards.transfer_pricing_guard import TransferPricingGuard
+
+guard = TransferPricingGuard()
+
+result = guard.verify_arms_length_price(
+    transaction_price=85.0,
+    benchmark_price=100.0,
+    method="CUP",
+    tolerance_percent=3.0
+)
+# {"verified": False, "risk": "TRANSFER_PRICING_ADJUSTMENT",
+#  "message": "Price 85 deviates from ALP 100 beyond 3.0% tolerance.",
+#  "safe_harbour_range": [97.0, 103.0], "potential_adjustment": 15.0}
+```
+
+| Parameter | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `transaction_price` | `float` | Yes | - | Actual price charged to/by the related party |
+| `benchmark_price` | `float` | Yes | - | Arm's Length Price determined by analysis |
+| `method` | `str` | No | `"CUP"` | Transfer pricing method (CUP, TNMM, RPM, etc.) |
+| `tolerance_percent` | `float` | No | `3.0` | Safe harbour tolerance as a percentage |
+
+## 🌐 Tax residency
+
+### PoEMGuard (Place of Effective Management)
+
+**Goal:** Determine tax residency of foreign companies based on Place of Effective Management rules. **Logic:** Applies the Active Business Outside India (ABOI) test and key management location to determine if a foreign-incorporated company should be treated as a Resident for Indian tax purposes.
+
+ABOI test criteria (all must be met to pass):
+
+- Assets outside India >= 50%
+- Employees outside India >= 50%
+- Payroll outside India >= 50%
+
+If a company **fails** the ABOI test and its key management is in India, it is deemed a **Resident** under PoEM rules.
+
+Reference: CBDT Circular 6 of 2017.
+
+```python
+from qwed_tax.guards.poem_guard import PoEMGuard
+
+guard = PoEMGuard()
+
+result = guard.determine_residency(
+    company_name="Offshore Corp Ltd",
+    is_foreign_incorp=True,
+    turnover_total=10000000,
+    turnover_outside_india=3000000,
+    assets_total=5000000,
+    assets_outside_india=1000000,   # 20% — fails ABOI
+    employees_total=100,
+    employees_outside_india=20,     # 20% — fails ABOI
+    payroll_total=2000000,
+    payroll_outside_india=400000,   # 20% — fails ABOI
+    key_management_location="INDIA"
+)
+# {"verified": True, "residency": "RESIDENT", "is_aboi": False,
+#  "reason": "Fails ABOI test AND Key Management is in India (PoEM established)."}
+```
+
+| Parameter | Type | Required | Description |
+| --- | --- | --- | --- |
+| `company_name` | `str` | Yes | Name of the company |
+| `is_foreign_incorp` | `bool` | Yes | Whether the company is incorporated outside India |
+| `turnover_total` | `float` | Yes | Total turnover |
+| `turnover_outside_india` | `float` | Yes | Turnover generated outside India |
+| `assets_total` | `float` | Yes | Total asset value |
+| `assets_outside_india` | `float` | Yes | Asset value outside India |
+| `employees_total` | `int` | Yes | Total headcount |
+| `employees_outside_india` | `int` | Yes | Headcount outside India |
+| `payroll_total` | `float` | Yes | Total payroll spend |
+| `payroll_outside_india` | `float` | Yes | Payroll spend outside India |
+| `key_management_location` | `str` | Yes | Where key management decisions are made (`"INDIA"` or other) |
