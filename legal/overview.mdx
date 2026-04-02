@@ -31,8 +31,8 @@ pip install qwed-legal
 |-------|--------|----------|
 | **DeadlineGuard** | python-dateutil + holidays | Business days, leap years, jurisdiction holidays |
 | **LiabilityGuard** | Decimal + SymPy | Cap %, tiered liability, indemnity limits |
-| **ClauseGuard** | Text heuristics | Text-based contradiction detection |
-| **CitationGuard** | Regex + Bluebook | Case citations, reporter validation |
+| **ClauseGuard** | Text heuristics + Z3 | Text-based contradiction detection with optional Z3 verification |
+| **CitationGuard** | Regex patterns | US, UK, and India citation format validation |
 | **JurisdictionGuard** | Rule-based logic | Choice of law, forum selection, CISG |
 | **StatuteOfLimitationsGuard** | Date calculations | Claim periods by jurisdiction |
 | **IRACGuard** | Regex patterns | Legal reasoning structure verification |
@@ -67,9 +67,9 @@ from qwed_legal import CitationGuard
 guard = CitationGuard()
 result = guard.verify("Brown v. Board of Education, 347 U.S. 483 (1954)")
 
-print(result.valid)  # True - valid Bluebook format
+print(result.valid)  # True - valid citation format
 print(result.parsed_components)
-# {'plaintiff': 'Brown', 'defendant': 'Board of Education', 'volume': 347, 'reporter': 'U.S.', 'page': 483, 'year': 1954}
+# {'volume': 347, 'reporter': 'U.S.', 'page': '483'}
 ```
 
 ## Architecture

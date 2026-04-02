@@ -106,16 +106,17 @@ citations = [
     "Doe v. Roe, 999 X.Y.Z. 789 (2019)",                 # FAKE!
 ]
 
-result = guard.verify_batch(citations)
+# Batch summary
+batch_result = guard.verify_batch(citations)
+print(f"Valid: {batch_result.valid}/{batch_result.total}")  # Valid: 2/4
 
-print(f"Valid: {result.valid}/{result.total}")  # Valid: 2/4
-
-# Check each citation
-for i, cite_result in enumerate(result.citations):
-    status = "✅" if cite_result.valid else "❌"
-    print(f"{status} {citations[i]}")
-    if not cite_result.valid:
-        print(f"   Issues: {cite_result.issues}")
+# Verify each citation individually for details
+for citation in citations:
+    result = guard.verify(citation)
+    status = "✅" if result.valid else "❌"
+    print(f"{status} {citation}")
+    if not result.valid:
+        print(f"   Issues: {result.issues}")
 ```
 
 **Output:**
@@ -124,9 +125,9 @@ Valid: 2/4
 ✅ Miranda v. Arizona, 384 U.S. 436 (1966)
 ✅ Brown v. Board of Education, 347 U.S. 483 (1954)
 ❌ Smith v. Jones, 123 FAKE 456 (2020)
-   Issues: ["Unknown reporter abbreviation: 'FAKE'"]
+   Issues: ["Unknown reporter"]
 ❌ Doe v. Roe, 999 X.Y.Z. 789 (2019)
-   Issues: ["Unknown reporter abbreviation: 'X.Y.Z.'"]
+   Issues: ["Unknown reporter"]
 ```
 
 ---
