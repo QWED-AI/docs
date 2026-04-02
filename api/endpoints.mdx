@@ -210,9 +210,11 @@ Verify factual claims against a provided context.
 
 <Info>New in v4.0.0</Info>
 
-Multi-engine consensus verification. Runs the query through multiple verification engines and requires agreement above a confidence threshold.
+Multi-engine consensus verification. Runs the query through multiple verification engines and requires agreement above a confidence threshold. This endpoint is rate-limited per tenant.
 
 Mathematical expressions are parsed and compared using `Decimal` arithmetic internally, which avoids floating-point drift when engines cross-check results.
+
+<Note>The fact engine is excluded from automatic engine selection during consensus verification. Fact-based verification requires external context and will return an error if invoked without it, preventing self-referential consensus loops.</Note>
 
 **Request:**
 
@@ -506,7 +508,9 @@ Register a new AI agent with QWED for verified agentic workflows.
 
 ### POST /agents/{agent_id}/verify
 
-Verify a claim using an agent token. Creates an auditable record tied to the agent. Optionally runs Sentinel Guard security checks (exfiltration detection, MCP poisoning) before verification.
+Verify a claim using an agent token. Creates an auditable record tied to the agent. Security checks are enforced server-side — exfiltration detection always runs, and MCP poisoning detection runs automatically when a `tool_schema` is provided.
+
+<Warning>**Breaking change:** The `security_checks` request field has been removed. Security checks are now mandatory and enforced server-side. You no longer need to (or can) opt in to exfiltration or MCP poison checks.</Warning>
 
 **Request:**
 
@@ -514,11 +518,10 @@ Verify a claim using an agent token. Creates an auditable record tied to the age
 {
   "query": "What is 15% of 200?",
   "provider": "openai",
-  "security_checks": {
-    "exfiltration": true,
-    "mcp_poison": false
-  },
-  "tool_schema": null
+  "tool_schema": {
+    "name": "fetch_report",
+    "description": "Fetch quarterly report data"
+  }
 }
 ```
 
@@ -526,9 +529,7 @@ Verify a claim using an agent token. Creates an auditable record tied to the age
 |-----------|------|----------|-------------|
 | `query` | string | Yes | The claim to verify |
 | `provider` | string | No | LLM provider preference |
-| `security_checks.exfiltration` | boolean | No | Run `ExfiltrationGuard` on the query payload |
-| `security_checks.mcp_poison` | boolean | No | Run `MCPPoisonGuard` on the `tool_schema` |
-| `tool_schema` | object | No | MCP tool definition to scan (required when `mcp_poison` is `true`) |
+| `tool_schema` | object | No | MCP tool definition to scan. When provided, `MCPPoisonGuard` runs automatically |
 
 **Headers:**
 
@@ -536,11 +537,15 @@ Verify a claim using an agent token. Creates an auditable record tied to the age
 X-Agent-Token: qwed_agent_...
 ```
 
+**Security behavior:**
+
+- **Exfiltration check:** Always runs on every agent verification request. If the query payload is flagged, the request is rejected with a `403`.
+- **MCP poison check:** Runs automatically when `tool_schema` is present. If the tool definition is flagged, the request is rejected with a `403`.
+
 **Error responses:**
 
 | Status | Description |
 |--------|-------------|
-| 400 | Invalid security check configuration or payload |
 | 401 | Invalid agent token |
 | 403 | Agent budget exceeded or request blocked by security checks |
 | 500 | Internal agent verification error |

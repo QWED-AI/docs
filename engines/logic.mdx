@@ -161,9 +161,9 @@ result = client.verify_logic(
 
 ---
 
-## Security: Operator Whitelist
+## Security: Operator whitelist
 
-The DSL uses a **strict whitelist** - only approved operators are allowed:
+The DSL uses a **strict whitelist** — only approved operators are allowed:
 
 ```python
 # ALLOWED
@@ -177,6 +177,10 @@ The DSL uses a **strict whitelist** - only approved operators are allowed:
 "(EVAL 'print(1)')"         ✗
 # Error: SECURITY BLOCK: Unknown operator 'EVAL'
 ```
+
+### Fail-closed constraint parsing
+
+The logic engine uses `SafeEvaluator` for all constraint parsing. If `SafeEvaluator` is unavailable, the engine raises a `RuntimeError` instead of falling back to raw evaluation. This fail-closed design ensures that untrusted input is never passed to Python's `eval()`.
 
 ---
 
