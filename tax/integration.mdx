@@ -5,11 +5,11 @@ sidebarTitle: "Integration"
 description: "Use QWED Tax pre-flight middleware to verify payroll and tax actions in AI agent workflows before execution."
 ---
 
-The primary usage pattern for QWED-Tax is the **Pre-Flight Check**.
+The primary usage patterns for QWED-Tax are the **TaxPreFlight** auditor for intent-based checks and the **QWEDTaxMiddleware** for intercepting AI-generated payroll payloads.
 
-## TaxPreFlight Middleware
+## TaxPreFlight
 
-Wrap your Fintech API calls with this auditor.
+The `TaxPreFlight` class runs all applicable guards against a transaction intent dictionary. It checks worker classification, economic nexus, trader set-offs, capital gains, corporate loans, startup valuations, international remittances, and expense/TDS compliance in a single call.
 
 ```python
 from qwed_tax.verifier import TaxPreFlight
@@ -35,16 +35,51 @@ report = preflight.audit_transaction(intent)
 
 # 4. Enforce
 if not report["allowed"]:
-    print(f"🛑 BLOCKED: {report['blocks']}")
+    print(f"BLOCKED: {report['blocks']}")
     # Do NOT call Gusto/Stripe API
 else:
-    print("✅ Verified. Proceeding to Fintech API.")
+    print("Verified. Proceeding to Fintech API.")
     # call_gusto_api()
 ```
 
+### Intent fields reference
+
+The `audit_transaction` method inspects the following fields. Only include the fields relevant to your transaction — guards are skipped when their required fields are absent.
+
+| Field | Type | Used by |
+| --- | --- | --- |
+| `worker_type` | `str` | ClassificationGuard |
+| `worker_facts` | `dict` | ClassificationGuard |
+| `state` | `str` | NexusGuard |
+| `sales_data` | `dict` (`amount`, `transactions`) | NexusGuard |
+| `tax_decision` | `str` | NexusGuard |
+| `loss_head` | `str` | SpeculationGuard |
+| `loss_amount` | `float` | SpeculationGuard |
+| `offset_head` | `str` | SpeculationGuard |
+| `asset_type` | `str` | CapitalGainsGuard |
+| `dates` | `dict` (`buy`, `sell`) | CapitalGainsGuard |
+| `claimed_rate` | `str` | CapitalGainsGuard |
+| `lender_type` | `str` | RelatedPartyGuard |
+| `borrower_role` | `str` | RelatedPartyGuard |
+| `interest_rate` | `float` | RelatedPartyGuard |
+| `market_rate` | `float` | RelatedPartyGuard |
+| `investment_round` | `str` | ValuationGuard (when `"convertible_note"`) |
+| `investment_amount` | `str` | ValuationGuard |
+| `cap_price` | `str` | ValuationGuard |
+| `discount` | `str` | ValuationGuard |
+| `next_round_price` | `str` | ValuationGuard |
+| `remittance_amount_usd` | `float` | RemittanceGuard |
+| `purpose` | `str` | RemittanceGuard |
+| `fy_usage` | `float` | RemittanceGuard |
+| `expense_category` | `str` | InputCreditGuard |
+| `amount` | `float` | InputCreditGuard, TDSGuard |
+| `tax_paid` | `float` | InputCreditGuard |
+| `service_type` | `str` | TDSGuard |
+| `ytd_payment` | `float` | TDSGuard |
+
 ### Capital gains date validation
 
-The `audit_transaction` method now validates that both `buy` and `sell` dates are present when `asset_type` and `dates` are provided in the intent. If either is missing, the transaction is blocked with a descriptive error:
+The `audit_transaction` method validates that both `buy` and `sell` dates are present when `asset_type` and `dates` are provided in the intent. If either is missing, the transaction is blocked:
 
 ```python
 report = preflight.audit_transaction({
@@ -55,74 +90,152 @@ report = preflight.audit_transaction({
 # report["blocks"] = ["Capital gains checks require both buy and sell dates."]
 ```
 
-### Standalone usage
+### TDS advisories
 
-You can also use specific guards individually found in `qwed_tax.jurisdictions`.
+When a TDS deduction is required, it appears in the `advisories` field (the transaction is not blocked, but you are informed):
 
 ```python
-from qwed_tax.jurisdictions.us import PayrollGuard
-
-pg = PayrollGuard()
-result = pg.verify_fica_tax(gross_ytd=180000, current=5000, claimed_tax=310)
-print(result.message) 
-# -> "❌ FICA Error: Expected $68.20 (Hit Limit)"
+report = preflight.audit_transaction({
+    "service_type": "PROFESSIONAL_FEES",
+    "amount": 50000,
+    "ytd_payment": 0
+})
+# report["allowed"] = True
+# report["advisories"] = ["TDS Required: Deduct 5000.00 from payment."]
 ```
 
-## Gusto payroll middleware
+## TaxVerifier
 
-The `QWEDTaxMiddleware` class intercepts AI-generated payroll payloads destined for execution engines like Gusto. It validates the payload schema and mathematically verifies gross-to-net tax logic before allowing the API call to proceed.
+The `TaxVerifier` class provides jurisdiction-scoped access to guards. Initialize with `"US"` or `"INDIA"` to load the appropriate guard set.
 
-Use this when your AI agent generates payroll commands that need deterministic verification before execution.
+```python
+from qwed_tax.verifier import TaxVerifier
+
+# US jurisdiction
+us_verifier = TaxVerifier(jurisdiction="US")
+result = us_verifier.verify_us_payroll(entry=payroll_entry)
+
+# India jurisdiction
+india_verifier = TaxVerifier(jurisdiction="INDIA")
+result = india_verifier.verify_india_crypto(
+    losses={"VDA": Decimal("-5000")},
+    gains={"BUSINESS": Decimal("10000")}
+)
+
+# Deposit rate verification (India)
+result = india_verifier.verify_india_deposit(
+    age=65,
+    base_rate=Decimal("7.00"),
+    claimed_rate=Decimal("7.50"),
+    senior_premium=Decimal("0.50")
+)
+```
+
+| Jurisdiction | Available methods |
+| --- | --- |
+| `US` | `verify_us_payroll(entry)` — runs PayrollGuard gross-to-net check |
+| `INDIA` | `verify_india_crypto(losses, gains)` — runs CryptoTaxGuard set-off check |
+| `INDIA` | `verify_india_deposit(**kwargs)` — runs DepositRateGuard FD rate check |
+
+<Note>
+  The US verifier also includes a `TaxPreFlight` instance accessible via `us_verifier.preflight` for intent-based auditing.
+</Note>
+
+## QWEDTaxMiddleware (Gusto interceptor)
+
+The `QWEDTaxMiddleware` intercepts AI-generated payroll payloads before they reach execution APIs like Gusto. It validates the payload schema using Pydantic models and then runs deterministic gross-to-net verification.
 
 ```python
 from qwed_tax.middleware.gusto_interceptor import QWEDTaxMiddleware
 
 middleware = QWEDTaxMiddleware()
 
-# AI-generated payload meant for Gusto API
+# Simulate an AI-generated payroll payload
 ai_payload = {
     "payroll_entry": {
         "employee_id": "E001",
         "gross_pay": "5000.00",
         "taxes": [
-            {"name": "Federal Income Tax", "amount": "750.00"},
+            {"name": "Federal Income Tax", "amount": "800.00"},
             {"name": "Social Security", "amount": "310.00"}
         ],
         "deductions": [
             {"name": "401k", "amount": "250.00", "type": "PRE_TAX"}
         ],
-        "net_pay_claimed": "3690.00",
-        "currency": "USD"
+        "net_pay_claimed": "3640.00"
     }
 }
 
 decision = middleware.process_ai_payroll_request(ai_payload)
-
-if decision["execution_permitted"]:
-    # Safe to forward to Gusto API
-    gusto_api.execute(decision["validated_payload"])
-else:
-    # Block the request — AI hallucinated the math
-    log_error(decision["reason"])
 ```
 
-The middleware returns one of three statuses:
+### Response format
 
-| Status | Meaning |
-| --- | --- |
-| `VERIFIED` | Tax logic is mathematically sound. Safe to execute. |
-| `BLOCKED` (TAX_LOGIC_HALLUCINATION) | AI-generated math is incorrect. Request is blocked. |
-| `BLOCKED` (INVALID_PAYLOAD) | Payload is missing required fields or fails schema validation. |
+<Tabs>
+  <Tab title="Verified">
+    ```json
+    {
+      "status": "VERIFIED",
+      "message": "AI tax logic mathematically verified. Safe to execute.",
+      "execution_permitted": true,
+      "validated_payload": { ... }
+    }
+    ```
+  </Tab>
+  <Tab title="Blocked (hallucination)">
+    ```json
+    {
+      "status": "BLOCKED",
+      "risk": "TAX_LOGIC_HALLUCINATION",
+      "reason": "Mathematical discrepancy detected. Claimed Net: 3640.00, Calculated: 3640.00.",
+      "execution_permitted": false
+    }
+    ```
+  </Tab>
+  <Tab title="Blocked (invalid payload)">
+    ```json
+    {
+      "status": "BLOCKED",
+      "risk": "INVALID_PAYLOAD",
+      "reason": "Missing or empty 'payroll_entry' in payload.",
+      "execution_permitted": false
+    }
+    ```
+  </Tab>
+</Tabs>
 
-<Note>
-  The middleware initializes a US jurisdiction `TaxVerifier` by default. It validates payroll entries using the `PayrollEntry` Pydantic model, so your payload must conform to the expected schema (see `qwed_tax.models`).
-</Note>
+<ResponseField name="status" type="string">
+  `VERIFIED` or `BLOCKED`.
+</ResponseField>
+<ResponseField name="execution_permitted" type="boolean">
+  Whether the payload is safe to forward to the execution API.
+</ResponseField>
+<ResponseField name="risk" type="string">
+  Risk code when blocked: `TAX_LOGIC_HALLUCINATION`, `INVALID_PAYLOAD`, or `VERIFIER_ERROR`.
+</ResponseField>
+<ResponseField name="reason" type="string">
+  Human-readable explanation of why the payload was blocked.
+</ResponseField>
+<ResponseField name="validated_payload" type="object">
+  The validated payload (JSON-serialized) when execution is permitted.
+</ResponseField>
+
+## Standalone guard usage
+
+You can also use specific guards individually found in `qwed_tax.jurisdictions` and `qwed_tax.guards`.
+
+```python
+from qwed_tax.jurisdictions.us.payroll_guard import PayrollGuard
+
+pg = PayrollGuard()
+result = pg.verify_fica_tax(gross_ytd=180000, current_gross=5000, claimed_ss_tax=310)
+print(result.message)
+# -> "FICA Error: Expected $68.20, Claimed $310. Limit logic failed? (Hit Limit this period...)"
+```
 
 ## TypeScript SDK
 
-Run compliance checks proactively in the browser/frontend.
-
-Run compliance checks proactively in the browser/frontend.
+Run compliance checks proactively in the browser or frontend.
 
 ```bash
 npm install @qwed-ai/tax
@@ -134,10 +247,10 @@ import { TaxPreFlight } from '@qwed-ai/tax';
 const result = TaxPreFlight.audit({
   action: "hire",
   worker_type: "1099",
-  worker_facts: { provides_tools: true, reimburses_expenses: true } // implies Employee
+  worker_facts: { provides_tools: true, reimburses_expenses: true }
 });
 
 if (!result.allowed) {
-   alert(" Compliance Block: " + result.blocks.join(", "));
+   alert("Compliance Block: " + result.blocks.join(", "));
 }
 ```
