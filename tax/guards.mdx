@@ -2,14 +2,14 @@
 sidebar_position: 2
 title: "QWED Tax guards for AI payroll and tax verification"
 sidebarTitle: "The Guards"
-description: "Reference for QWED Tax guards covering US and India workflows including classification, nexus, payroll, and GST verification."
+description: "Reference for QWED Tax guards covering US and India workflows including classification, nexus, payroll, withholding, GST, transfer pricing, and PoEM verification."
 ---
 
 QWED-Tax verifies logic deterministically. No probabilities, just rules.
 
-## 🇺🇸 United States (IRS)
+## United States (IRS)
 
-### 1. ClassificationGuard (IRS Common Law)
+### ClassificationGuard (IRS Common Law)
 
 **Goal:** Prevent "Employee Misclassification" lawsuits. **Logic:** Uses the IRS Common Law test to determine if a worker is a W-2 Employee or 1099 Contractor.
 
@@ -19,109 +19,165 @@ QWED-Tax verifies logic deterministically. No probabilities, just rules.
 
 **Rule:** If you control _how_ they work and _pay_ their expenses, they are an Employee (W-2), even if the AI says "1099".
 
-### 2. NexusGuard (Economic Nexus)
+```python
+from qwed_tax.guards.classification_guard import ClassificationGuard
+
+guard = ClassificationGuard()
+
+result = guard.verify_classification_claim(
+    llm_claim="1099",
+    facts={
+        "provides_tools": True,
+        "reimburses_expenses": True,
+        "indefinite_relationship": True
+    }
+)
+# {"verified": False, "error": "Misclassification Risk: Facts indicate W2, but AI claimed 1099..."}
+```
+
+### ClassificationGuard (ABC Test / Z3)
+
+**Goal:** Formal verification of worker classification under state-specific ABC Test laws (CA AB5, NJ, MA). Uses the **Z3 theorem prover** to prove classification correctness.
+
+**Rule:** A worker is a contractor only if **all three** criteria are met:
+- **A:** Free from control and direction
+- **B:** Work is outside the usual course of business
+- **C:** Customarily engaged in an independent trade
+
+```python
+from qwed_tax.jurisdictions.us.classification_guard import ClassificationGuard
+from qwed_tax.models import WorkerClassificationParams, State
+
+guard = ClassificationGuard()
+
+params = WorkerClassificationParams(
+    worker_id="W001",
+    freedom_from_control=True,
+    work_outside_usual_business=False,  # Fails criterion B
+    customarily_engaged_independently=True,
+    state=State.CA
+)
+
+result = guard.verify_classification(params, claimed_status_contractor=True)
+# {"verified": False, "classification": "Employee (W-2)",
+#  "message": "MISCLASSIFICATION: Laws in CA require Employee (W-2). Reasons: Failed B (Core Business Work)"}
+```
+
+| Parameter | Type | Required | Description |
+| --- | --- | --- | --- |
+| `params` | `WorkerClassificationParams` | Yes | Worker facts for ABC Test |
+| `claimed_status_contractor` | `bool` | Yes | `True` if the AI claims 1099, `False` if W-2 |
+
+### NexusGuard (Economic Nexus)
 
 **Goal:** Prevent Sales Tax Evasion. **Logic:** Checks local state thresholds for 2025.
 
 - **NY/TX/CA:** \> \$500,000 Sales
-- **FL/IL/PA:** \> \$100,000 Sales **Rule:** If YTD Sales \> Threshold and AI says "No Tax", **BLOCK**.
+- **FL/IL/PA:** \> \$100,000 Sales
 
-### 3. PayrollGuard (FICA Limits)
+**Rule:** If YTD Sales \> Threshold and AI says "No Tax", **BLOCK**.
 
-**Goal:** Verify Paycheck Math. **Logic:**
+| State | Amount threshold | Transaction threshold |
+| --- | --- | --- |
+| CA | \$500,000 | — |
+| NY | \$500,000 | 100 |
+| TX | \$500,000 | — |
+| FL | \$100,000 | — |
+| IL | \$100,000 | 200 |
+| PA | \$100,000 | — |
+| OH | \$100,000 | 200 |
+| GA | \$100,000 | 200 |
+
+### PayrollGuard (FICA limits)
+
+**Goal:** Verify paycheck math. **Logic:**
 
 - **Gross-to-Net:** `Gross - Taxes - Deductions == Net` (Exact Decimal match).
-- **Soical Security Cap:** Enforces 2025 Wage Base Limit (\$176,100). Tax stops after this amount.
-
-## 🇮🇳 India (CBDT)
-
-### 1. CryptoTaxGuard (Sec 115BBH)
-
-**Rule:** Losses from Virtual Digital Assets (VDA) cannot be set off against any other income (including other VDA gains). **Verdict:** Blocks any AI attempt to reduce tax liability using crypto losses.
-
-### 2. GSTGuard (RCM)
-
-**Rule:** Certain services (GTA, Legal) require **Reverse Charge Mechanism** (Recipient pays tax). **Verdict:** Blocks invoices where AI failed to apply RCM logic.
-
-### 3. InvestmentGuard (Trading)
-
-**Goal:** Prevent Set-Off Errors. **Logic:**
-
-- **SpeculationGuard:** Intraday Equity losses are "Speculative". They cannot be set off against F&O (Non-speculative) or Salary income.
-- **CapitalGainsGuard:** Enforces strictly defined holding periods (e.g. Equity \> 12m = LTCG). **Verdict:** Blocks "Illegal Set-Off" claims.
-
-### 4. CorporateGuard (Loans & Valuation)
-
-**Goal:** Corporate Governance (Sec 185/Valuation). **Logic:**
-
-- **RelatedPartyGuard:** Prohibits loans to Directors/Relatives/Holding-Co-Directors unless specific exemptions apply.
-- **ValuationGuard:** Deterministically calculates Convertible Note conversion prices (`min(Cap, Discount)`). **Verdict:** Blocks loans that risk "Deemed Dividend" or Section 185 violation.
-
-### 5. RemittanceGuard (FEMA/LRS)
-
-**Goal:** Prevent Forex Violations. **Logic:**
-
-- **LRS Limit:** Enforces \$250,000 annual limit per PAN.
-- **Prohibited List:** Blocks Gambling, Lottery, Racing, and **Margin Trading**.
-- **TCS Logic:** Applies 20% Tax for generic remittance, 5% for Education/Medical. **Verdict:** Blocks prohibited remittances and miscalculated TCS.
-
-### 6. Accounts Payable Guards (Indirect Tax)
-
-**Goal:** Automate GST/VAT and TDS compliance. **Logic:**
-
-- **InputCreditGuard:** Checks Section 17(5) "Blocked List".
-  - _Food/Beverages:_ Blocked.
-  - _Motor Vehicles:_ Blocked (unless transport biz).
-  - _Gift to Employee:_ Blocked only above INR 50,000. Gifts below the threshold are ITC-eligible.
-- **TDSGuard:** Calculates withholding based on service type.
-  - _Professional Fees:_ 10% (Sec 194J).
-  - _Contractors:_ 1% or 2% (Sec 194C). **Verdict:** Blocks ITC claims on personal items and ensures vendor payments have TDS deducted.
-
-<Note>
-  Category matching for `InputCreditGuard` uses exact match (not substring). Ensure you pass the canonical category name (e.g., `FOOD_AND_BEVERAGE`, `MOTOR_VEHICLE`, `GIFT_TO_EMPLOYEE`).
-</Note>
-
-## 🌐 International (DTAA)
-
-### DTAAGuard (Foreign Tax Credit)
-
-**Goal:** Verify Foreign Tax Credit (FTC) eligibility under Double Taxation Avoidance Agreements. **Logic:**
-
-- **Basic Credit:** Allowable credit = min(Foreign Tax Paid, Home Tax Payable on foreign income).
-- **Treaty Rate Limit:** When a DTAA treaty rate is provided, the credit is further capped at the treaty-limited amount.
-- **Excess Lapsed:** Any foreign tax paid above the allowable credit is reported as lapsed.
+- **Social Security Cap:** Enforces 2025 Wage Base Limit (\$176,100). Tax stops after this amount.
 
 ```python
-from qwed_tax.guards.dtaa_guard import DTAAGuard
+from qwed_tax.jurisdictions.us.payroll_guard import PayrollGuard
+from qwed_tax.models import PayrollEntry, TaxEntry, DeductionEntry, DeductionType
+from decimal import Decimal
 
-guard = DTAAGuard()
+guard = PayrollGuard()
 
-# Without treaty rate — simple min(foreign_tax, home_tax)
-result = guard.verify_foreign_tax_credit(
-    foreign_income=1000,
-    foreign_tax_paid=200,
-    home_tax_rate=15.0
+entry = PayrollEntry(
+    employee_id="E001",
+    gross_pay=Decimal("5000.00"),
+    taxes=[TaxEntry(name="Federal Income Tax", amount=Decimal("800.00"))],
+    deductions=[DeductionEntry(name="401k", amount=Decimal("250.00"), type=DeductionType.PRE_TAX)],
+    net_pay_claimed=Decimal("3950.00"),
+    currency="USD"
 )
-# allowable_credit: 150.0, excess_tax_lapsed: 50.0
 
-# With treaty rate — credit further capped by treaty limit
-result = guard.verify_foreign_tax_credit(
-    foreign_income=1000,
-    foreign_tax_paid=200,
-    home_tax_rate=30.0,
-    foreign_tax_limit_rate=10.0  # Treaty caps at 10%
-)
-# allowable_credit: 100.0, excess_tax_lapsed: 100.0
+result = guard.verify_gross_to_net(entry)
+# VerificationResult(verified=True, recalculated_net_pay=Decimal('3950.00'), discrepancy=Decimal('0.00'), ...)
 ```
 
-| Parameter | Type | Required | Default | Description |
-| --- | --- | --- | --- | --- |
-| `foreign_income` | `float` | Yes | - | Income earned in foreign jurisdiction |
-| `foreign_tax_paid` | `float` | Yes | - | Tax paid in foreign jurisdiction |
-| `home_tax_rate` | `float` | Yes | - | Home country tax rate (percentage) |
-| `foreign_tax_limit_rate` | `float` | No | `None` | DTAA treaty rate limit (percentage). When `None`, no treaty cap is applied |
+### WithholdingGuard (W-4 / Z3)
 
-## 🇺🇸 Form 1099 Filing (IRS)
+**Goal:** Verify W-4 exempt status claims using the Z3 theorem prover. **Logic:** An employee can only claim "Exempt" if they had **zero tax liability** last year AND expect **no liability** this year (IRS Pub 505).
+
+```python
+from qwed_tax.jurisdictions.us.withholding_guard import WithholdingGuard, W4Form
+
+guard = WithholdingGuard()
+
+form = W4Form(
+    employee_id="E001",
+    claim_exempt=True,
+    tax_liability_last_year=5000.0,  # Had liability last year
+    expect_refund_this_year=True
+)
+
+result = guard.verify_exempt_status(form)
+# {"verified": False, "message": "IRS VIOLATION: Cannot claim 'Exempt' if you had tax liability last year..."}
+```
+
+| Parameter | Type | Required | Description |
+| --- | --- | --- | --- |
+| `form` | `W4Form` | Yes | W-4 form data including exempt claim, prior year liability, and expected refund |
+
+### ReciprocityGuard (State tax / Z3)
+
+**Goal:** Determine which state receives income tax withholding when an employee lives in one state and works in another. Uses **Z3** to prove the correct withholding state under reciprocity agreements.
+
+**Covered reciprocity pairs:** NJ-PA, PA-NJ, MD-PA, PA-MD, VA-MD, MD-VA.
+
+```python
+from qwed_tax.jurisdictions.us.reciprocity_guard import ReciprocityGuard
+from qwed_tax.models import WorkArrangement, Address, State
+
+guard = ReciprocityGuard()
+
+arrangement = WorkArrangement(
+    employee_id="E001",
+    residence_address=Address(street="123 Main St", city="Newark", state=State.NJ, zip_code="07102"),
+    work_address=Address(street="456 Market St", city="Philadelphia", state=State.PA, zip_code="19103"),
+    is_remote=False
+)
+
+result = guard.determine_withholding_state(arrangement)
+# {"verified": True, "withholding_state": State.NJ,
+#  "reason": "Reciprocity Agreement exists between NJ and PA. Withhold for Residence (NJ)."}
+```
+
+### AddressGuard
+
+**Goal:** Verify that zip codes match their claimed state. Uses a simplified heuristic lookup of zip code prefixes.
+
+```python
+from qwed_tax.address_guard import AddressGuard
+from qwed_tax.models import Address, State
+
+guard = AddressGuard()
+
+result = guard.verify_address(Address(
+    street="123 Main St", city="Newark", state=State.NJ, zip_code="90210"
+))
+# {"verified": False, "message": "MISMATCH: Zip 90210 does not belong to NJ."}
+```
 
 ### Form1099Guard
 
@@ -158,3 +214,306 @@ result = guard.verify_filing_requirement(payment)
 <Note>
   Payment types without a defined filing rule return `{"filing_required": False, "form": None}` with a descriptive reason.
 </Note>
+
+## India (CBDT)
+
+### CryptoTaxGuard (Sec 115BBH)
+
+**Rule:** Losses from Virtual Digital Assets (VDA) cannot be set off against any other income (including other VDA gains).
+
+Two verification methods:
+- `verify_set_off()` — Blocks any AI attempt to reduce tax liability using crypto losses.
+- `verify_flat_tax_rate()` — Verifies the strict 30% flat tax on positive VDA income.
+
+```python
+from qwed_tax.jurisdictions.india.guards.crypto_guard import CryptoTaxGuard
+from decimal import Decimal
+
+guard = CryptoTaxGuard()
+
+# Verify set-off compliance
+result = guard.verify_set_off(
+    losses={"VDA": Decimal("-5000")},
+    gains={"BUSINESS": Decimal("10000")}
+)
+# TaxResult(verified=False, message="Section 115BBH Alert: Loss from VDA cannot be set off...")
+
+# Verify flat tax rate
+result = guard.verify_flat_tax_rate(
+    vda_income=Decimal("100000"),
+    claimed_tax=Decimal("30000")
+)
+# TaxResult(verified=True, message="VDA Tax correct (30% of 100000)")
+```
+
+### GSTGuard (RCM)
+
+**Rule:** Certain services (GTA, Legal) require **Reverse Charge Mechanism** (Recipient pays tax).
+
+| Service | Provider | Recipient | Liability |
+| --- | --- | --- | --- |
+| GTA | Any | Body Corporate / Partnership | RCM (Recipient) |
+| Legal | Any | Body Corporate | RCM (Recipient) |
+| Security | Non-Body Corporate | Body Corporate | RCM (Recipient) |
+
+```python
+from qwed_tax.jurisdictions.india.guards.gst_guard import GSTGuard, ServiceType, EntityType
+
+guard = GSTGuard()
+
+result = guard.verify_rcm_applicability(
+    service=ServiceType.LEGAL,
+    provider=EntityType.INDIVIDUAL,
+    recipient=EntityType.BODY_CORPORATE
+)
+# {"verified": True, "liability": "RECIPIENT (RCM)", "is_rcm": True,
+#  "reason": "Legal service to Business Entity attracts RCM."}
+```
+
+### InvestmentGuard (Trading / Z3)
+
+**Goal:** Classify stock market income into the correct tax head using the Z3 theorem prover.
+
+- **Intraday** = Speculative Business Income (Slab Rate, Sec 43(5))
+- **Delivery** = Capital Gains (STCG/LTCG based on holding period)
+- **F&O** = Non-Speculative Business Income
+
+```python
+from qwed_tax.jurisdictions.india.guards.investment_guard import InvestmentGuard, TransactionType
+
+guard = InvestmentGuard()
+
+result = guard.verify_classification(
+    tx_type=TransactionType.INTRADAY,
+    holding_period_days=0
+)
+# {"classification": "Speculative Business Income", "tax_treatment": "Added to Total Income (Slab Rate)", "verified": True}
+```
+
+### InterHeadAdjustmentGuard (Set-off matrix)
+
+**Goal:** Enforce the full inter-head set-off rules for Indian income tax. Uses a prohibition matrix to block illegal loss adjustments.
+
+| Loss head | Can set off against |
+| --- | --- |
+| Speculative Business | Only Speculative Business profit |
+| Long-term Capital Gains | Only Long-term Capital Gains |
+| Short-term Capital Gains | Short-term or Long-term Capital Gains |
+| VDA (Crypto) | Nothing (lapses entirely) |
+
+```python
+from qwed_tax.jurisdictions.india.guards.setoff_guard import InterHeadAdjustmentGuard, TaxHead
+
+guard = InterHeadAdjustmentGuard()
+
+result = guard.verify_setoff(
+    loss_head=TaxHead.VDA,
+    profit_head=TaxHead.SALARY
+)
+# {"verified": False, "message": "Illegal Set-Off: Loss from VDA cannot be set off against anything (it lapses)."}
+```
+
+### DepositRateGuard
+
+**Goal:** Verify bank deposit interest rates, specifically senior citizen premiums (60+).
+
+```python
+from qwed_tax.jurisdictions.india.guards.deposit_guard import DepositRateGuard
+from decimal import Decimal
+
+guard = DepositRateGuard()
+
+result = guard.verify_fd_rate(
+    age=65,
+    base_rate=Decimal("7.00"),
+    claimed_rate=Decimal("7.00"),  # Missing senior premium
+    senior_premium=Decimal("0.50")
+)
+# RateCheckResult(verified=False, expected_rate=Decimal('7.50'), claimed_rate=Decimal('7.00'),
+#  message="Rate Error: Age 65 should get 7.50%, but LLM claimed 7.00%.")
+```
+
+| Parameter | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `age` | `int` | Yes | — | Customer age |
+| `base_rate` | `Decimal` | Yes | — | Base FD interest rate |
+| `claimed_rate` | `Decimal` | Yes | — | Rate claimed by the AI |
+| `senior_premium` | `Decimal` | No | `0.50` | Additional rate for 60+ |
+
+### SpeculationGuard
+
+**Rule:** Intraday (Speculative) losses can **only** be set off against Intraday (Speculative) profits. They cannot reduce F&O or Delivery income. Losses must be carried forward for up to 4 years.
+
+### CapitalGainsGuard
+
+**Goal:** Classify assets as STCG or LTCG based on holding period and verify the statutory tax rate.
+
+| Asset type | LTCG threshold | LTCG rate (FY 2024-25) | STCG rate |
+| --- | --- | --- | --- |
+| Equity | > 365 days | 12.5% | 20% |
+| Real estate | > 730 days | — | — |
+| Debt | > 1095 days | Slab rate | Slab rate |
+
+### Accounts payable guards (Indirect Tax)
+
+**Goal:** Automate GST/VAT and TDS compliance. **Logic:**
+
+- **InputCreditGuard:** Checks Section 17(5) "Blocked List".
+  - _Food/Beverages:_ Blocked.
+  - _Motor Vehicles:_ Blocked (unless transport biz).
+  - _Gift to Employee:_ Blocked only above INR 50,000. Gifts below the threshold are ITC-eligible.
+- **TDSGuard:** Calculates withholding based on service type.
+  - _Professional Fees:_ 10% (Sec 194J).
+  - _Contractors:_ 1% or 2% (Sec 194C).
+  - _Commission:_ 5% (Sec 194H).
+  - _Rent (Land):_ 10% (Sec 194I).
+
+| Service type | Threshold (INR) | TDS rate | Section |
+| --- | --- | --- | --- |
+| Professional Fees | 30,000 | 10% | 194J |
+| Contractor (Individual) | 30,000 | 1% | 194C |
+| Contractor (Firm) | 30,000 | 2% | 194C |
+| Commission | 15,000 | 5% | 194H |
+| Rent (Land) | 2,40,000 | 10% | 194I |
+
+<Note>
+  Category matching for `InputCreditGuard` uses exact match (not substring). Ensure you pass the canonical category name (e.g., `FOOD_AND_BEVERAGE`, `MOTOR_VEHICLE`, `GIFT_TO_EMPLOYEE`).
+</Note>
+
+### CorporateGuard (Loans and valuation)
+
+**Goal:** Corporate Governance (Sec 185/Valuation). **Logic:**
+
+- **RelatedPartyGuard:** Prohibits loans to Directors/Relatives/Holding-Co-Directors unless specific exemptions apply. Also enforces interest rate benchmarking under Section 186.
+- **ValuationGuard:** Deterministically calculates Convertible Note conversion prices (`min(Cap, Discount)`).
+
+**Prohibited borrower roles:** `DIRECTOR`, `DIRECTOR_RELATIVE`, `PARTNER`, `PARTNER_OF_DIRECTOR`, `HOLDING_COMPANY_DIRECTOR`.
+
+## International
+
+### DTAAGuard (Foreign Tax Credit)
+
+**Goal:** Verify Foreign Tax Credit (FTC) eligibility under Double Taxation Avoidance Agreements. **Logic:**
+
+- **Basic Credit:** Allowable credit = min(Foreign Tax Paid, Home Tax Payable on foreign income).
+- **Treaty Rate Limit:** When a DTAA treaty rate is provided, the credit is further capped at the treaty-limited amount.
+- **Excess Lapsed:** Any foreign tax paid above the allowable credit is reported as lapsed.
+
+```python
+from qwed_tax.guards.dtaa_guard import DTAAGuard
+
+guard = DTAAGuard()
+
+# Without treaty rate — simple min(foreign_tax, home_tax)
+result = guard.verify_foreign_tax_credit(
+    foreign_income=1000,
+    foreign_tax_paid=200,
+    home_tax_rate=15.0
+)
+# allowable_credit: 150.0, excess_tax_lapsed: 50.0
+
+# With treaty rate — credit further capped by treaty limit
+result = guard.verify_foreign_tax_credit(
+    foreign_income=1000,
+    foreign_tax_paid=200,
+    home_tax_rate=30.0,
+    foreign_tax_limit_rate=10.0  # Treaty caps at 10%
+)
+# allowable_credit: 100.0, excess_tax_lapsed: 100.0
+```
+
+| Parameter | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `foreign_income` | `float` | Yes | — | Income earned in foreign jurisdiction |
+| `foreign_tax_paid` | `float` | Yes | — | Tax paid in foreign jurisdiction |
+| `home_tax_rate` | `float` | Yes | — | Home country tax rate (percentage) |
+| `foreign_tax_limit_rate` | `float` | No | `None` | DTAA treaty rate limit (percentage). When `None`, no treaty cap is applied |
+
+### TransferPricingGuard (Arm's Length Price)
+
+**Goal:** Verify that related-party transactions are priced within an acceptable range of the Arm's Length Price (ALP). Ref: OECD Guidelines, US Sec 482, India Sec 92C.
+
+```python
+from qwed_tax.guards.transfer_pricing_guard import TransferPricingGuard
+
+guard = TransferPricingGuard()
+
+result = guard.verify_arms_length_price(
+    transaction_price=80.0,
+    benchmark_price=100.0,
+    method="CUP",
+    tolerance_percent=3.0
+)
+# {"verified": False, "risk": "TRANSFER_PRICING_ADJUSTMENT",
+#  "message": "Price 80 deviates from ALP 100 beyond 3.0% tolerance.",
+#  "safe_harbour_range": [97.0, 103.0], "potential_adjustment": 20.0}
+```
+
+| Parameter | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `transaction_price` | `float` | Yes | — | Actual price charged to/by related party |
+| `benchmark_price` | `float` | Yes | — | Arm's Length Price (ALP) from analysis |
+| `method` | `str` | No | `"CUP"` | Transfer pricing method (e.g., CUP, TNMM) |
+| `tolerance_percent` | `float` | No | `3.0` | Safe harbour tolerance percentage |
+
+### PoEMGuard (Place of Effective Management)
+
+**Goal:** Determine tax residency of foreign companies under CBDT Circular 6 of 2017 and OECD models.
+
+**Logic:** A foreign company is treated as Indian **Resident** if it fails the Active Business Outside India (ABOI) test **AND** its key management is in India.
+
+**ABOI test criteria (all must be true to pass):**
+- Assets outside India >= 50%
+- Employees outside India >= 50%
+- Payroll outside India >= 50%
+
+```python
+from qwed_tax.guards.poem_guard import PoEMGuard
+
+guard = PoEMGuard()
+
+result = guard.determine_residency(
+    company_name="GlobalCorp Ltd",
+    is_foreign_incorp=True,
+    turnover_total=10000000,
+    turnover_outside_india=3000000,
+    assets_total=5000000,
+    assets_outside_india=1000000,   # 20% — fails ABOI
+    employees_total=100,
+    employees_outside_india=20,     # 20% — fails ABOI
+    payroll_total=1000000,
+    payroll_outside_india=200000,   # 20% — fails ABOI
+    key_management_location="India"
+)
+# {"verified": True, "residency": "RESIDENT", "is_aboi": False,
+#  "reason": "Fails ABOI test AND Key Management is in India (PoEM established)."}
+```
+
+| Parameter | Type | Required | Description |
+| --- | --- | --- | --- |
+| `company_name` | `str` | Yes | Name of the company |
+| `is_foreign_incorp` | `bool` | Yes | Whether incorporated outside India |
+| `turnover_total` | `float` | Yes | Total turnover |
+| `turnover_outside_india` | `float` | Yes | Turnover outside India |
+| `assets_total` | `float` | Yes | Total assets |
+| `assets_outside_india` | `float` | Yes | Assets outside India |
+| `employees_total` | `int` | Yes | Total employee count |
+| `employees_outside_india` | `int` | Yes | Employees outside India |
+| `payroll_total` | `float` | Yes | Total payroll expense |
+| `payroll_outside_india` | `float` | Yes | Payroll expense outside India |
+| `key_management_location` | `str` | Yes | Where key management decisions are made |
+
+### RemittanceGuard (FEMA/LRS)
+
+**Goal:** Prevent forex violations. **Logic:**
+
+- **LRS Limit:** Enforces \$250,000 annual limit per PAN.
+- **Prohibited List:** Blocks Gambling, Lottery, Racing, and **Margin Trading**.
+- **TCS Logic:** Applies 20% tax for generic remittance, 5% for Education/Medical. Education with loan funding is 0.5%. Threshold exemption of INR 7,00,000.
+
+| Purpose | TCS rate | Notes |
+| --- | --- | --- |
+| Education (loan-funded) | 0.5% | Above INR 7L threshold |
+| Education (self-funded) | 5% | Above INR 7L threshold |
+| Medical | 5% | Above INR 7L threshold |
+| All other | 20% | Above INR 7L threshold |
