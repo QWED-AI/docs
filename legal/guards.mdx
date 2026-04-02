@@ -37,6 +37,24 @@ print(result.computed_deadline)  # 2026-02-27
 print(result.difference_days)    # 13
 ```
 
+### Parameters
+
+<ParamField path="signing_date" type="str" required>
+  The date the contract was signed (ISO format or natural language).
+</ParamField>
+
+<ParamField path="term" type="str" required>
+  The term description (e.g., "30 days", "30 business days", "2 weeks", "3 months", "1 year").
+</ParamField>
+
+<ParamField path="claimed_deadline" type="str" required>
+  The deadline claimed by the LLM.
+</ParamField>
+
+<ParamField path="tolerance_days" type="int" default="0">
+  Allow +/- this many days when verifying the deadline. Useful for accommodating minor rounding differences.
+</ParamField>
+
 ### Features
 
 | Feature | Description |
@@ -45,6 +63,19 @@ print(result.difference_days)    # 13
 | **Holiday Support** | 200\+ countries via `python-holidays` |
 | **Leap Years** | Handles Feb 29 correctly |
 | **Natural Language** | Parses "2 weeks", "3 months", "1 year" |
+
+### Calculate business days between dates
+
+```python
+guard = DeadlineGuard(country="US")
+
+business_days = guard.calculate_business_days_between(
+    start_date="2026-01-15",
+    end_date="2026-02-14"
+)
+
+print(business_days)  # Number of business days excluding weekends and holidays
+```
 
 ---
 
@@ -102,9 +133,9 @@ result = guard.verify_indemnity_limit(
 
 ## 3. ClauseGuard ⚖️
 
-**Purpose:** Detect contradictory clauses using formal logic.
+**Purpose:** Detect contradictory clauses using text heuristics and optional Z3 verification.
 
-### The Problem
+### The problem
 
 LLMs miss logical contradictions:
 
@@ -113,7 +144,9 @@ LLMs miss logical contradictions:
 
 These clauses **conflict** for days 30-90!
 
-### The Solution
+### The solution
+
+The primary `check_consistency()` method uses text heuristics to detect conflicts. For formal logic verification, use `verify_using_z3()`.
 
 ```python
 from qwed_legal import ClauseGuard
@@ -131,13 +164,27 @@ print(result.conflicts)
 # [(0, 1, "Termination notice (30 days) conflicts with minimum term (90 days)")]
 ```
 
-### Detection Types
+### Detection types
 
 | Conflict Type | Description |
 | --- | --- |
 | **Termination** | Notice period vs minimum term |
 | **Permission/Prohibition** | "May" vs "May not" |
 | **Exclusivity** | Multiple exclusive rights |
+
+### Z3-based verification
+
+For power users who want to define precise logical constraints:
+
+```python
+result = guard.verify_using_z3([
+    "constraint_a",
+    "constraint_b",
+])
+
+print(result.consistent)  # True if constraints are satisfiable
+print(result.message)     # "✅ VERIFIED: Constraints are satisfiable."
+```
 
 ---
 
@@ -160,23 +207,22 @@ guard = CitationGuard()
 result = guard.verify("Brown v. Board of Education, 347 U.S. 483 (1954)")
 print(result.valid)  # True
 print(result.parsed_components)
-# {'plaintiff': 'Brown', 'defendant': 'Board of Education', 
-#  'volume': 347, 'reporter': 'U.S.', 'page': 483, 'year': 1954}
+# {'volume': 347, 'reporter': 'U.S.', 'page': '483'}
 
 # Invalid citation (fake reporter)
 result = guard.verify("Smith v. Jones, 999 FAKE 123 (2020)")
 print(result.valid)   # False
-print(result.issues)  # ["Unknown reporter abbreviation: 'FAKE'"]
+print(result.issues)  # ["Unknown reporter"]
 ```
 
-### Supported Reporters
+### Supported citation patterns
 
-| Category | Examples |
-| --- | --- |
-| **Supreme Court** | U.S., S.Ct., L.Ed., L.Ed.2d |
-| **Federal** | F., F.2d, F.3d, F.4th, F.Supp. |
-| **State** | Cal., N.Y., Tex., Ill., Pa. |
-| **Regional** | A., N.E., N.W., P., S.E., S.W., So. |
+| Pattern | Format | Example |
+| --- | --- | --- |
+| **US Supreme Court** | `volume U.S. page` | `347 U.S. 483` |
+| **US Federal** | `volume F./F.2d/F.3d page` | `500 F.3d 120` |
+| **UK Neutral** | `[year] court number` | `[2023] UKSC 10` |
+| **India AIR** | `AIR year court page` | `AIR 2020 SC 100` |
 
 ### Batch Verification
 
@@ -283,16 +329,28 @@ print(result.expiration_date)   # 2024-01-15
 print(result.days_remaining)    # -867 (negative = expired)
 ```
 
-### Supported Jurisdictions
+### Supported jurisdictions
+
+12 jurisdictions are supported with periods for 10 claim types.
 
 | Jurisdiction | Breach of Contract | Negligence | Fraud |
 | --- | --- | --- | --- |
 | California | 4 years | 2 years | 3 years |
 | New York | 6 years | 3 years | 6 years |
 | Texas | 4 years | 2 years | 4 years |
+| Delaware | 3 years | 2 years | 3 years |
+| Florida | 5 years | 4 years | 4 years |
+| Illinois | 5 years | 2 years | 5 years |
 | UK/England | 6 years | 6 years | 6 years |
 | Germany | 3 years | 3 years | 10 years |
+| France | 5 years | 5 years | 5 years |
+| Australia | 6 years | 6 years | 6 years |
 | India | 3 years | 3 years | 3 years |
+| Canada | 2 years | 2 years | 6 years |
+
+### Supported claim types
+
+`breach_of_contract`, `breach_of_warranty`, `negligence`, `professional_malpractice`, `fraud`, `personal_injury`, `property_damage`, `employment`, `product_liability`, `defamation`
 
 ### Compare Jurisdictions
 
