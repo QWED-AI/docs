@@ -55,7 +55,7 @@ report = preflight.audit_transaction({
 # report["blocks"] = ["Capital gains checks require both buy and sell dates."]
 ```
 
-### Standalone Usage
+### Standalone usage
 
 You can also use specific guards individually found in `qwed_tax.jurisdictions`.
 
@@ -68,7 +68,59 @@ print(result.message)
 # -> "❌ FICA Error: Expected $68.20 (Hit Limit)"
 ```
 
-## 🌐 TypeScript SDK (New!)
+## Gusto payroll middleware
+
+The `QWEDTaxMiddleware` class intercepts AI-generated payroll payloads destined for execution engines like Gusto. It validates the payload schema and mathematically verifies gross-to-net tax logic before allowing the API call to proceed.
+
+Use this when your AI agent generates payroll commands that need deterministic verification before execution.
+
+```python
+from qwed_tax.middleware.gusto_interceptor import QWEDTaxMiddleware
+
+middleware = QWEDTaxMiddleware()
+
+# AI-generated payload meant for Gusto API
+ai_payload = {
+    "payroll_entry": {
+        "employee_id": "E001",
+        "gross_pay": "5000.00",
+        "taxes": [
+            {"name": "Federal Income Tax", "amount": "750.00"},
+            {"name": "Social Security", "amount": "310.00"}
+        ],
+        "deductions": [
+            {"name": "401k", "amount": "250.00", "type": "PRE_TAX"}
+        ],
+        "net_pay_claimed": "3690.00",
+        "currency": "USD"
+    }
+}
+
+decision = middleware.process_ai_payroll_request(ai_payload)
+
+if decision["execution_permitted"]:
+    # Safe to forward to Gusto API
+    gusto_api.execute(decision["validated_payload"])
+else:
+    # Block the request — AI hallucinated the math
+    log_error(decision["reason"])
+```
+
+The middleware returns one of three statuses:
+
+| Status | Meaning |
+| --- | --- |
+| `VERIFIED` | Tax logic is mathematically sound. Safe to execute. |
+| `BLOCKED` (TAX_LOGIC_HALLUCINATION) | AI-generated math is incorrect. Request is blocked. |
+| `BLOCKED` (INVALID_PAYLOAD) | Payload is missing required fields or fails schema validation. |
+
+<Note>
+  The middleware initializes a US jurisdiction `TaxVerifier` by default. It validates payroll entries using the `PayrollEntry` Pydantic model, so your payload must conform to the expected schema (see `qwed_tax.models`).
+</Note>
+
+## TypeScript SDK
+
+Run compliance checks proactively in the browser/frontend.
 
 Run compliance checks proactively in the browser/frontend.
 
