@@ -106,6 +106,38 @@ QWED treats LLMs as **untrusted translators**:
 
 ---
 
+## Trust boundaries in the natural language pipeline
+
+When a query enters through `POST /verify/natural_language`, an LLM first translates the user's natural language into a formal expression. Even when the downstream solver (e.g., SymPy) evaluates that expression deterministically, the overall result depends on whether the LLM correctly interpreted the user's intent — and that step is **not** deterministic.
+
+To make this distinction explicit, the natural language math pipeline now:
+
+1. Returns `INCONCLUSIVE` as the top-level status instead of `VERIFIED`, even when the expression evaluation succeeds.
+2. Includes a `trust_boundary` object in the response that describes exactly what was and was not proven.
+
+```json
+{
+  "trust_boundary": {
+    "query_interpretation_source": "llm_translation",
+    "query_semantics_verified": false,
+    "verification_scope": "translated_expression_only",
+    "deterministic_expression_evaluation": true,
+    "formal_proof": false,
+    "translation_claim_self_consistent": true,
+    "provider_used": "openai",
+    "overall_status": "INCONCLUSIVE"
+  }
+}
+```
+
+This means a `VERIFIED` result from the Math Engine's direct endpoint (`POST /verify/math`) carries stronger guarantees than the same calculation routed through the natural language pipeline. See the [Math Engine](/engines/math#trust-boundary) documentation for the full field reference.
+
+### Numerical sampling fallback
+
+The identity verification fallback (numerical sampling at fixed test points) now returns `UNKNOWN` with `confidence: 0.0` instead of `LIKELY_EQUIVALENT` with `confidence: 0.99`. Matching at a handful of sample points does not constitute a formal proof and should not be treated as one.
+
+---
+
 ## Frequently Asked Questions
 
 ### Q: Can I filter responses by verification_mode?
