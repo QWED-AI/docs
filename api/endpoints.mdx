@@ -83,9 +83,36 @@ The response follows the `VerificationResult` schema. For math queries, the top-
     "overall_status": "INCONCLUSIVE"
   },
   "final_answer": 30.0,
+  "provider_used": "openai_compat",
   "latency_ms": 245.3
 }
 ```
+
+**Status values for natural language math verification:**
+
+| Status | Meaning |
+|--------|---------|
+| `INCONCLUSIVE` | Expression evaluation succeeded, but the LLM translation step is non-deterministic so the result cannot be treated as a proven verdict on the original user query |
+| `ERROR` | The translated expression had a syntax error or the engine could not evaluate it |
+| `NOT_MATH_QUERY` | The query was not recognized as a mathematical question |
+| `BLOCKED` | Request blocked by security policy |
+
+<Note>
+The `status` field was previously set to the inner engine result (e.g., `VERIFIED`). It now returns `INCONCLUSIVE` when the inner engine returns `VERIFIED` or `CORRECTION_NEEDED`, because the natural language pipeline involves a non-deterministic LLM translation step. Use the `trust_boundary` object to inspect the detailed verification breakdown. For fully deterministic results, use `POST /verify/math` directly.
+</Note>
+
+**`trust_boundary` fields:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `query_interpretation_source` | string | Always `"llm_translation"` |
+| `query_semantics_verified` | boolean | Always `false` — QWED cannot verify that the LLM correctly interpreted the user's intent |
+| `verification_scope` | string | Always `"translated_expression_only"` |
+| `deterministic_expression_evaluation` | boolean | `true` when the inner engine status was `VERIFIED` or `CORRECTION_NEEDED` |
+| `formal_proof` | boolean | Always `false` |
+| `translation_claim_self_consistent` | boolean | Whether the translated expression matched its own claimed answer |
+| `provider_used` | string | LLM provider used for translation |
+| `overall_status` | string | Mirrors the top-level `status` field |
 
 ---
 

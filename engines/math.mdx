@@ -270,6 +270,42 @@ result = client.verify_math(
 
 ---
 
+## Trust boundary
+
+When math verification runs through the natural language pipeline (`POST /verify/natural_language`), the response now includes a `trust_boundary` object. This object describes exactly what the pipeline proved and what it did not, separating deterministic expression evaluation from the non-deterministic LLM translation step.
+
+```json
+{
+  "trust_boundary": {
+    "query_interpretation_source": "llm_translation",
+    "query_semantics_verified": false,
+    "verification_scope": "translated_expression_only",
+    "deterministic_expression_evaluation": true,
+    "formal_proof": false,
+    "translation_claim_self_consistent": true,
+    "provider_used": "openai",
+    "overall_status": "INCONCLUSIVE"
+  }
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `query_interpretation_source` | string | Always `"llm_translation"` — indicates the query was interpreted by an LLM |
+| `query_semantics_verified` | boolean | Always `false` — QWED cannot verify that the LLM correctly interpreted the user's intent |
+| `verification_scope` | string | Always `"translated_expression_only"` — only the translated expression was verified |
+| `deterministic_expression_evaluation` | boolean | `true` when the inner engine status was `VERIFIED` or `CORRECTION_NEEDED` |
+| `formal_proof` | boolean | Always `false` — SymPy evaluation is deterministic but not a formal proof of the original query |
+| `translation_claim_self_consistent` | boolean | Whether the translated expression matched its own claimed answer |
+| `provider_used` | string | The LLM provider used for translation |
+| `overall_status` | string | The top-level response status after trust boundary alignment |
+
+<Note>
+Because the LLM translation step is non-deterministic, the natural language pipeline now returns `INCONCLUSIVE` instead of `VERIFIED` even when the underlying expression evaluation succeeds. This prevents over-representing a translated-query evaluation as a proven user-query verdict. Use the direct `POST /verify/math` endpoint if you need a fully deterministic result without the LLM translation layer.
+</Note>
+
+---
+
 ## Edge Cases
 
 | Scenario              | Behavior                    |
