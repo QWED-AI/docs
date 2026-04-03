@@ -43,7 +43,7 @@ print(agent["agent_id"])     # agent_abc123
 print(agent["agent_token"])  # qwed_agent_xyz...
 ```
 
-## Verifying Actions
+## Verifying actions
 
 Before an agent executes an action, you must provide an `ActionContext` with a `conversation_id` and a monotonically increasing `step_number`. These fields are **required** — requests without them are rejected.
 
@@ -67,6 +67,8 @@ elif decision["decision"] == "DENIED":
     print("Action blocked:", decision["error"])
 elif decision["decision"] == "PENDING":
     request_human_approval()
+elif decision["decision"] == "BUDGET_EXCEEDED":
+    print("Budget limit reached:", decision["error"])
 ```
 
 ## Conversation controls
@@ -164,7 +166,7 @@ print(budget)
 # }
 ```
 
-## Activity Logging
+## Activity logging
 
 ```python
 # Get agent activity
@@ -173,7 +175,68 @@ for entry in activity:
     print(f"{entry['timestamp']}: {entry['action_type']} -> {entry['decision']}")
 ```
 
-## Framework Integration
+## Runtime hardening
+
+<Info>New in v4.1.0</Info>
+
+QWED enforces several runtime controls to prevent agent misuse, infinite loops, and replay attacks. These protections operate at the verification kernel level and cannot be bypassed by agents.
+
+### Action context enforcement
+
+Every `verify_action` call requires an `ActionContext` with:
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `conversation_id` | string | Yes | Unique identifier for the conversation/session |
+| `step_number` | integer | Yes | Monotonically increasing step counter (must be >= 1) |
+| `user_intent` | string | No | Human-readable description of the user's goal |
+
+The step number must increase with each action in a conversation. Attempts to reuse or decrement step numbers are rejected.
+
+### Replay and loop detection
+
+The agent service detects and blocks three types of problematic patterns:
+
+| Pattern | Error code | Description |
+|---------|------------|-------------|
+| Step replay | `QWED-AGENT-LOOP-002` | Submitting an action with a `step_number` that was already used in the conversation |
+| Repetitive loop | `QWED-AGENT-LOOP-003` | Submitting the same action (identical fingerprint) more than 2 consecutive times |
+| Step limit exceeded | `QWED-AGENT-LOOP-001` | Exceeding the maximum of 50 steps per conversation |
+
+Actions are fingerprinted deterministically using `action_type`, `query`, `code`, `target`, and `parameters`. If a loop is detected, the conversation state is not advanced — the agent can recover by submitting a different action at the same step number.
+
+```python
+# Step 1: approved
+client.verify_action(agent_id, action={"type": "calculate", "query": "2+2"},
+    context={"conversation_id": "conv_1", "step_number": 1})
+
+# Step 1 again: DENIED (replay)
+client.verify_action(agent_id, action={"type": "calculate", "query": "2+2"},
+    context={"conversation_id": "conv_1", "step_number": 1})
+# -> {"decision": "DENIED", "error": {"code": "QWED-AGENT-LOOP-002"}}
+```
+
+### In-flight reservation system
+
+When a `verify_action` call is being processed, QWED reserves the step number to prevent concurrent requests from claiming the same step. The reservation is released if the action is denied, allowing the agent to retry with a different action at the same step.
+
+### Budget denial behavior
+
+When a budget check fails, the conversation step is not consumed. This means the agent can retry the same step number after the budget resets without triggering a replay detection error.
+
+### Fail-closed rate limiting
+
+The Redis-backed sliding window rate limiter fails closed when Redis is unavailable. If the Redis backend encounters an error, all requests are denied rather than allowed, preventing uncontrolled access during infrastructure failures. When Redis is entirely absent at startup, a local in-memory fallback limiter is used instead.
+
+### Environment integrity verification
+
+On API server startup, QWED runs an environment integrity check (via `StartupHookGuard`) before initializing the database. If the environment is compromised, the server refuses to start. This prevents operation in tampered runtime environments.
+
+### Timing-safe token verification
+
+Agent token verification uses `hmac.compare_digest` for constant-time comparison, preventing timing side-channel attacks against agent authentication.
+
+## Framework integration
 
 ### LangChain
 
