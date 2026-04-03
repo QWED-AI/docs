@@ -92,6 +92,19 @@ result = client.check_satisfiability("(AND (GT x 10) (LT x 5))")
 print(result.satisfiable)  # False
 ```
 
+### Stats: Internal verification error
+
+```
+Error: Internal verification error
+```
+
+This generic message is returned when the Stats Engine fails to generate or translate your query into executable code. The actual error details are masked to prevent leaking sensitive information.
+
+**Solution:**
+1. Verify your query is a valid statistical question (e.g., "What is the mean of column X?")
+2. Check that the column names in your query match the columns in your data
+3. If the issue persists, check the server-side logs for the exception type
+
 ### Code: Timeout
 
 ```

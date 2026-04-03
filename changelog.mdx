@@ -3,6 +3,18 @@ title: "Changelog"
 description: "All notable changes to QWED Protocol — releases, features, security fixes, and improvements."
 ---
 
+## v4.0.5 — Stats exception masking
+**Released: April 3, 2026** · [GitHub PR #118](https://github.com/QWED-AI/qwed-verification/pull/118)
+
+> Prevents the Stats Engine from leaking internal exception details to API callers. Clients now receive a generic error message when stats code generation fails.
+
+### Security
+
+- **Stats translation error masking** — When stats code generation fails, the API now returns `"Internal verification error"` instead of the raw exception message. This prevents accidental exposure of file paths, API keys, or other sensitive data that may appear in exception text.
+- **Server-side logging preserved** — The exception type is still logged server-side for operator debugging, but the log no longer includes the full exception message.
+
+---
+
 ## v4.0.4 — Fail-closed execution enforcement
 **Released: April 3, 2026** · [GitHub PR #117](https://github.com/QWED-AI/qwed-verification/pull/117)
 
