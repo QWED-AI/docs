@@ -83,7 +83,25 @@ elif result.verification_mode == "HEURISTIC":
 
 ---
 
-## Design Philosophy
+## Trust boundaries in translated queries
+
+When a natural language query is verified through the math pipeline, the response status is `INCONCLUSIVE` — even when the expression evaluation itself is fully deterministic. This is because the LLM translation step (natural language → expression) is not formally verified.
+
+Each response includes a `trust_boundary` object that makes this explicit:
+
+```python
+result = client.verify("What is 15% of 200?")
+
+print(result.status)  # "INCONCLUSIVE"
+print(result.trust_boundary["deterministic_expression_evaluation"])  # True
+print(result.trust_boundary["query_semantics_verified"])  # False
+```
+
+Use the `trust_boundary` fields to decide how to handle the result in your application. For example, you might accept the computed answer while logging that the translation was not formally proven. See [Math Engine — Trust boundary](/engines/math#trust-boundary) for the full field reference.
+
+---
+
+## Design philosophy
 
 > **"Probabilistic systems should not be trusted with deterministic tasks."**
 
@@ -92,6 +110,7 @@ QWED treats LLMs as **untrusted translators**:
 1. LLM converts natural language → formal specification
 2. **Deterministic solver** verifies the formal specification
 3. If solver cannot verify, result is marked `HEURISTIC`
+4. If the translation itself cannot be formally verified, result is marked `INCONCLUSIVE` with a `trust_boundary`
 
 ```
 ┌─────────────────────────────────────────────────────────┐
@@ -101,6 +120,7 @@ QWED treats LLMs as **untrusted translators**:
 │                                                         │
 │  Solver = SymPy/Z3/AST  →  SYMBOLIC                     │
 │  Solver = LLM Fallback  →  HEURISTIC                    │
+│  Translation unverified  →  INCONCLUSIVE + trust_boundary│
 └─────────────────────────────────────────────────────────┘
 ```
 
