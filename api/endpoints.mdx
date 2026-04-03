@@ -55,11 +55,11 @@ Main entry point for verifying natural language queries. Routes through the QWED
 
 **Response:**
 
-The response follows the `VerificationResult` schema:
+The response follows the `VerificationResult` schema. For math queries, the top-level `status` is `INCONCLUSIVE` because the LLM translation step is not formally verified — see [Trust boundary](/engines/math#trust-boundary) for details.
 
 ```json
 {
-  "status": "VERIFIED",
+  "status": "INCONCLUSIVE",
   "user_query": "What is 15% of 200?",
   "translation": {
     "expression": "0.15 * 200",
@@ -67,14 +67,20 @@ The response follows the `VerificationResult` schema:
     "reasoning": "15% as decimal is 0.15, multiply by 200",
     "confidence": 0.95
   },
-  "validation": {
-    "is_valid": true,
-    "checks_passed": ["syntax", "symbols", "evaluable"]
-  },
   "verification": {
     "calculated_value": 30.0,
     "is_correct": true,
     "diff": 0.0
+  },
+  "trust_boundary": {
+    "query_interpretation_source": "llm_translation",
+    "query_semantics_verified": false,
+    "verification_scope": "translated_expression_only",
+    "deterministic_expression_evaluation": true,
+    "formal_proof": false,
+    "translation_claim_self_consistent": true,
+    "provider_used": "openai_compat",
+    "overall_status": "INCONCLUSIVE"
   },
   "final_answer": 30.0,
   "latency_ms": 245.3
