@@ -51,7 +51,7 @@ description: "QWED API error code reference. Covers general errors (QWED-001 to 
 | `QWED-202` | Dangerous code pattern |
 | `QWED-203` | Blocked content |
 
-## Agent Errors
+## Agent errors
 
 | Code | Message |
 | --- | --- |
@@ -61,6 +61,25 @@ description: "QWED API error code reference. Covers general errors (QWED-001 to 
 | `QWED-AGENT-004` | Action not permitted |
 | `QWED-AGENT-BUDGET-001` | Daily cost limit exceeded |
 | `QWED-AGENT-BUDGET-002` | Hourly rate limit exceeded |
+
+## Agent context errors
+
+<Info>New in v4.1.0</Info>
+
+| Code | Message |
+| --- | --- |
+| `QWED-AGENT-CTX-001` | Action context with `conversation_id` and `step_number` is required |
+| `QWED-AGENT-CTX-002` | `step_number` must be >= 1 |
+
+## Agent loop detection errors
+
+<Info>New in v4.1.0</Info>
+
+| Code | Message |
+| --- | --- |
+| `QWED-AGENT-LOOP-001` | Conversation step limit exceeded (max 50 steps) |
+| `QWED-AGENT-LOOP-002` | Replay or out-of-order action step detected |
+| `QWED-AGENT-LOOP-003` | Repetitive action loop detected (same action more than 2 consecutive times) |
 
 ## Attestation Errors
 
