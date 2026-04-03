@@ -8,10 +8,11 @@ The Consensus Engine orchestrates multiple verification engines for high-confide
 
 ## Features
 
-- **Async Parallel Execution** - Run engines concurrently
-- **Circuit Breaker** - Auto-disable failing engines
-- **Engine Health Monitoring** - Track reliability
-- **Weighted Consensus** - Consider engine reliability
+- **Async parallel execution** — Run engines concurrently
+- **Circuit breaker** — Auto-disable failing engines
+- **Engine health monitoring** — Track reliability
+- **Weighted consensus** — Consider engine reliability
+- **Secure code execution** — Python engine runs through the Docker sandbox only
 
 ## Usage
 
@@ -38,6 +39,10 @@ print(result.agreement_status) # "unanimous"
 | `single`  | 1 (SymPy)           | ⚡ Fast | Good       |
 | `high`    | 2 (SymPy + Python)  | Medium | High       |
 | `maximum` | 3+ (All applicable) | Slower | Maximum    |
+
+<Note>
+The Python engine in `high` and `maximum` modes requires Docker. If the secure Docker sandbox is unavailable, consensus verification returns HTTP 503 instead of falling back to in-process code execution.
+</Note>
 
 ## Async Execution
 
@@ -81,6 +86,14 @@ When an unexpected error occurs during async engine aggregation, the Consensus E
 - The error is logged via `logger.exception` for post-mortem debugging
 
 The recorded result uses `engine_name: "consensus_orchestrator"`, `method: "async_aggregation"`, `success: false`, and includes the error message in the `error` field.
+
+---
+
+## Secure code execution
+
+When consensus verification includes the Python engine (in `high` or `maximum` mode), all generated Python code runs through the secure Docker sandbox via `SecureCodeExecutor`. The engine no longer uses the in-process `CodeExecutor`.
+
+If Docker is unavailable, the Python engine records a `SECURE_EXECUTION_REQUIRED` error, and the consensus calculation immediately returns a `blocked_secure_execution` status — the API surfaces this as HTTP 503.
 
 ---
 

@@ -351,7 +351,11 @@ Mathematical expressions are parsed and compared using `Decimal` arithmetic inte
 | `verification_chain` | array | Detailed results from each engine |
 | `meets_requirement` | boolean | Whether confidence meets `min_confidence` |
 
-If the confidence score falls below the `min_confidence` threshold, the endpoint returns HTTP 422 with a descriptive error.
+| Status | Description |
+|--------|-------------|
+| 400 | Invalid verification mode |
+| 422 | Consensus confidence below the requested `min_confidence` threshold |
+| 503 | Secure Docker sandbox unavailable — required for Python engine in `high`/`maximum` mode |
 
 ---
 
@@ -420,6 +424,15 @@ curl -X POST https://api.qwedai.com/v1/verify/stats \
   "message": "Statistical claim verified against dataset"
 }
 ```
+
+| Status | Description |
+|--------|-------------|
+| 403 | Verification blocked by security policy (e.g., generated code failed AST safety checks) |
+| 503 | Secure Docker sandbox unavailable — statistical verification requires Docker |
+
+<Note>
+Statistical verification requires a running Docker daemon. If Docker is unavailable, the endpoint returns HTTP 503 instead of falling back to in-process execution. See the [Stats Engine](/engines/stats) page for details.
+</Note>
 
 ---
 

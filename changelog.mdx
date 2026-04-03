@@ -3,6 +3,28 @@ title: "Changelog"
 description: "All notable changes to QWED Protocol — releases, features, security fixes, and improvements."
 ---
 
+## v4.0.4 — Fail-closed execution enforcement
+**Released: April 3, 2026** · [GitHub PR #117](https://github.com/QWED-AI/qwed-verification/pull/117)
+
+> Removes unsafe in-process execution fallbacks from statistical and consensus verification. All model-generated Python now runs exclusively in the secure Docker sandbox.
+
+### Breaking changes
+
+- **Docker required for stats verification** — The Wasm and restricted Python fallback execution paths have been removed from the Stats Engine. If Docker is unavailable, `/verify/stats` returns HTTP 503 instead of executing code in-process.
+- **Consensus Python engine uses Docker** — The Python verification engine within consensus verification now runs through `SecureCodeExecutor` instead of the in-process `CodeExecutor`. If Docker is unavailable during `high` or `maximum` mode, `/verify/consensus` returns HTTP 503.
+
+### Security
+
+- **Fail-closed sandbox gating** — Both the Stats Engine and the Consensus Engine refuse to execute model-generated code when the Docker sandbox is not available, preventing any downgrade to in-process execution.
+- **Live Docker health checks** — `SecureCodeExecutor.is_available()` now pings the Docker daemon on each request instead of relying on cached startup state, catching mid-operation Docker failures.
+
+### API changes
+
+- `POST /verify/stats` now returns HTTP 503 when the secure runtime is unavailable, and HTTP 403 when generated code is blocked by security policy.
+- `POST /verify/consensus` now returns HTTP 503 when secure execution is required but Docker is unavailable.
+
+---
+
 ## v4.0.3 — Server-enforced agent security
 **Released: April 2, 2026** · [GitHub PR #116](https://github.com/QWED-AI/qwed-verification/pull/116)
 
