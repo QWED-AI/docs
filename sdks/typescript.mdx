@@ -212,11 +212,9 @@ const { agent_id, agent_token } = await client.registerAgent({
 
 ### verifyAgent(agentId, agentToken, query, options)
 
-Verify an agent action. Exfiltration detection runs on every request. MCP poison inspection runs automatically when you provide a `toolSchema`.
+Verify an agent action. Security checks (exfiltration detection and MCP poisoning) are enforced server-side and cannot be disabled by the client.
 
-<Warning>
-**Breaking change (v4.0.3):** The `checkExfiltration` and `checkMcpPoison` options have been removed. Security checks are now enforced server-side and cannot be disabled. Remove these options from your code.
-</Warning>
+<Warning>**Breaking change:** The `checkExfiltration` and `checkMcpPoison` options have been removed. Exfiltration detection always runs. MCP poison detection runs automatically when you provide a `toolSchema`.</Warning>
 
 ```typescript
 const response = await client.verifyAgent(

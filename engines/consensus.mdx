@@ -89,11 +89,17 @@ The recorded result uses `engine_name: "consensus_orchestrator"`, `method: "asyn
 
 ---
 
-## Secure code execution
+## Engine selection
 
-When consensus verification includes the Python engine (in `high` or `maximum` mode), all generated Python code runs through the secure Docker sandbox via `SecureCodeExecutor`. The engine no longer uses the in-process `CodeExecutor`.
+The consensus engine automatically selects which engines to run based on the verification mode:
 
-If Docker is unavailable, the Python engine records a `SECURE_EXECUTION_REQUIRED` error, and the consensus calculation immediately returns a `blocked_secure_execution` status — the API surfaces this as HTTP 503.
+| Mode      | Engines selected                    |
+| --------- | ----------------------------------- |
+| `single`  | SymPy                               |
+| `high`    | SymPy, Python                       |
+| `maximum` | SymPy, Python, Z3 (+ Stats for statistical queries) |
+
+<Note>The fact engine is excluded from automatic engine selection. Fact verification requires external context, and including it in consensus without that context would create self-referential verification loops. If fact verification is invoked during consensus, it returns an error indicating that external context is required.</Note>
 
 ---
 
@@ -107,10 +113,5 @@ The engine uses weighted voting:
 | Z3     | 0.995              |
 | Python | 0.99               |
 | Stats  | 0.98               |
-| Image  | 0.80               |
-
-<Note>
-The Fact engine is no longer selected during automatic consensus verification. It requires external fact context to produce meaningful results. If you need fact-based verification, call the [Fact engine](/engines/fact) directly.
-</Note>
 
 Final confidence = weighted average of agreeing engines.
