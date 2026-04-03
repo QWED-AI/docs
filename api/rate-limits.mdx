@@ -106,7 +106,13 @@ Some endpoints have specific limits:
 | `/agent/register` | 10/hour |
 | `/attestation/verify` | 1000/hour |
 
-## Enterprise Options
+## Fail-closed enforcement
+
+When using Redis-backed rate limiting, the rate limiter operates with a **fail-closed** policy. If the Redis backend encounters an error at runtime, requests are denied rather than allowed through. This ensures that a temporary Redis outage does not silently bypass rate limits.
+
+If Redis is unavailable at startup, an in-memory fallback is used until the service is restarted with a healthy Redis connection.
+
+## Enterprise options
 
 For higher limits, contact us for:
 - Custom rate limits

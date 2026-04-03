@@ -661,6 +661,8 @@ Verify a claim using an agent token. Creates an auditable record tied to the age
 
 <Warning>**Breaking change:** The `security_checks` request field has been removed. Security checks are now mandatory and enforced server-side. You no longer need to (or can) opt in to exfiltration or MCP poison checks.</Warning>
 
+<Warning>**Breaking change:** The `context` field with `conversation_id` and `step_number` is now required for all agent action verification requests. Requests without these fields are rejected with error code `QWED-AGENT-CTX-001`. See [conversation controls](/advanced/agent-verification#conversation-controls) for details.</Warning>
+
 **Request:**
 
 ```json
@@ -785,7 +787,14 @@ Verify an attestation JWT.
 
 ### GET /metrics
 
-Returns global system metrics and per-tenant breakdowns. In production, this should require admin authentication.
+Returns global system metrics and per-tenant breakdowns. Requires admin authentication — you must provide either a JWT token for a user with the `owner` or `admin` role, or an API key linked to an admin user.
+
+**Headers (one of):**
+
+```text
+Authorization: Bearer <jwt_token>
+X-API-Key: <api_key>
+```
 
 **Response:**
 
@@ -795,6 +804,11 @@ Returns global system metrics and per-tenant breakdowns. In production, this sho
   "tenants": { "1": { "requests": 500 }, "2": { "requests": 750 } }
 }
 ```
+
+| Status | Description |
+|--------|-------------|
+| 401 | No authentication provided |
+| 403 | Authenticated but not an admin or owner |
 
 ### GET /metrics/{organization_id}
 
@@ -806,7 +820,19 @@ Returns metrics scoped to a specific organization. Tenants can only view their o
 
 ### GET /metrics/prometheus
 
-Returns metrics in Prometheus text format for scraping by monitoring infrastructure.
+Returns metrics in Prometheus text format for scraping by monitoring infrastructure. Requires the same admin authentication as `GET /metrics`.
+
+**Headers (one of):**
+
+```text
+Authorization: Bearer <jwt_token>
+X-API-Key: <api_key>
+```
+
+| Status | Description |
+|--------|-------------|
+| 401 | No authentication provided |
+| 403 | Authenticated but not an admin or owner |
 
 ### GET /logs
 
