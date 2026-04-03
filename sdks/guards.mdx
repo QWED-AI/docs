@@ -479,6 +479,51 @@ Scans configuration files for exposed secrets and credentials. See [Security Har
 
 ---
 
+## Server-side guards
+
+The following guards run on the QWED server and are applied automatically during API request processing. You do not need to invoke them directly — they are documented here for transparency and audit purposes.
+
+### CodeGuard
+
+Statically analyzes code for security risks using AST parsing (Python) or regex heuristics (Bash/Shell). Blocks Remote Code Execution (RCE) vectors before code reaches the verification engine.
+
+**Blocked Python patterns:**
+- Dangerous functions: `eval`, `exec`, `compile`, `open`, `system`, `popen`, `__import__`, `spawn`
+- Dangerous modules: `os`, `subprocess`, `sys`, `shutil`, `socket`, `pickle`, `pty`
+
+**Blocked Shell patterns:**
+- RCE chains (`curl | bash`, `wget | sh`)
+- Destructive commands (`rm -rf`)
+- Fork bombs
+- Netcat / reverse shell connections
+- Sensitive file access (`/etc/passwd`, `id_rsa`)
+- Credential hunting (`grep` for passwords/tokens)
+- Privilege escalation (`sudo`)
+
+### PIIGuard
+
+Local-first PII and secret detection using pre-compiled regex patterns. Scans request payloads before they are processed by verification engines.
+
+**Detected secret types:**
+- OpenAI API keys (`sk-proj-...`)
+- Anthropic API keys (`sk-ant-...`)
+- AWS access keys (`AKIA...`)
+- SSH private keys
+- Email addresses (excludes common public prefixes like `support@`, `info@`)
+- Password assignments in code
+- Obfuscated API keys (whitespace-separated fragments)
+- US phone numbers
+
+### SQLGuard
+
+Validates SQL syntax using `sqlglot` and enforces read-only mutation policies. Blocks `DROP`, `DELETE`, `INSERT`, `UPDATE`, `ALTER`, `CREATE`, and `TRUNCATE` statements when mutation is not explicitly allowed.
+
+<ParamField path="allow_mutation" type="bool" default="false">
+  When `false` (default), only `SELECT` and other read-only queries are permitted. Set to `true` only in trusted contexts.
+</ParamField>
+
+---
+
 ## Next steps
 
 <CardGroup cols={2}>
