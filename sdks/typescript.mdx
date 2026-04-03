@@ -241,7 +241,7 @@ console.log(response.budget_remaining);
 | `agentToken` | `string` | — | Agent token from registration |
 | `query` | `string` | — | The action or query to verify |
 | `options.provider` | `string` | — | LLM provider name |
-| `options.toolSchema` | `object` | — | MCP tool schema to scan (triggers automatic MCP poison check) |
+| `options.toolSchema` | `object` | — | MCP tool definition — triggers server-side `MCPPoisonGuard` inspection |
 
 ### getAgentBudget(agentId, agentToken)
 

@@ -28,53 +28,75 @@ curl -H "X-API-Key: qwed_your_key" https://api.qwedai.com/v1/health
 
 | Method | Endpoint | Description |
 | --- | --- | --- |
-| GET | `/health` | Health check |
-| POST | `/verify` | Auto-detect verification |
-| POST | `/verify/math` | Math verification |
-| POST | `/verify/logic` | Logic verification |
-| POST | `/verify/code` | Code security |
-| POST | `/verify/sql` | SQL validation |
-| POST | `/verify/fact` | Fact checking |
-| POST | `/verify/consensus` | Multi-engine consensus |
+| GET | `/health` | Health check (no auth required) |
+| POST | `/verify/natural_language` | Natural language verification |
+| POST | `/verify/math` | Math expression/equation verification |
+| POST | `/verify/logic` | Logic constraint verification |
+| POST | `/verify/code` | Code security analysis |
+| POST | `/verify/sql` | SQL validation against schema |
+| POST | `/verify/fact` | Fact checking against context |
+| POST | `/verify/consensus` | Multi-engine consensus verification |
 | POST | `/verify/image` | Image claim verification |
 | POST | `/verify/stats` | Statistical claim verification |
+| POST | `/verify/process` | Reasoning trace verification |
+| POST | `/verify/rag` | RAG retrieval mismatch detection |
 | POST | `/verify/batch` | Batch verification |
+| GET | `/verify/batch/{job_id}` | Get batch job status |
 | POST | `/agents/register` | Register an AI agent |
-| POST | `/agents/{id}/verify` | Agent verification |
+| POST | `/agents/{id}/verify` | Agent verification request |
+| POST | `/agents/{id}/tools/{tool}` | Agent tool call approval |
+| GET | `/agents/{id}/activity` | Agent activity audit log |
 | GET | `/metrics` | System metrics |
-| GET | `/metrics/prometheus` | Prometheus scrape |
+| GET | `/metrics/{org_id}` | Per-tenant metrics |
+| GET | `/metrics/prometheus` | Prometheus scrape format |
+| GET | `/logs` | Tenant verification logs |
+| POST | `/auth/signup` | Create account and organization |
+| POST | `/auth/signin` | Sign in |
+| GET | `/auth/me` | Current user info |
+| POST | `/auth/api-keys` | Create API key |
+| GET | `/auth/api-keys` | List API keys |
+| DELETE | `/auth/api-keys/{id}` | Revoke API key |
+| GET | `/audit/logs` | Audit logs |
+| GET | `/audit/export` | Export audit logs as CSV |
 
-## Request Format
+## Request format
+
+Most verification endpoints accept JSON with a `query` or domain-specific fields:
 
 ```json
 {
-  "query": "2+2=4",
-  "type": "math",
-  "options": {
-    "include_attestation": true,
-    "timeout_ms": 30000
-  }
+  "query": "What is 15% of 200?",
+  "provider": "openai"
 }
 ```
 
-## Response Format
+Some endpoints (image, stats) use multipart form data instead of JSON.
+
+## Response format
+
+Responses vary by engine. A typical natural language verification response:
 
 ```json
 {
   "status": "VERIFIED",
-  "verified": true,
-  "engine": "math",
-  "result": {
-    "is_valid": true,
-    "message": "Expression is correct"
+  "user_query": "What is 15% of 200?",
+  "translation": {
+    "expression": "0.15 * 200",
+    "claimed_answer": 30.0,
+    "reasoning": "15% as decimal is 0.15, multiply by 200",
+    "confidence": 0.95
   },
-  "attestation": "eyJhbGciOiJFUzI1NiIs...",
-  "metadata": {
-    "request_id": "req_abc123",
-    "latency_ms": 45
-  }
+  "verification": {
+    "calculated_value": 30.0,
+    "is_correct": true,
+    "diff": 0.0
+  },
+  "final_answer": 30.0,
+  "latency_ms": 245.3
 }
 ```
+
+See [All endpoints](/api/endpoints) for engine-specific response schemas.
 
 ## Status Codes
 
@@ -94,9 +116,10 @@ curl -H "X-API-Key: qwed_your_key" https://api.qwedai.com/v1/health
 | Pro | 600 | 50,000 |
 | Enterprise | Unlimited | Unlimited |
 
-## Detailed Reference
+## Detailed reference
 
-- [All Endpoints](/api/endpoints)
+- [All endpoints](/api/endpoints)
 - [Authentication](/api/authentication)
-- [Error Codes](/api/errors)
-- [Rate Limits](/api/rate-limits)
+- [Error codes](/api/errors)
+- [Rate limits](/api/rate-limits)
+- [DSL reference](/api/dsl-reference)

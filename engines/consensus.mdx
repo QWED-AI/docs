@@ -8,10 +8,11 @@ The Consensus Engine orchestrates multiple verification engines for high-confide
 
 ## Features
 
-- **Async Parallel Execution** - Run engines concurrently
-- **Circuit Breaker** - Auto-disable failing engines
-- **Engine Health Monitoring** - Track reliability
-- **Weighted Consensus** - Consider engine reliability
+- **Async parallel execution** — Run engines concurrently
+- **Circuit breaker** — Auto-disable failing engines
+- **Engine health monitoring** — Track reliability
+- **Weighted consensus** — Consider engine reliability
+- **Secure code execution** — Python engine runs through the Docker sandbox only
 
 ## Usage
 
@@ -38,6 +39,10 @@ print(result.agreement_status) # "unanimous"
 | `single`  | 1 (SymPy)           | ⚡ Fast | Good       |
 | `high`    | 2 (SymPy + Python)  | Medium | High       |
 | `maximum` | 3+ (All applicable) | Slower | Maximum    |
+
+<Note>
+The Python engine in `high` and `maximum` modes requires Docker. If the secure Docker sandbox is unavailable, consensus verification returns HTTP 503 instead of falling back to in-process code execution.
+</Note>
 
 ## Async Execution
 
