@@ -411,6 +411,8 @@ curl -X POST https://api.qwedai.com/v1/verify/image \
 
 Verify statistical claims against CSV data. Accepts multipart form data with a CSV file.
 
+Statistical code execution requires the secure Docker sandbox. If Docker is unavailable, the endpoint returns HTTP 503. If the verification is blocked by a security policy, it returns HTTP 403.
+
 **Request:**
 
 ```bash

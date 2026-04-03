@@ -42,6 +42,15 @@ description: "QWED API error code reference. Covers general errors (QWED-001 to 
 | `QWED-104` | Engine timeout |
 | `QWED-105` | Unsupported language |
 
+## Execution Errors
+
+| Code | HTTP | Message |
+| --- | --- | --- |
+| `QWED-300` | 503 | Secure execution runtime unavailable — the Docker sandbox is not reachable |
+| `QWED-301` | 403 | Verification blocked by security policy |
+
+These errors apply to the `/verify/stats` and `/verify/consensus` endpoints. Statistical and consensus Python verification requires the secure Docker sandbox. When Docker is unavailable, the API returns `503` instead of falling back to in-process execution.
+
 ## Security Errors
 
 | Code | Message |

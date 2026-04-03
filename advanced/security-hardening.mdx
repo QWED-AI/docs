@@ -141,6 +141,16 @@ The gateway is enabled by default for all API endpoints. It also includes a bloc
 
 All API error paths now use a centralized `redact_pii()` function that masks email addresses, phone numbers, SSNs, and IP addresses before they reach logs. Stack traces are suppressed in error responses (`exc_info=False`) to prevent data leakage.
 
+### Fail-closed code execution
+
+<Info>New in v4.0.4</Info>
+
+All model-generated Python code — in both the Stats and Consensus engines — runs exclusively inside a Docker sandbox (`SecureCodeExecutor`). The in-process Wasm and restricted execution fallbacks that existed in earlier versions have been permanently disabled.
+
+If the Docker daemon is unreachable, the affected endpoints return HTTP 503 rather than degrading to an insecure execution mode. The executor performs a live health check (`docker.ping()`) on every request to detect runtime failures that would not be caught by a startup-time flag.
+
+This design ensures that a Docker outage is surfaced as a visible service disruption rather than silently downgrading security.
+
 ### Safe expression evaluation
 
 All `eval()` calls have been fully eliminated and replaced with a custom AST-walking evaluator. Instead of compiling and executing code, the evaluator parses expressions into an AST, validates every node against a strict allow-list, and then interprets the tree directly — no `eval()` or `compile()` is ever invoked.
