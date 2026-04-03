@@ -1,17 +1,20 @@
 ---
 sidebar_position: "5"
 title: "Stats Engine"
-description: "QWED's Stats Engine executes statistical queries on tabular data using secure sandboxed execution via Wasm, Docker, or restricted Python environments."
+description: "QWED's Stats Engine executes statistical queries on tabular data using a secure Docker sandbox. In-process fallbacks are disabled."
 ---
 
-The Stats Engine executes statistical queries on tabular data using secure sandboxed execution.
+The Stats Engine executes statistical queries on tabular data using a secure Docker sandbox.
+
+<Warning>
+**Changed in v4.0.4:** The Wasm and restricted in-process execution fallbacks have been removed. Statistical verification now requires the secure Docker sandbox. If Docker is unavailable, the engine returns a `503` error instead of falling back to in-process execution.
+</Warning>
 
 ## Features
 
-- **Wasm Sandbox** - Portable, secure execution anywhere
-- **Docker Sandbox** - Full isolation for production
-- **Restricted Executor** - AST-validated Python subset (fallback)
-- **Security Validation** - Pre-execution code analysis
+- **Docker Sandbox** - Full isolation for all statistical code execution
+- **Security Validation** - Pre-execution AST-based code analysis
+- **Fail-closed design** - No in-process fallbacks when Docker is unavailable
 
 ## Usage
 
@@ -35,13 +38,19 @@ result = client.verify_stats(
 print(result.answer)  # 150.0
 ```
 
-## Sandbox Options
+## Execution requirements
 
-| Sandbox    | Security | Portability | Speed |
-| ---------- | -------- | ----------- | ----- |
-| Docker     | ⭐⭐⭐      | ⭐⭐          | ⭐⭐    |
-| Wasm       | ⭐⭐⭐      | ⭐⭐⭐         | ⭐⭐⭐   |
-| Restricted | ⭐⭐       | ⭐⭐⭐         | ⭐⭐⭐   |
+Statistical verification runs model-generated Python code exclusively inside a Docker container. You must have Docker available in your deployment environment.
+
+| Requirement | Details |
+| ----------- | ------- |
+| Docker daemon | Must be running and reachable by the QWED process |
+| Health check | The executor pings Docker on every request to confirm availability |
+| Failure mode | Returns HTTP 503 when Docker is unreachable |
+
+<Note>
+The Wasm and restricted in-process executors are retained in the codebase as disabled stubs. They always return a failure result and never execute user-supplied code.
+</Note>
 
 ## Direct Operations
 

@@ -351,7 +351,13 @@ Mathematical expressions are parsed and compared using `Decimal` arithmetic inte
 | `verification_chain` | array | Detailed results from each engine |
 | `meets_requirement` | boolean | Whether confidence meets `min_confidence` |
 
-If the confidence score falls below the `min_confidence` threshold, the endpoint returns HTTP 422 with a descriptive error.
+| Status | Description |
+|--------|-------------|
+| 400 | Invalid verification mode |
+| 422 | Consensus confidence below the requested `min_confidence` threshold |
+| 503 | Secure execution runtime unavailable for the requested consensus depth (Docker is not running) |
+
+The `503` response occurs when the `high` or `maximum` mode requires the Python engine but the secure Docker sandbox is unreachable.
 
 ---
 
@@ -397,6 +403,8 @@ curl -X POST https://api.qwedai.com/v1/verify/image \
 
 Verify statistical claims against CSV data. Accepts multipart form data with a CSV file.
 
+Statistical code execution requires the secure Docker sandbox. If Docker is unavailable, the endpoint returns HTTP 503. If the verification is blocked by a security policy, it returns HTTP 403.
+
 **Request:**
 
 ```bash
@@ -420,6 +428,11 @@ curl -X POST https://api.qwedai.com/v1/verify/stats \
   "message": "Statistical claim verified against dataset"
 }
 ```
+
+| Status | Description |
+|--------|-------------|
+| 403 | Verification blocked by security policy |
+| 503 | Secure execution runtime unavailable (Docker is not running) |
 
 ---
 

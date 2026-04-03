@@ -6,12 +6,17 @@ description: "QWED's Consensus Engine orchestrates multiple verification engines
 
 The Consensus Engine orchestrates multiple verification engines for high-confidence results with fault tolerance.
 
+<Warning>
+**Changed in v4.0.4:** Python code verification within consensus now runs exclusively through the secure Docker executor (`SecureCodeExecutor`). If the Docker sandbox is unavailable, consensus returns a `blocked_secure_execution` status and the API responds with HTTP 503.
+</Warning>
+
 ## Features
 
 - **Async Parallel Execution** - Run engines concurrently
 - **Circuit Breaker** - Auto-disable failing engines
 - **Engine Health Monitoring** - Track reliability
 - **Weighted Consensus** - Consider engine reliability
+- **Secure code execution** - Python engine uses Docker isolation
 
 ## Usage
 
@@ -33,11 +38,15 @@ print(result.agreement_status) # "unanimous"
 
 ## Verification Modes
 
-| Mode      | Engines             | Speed  | Confidence |
-| --------- | ------------------- | ------ | ---------- |
-| `single`  | 1 (SymPy)           | ⚡ Fast | Good       |
-| `high`    | 2 (SymPy + Python)  | Medium | High       |
-| `maximum` | 3+ (All applicable) | Slower | Maximum    |
+| Mode      | Engines             | Speed  | Confidence | Docker required |
+| --------- | ------------------- | ------ | ---------- | --------------- |
+| `single`  | 1 (SymPy)           | ⚡ Fast | Good       | No              |
+| `high`    | 2 (SymPy + Python)  | Medium | High       | Yes             |
+| `maximum` | 3+ (All applicable) | Slower | Maximum    | Yes             |
+
+<Note>
+The `high` and `maximum` modes include the Python engine, which requires the secure Docker sandbox. If Docker is unavailable, these modes return `blocked_secure_execution` instead of falling back to in-process execution.
+</Note>
 
 ## Async Execution
 
@@ -101,3 +110,13 @@ The Fact engine is no longer selected during automatic consensus verification. I
 </Note>
 
 Final confidence = weighted average of agreeing engines.
+
+### Agreement statuses
+
+| Status | Meaning |
+| ------ | ------- |
+| `unanimous` | All engines returned the same answer |
+| `majority` | More than half of the total weight agrees |
+| `split` | No clear majority among engines |
+| `no_results` | No engines returned a result |
+| `blocked_secure_execution` | The Docker sandbox is unavailable and a required engine cannot run (returns HTTP 503) |
