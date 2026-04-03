@@ -49,10 +49,17 @@ All generated statistical code is executed inside a Docker container with enforc
 | Docker unavailable at startup | Requests return `503 Service Temporarily Unavailable` |
 | Docker becomes unavailable mid-operation | Request is blocked and returns `503` |
 | Code fails AST security check | Request returns `403 Verification Blocked by Security Policy` |
+| Code generation fails | Request returns `Internal verification error` |
 
 <Warning>
 Previous versions of QWED offered Wasm and restricted Python fallbacks when Docker was unavailable. These fallback paths have been removed. You must have a running Docker daemon for statistical verification to work.
 </Warning>
+
+## Error handling
+
+When the Stats Engine encounters an internal failure — such as a code generation or translation error — it returns a generic `"Internal verification error"` message. Sensitive details like file paths, credentials, or stack traces are never included in the API response.
+
+If you receive this error, check the server-side logs for diagnostic details. The engine logs the exception type for debugging while keeping the client response opaque.
 
 ## Direct operations
 
