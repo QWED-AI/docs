@@ -55,11 +55,11 @@ Main entry point for verifying natural language queries. Routes through the QWED
 
 **Response:**
 
-The response follows the `VerificationResult` schema:
+The response follows the `VerificationResult` schema. For math queries, the top-level `status` is `INCONCLUSIVE` because the LLM translation step is not formally verified — see [Trust boundary](/engines/math#trust-boundary) for details.
 
 ```json
 {
-  "status": "VERIFIED",
+  "status": "INCONCLUSIVE",
   "user_query": "What is 15% of 200?",
   "translation": {
     "expression": "0.15 * 200",
@@ -67,14 +67,20 @@ The response follows the `VerificationResult` schema:
     "reasoning": "15% as decimal is 0.15, multiply by 200",
     "confidence": 0.95
   },
-  "validation": {
-    "is_valid": true,
-    "checks_passed": ["syntax", "symbols", "evaluable"]
-  },
   "verification": {
     "calculated_value": 30.0,
     "is_correct": true,
     "diff": 0.0
+  },
+  "trust_boundary": {
+    "query_interpretation_source": "llm_translation",
+    "query_semantics_verified": false,
+    "verification_scope": "translated_expression_only",
+    "deterministic_expression_evaluation": true,
+    "formal_proof": false,
+    "translation_claim_self_consistent": true,
+    "provider_used": "openai_compat",
+    "overall_status": "INCONCLUSIVE"
   },
   "final_answer": 30.0,
   "latency_ms": 245.3
@@ -661,6 +667,8 @@ Verify a claim using an agent token. Creates an auditable record tied to the age
 
 <Warning>**Breaking change:** The `security_checks` request field has been removed. Security checks are now mandatory and enforced server-side. You no longer need to (or can) opt in to exfiltration or MCP poison checks.</Warning>
 
+<Warning>**Breaking change:** The `context` field with `conversation_id` and `step_number` is now required for all agent action verification requests. Requests without these fields are rejected with error code `QWED-AGENT-CTX-001`. See [conversation controls](/advanced/agent-verification#conversation-controls) for details.</Warning>
+
 **Request:**
 
 ```json
@@ -785,15 +793,13 @@ Verify an attestation JWT.
 
 ### GET /metrics
 
-Returns global system metrics and per-tenant breakdowns. Requires admin authentication via Bearer token or API key.
-
-<Warning>**Breaking change (v4.1.0):** The `/metrics` endpoint now enforces admin authentication. Requests from non-admin users or inactive accounts return HTTP 403. Both Bearer token and API key authentication are supported — when using an API key, the associated user must have the `admin` role.</Warning>
+Returns global system metrics and per-tenant breakdowns. Requires admin authentication — you must provide either a JWT token for an active user with the `owner` or `admin` role, or an API key linked to an active `owner` or `admin` user.
 
 **Headers (one of):**
 
 ```text
 Authorization: Bearer <jwt_token>
-X-API-Key: qwed_...
+X-API-Key: <api_key>
 ```
 
 **Response:**
@@ -807,7 +813,8 @@ X-API-Key: qwed_...
 
 | Status | Description |
 |--------|-------------|
-| 403 | Admin access required — user must have `admin` role and be active |
+| 401 | No authentication provided |
+| 403 | Authenticated but not an active admin or owner |
 
 ### GET /metrics/{organization_id}
 
@@ -819,9 +826,19 @@ Returns metrics scoped to a specific organization. Tenants can only view their o
 
 ### GET /metrics/prometheus
 
-Returns metrics in Prometheus text format for scraping by monitoring infrastructure. Requires admin authentication.
+Returns metrics in Prometheus text format for scraping by monitoring infrastructure. Requires the same admin authentication as `GET /metrics`.
 
-<Warning>**Breaking change (v4.1.0):** The `/metrics/prometheus` endpoint now enforces admin authentication, matching the `/metrics` endpoint behavior.</Warning>
+**Headers (one of):**
+
+```text
+Authorization: Bearer <jwt_token>
+X-API-Key: <api_key>
+```
+
+| Status | Description |
+|--------|-------------|
+| 401 | No authentication provided |
+| 403 | Authenticated but not an active admin or owner |
 
 ### GET /logs
 

@@ -174,7 +174,7 @@ did:qwed:agent:<agent_id>
 
 ### 4.1 Agent Verification Request
 
-<Warning>**v1.1.0:** The `context` field with `conversation_id` and `step_number` is now **required**. Requests without a valid context are rejected with `QWED-AGENT-CTX-001`.</Warning>
+The `context` object with `conversation_id` and `step_number` is **required**. The `step_number` must be a positive integer that increases monotonically within a conversation. QWED uses these fields to enforce replay protection, loop detection, and conversation length limits. See [conversation controls](/advanced/agent-verification#conversation-controls) for details.
 
 ```json
 {
@@ -635,11 +635,11 @@ verified_agent = QWEDVerifiedAgent(
 | `QWED-AGENT-003`        | Agent suspended          |
 | `QWED-AGENT-004`        | Tool not allowed         |
 | `QWED-AGENT-005`        | Verification failed      |
-| `QWED-AGENT-CTX-001`    | Missing action context (`conversation_id` and `step_number` required) |
-| `QWED-AGENT-CTX-002`    | Invalid step number (must be >= 1) |
-| `QWED-AGENT-LOOP-001`   | Conversation step limit exceeded (max 50) |
-| `QWED-AGENT-LOOP-002`   | Replay or out-of-order step detected |
-| `QWED-AGENT-LOOP-003`   | Repetitive action loop detected |
+| `QWED-AGENT-CTX-001`    | Missing required action context (`conversation_id` and `step_number`) |
+| `QWED-AGENT-CTX-002`    | Invalid `step_number` (must be >= 1) |
+| `QWED-AGENT-LOOP-001`   | Conversation step limit exceeded (max 50 steps) |
+| `QWED-AGENT-LOOP-002`   | Replay or out-of-order action step detected |
+| `QWED-AGENT-LOOP-003`   | Repetitive action loop detected (max 2 consecutive identical actions) |
 | `QWED-AGENT-BUDGET-001` | Daily cost exceeded      |
 | `QWED-AGENT-BUDGET-002` | Hourly rate exceeded     |
 | `QWED-AGENT-BUDGET-003` | Token limit exceeded     |

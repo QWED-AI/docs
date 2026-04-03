@@ -75,7 +75,11 @@ result = client.verify_math("sin(x)^2 + cos(x)^2 = 1")
 # ✓ Verified: Pythagorean identity
 ```
 
-Identity verification uses symbolic simplification first, then samples five test points as a fallback. Only points that can be successfully evaluated count toward agreement — domain-restricted expressions (e.g., `log(x)` at `x = -1`) are skipped rather than causing a false negative.
+Identity verification uses symbolic simplification first. If SymPy proves the identity algebraically, the result is `VERIFIED`. When symbolic simplification is inconclusive, the engine samples five test points as a fallback. Only points that can be successfully evaluated count toward agreement — domain-restricted expressions (e.g., `log(x)` at `x = -1`) are skipped rather than causing a false negative.
+
+<Warning>
+Numerical sampling cannot prove equivalence. Even if all sample points agree, the result is `UNKNOWN` with `confidence: 0.0` because two expressions can match at fixed points without being algebraically identical. Treat `UNKNOWN` results as unverified.
+</Warning>
 
 ### 3. Derivatives
 
@@ -175,7 +179,44 @@ result = client.verify_irr(
 
 ---
 
-## Error Handling
+## Trust boundary
+
+When you verify a natural language math query through the `/verify/natural_language` endpoint, the response includes a `trust_boundary` object that describes exactly what the pipeline proved and what it did not.
+
+```json
+{
+  "status": "INCONCLUSIVE",
+  "final_answer": 30.0,
+  "trust_boundary": {
+    "query_interpretation_source": "llm_translation",
+    "query_semantics_verified": false,
+    "verification_scope": "translated_expression_only",
+    "deterministic_expression_evaluation": true,
+    "formal_proof": false,
+    "translation_claim_self_consistent": true,
+    "provider_used": "openai_compat",
+    "overall_status": "INCONCLUSIVE"
+  }
+}
+```
+
+| Field | Meaning |
+| --- | --- |
+| `query_interpretation_source` | How the user query was converted to an expression (always `llm_translation`) |
+| `query_semantics_verified` | Whether the translation accurately represents the user's intent (`false` — this is not formally provable) |
+| `verification_scope` | What was actually verified (`translated_expression_only`) |
+| `deterministic_expression_evaluation` | Whether the expression itself was evaluated deterministically |
+| `formal_proof` | Whether a formal proof was established |
+| `translation_claim_self_consistent` | Whether the LLM's claimed answer matches the computed answer |
+| `overall_status` | The response-level status reflecting the trust boundary |
+
+<Note>
+The overall status for natural language math queries is `INCONCLUSIVE` because, while the expression evaluation is deterministic, QWED cannot verify that the LLM correctly interpreted the user's intent. The `trust_boundary` gives you the information to decide whether the result is sufficient for your use case.
+</Note>
+
+---
+
+## Error handling
 
 When verification fails, QWED provides detailed error information:
 
