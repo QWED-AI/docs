@@ -55,7 +55,7 @@ Main entry point for verifying natural language queries. Routes through the QWED
 
 **Response:**
 
-The response follows the `VerificationResult` schema. The top-level `status` reflects trust boundary alignment — see the `trust_boundary` object for a detailed breakdown of what was and was not verified.
+The response follows the `VerificationResult` schema. For math queries, the top-level `status` is `INCONCLUSIVE` because the LLM translation step is not formally verified — see [Trust boundary](/engines/math#trust-boundary) for details.
 
 ```json
 {
@@ -79,11 +79,11 @@ The response follows the `VerificationResult` schema. The top-level `status` ref
     "deterministic_expression_evaluation": true,
     "formal_proof": false,
     "translation_claim_self_consistent": true,
-    "provider_used": "openai",
+    "provider_used": "openai_compat",
     "overall_status": "INCONCLUSIVE"
   },
   "final_answer": 30.0,
-  "provider_used": "openai",
+  "provider_used": "openai_compat",
   "latency_ms": 245.3
 }
 ```
