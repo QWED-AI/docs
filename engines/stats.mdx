@@ -1,20 +1,21 @@
 ---
 sidebar_position: "5"
-title: "Stats Engine"
-description: "QWED's Stats Engine executes statistical queries on tabular data using a secure Docker sandbox. In-process fallbacks are disabled."
+title: "Stats engine"
+description: "QWED's Stats Engine executes statistical queries on tabular data using the secure Docker sandbox. In-process fallbacks are disabled."
 ---
 
-The Stats Engine executes statistical queries on tabular data using a secure Docker sandbox.
-
-<Warning>
-**Changed in v4.0.4:** The Wasm and restricted in-process execution fallbacks have been removed. Statistical verification now requires the secure Docker sandbox. If Docker is unavailable, the engine returns a `503` error instead of falling back to in-process execution.
-</Warning>
+The Stats Engine executes statistical queries on tabular data. All model-generated code runs inside a secure Docker sandbox — in-process execution paths (Wasm and restricted Python) are disabled.
 
 ## Features
 
-- **Docker Sandbox** - Full isolation for all statistical code execution
-- **Security Validation** - Pre-execution AST-based code analysis
-- **Fail-closed design** - No in-process fallbacks when Docker is unavailable
+- **Docker sandbox** — Full container isolation for all statistical code execution
+- **Fail-closed execution** — If Docker is unavailable, verification is blocked rather than falling back to in-process execution
+- **Pre-execution security validation** — AST-based code analysis before Docker execution
+- **Live Docker health checks** — The executor verifies Docker availability on each request, not just at startup
+
+## Prerequisites
+
+The Stats Engine requires a running Docker daemon. Without Docker, all statistical verification requests return HTTP 503. See the [deployment guide](/advanced/deployment) for setup instructions.
 
 ## Usage
 
@@ -38,21 +39,29 @@ result = client.verify_stats(
 print(result.answer)  # 150.0
 ```
 
-## Execution requirements
+## Execution model
 
-Statistical verification runs model-generated Python code exclusively inside a Docker container. You must have Docker available in your deployment environment.
+All generated statistical code is executed inside a Docker container with enforced memory and CPU limits. The engine does not fall back to in-process execution under any circumstances.
 
-| Requirement | Details |
-| ----------- | ------- |
-| Docker daemon | Must be running and reachable by the QWED process |
-| Health check | The executor pings Docker on every request to confirm availability |
-| Failure mode | Returns HTTP 503 when Docker is unreachable |
+| Scenario | Behavior |
+| -------- | -------- |
+| Docker running | Code executes in an isolated container |
+| Docker unavailable at startup | Requests return `503 Service Temporarily Unavailable` |
+| Docker becomes unavailable mid-operation | Request is blocked and returns `503` |
+| Code fails AST security check | Request returns `403 Verification Blocked by Security Policy` |
+| Code generation fails | Request returns `Internal verification error` |
 
-<Note>
-The Wasm and restricted in-process executors are retained in the codebase as disabled stubs. They always return a failure result and never execute user-supplied code.
-</Note>
+<Warning>
+Previous versions of QWED offered Wasm and restricted Python fallbacks when Docker was unavailable. These fallback paths have been removed. You must have a running Docker daemon for statistical verification to work.
+</Warning>
 
-## Direct Operations
+## Error handling
+
+When the Stats Engine encounters an internal failure — such as a code generation or translation error — it returns a generic `"Internal verification error"` message. Sensitive details like file paths, credentials, or stack traces are never included in the API response.
+
+If you receive this error, check the server-side logs for diagnostic details. The engine logs the exception type for debugging while keeping the client response opaque.
+
+## Direct operations
 
 For simple operations, bypass code generation:
 

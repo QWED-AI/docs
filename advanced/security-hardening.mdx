@@ -74,8 +74,12 @@ export RATE_LIMIT_REQUESTS_PER_MINUTE=50
 export RATE_LIMIT_WINDOW_SECONDS=60
 ```
 
-#### Redis Backing (Recommended)
-The default in-memory limiter does not scale across multiple worker processes or replicas. For high-availability deployments, we recommend replacing the in-memory `RateLimiter` class with a Redis-backed implementation to ensure consistent enforcement across your cluster.
+#### Redis backing (recommended)
+The default in-memory limiter does not scale across multiple worker processes or replicas. For high-availability deployments, we recommend using a Redis-backed rate limiter to ensure consistent enforcement across your cluster.
+
+<Note>
+The Redis-backed rate limiter uses a **fail-closed** policy. If Redis becomes unreachable at runtime, requests are denied rather than allowed through. This prevents a Redis outage from silently disabling rate limiting. An in-memory fallback is only used when Redis is unavailable at initialization time.
+</Note>
 
 ### CORS Configuration
 By default, QWED is configured for development (`*`). You **must** restrict this in production to prevent unauthorized cross-origin requests.
@@ -188,6 +192,12 @@ While QWED handles internal verification, you must implement the following "Huma
 - **Output Monitoring**: Log and randomly audit verified outputs to ensure the verification engine itself hasn't been bypassed.
 
 #### LLM05: Supply Chain Vulnerabilities
+- **Startup environment integrity**: QWED now enforces environment integrity at startup by verifying all Python `.pth` startup hook files against a built-in allowlist. If any unrecognized `.pth` file is found, the server refuses to start. You can extend the allowlist for custom deployments using the `QWED_ALLOWED_STARTUP_PTH_FILES` environment variable (comma-separated list of filenames).
+
+  ```bash
+  export QWED_ALLOWED_STARTUP_PTH_FILES="my_custom_plugin.pth,internal_tool.pth"
+  ```
+
 - **Startup hook detection**: Use [`StartupHookGuard`](/sdks/guards#startuphookguard) to scan for malicious `.pth` files in Python `site-packages` before your application starts. This defends against supply chain attacks that inject code-execution hooks via compromised PyPI packages.
 - **Network Isolation**: Run the QWED backend in a VPC without direct outbound internet access, except to specific LLM provider APIs (allowlist).
 - **Dependency Scanning**: Regularly scan your deployment container for vulnerabilities in system packages.

@@ -75,6 +75,7 @@ print(result.model)   # {"x": 6, "y": 9}
 | `VERIFIED` | Claim is valid and accepted |
 | `FAILED` | Claim is invalid |
 | `CORRECTED` | Claim was wrong and corrected |
+| `INCONCLUSIVE` | Expression evaluated deterministically, but the translation from natural language was not formally verified. Check the `trust_boundary` field for details |
 | `BLOCKED` | Security or policy violation detected |
 | `ERROR` | Engine could not complete verification |
 

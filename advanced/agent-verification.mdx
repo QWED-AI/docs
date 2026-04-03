@@ -45,7 +45,7 @@ print(agent["agent_token"])  # qwed_agent_xyz...
 
 ## Verifying Actions
 
-Before an agent executes an action:
+Before an agent executes an action, you must provide an `ActionContext` with a `conversation_id` and a monotonically increasing `step_number`. These fields are **required** — requests without them are rejected.
 
 ```python
 decision = client.verify_action(
@@ -56,6 +56,7 @@ decision = client.verify_action(
     },
     context={
         "conversation_id": "conv_xyz",
+        "step_number": 1,
         "user_intent": "Get user list"
     }
 )
@@ -67,6 +68,60 @@ elif decision["decision"] == "DENIED":
 elif decision["decision"] == "PENDING":
     request_human_approval()
 ```
+
+## Conversation controls
+
+QWED enforces runtime guardrails that prevent agents from replaying actions, running in infinite loops, or exceeding conversation length limits. These checks run automatically on every `verify_action` call.
+
+### How it works
+
+Each call to `verify_action` must include a `conversation_id` (identifying the current session) and a `step_number` (a positive integer that increases with each action in that session). QWED uses these fields to enforce three controls:
+
+| Control | Limit | Error code |
+|---------|-------|------------|
+| Conversation length | 50 steps per conversation | `QWED-AGENT-LOOP-001` |
+| Replay detection | Each step number can only be used once | `QWED-AGENT-LOOP-002` |
+| Repetitive loop detection | Max 2 consecutive identical actions | `QWED-AGENT-LOOP-003` |
+
+### Incrementing steps correctly
+
+The `step_number` must be strictly greater than any previously committed step within the same conversation. If an action is denied (for example, due to a loop), that step number is **not** consumed — you can retry the same step with a different action.
+
+```python
+# Step 1: approved
+client.verify_action(
+    agent_id="agent_abc123",
+    action={"type": "calculate", "query": "2+2"},
+    context={"conversation_id": "conv_1", "step_number": 1}
+)
+
+# Step 2: same action, still approved (first repeat)
+client.verify_action(
+    agent_id="agent_abc123",
+    action={"type": "calculate", "query": "2+2"},
+    context={"conversation_id": "conv_1", "step_number": 2}
+)
+
+# Step 3: same action again — denied as repetitive loop
+result = client.verify_action(
+    agent_id="agent_abc123",
+    action={"type": "calculate", "query": "2+2"},
+    context={"conversation_id": "conv_1", "step_number": 3}
+)
+# result["decision"] == "DENIED"
+# result["error"]["code"] == "QWED-AGENT-LOOP-003"
+
+# Step 3 retry: a different action succeeds on the same step number
+client.verify_action(
+    agent_id="agent_abc123",
+    action={"type": "verify_logic", "query": "x > 1"},
+    context={"conversation_id": "conv_1", "step_number": 3}
+)
+```
+
+<Warning>
+If your agent framework retries failed actions automatically, make sure it does not reuse the same `step_number` for a previously approved step. Replayed step numbers are always rejected.
+</Warning>
 
 ## Trust Levels
 

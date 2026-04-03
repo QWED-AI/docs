@@ -55,11 +55,11 @@ Main entry point for verifying natural language queries. Routes through the QWED
 
 **Response:**
 
-The response follows the `VerificationResult` schema:
+The response follows the `VerificationResult` schema. For math queries, the top-level `status` is `INCONCLUSIVE` because the LLM translation step is not formally verified — see [Trust boundary](/engines/math#trust-boundary) for details.
 
 ```json
 {
-  "status": "VERIFIED",
+  "status": "INCONCLUSIVE",
   "user_query": "What is 15% of 200?",
   "translation": {
     "expression": "0.15 * 200",
@@ -67,14 +67,20 @@ The response follows the `VerificationResult` schema:
     "reasoning": "15% as decimal is 0.15, multiply by 200",
     "confidence": 0.95
   },
-  "validation": {
-    "is_valid": true,
-    "checks_passed": ["syntax", "symbols", "evaluable"]
-  },
   "verification": {
     "calculated_value": 30.0,
     "is_correct": true,
     "diff": 0.0
+  },
+  "trust_boundary": {
+    "query_interpretation_source": "llm_translation",
+    "query_semantics_verified": false,
+    "verification_scope": "translated_expression_only",
+    "deterministic_expression_evaluation": true,
+    "formal_proof": false,
+    "translation_claim_self_consistent": true,
+    "provider_used": "openai_compat",
+    "overall_status": "INCONCLUSIVE"
   },
   "final_answer": 30.0,
   "latency_ms": 245.3
@@ -294,9 +300,13 @@ Verify a factual claim against a provided context.
 
 ### POST /verify/consensus
 
-Multi-engine consensus verification. Runs the query through multiple verification engines and requires agreement above a confidence threshold.
+<Info>New in v4.0.0</Info>
+
+Multi-engine consensus verification. Runs the query through multiple verification engines and requires agreement above a confidence threshold. This endpoint is rate-limited per tenant.
 
 Mathematical expressions are parsed and compared using `Decimal` arithmetic internally, which avoids floating-point drift when engines cross-check results.
+
+<Note>The fact engine is excluded from automatic engine selection during consensus verification. Fact-based verification requires external context and will return an error if invoked without it, preventing self-referential consensus loops.</Note>
 
 **Request:**
 
@@ -355,9 +365,7 @@ Mathematical expressions are parsed and compared using `Decimal` arithmetic inte
 |--------|-------------|
 | 400 | Invalid verification mode |
 | 422 | Consensus confidence below the requested `min_confidence` threshold |
-| 503 | Secure execution runtime unavailable for the requested consensus depth (Docker is not running) |
-
-The `503` response occurs when the `high` or `maximum` mode requires the Python engine but the secure Docker sandbox is unreachable.
+| 503 | Secure Docker sandbox unavailable — required for Python engine in `high`/`maximum` mode |
 
 ---
 
@@ -431,8 +439,12 @@ curl -X POST https://api.qwedai.com/v1/verify/stats \
 
 | Status | Description |
 |--------|-------------|
-| 403 | Verification blocked by security policy |
-| 503 | Secure execution runtime unavailable (Docker is not running) |
+| 403 | Verification blocked by security policy (e.g., generated code failed AST safety checks) |
+| 503 | Secure Docker sandbox unavailable — statistical verification requires Docker |
+
+<Note>
+Statistical verification requires a running Docker daemon. If Docker is unavailable, the endpoint returns HTTP 503 instead of falling back to in-process execution. See the [Stats Engine](/engines/stats) page for details.
+</Note>
 
 ---
 
@@ -610,7 +622,7 @@ Register a new AI agent with QWED for verified agentic workflows.
 ```json
 {
   "name": "FinanceBot",
-  "agent_type": "supervised",
+  "agent_type": "semi_autonomous",
   "description": "Financial analysis agent",
   "permissions": ["math", "logic", "code"],
   "max_cost_per_day": 50.0
@@ -620,10 +632,18 @@ Register a new AI agent with QWED for verified agentic workflows.
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
 | `name` | string | Yes | — | Agent display name |
-| `agent_type` | string | No | `autonomous` | `supervised`, `autonomous`, or `trusted` |
+| `agent_type` | string | No | `autonomous` | `autonomous`, `semi_autonomous`, or `assistant` |
 | `description` | string | No | — | Agent description |
 | `permissions` | array | No | `[]` | Allowed verification engine names (e.g., `math`, `logic`, `code`) |
 | `max_cost_per_day` | float | No | `100.0` | Daily budget cap in USD |
+
+**Agent types:**
+
+| Type | Description |
+|------|-------------|
+| `autonomous` | Fully autonomous agent (AutoGPT-style) |
+| `semi_autonomous` | Requires approval for critical actions |
+| `assistant` | Human-in-the-loop |
 
 **Response:**
 
@@ -632,7 +652,7 @@ Register a new AI agent with QWED for verified agentic workflows.
   "agent_id": 42,
   "agent_token": "qwed_agent_...",
   "name": "FinanceBot",
-  "type": "supervised",
+  "type": "semi_autonomous",
   "status": "active",
   "max_cost_per_day": 50.0,
   "message": "Agent registered successfully. Store the agent_token securely."
@@ -645,13 +665,11 @@ Register a new AI agent with QWED for verified agentic workflows.
 
 ### POST /agents/{agent_id}/verify
 
-Verify a claim using an agent token. Creates an auditable record tied to the agent.
+Verify a claim using an agent token. Creates an auditable record tied to the agent. Security checks are enforced server-side — exfiltration detection always runs, and MCP poisoning detection runs automatically when a `tool_schema` is provided.
 
-Security checks are enforced server-side on every request — `ExfiltrationGuard` always runs, and `MCPPoisonGuard` runs automatically when a `tool_schema` is provided. You do not need to opt in.
+<Warning>**Breaking change:** The `security_checks` request field has been removed. Security checks are now mandatory and enforced server-side. You no longer need to (or can) opt in to exfiltration or MCP poison checks.</Warning>
 
-<Warning>
-**Breaking change (v4.0.3):** The `security_checks` request field has been removed. Exfiltration and MCP poison checks are now enforced server-side and cannot be disabled by clients. Remove any `security_checks` fields from your request payloads.
-</Warning>
+<Warning>**Breaking change:** The `context` field with `conversation_id` and `step_number` is now required for all agent action verification requests. Requests without these fields are rejected with error code `QWED-AGENT-CTX-001`. See [conversation controls](/advanced/agent-verification#conversation-controls) for details.</Warning>
 
 **Request:**
 
@@ -670,13 +688,18 @@ Security checks are enforced server-side on every request — `ExfiltrationGuard
 |-----------|------|----------|-------------|
 | `query` | string | Yes | The claim to verify |
 | `provider` | string | No | LLM provider preference |
-| `tool_schema` | object | No | MCP tool definition — when provided, `MCPPoisonGuard` runs automatically |
+| `tool_schema` | object | No | MCP tool definition to scan. When provided, `MCPPoisonGuard` runs automatically |
 
 **Headers:**
 
 ```text
 X-Agent-Token: qwed_agent_...
 ```
+
+**Security behavior:**
+
+- **Exfiltration check:** Always runs on every agent verification request. If the query payload is flagged, the request is rejected with a `403`.
+- **MCP poison check:** Runs automatically when `tool_schema` is present. If the tool definition is flagged, the request is rejected with a `403`.
 
 **Error responses:**
 
@@ -772,7 +795,14 @@ Verify an attestation JWT.
 
 ### GET /metrics
 
-Returns global system metrics and per-tenant breakdowns. In production, this should require admin authentication.
+Returns global system metrics and per-tenant breakdowns. Requires admin authentication — you must provide either a JWT token for a user with the `owner` or `admin` role, or an API key linked to an admin user.
+
+**Headers (one of):**
+
+```text
+Authorization: Bearer <jwt_token>
+X-API-Key: <api_key>
+```
 
 **Response:**
 
@@ -782,6 +812,11 @@ Returns global system metrics and per-tenant breakdowns. In production, this sho
   "tenants": { "1": { "requests": 500 }, "2": { "requests": 750 } }
 }
 ```
+
+| Status | Description |
+|--------|-------------|
+| 401 | No authentication provided |
+| 403 | Authenticated but not an admin or owner |
 
 ### GET /metrics/{organization_id}
 
@@ -793,7 +828,19 @@ Returns metrics scoped to a specific organization. Tenants can only view their o
 
 ### GET /metrics/prometheus
 
-Returns metrics in Prometheus text format for scraping by monitoring infrastructure.
+Returns metrics in Prometheus text format for scraping by monitoring infrastructure. Requires the same admin authentication as `GET /metrics`.
+
+**Headers (one of):**
+
+```text
+Authorization: Bearer <jwt_token>
+X-API-Key: <api_key>
+```
+
+| Status | Description |
+|--------|-------------|
+| 401 | No authentication provided |
+| 403 | Authenticated but not an admin or owner |
 
 ### GET /logs
 

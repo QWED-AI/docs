@@ -12,11 +12,11 @@ The Consensus Engine orchestrates multiple verification engines for high-confide
 
 ## Features
 
-- **Async Parallel Execution** - Run engines concurrently
-- **Circuit Breaker** - Auto-disable failing engines
-- **Engine Health Monitoring** - Track reliability
-- **Weighted Consensus** - Consider engine reliability
-- **Secure code execution** - Python engine uses Docker isolation
+- **Async parallel execution** — Run engines concurrently
+- **Circuit breaker** — Auto-disable failing engines
+- **Engine health monitoring** — Track reliability
+- **Weighted consensus** — Consider engine reliability
+- **Secure code execution** — Python engine runs through the Docker sandbox only
 
 ## Usage
 
@@ -46,6 +46,10 @@ print(result.agreement_status) # "unanimous"
 
 <Note>
 The `high` and `maximum` modes include the Python engine, which requires the secure Docker sandbox. If Docker is unavailable, these modes return `blocked_secure_execution` instead of falling back to in-process execution.
+</Note>
+
+<Note>
+The Python engine in `high` and `maximum` modes requires Docker. If the secure Docker sandbox is unavailable, consensus verification returns HTTP 503 instead of falling back to in-process code execution.
 </Note>
 
 ## Async Execution
@@ -93,6 +97,20 @@ The recorded result uses `engine_name: "consensus_orchestrator"`, `method: "asyn
 
 ---
 
+## Engine selection
+
+The consensus engine automatically selects which engines to run based on the verification mode:
+
+| Mode      | Engines selected                    |
+| --------- | ----------------------------------- |
+| `single`  | SymPy                               |
+| `high`    | SymPy, Python                       |
+| `maximum` | SymPy, Python, Z3 (+ Stats for statistical queries) |
+
+<Note>The fact engine is excluded from automatic engine selection. Fact verification requires external context, and including it in consensus without that context would create self-referential verification loops. If fact verification is invoked during consensus, it returns an error indicating that external context is required.</Note>
+
+---
+
 ## Consensus calculation
 
 The engine uses weighted voting:
@@ -103,11 +121,6 @@ The engine uses weighted voting:
 | Z3     | 0.995              |
 | Python | 0.99               |
 | Stats  | 0.98               |
-| Image  | 0.80               |
-
-<Note>
-The Fact engine is no longer selected during automatic consensus verification. It requires external fact context to produce meaningful results. If you need fact-based verification, call the [Fact engine](/engines/fact) directly.
-</Note>
 
 Final confidence = weighted average of agreeing engines.
 
