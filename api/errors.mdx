@@ -72,7 +72,47 @@ description: "QWED API error code reference. Covers general errors (QWED-001 to 
 | `QWED-ATT-004` | Untrusted issuer |
 | `QWED-ATT-005` | Signature verification failed |
 
-## Handling Errors
+## Exception hierarchy
+
+The QWED SDK and server use a structured exception hierarchy that provides actionable error messages with suggestions and documentation links. All exceptions extend the base `QWEDError` class.
+
+### Base exception
+
+All QWED exceptions include these fields:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `message` | string | Human-readable error description |
+| `suggestion` | string \| null | Actionable fix recommendation |
+| `docs_url` | string | Link to relevant documentation |
+| `details` | object | Additional context (engine, expression, etc.) |
+
+### DSL and parsing exceptions
+
+| Exception | Trigger | Details |
+|-----------|---------|---------|
+| `QWEDSyntaxError` | Invalid DSL expression syntax | Includes `expression`, `line`, and `column` fields for precise error location |
+| `QWEDSymbolNotFoundError` | Unknown variable or function in expression | Includes "did you mean?" suggestions from available symbols |
+
+### Verification exceptions
+
+| Exception | Engine | Details |
+|-----------|--------|---------|
+| `QWEDVerificationError` | Any | Base class for all verification failures. Includes `expected`, `actual`, and `engine` fields |
+| `QWEDMathError` | Math | Includes `expression`, `expected`, `calculated`, and `tolerance` values |
+| `QWEDLogicError` | Logic | Includes `formula` and counterexample `model` when available |
+| `QWEDCodeError` | Code | Includes `code`, `output`, `expected_output`, and `execution_error` |
+| `QWEDSQLError` | SQL | Includes `query`, `schema`, and specific `issue` description |
+
+### Configuration and API exceptions
+
+| Exception | Trigger | Details |
+|-----------|---------|---------|
+| `QWEDConfigError` | Invalid configuration | Includes `config_key`, `expected_type`, and `actual_value` |
+| `QWEDAPIError` | API communication failure | Includes `status_code` and `endpoint`. Provides targeted suggestions per status code (401 = check API key, 429 = rate limit, etc.) |
+| `QWEDDependencyError` | Missing package | Includes install command (e.g., `pip install sympy`) |
+
+## Handling errors
 
 ### Python
 
@@ -82,7 +122,30 @@ from qwed_sdk import QWEDClient, QWEDError
 try:
     result = client.verify("test")
 except QWEDError as e:
-    print(f"Error {e.code}: {e.message}")
+    print(f"Error: {e.message}")
+    print(f"Suggestion: {e.suggestion}")
+    print(f"Details: {e.details}")
+    print(f"Docs: {e.docs_url}")
+```
+
+### Catching specific exceptions
+
+```python
+from qwed_sdk import QWEDClient
+from qwed_new.core.exceptions import (
+    QWEDMathError,
+    QWEDSyntaxError,
+    QWEDConfigError,
+)
+
+try:
+    result = client.verify_math("invalid expression $$")
+except QWEDSyntaxError as e:
+    print(f"Syntax error at column {e.column}: {e.message}")
+except QWEDMathError as e:
+    print(f"Math error: expected {e.expected}, got {e.actual}")
+except QWEDConfigError as e:
+    print(f"Config issue with '{e.details.get('config_key')}': {e.message}")
 ```
 
 ### TypeScript

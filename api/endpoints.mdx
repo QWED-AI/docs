@@ -614,7 +614,7 @@ Register a new AI agent with QWED for verified agentic workflows.
 ```json
 {
   "name": "FinanceBot",
-  "agent_type": "supervised",
+  "agent_type": "semi_autonomous",
   "description": "Financial analysis agent",
   "permissions": ["math", "logic", "code"],
   "max_cost_per_day": 50.0
@@ -624,10 +624,18 @@ Register a new AI agent with QWED for verified agentic workflows.
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
 | `name` | string | Yes | — | Agent display name |
-| `agent_type` | string | No | `autonomous` | `supervised`, `autonomous`, or `trusted` |
+| `agent_type` | string | No | `autonomous` | `autonomous`, `semi_autonomous`, or `assistant` |
 | `description` | string | No | — | Agent description |
 | `permissions` | array | No | `[]` | Allowed verification engine names (e.g., `math`, `logic`, `code`) |
 | `max_cost_per_day` | float | No | `100.0` | Daily budget cap in USD |
+
+**Agent types:**
+
+| Type | Description |
+|------|-------------|
+| `autonomous` | Fully autonomous agent (AutoGPT-style) |
+| `semi_autonomous` | Requires approval for critical actions |
+| `assistant` | Human-in-the-loop |
 
 **Response:**
 
@@ -636,7 +644,7 @@ Register a new AI agent with QWED for verified agentic workflows.
   "agent_id": 42,
   "agent_token": "qwed_agent_...",
   "name": "FinanceBot",
-  "type": "supervised",
+  "type": "semi_autonomous",
   "status": "active",
   "max_cost_per_day": 50.0,
   "message": "Agent registered successfully. Store the agent_token securely."
