@@ -3,44 +3,57 @@ title: "Changelog"
 description: "All notable changes to QWED Protocol — releases, features, security fixes, and improvements."
 ---
 
-## v5.0.0 — Enforcement Boundary Hardening
-**Released: April 4, 2026** · [GitHub PR #121](https://github.com/QWED-AI/qwed-verification/pull/121)
+## v5.0.0 — Enforcement boundary hardening
+**Released: April 4, 2026** · [GitHub Release](https://github.com/QWED-AI/qwed-verification/releases/tag/v5.0.0)
 
-> Major release focused on making QWED's verification boundary fail-closed, deterministic about what it proves, and substantially harder to bypass under adversarial conditions. Consolidates 98 commits and 20 merged PRs since v4.0.1.
+> Major release making QWED's verification boundary fail-closed, deterministic about what it proves, and harder to bypass under adversarial conditions. Consolidates 98 commits and 20 merged PRs since v4.0.1, including the full enforcement hardening series.
 
 ### Breaking changes
 
-- **`security_checks` removed from agent verification** — Exfiltration and MCP poison checks are now enforced server-side on every request. The `security_checks` request field and the TypeScript SDK `checkExfiltration`/`checkMcpPoison` options have been removed. `tool_schema` remains available to trigger MCP poison inspection.
-- **`ActionContext` mandatory for agents** — `verify_action()` requires `ActionContext` with `conversation_id` and `step_number`. Requests without these fields are rejected with `QWED-AGENT-CTX-001`.
-- **`INCONCLUSIVE` is now a distinct verification status** — Downstream consumers must handle it. Natural-language math responses return `INCONCLUSIVE` when verifying LLM-translated expressions.
-- **`BLOCKED` and `UNKNOWN` are explicit outcomes** — Not generic failures. `verify_identity()` numerical sampling fallback now returns `UNKNOWN` instead of `LIKELY_EQUIVALENT`.
-- **`/metrics` and `/metrics/prometheus` require admin auth** — Update monitoring integrations to provide a JWT or API key with `owner` or `admin` role.
-- **Docker required for stats and consensus** — In-process execution fallbacks have been removed.
+- **`INCONCLUSIVE` is a new verification status** — Natural-language math responses now return `INCONCLUSIVE` when verifying LLM-translated expressions, because the translation step is non-deterministic. Downstream consumers must handle this status alongside `VERIFIED`, `ERROR`, and `BLOCKED`.
+- **`BLOCKED` and `UNKNOWN` are explicit outcomes** — These are no longer treated as generic failures. Consumers should map them to distinct UI states or retry logic.
+- **`ActionContext` is mandatory for agent verification** — All `verify_action` requests must include `conversation_id` and `step_number`. Requests without them are rejected with `QWED-AGENT-CTX-001`.
+- **`security_checks` field removed** — Exfiltration and MCP poison checks are now server-enforced and unconditional. The `security_checks` request field and the TypeScript SDK `checkExfiltration`/`checkMcpPoison` options no longer exist.
+- **`/metrics` endpoints require admin authentication** — `GET /metrics` and `GET /metrics/prometheus` now require an authenticated admin or owner role. Update monitoring integrations accordingly.
+- **Docker required for stats and consensus verification** — The in-process execution fallbacks have been removed. If Docker is unavailable, `/verify/stats` and `/verify/consensus` return HTTP 503.
 
 ### Security
 
-- **Fail-closed verification** — Disabled unsafe in-process execution fallbacks; stats and consensus paths now require secure Docker sandbox.
-- **Logic verifier eval() removed** — Raises `RuntimeError` if `SafeEvaluator` is unavailable instead of falling back to unrestricted `eval()`.
-- **Consensus rate limiting** — `POST /verify/consensus` now enforces `check_rate_limit` to prevent cost amplification attacks.
-- **Consensus fact self-attestation removed** — Fact engine no longer calls `verify_fact(query, query)` — requires external context.
-- **Redis fail-closed** — `RedisSlidingWindowLimiter` now denies requests on Redis errors instead of allowing them.
-- **Timing-safe token verification** — Agent token comparison switched to `hmac.compare_digest`.
-- **Environment integrity** — Startup enforces `verify_environment_integrity()` before database initialization.
+- **Fail-closed verification boundary** — Disabled unsafe in-process execution fallbacks; stats and consensus paths now require the secure Docker sandbox.
+- **Logic verifier eval() removed** — The raw `eval()` fallback in logic constraint parsing has been removed. If `SafeEvaluator` is unavailable, the verifier raises a `RuntimeError`.
+- **Consensus rate limiting** — `POST /verify/consensus` now enforces per-tenant rate limiting, matching other verification endpoints.
+- **Consensus fact self-attestation removed** — The fact engine no longer participates in automatic consensus engine selection, preventing self-referential verification loops.
+- **Redis fail-closed** — The sliding window rate limiter now denies requests on Redis errors instead of allowing them.
+- **Timing-safe token verification** — Agent token comparison uses `hmac.compare_digest` to prevent timing side-channel attacks.
+- **Environment integrity enforcement** — The API server runs `verify_environment_integrity()` at startup before database initialization.
 
-### Determinism and trust boundary
+### Trust boundary metadata
 
-- Natural-language math responses now return `INCONCLUSIVE` when verifying LLM-translated expressions — never `VERIFIED`.
-- Added explicit `trust_boundary` metadata in API responses describing what was actually verified.
-- `verify_identity()` numerical sampling fallback now returns `UNKNOWN` instead of `LIKELY_EQUIVALENT`.
-- Heuristic and non-proof outcomes are honestly labeled instead of presented as formal verification.
+API responses now include a `trust_boundary` object that describes exactly what was verified and what was not. This gives you machine-readable transparency into the verification scope.
+
+```json
+{
+  "trust_boundary": {
+    "query_interpretation_source": "llm_translation",
+    "query_semantics_verified": false,
+    "verification_scope": "translated_expression_only",
+    "deterministic_expression_evaluation": true,
+    "formal_proof": false,
+    "overall_status": "INCONCLUSIVE"
+  }
+}
+```
+
+See the [`POST /verify/natural_language`](/api/endpoints#post-verifynatural_language) endpoint reference for full field descriptions.
 
 ### Agent hardening
 
-- **Action context mandatory** — `verify_action()` requires `ActionContext` with `conversation_id` and `step_number`.
-- **Replay detection** — Same `(conversation_id, step_number)` pair is blocked (`QWED-AGENT-LOOP-002`).
-- **Loop detection** — Same action repeated 3+ times triggers DENIED (`QWED-AGENT-LOOP-003`).
-- **In-flight step reservations** — Prevents race conditions in concurrent agent calls.
-- **Budget denial isolation** — Budget-exceeded denials do not consume conversation state.
+- **Action context mandatory** — All `verify_action` requests must include `conversation_id` and `step_number`. Requests without them are rejected with `QWED-AGENT-CTX-001`.
+- **Replay detection** — Reusing a `(conversation_id, step_number)` pair is blocked (`QWED-AGENT-LOOP-002`).
+- **Loop detection** — Repeating the same action 3+ consecutive times triggers a denial (`QWED-AGENT-LOOP-003`).
+- **In-flight step reservations** — Prevents race conditions when multiple agent calls run concurrently.
+- **Budget denial isolation** — Budget-exceeded denials do not consume conversation state, so the agent can retry after the budget resets.
+- **Stats exception masking** — The Stats Engine no longer leaks internal exception details to API callers.
 
 ### SDK version bumps
 
@@ -49,14 +62,23 @@ description: "All notable changes to QWED Protocol — releases, features, secur
 - `@qwed-ai/sdk` (npm): `4.0.1` → `5.0.0`
 - TypeScript SDK: Removed `security_checks` from agent verification helpers; `tool_schema` remains.
 
+### Upgrade
+
 ```bash
 pip install qwed==5.0.0
 docker pull qwedai/qwed-verification:5.0.0
 npm install @qwed-ai/sdk@5.0.0
 ```
 
----
+<Warning>
+If you use `POST /verify/natural_language` and check the top-level `status` field, you must now handle `INCONCLUSIVE` as a valid outcome. Use the `trust_boundary` object to inspect the detailed verification breakdown. For fully deterministic results, use `POST /verify/math` directly.
+</Warning>
 
+<Warning>
+If you use agent verification, all requests must now include `conversation_id` and `step_number` in the context. See the [agent verification guide](/advanced/agent-verification) for details.
+</Warning>
+
+---
 ## v4.0.5 — Stats exception masking
 **Released: April 3, 2026** · [GitHub PR #118](https://github.com/QWED-AI/qwed-verification/pull/118)
 
