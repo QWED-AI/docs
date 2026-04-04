@@ -4,7 +4,7 @@ description: "All notable changes to QWED Protocol — releases, features, secur
 ---
 
 ## v5.0.0 — Enforcement boundary hardening
-**Released: April 4, 2026** · [GitHub PR #121](https://github.com/QWED-AI/qwed-verification/pull/121)
+**Released: April 4, 2026** · [GitHub Release](https://github.com/QWED-AI/qwed-verification/releases/tag/v5.0.0)
 
 > Major release making QWED's verification boundary fail-closed, deterministic about what it proves, and harder to bypass under adversarial conditions. Consolidates 98 commits and 20 merged PRs since v4.0.1, including the full enforcement hardening series.
 
@@ -48,11 +48,19 @@ See the [`POST /verify/natural_language`](/api/endpoints#post-verifynatural_lang
 
 ### Agent hardening
 
+- **Action context mandatory** — All `verify_action` requests must include `conversation_id` and `step_number`. Requests without them are rejected with `QWED-AGENT-CTX-001`.
 - **Replay detection** — Reusing a `(conversation_id, step_number)` pair is blocked (`QWED-AGENT-LOOP-002`).
 - **Loop detection** — Repeating the same action 3+ consecutive times triggers a denial (`QWED-AGENT-LOOP-003`).
 - **In-flight step reservations** — Prevents race conditions when multiple agent calls run concurrently.
 - **Budget denial isolation** — Budget-exceeded denials do not consume conversation state, so the agent can retry after the budget resets.
 - **Stats exception masking** — The Stats Engine no longer leaks internal exception details to API callers.
+
+### SDK version bumps
+
+- `qwed` (PyPI): `4.0.1` → `5.0.0`
+- `qwed_sdk` (Python): `2.1.0-dev` → `5.0.0`
+- `@qwed-ai/sdk` (npm): `4.0.1` → `5.0.0`
+- TypeScript SDK: Removed `security_checks` from agent verification helpers; `tool_schema` remains.
 
 ### Upgrade
 
@@ -71,7 +79,6 @@ If you use agent verification, all requests must now include `conversation_id` a
 </Warning>
 
 ---
-
 ## v4.0.5 — Stats exception masking
 **Released: April 3, 2026** · [GitHub PR #118](https://github.com/QWED-AI/qwed-verification/pull/118)
 
