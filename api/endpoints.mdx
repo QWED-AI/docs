@@ -26,7 +26,7 @@ curl https://api.qwedai.com/v1/health
 {
   "status": "healthy",
   "service": "QWED Platform",
-  "version": "1.0.0",
+  "version": "5.0.0",
   "timestamp": "2024-12-20T12:00:00Z"
 }
 ```
@@ -117,6 +117,8 @@ The `status` field was previously set to the inner engine result (e.g., `VERIFIE
 ---
 
 ### POST /verify/math
+
+<Info>New in v5.0.0: `verify_identity()` numerical sampling fallback now returns `UNKNOWN` instead of `LIKELY_EQUIVALENT`.</Info>
 
 Verify mathematical expressions or equations using SymPy symbolic computation.
 
@@ -327,9 +329,9 @@ Verify a factual claim against a provided context.
 
 ### POST /verify/consensus
 
-<Info>New in v4.0.0</Info>
+<Info>New in v4.0.0 · Updated in v5.0.0</Info>
 
-Multi-engine consensus verification. Runs the query through multiple verification engines and requires agreement above a confidence threshold. This endpoint is rate-limited per tenant.
+Multi-engine consensus verification. Runs the query through multiple verification engines and requires agreement above a confidence threshold. This endpoint is rate-limited per API key.
 
 Mathematical expressions are parsed and compared using `Decimal` arithmetic internally, which avoids floating-point drift when engines cross-check results.
 
@@ -692,11 +694,13 @@ Register a new AI agent with QWED for verified agentic workflows.
 
 ### POST /agents/{agent_id}/verify
 
+<Info>Updated in v5.0.0</Info>
+
 Verify a claim using an agent token. Creates an auditable record tied to the agent. Security checks are enforced server-side — exfiltration detection always runs, and MCP poisoning detection runs automatically when a `tool_schema` is provided.
 
-<Warning>**Breaking change:** The `security_checks` request field has been removed. Security checks are now mandatory and enforced server-side. You no longer need to (or can) opt in to exfiltration or MCP poison checks.</Warning>
+<Warning>**Breaking change (v5.0.0):** The `security_checks` request field has been removed. Security checks are now mandatory and enforced server-side. You no longer need to (or can) opt in to exfiltration or MCP poison checks.</Warning>
 
-<Warning>**Breaking change:** The `context` field with `conversation_id` and `step_number` is now required for all agent action verification requests. Requests without these fields are rejected with error code `QWED-AGENT-CTX-001`. See [conversation controls](/advanced/agent-verification#conversation-controls) for details.</Warning>
+<Warning>**Breaking change (v5.0.0):** The `context` field with `conversation_id` and `step_number` is now required for all agent action verification requests. Requests without these fields are rejected with error code `QWED-AGENT-CTX-001`. See [conversation controls](/advanced/agent-verification#conversation-controls) for details.</Warning>
 
 **Request:**
 
@@ -704,6 +708,10 @@ Verify a claim using an agent token. Creates an auditable record tied to the age
 {
   "query": "What is 15% of 200?",
   "provider": "openai",
+  "context": {
+    "conversation_id": "conv_abc123",
+    "step_number": 1
+  },
   "tool_schema": {
     "name": "fetch_report",
     "description": "Fetch quarterly report data"
@@ -715,6 +723,9 @@ Verify a claim using an agent token. Creates an auditable record tied to the age
 |-----------|------|----------|-------------|
 | `query` | string | Yes | The claim to verify |
 | `provider` | string | No | LLM provider preference |
+| `context` | object | Yes | Action context — see below |
+| `context.conversation_id` | string | Yes | Unique identifier for the conversation/session |
+| `context.step_number` | integer | Yes | Monotonically increasing step counter (>= 1) |
 | `tool_schema` | object | No | MCP tool definition to scan. When provided, `MCPPoisonGuard` runs automatically |
 
 **Headers:**

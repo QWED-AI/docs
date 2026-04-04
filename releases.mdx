@@ -5,8 +5,8 @@ description: "QWED Protocol release history — download links, installation, an
 
 ## Current Release
 
-<Card title="v4.0.1 — Sentinel Guard Sync 🔄" icon="arrows-rotate" href="/changelog">
-  Patch release — TypeScript SDK alignment, new `/verify/process` endpoint, agent security checks, and security fixes.
+<Card title="v5.0.0 — Enforcement Boundary Hardening" icon="shield-check" href="/changelog">
+  Major release — fail-closed verification, deterministic trust boundaries, agent hardening, and SDK version bump to 5.0.0.
 </Card>
 
 ### Install
@@ -14,23 +14,23 @@ description: "QWED Protocol release history — download links, installation, an
 <CodeGroup>
 
 ```bash pip
-pip install qwed==4.0.1
+pip install qwed==5.0.0
 ```
 
 ```bash docker
-docker pull qwedai/qwed-verification:4.0.1
+docker pull qwedai/qwed-verification:5.0.0
 ```
 
 ```bash npm
-npm install @qwed-ai/sdk@4.0.1
+npm install @qwed-ai/sdk@5.0.0
 ```
 
 ```bash cargo
-cargo add qwed@1.0.0
+cargo add qwed@5.0.0
 ```
 
 ```bash go
-go get github.com/QWED-AI/qwed-verification/sdk-go@v4.0.1
+go get github.com/QWED-AI/qwed-verification/sdk-go@v5.0.0
 ```
 
 </CodeGroup>
@@ -41,7 +41,13 @@ go get github.com/QWED-AI/qwed-verification/sdk-go@v4.0.1
 
 <AccordionGroup>
 
-<Accordion title="v4.0.1 — Sentinel Guard Sync (March 23, 2026)" icon="arrows-rotate" defaultOpen>
+<Accordion title="v5.0.0 — Enforcement Boundary Hardening (April 4, 2026)" icon="shield-check" defaultOpen>
+  **98 commits** · Fail-closed verification boundary · `security_checks` removed (server-enforced) · `ActionContext` mandatory for agents · `INCONCLUSIVE`/`BLOCKED`/`UNKNOWN` as explicit statuses · `trust_boundary` metadata · `/metrics` admin auth · Redis fail-closed rate limiting · Agent replay/loop detection · SDK `5.0.0` across Python, TypeScript, Go.
+
+  [Full Release Notes →](/changelog) · [GitHub PR ↗](https://github.com/QWED-AI/qwed-verification/pull/121)
+</Accordion>
+
+<Accordion title="v4.0.1 — Sentinel Guard Sync (March 23, 2026)" icon="arrows-rotate">
   TypeScript SDK alignment · `POST /verify/process` endpoint · Agent security checks (`exfiltration`, `mcp_poison`) · Security fixes (info disclosure, symbolic precision) · `@qwed-ai/sdk@4.0.1`.
 
   [Full Release Notes →](/changelog) · [GitHub Release ↗](https://github.com/QWED-AI/qwed-verification/releases/tag/v4.0.1)

@@ -212,9 +212,13 @@ const { agent_id, agent_token } = await client.registerAgent({
 
 ### verifyAgent(agentId, agentToken, query, options)
 
+<Info>Updated in v5.0.0</Info>
+
 Verify an agent action. Security checks (exfiltration detection and MCP poisoning) are enforced server-side and cannot be disabled by the client.
 
-<Warning>**Breaking change:** The `checkExfiltration` and `checkMcpPoison` options have been removed. Exfiltration detection always runs. MCP poison detection runs automatically when you provide a `toolSchema`.</Warning>
+<Warning>**Breaking change (v5.0.0):** The `checkExfiltration` and `checkMcpPoison` options have been removed. Exfiltration detection always runs. MCP poison detection runs automatically when you provide a `toolSchema`.</Warning>
+
+<Warning>**Breaking change (v5.0.0):** The `context` option with `conversationId` and `stepNumber` is now required. Requests without these fields are rejected with error code `QWED-AGENT-CTX-001`.</Warning>
 
 ```typescript
 const response = await client.verifyAgent(
@@ -223,6 +227,10 @@ const response = await client.verifyAgent(
   'Summarize the Q3 revenue report',
   {
     provider: 'openai',
+    context: {
+      conversationId: 'conv_abc123',
+      stepNumber: 1,
+    },
     toolSchema: {
       name: 'fetch_report',
       description: 'Fetch quarterly report data',
@@ -240,6 +248,9 @@ console.log(response.budget_remaining);
 | `agentId` | `number` | — | Agent ID from registration |
 | `agentToken` | `string` | — | Agent token from registration |
 | `query` | `string` | — | The action or query to verify |
+| `options.context` | `object` | — | Action context (required in v5.0.0) |
+| `options.context.conversationId` | `string` | — | Unique conversation/session identifier |
+| `options.context.stepNumber` | `number` | — | Monotonically increasing step counter (>= 1) |
 | `options.provider` | `string` | — | LLM provider name |
 | `options.toolSchema` | `object` | — | MCP tool definition — triggers server-side `MCPPoisonGuard` inspection |
 
@@ -306,11 +317,37 @@ enum VerificationType {
   SQL = 'sql',
   Image = 'image',
   Reasoning = 'reasoning',
-  Process = 'process',   // New in v4.0.1
-  RAG = 'rag',           // New in v4.0.1
-  Security = 'security', // New in v4.0.1
+  Process = 'process',
+  RAG = 'rag',
+  Security = 'security',
 }
 ```
+
+### VerificationStatus enum
+
+<Info>New in v5.0.0</Info>
+
+The `VerificationStatus` enum includes all possible status values returned by the verification API. Downstream consumers must handle `INCONCLUSIVE`, `BLOCKED`, and `UNKNOWN` as distinct outcomes.
+
+```typescript
+enum VerificationStatus {
+  Verified = 'VERIFIED',
+  CorrectionNeeded = 'CORRECTION_NEEDED',
+  Inconclusive = 'INCONCLUSIVE',   // New in v5.0.0
+  Blocked = 'BLOCKED',             // New in v5.0.0
+  Unknown = 'UNKNOWN',             // New in v5.0.0
+  Error = 'ERROR',
+}
+```
+
+| Status | Meaning |
+|--------|---------|
+| `VERIFIED` | Claim is formally verified |
+| `CORRECTION_NEEDED` | Claim is incorrect — correct value included in response |
+| `INCONCLUSIVE` | Verification succeeded on the translated expression but the LLM translation step is non-deterministic |
+| `BLOCKED` | Request blocked by security policy |
+| `UNKNOWN` | Verification could not produce a definitive result (e.g., numerical sampling fallback) |
+| `ERROR` | Internal verification error |
 
 ## Error handling
 

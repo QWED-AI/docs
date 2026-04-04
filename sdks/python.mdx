@@ -25,6 +25,10 @@ print(result.verified)  # True
 print(result.status)    # "VERIFIED"
 ```
 
+<Note>
+As of v5.0.0, the `status` field may return `INCONCLUSIVE`, `BLOCKED`, or `UNKNOWN` in addition to `VERIFIED` and `ERROR`. Natural-language math queries return `INCONCLUSIVE` when the inner engine succeeds, because the LLM translation step is non-deterministic. See the [trust boundary documentation](/api/endpoints#post-verifynatural_language) for details.
+</Note>
+
 ## Async Client
 
 ```python
