@@ -710,7 +710,9 @@ Verify a claim using an agent token. Creates an auditable record tied to the age
   "provider": "openai",
   "context": {
     "conversation_id": "conv_abc123",
-    "step_number": 1
+    "step_number": 1,
+    "pre_action_state_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "state_source": "db_snapshot"
   },
   "tool_schema": {
     "name": "fetch_report",
@@ -726,6 +728,8 @@ Verify a claim using an agent token. Creates an auditable record tied to the age
 | `context` | object | Yes | Action context — see below |
 | `context.conversation_id` | string | Yes | Unique identifier for the conversation/session |
 | `context.step_number` | integer | Yes | Monotonically increasing step counter (>= 1) |
+| `context.pre_action_state_hash` | string | Conditional | SHA-256 hex digest (64 lowercase hex characters) of the world state before the action. Must be provided together with `state_source`. Enables [LOOP-004](/specs/agent#94-progress-aware-doom-loop-detection-loop-004) detection |
+| `context.state_source` | string | Conditional | Declares how `pre_action_state_hash` was derived. One of: `file_tree`, `db_snapshot`, `conversation_digest`, `git_tree`, `custom`. Must be provided together with `pre_action_state_hash` |
 | `tool_schema` | object | No | MCP tool definition to scan. When provided, `MCPPoisonGuard` runs automatically |
 
 **Headers:**
