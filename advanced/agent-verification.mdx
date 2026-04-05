@@ -84,6 +84,7 @@ Each call to `verify_action` must include a `conversation_id` (identifying the c
 | Conversation length | 50 steps per conversation | `QWED-AGENT-LOOP-001` |
 | Replay detection | Each step number can only be used once | `QWED-AGENT-LOOP-002` |
 | Repetitive loop detection | Max 2 consecutive identical actions | `QWED-AGENT-LOOP-003` |
+| No-progress doom loop | Same action on unchanged state ≥ 3 times | `QWED-AGENT-LOOP-004` |
 
 ### Incrementing steps correctly
 
@@ -124,6 +125,55 @@ client.verify_action(
 <Warning>
 If your agent framework retries failed actions automatically, make sure it does not reuse the same `step_number` for a previously approved step. Replayed step numbers are always rejected.
 </Warning>
+
+### Progress-aware doom loop detection (LOOP-004)
+
+<Info>New in v5.1.0</Info>
+
+LOOP-003 catches agents that repeat the same action consecutively, but it cannot detect an agent that keeps retrying an action when the underlying system state has not changed. LOOP-004 addresses this by binding each action to the world state at the time it was proposed.
+
+To enable LOOP-004, include `pre_action_state_hash` and `state_source` in the action context:
+
+```python
+import hashlib
+
+# Compute a state hash from your environment
+db_snapshot = get_database_checksum()
+state_hash = hashlib.sha256(db_snapshot.encode()).hexdigest()
+
+decision = client.verify_action(
+    agent_id="agent_abc123",
+    action={"type": "execute_sql", "query": "UPDATE orders SET status = 'shipped'"},
+    context={
+        "conversation_id": "conv_xyz",
+        "step_number": 4,
+        "pre_action_state_hash": state_hash,
+        "state_source": "db_snapshot",
+    }
+)
+```
+
+The guard tracks a sliding window of the last 20 action+state fingerprints per conversation. If the same fingerprint appears 3 or more times, the action is halted with `QWED-AGENT-LOOP-004`.
+
+**Accepted `state_source` values:**
+
+| Value | Use case |
+|-------|----------|
+| `file_tree` | Git tree hash or directory listing hash |
+| `db_snapshot` | Database state checksum |
+| `conversation_digest` | Hash of the conversation history |
+| `git_tree` | Git tree object hash |
+| `custom` | Any caller-defined canonical hash |
+
+**Validation rules:**
+
+- `pre_action_state_hash` must be a 64-character lowercase hex SHA-256 digest
+- Both `pre_action_state_hash` and `state_source` must be provided together — supplying only one is rejected
+- During gradual rollout, both fields are optional. When the server enables `DOOM_LOOP_GUARD_REQUIRED`, they become mandatory
+
+<Note>
+LOOP-004 fingerprints are only committed to the sliding window when the action decision is `APPROVED`. Denied and pending actions do not affect the history, preventing false positives from rejected retries.
+</Note>
 
 ## Trust Levels
 
@@ -190,20 +240,23 @@ Every `verify_action` call requires an `ActionContext` with:
 | `conversation_id` | string | Yes | Unique identifier for the conversation/session |
 | `step_number` | integer | Yes | Monotonically increasing step counter (must be >= 1) |
 | `user_intent` | string | No | Human-readable description of the user's goal |
+| `pre_action_state_hash` | string | Conditional | SHA-256 hex digest of the world state before the action. Required when `state_source` is provided |
+| `state_source` | string | Conditional | How the hash was derived: `file_tree`, `db_snapshot`, `conversation_digest`, `git_tree`, or `custom`. Required when `pre_action_state_hash` is provided |
 
 The step number must increase with each action in a conversation. Attempts to reuse or decrement step numbers are rejected.
 
 ### Replay and loop detection
 
-The agent service detects and blocks three types of problematic patterns:
+The agent service detects and blocks four types of problematic patterns:
 
 | Pattern | Error code | Description |
 |---------|------------|-------------|
 | Step replay | `QWED-AGENT-LOOP-002` | Submitting an action with a `step_number` that was already used in the conversation |
 | Repetitive loop | `QWED-AGENT-LOOP-003` | Submitting the same action (identical fingerprint) more than 2 consecutive times |
+| No-progress doom loop | `QWED-AGENT-LOOP-004` | Repeating the same action on an unchanged world state 3 or more times (requires `pre_action_state_hash`) |
 | Step limit exceeded | `QWED-AGENT-LOOP-001` | Exceeding the maximum of 50 steps per conversation |
 
-Actions are fingerprinted deterministically using `action_type`, `query`, `code`, `target`, and `parameters`. If a loop is detected, the conversation state is not advanced — the agent can recover by submitting a different action at the same step number.
+Actions are fingerprinted deterministically using `action_type`, `query`, `code`, `target`, and `parameters`. When `pre_action_state_hash` is provided, the fingerprint also incorporates the world state hash. If a loop is detected, the conversation state is not advanced — the agent can recover by submitting a different action at the same step number.
 
 ```python
 # Step 1: approved

@@ -89,6 +89,20 @@ These errors apply to the `/verify/stats` and `/verify/consensus` endpoints. Sta
 | `QWED-AGENT-LOOP-001` | Conversation step limit exceeded (max 50 steps) |
 | `QWED-AGENT-LOOP-002` | Replay or out-of-order action step detected |
 | `QWED-AGENT-LOOP-003` | Repetitive action loop detected (same action more than 2 consecutive times) |
+| `QWED-AGENT-LOOP-004` | No-progress doom loop detected — agent is repeating the same action on an unchanged world state (≥ 3 times in the sliding window) |
+
+## Agent state errors
+
+<Info>New in v5.1.0</Info>
+
+These errors relate to the progress-aware doom loop guard ([LOOP-004](/specs/agent#94-progress-aware-doom-loop-detection-loop-004)). They are returned when the `pre_action_state_hash` or `state_source` context fields are invalid.
+
+| Code | Message |
+| --- | --- |
+| `QWED-AGENT-STATE-001` | `pre_action_state_hash` and `state_source` must be provided together (or are required when `DOOM_LOOP_GUARD_REQUIRED` is enabled) |
+| `QWED-AGENT-STATE-002` | `pre_action_state_hash` must be a 64-character lowercase hex SHA-256 digest |
+| `QWED-AGENT-STATE-003` | `state_source` must be one of: `file_tree`, `db_snapshot`, `conversation_digest`, `git_tree`, `custom` |
+| `QWED-AGENT-STATE-004` | Action parameters contain non-deterministic JSON-incompatible values |
 
 ## Attestation Errors
 
