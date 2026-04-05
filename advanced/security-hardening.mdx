@@ -6,6 +6,10 @@ description: "Harden QWED for production with prompt injection defense, secret m
 
 This guide provides instructions for hardening your QWED deployment for production environments. It covers prompt injection defense, secret management, network security, authentication, and compliance with OWASP LLM Top 10.
 
+<Note>
+Only **QWED v5.0.x** is currently supported with security patches and updates. Versions 4.x and earlier are end-of-life. If you are running a prior version, upgrade before applying the guidance below.
+</Note>
+
 ## 1. Secret Management
 
 QWED relies on environment variables for sensitive configuration. **Never commit `.env` files to version control.**
@@ -206,4 +210,40 @@ While QWED handles internal verification, you must implement the following "Huma
 - **Data Minimization**: Do not send PII (Personally Identifiable Information) to QWED unless absolutely necessary. Mask or redact sensitive data *before* it reaches the API.
 
 For related deployment controls, see [Architecture Overview](/architecture), [SDK Guards](/sdks/guards), and [Troubleshooting Guide](/troubleshooting).
+
+---
+
+## 6. Reporting a vulnerability
+
+If you discover a security vulnerability in QWED, do **not** report it through public GitHub issues, pull requests, or discussions.
+
+Instead, report it privately via email to **rahul@qwedai.com**. If GitHub private vulnerability reporting is enabled for the repository, you may use that channel as well.
+
+Include as much detail as possible:
+
+- Steps to reproduce the issue
+- Affected version(s)
+- Relevant code, configuration, logs, or screenshots
+- Proof-of-concept or exploit details, if available
+- The potential impact on confidentiality, integrity, or availability
+
+### Response timeline
+
+- Your report will be acknowledged within **24 hours**
+- The team will triage and validate the report as quickly as possible
+- You will be kept informed of progress during investigation and remediation
+- Disclosure timing will be coordinated with you when appropriate
+
+### Coordinated disclosure
+
+Please give the maintainers a reasonable amount of time to investigate and remediate the issue before making any public disclosure. You should:
+
+- Avoid publicly disclosing the issue until a fix or mitigation is available
+- Make a good-faith effort to avoid privacy violations, data destruction, or service disruption
+- Avoid accessing, modifying, or exfiltrating data beyond what is necessary to demonstrate the issue
+
+### Security issue vs. bug
+
+- **Security issue** — A vulnerability that compromises the confidentiality, integrity, or availability of the system, such as code execution, injection, auth bypass, privilege escalation, sensitive data exposure, sandbox escape, or fail-open security behavior. Report these privately as described above.
+- **Bug** — A functional defect or unexpected behavior that does not have security implications, such as a UI issue, incorrect calculation, documentation problem, or non-exploitable crash. Report these via the [GitHub Issue Tracker](https://github.com/QWED-AI/qwed-verification/issues).
 
