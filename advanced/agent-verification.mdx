@@ -77,7 +77,7 @@ QWED enforces runtime guardrails that prevent agents from replaying actions, run
 
 ### How it works
 
-Each call to `verify_action` must include a `conversation_id` (identifying the current session) and a `step_number` (a positive integer that increases with each action in that session). QWED uses these fields to enforce three controls:
+Each call to `verify_action` must include a `conversation_id` (identifying the current session) and a `step_number` (a positive integer that increases with each action in that session). QWED uses these fields to enforce four controls:
 
 | Control | Limit | Error code |
 |---------|-------|------------|
