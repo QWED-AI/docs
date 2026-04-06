@@ -61,6 +61,10 @@ QWED-MCP gives AI assistants access to **deterministic verification** through a 
 ├──────────────────────────────────────────────────────────────┤
 │                                                              │
 │  ┌────────────────────────────────────────────────────────┐  │
+│  │          RiskBasedExecutionGateway                     │  │
+│  │  └─► Policy lookup → Argument validation →            │  │
+│  │      Code safety (AST) → Admin policy enforcement     │  │
+│  ├────────────────────────────────────────────────────────┤  │
 │  │              execute_python_code                       │  │
 │  │  ├─► Synchronous Execution (30s timeout)               │  │
 │  │  └─► Background Execution (background=true)            │  │
@@ -86,6 +90,8 @@ QWED-MCP gives AI assistants access to **deterministic verification** through a 
 | --- | --- | --- |
 | [`execute_python_code`](/mcp/tools#execute_python_code) | Subprocess execution | The primary entry point for all QWED capabilities. Executes dynamically generated Python code with access to all QWED SDK libraries. Supports optional `background=true` for async execution. |
 | [`verification_status`](/mcp/tools#verification_status) | Job status polling | Check the status and results of background verification jobs dispatched via `execute_python_code` with `background=true`. |
+
+All tool calls pass through the [`RiskBasedExecutionGateway`](/mcp/tools#riskbasedexecutiongateway-governance) before dispatch. The gateway validates arguments, runs code safety analysis, and enforces admin policy. Unknown tools are blocked by default.
 
 <Info>
   In v0.1.x, QWED-MCP exposed individual tools like `verify_math`, `verify_logic`, `verify_code`, and `verify_sql`. These were consolidated into `execute_python_code` in v0.2.0 to solve context bloat (RFC-9728 compatibility). See [migration guide](/mcp/tools#migrating-from-v01x).
