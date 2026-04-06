@@ -25,11 +25,15 @@ The tool captures `stdout` and `stderr` from the subprocess and returns them as 
 | `code` | string | Yes | - | Python code to execute in a subprocess |
 | `background` | boolean | No | `false` | When `true`, the job runs asynchronously in the background and returns a `job_id` immediately. Use the [`verification_status`](#verification_status) tool to poll for results. Recommended for heavy or long-running verification scripts. |
 
+### Risk gateway pre-validation
+
+All tool calls pass through the [`RiskBasedExecutionGateway`](#riskbasedexecutiongateway-governance) before dispatch. The gateway normalizes arguments, verifies code safety, and enforces server policy. If the gateway blocks a request, the tool returns a structured `BLOCKED` response with a `verification_id` and error code instead of executing the code. See [governance error codes](#governance-error-codes) for the full list.
+
 ### Environment
 
 The subprocess runs with a restricted environment. Only `PATH`, `PYTHONPATH`, and `SYSTEMROOT` (Windows) are forwarded. Secrets, API keys, and other environment variables are stripped.
 
-The server admin must set `QWED_MCP_TRUSTED_CODE_EXECUTION=true` to enable this tool. When disabled, the tool returns an error message.
+The server admin must set `QWED_MCP_TRUSTED_CODE_EXECUTION=true` to enable this tool. When disabled, the tool returns a `BLOCKED_ADMIN_POLICY` response even if the code passes safety verification.
 
 ### Execution limits
 
@@ -153,8 +157,10 @@ Then poll for results:
 
 | Scenario | Response |
 | --- | --- |
-| Tool disabled | `Error: Code execution is disabled. The server admin must set QWED_MCP_TRUSTED_CODE_EXECUTION=true to enable this tool.` |
-| No code provided | `Error: No code provided.` |
+| Missing or empty `code` | `BLOCKED: Missing required non-empty 'code' argument. (verification_id=...)` — error code `QWED-MCP-RISK-003` |
+| Invalid `background` type | `BLOCKED: 'background' must be a boolean when provided. (verification_id=...)` — error code `QWED-MCP-RISK-004` |
+| Code fails safety check | `BLOCKED: QWED blocked python execution: <issues> (verification_id=...)` — error code `QWED-MCP-RISK-005` |
+| Tool disabled (admin policy) | `BLOCKED_ADMIN_POLICY: Python execution was verified, but server policy keeps code execution disabled until QWED_MCP_TRUSTED_CODE_EXECUTION=true. (verification_id=...)` — error code `QWED-MCP-RISK-006` |
 | Script raises exception | `STDERR` contains the traceback; return code is non-zero |
 | Timeout exceeded | `Execution timed out after 30.0 seconds.` |
 | Output cap exceeded | `[WARNING: OUTPUT TRUNCATED DUE TO 1MB SIZE CAP. PROCESS TERMINATED.]` — appended to the truncated output |
@@ -169,7 +175,11 @@ Check the execution status and output of a background verification task dispatch
 
 | Parameter | Type | Required | Description |
 | --- | --- | --- | --- |
-| `job_id` | string | Yes | The UUID returned by `execute_python_code` when `background=true` |
+| `job_id` | string | Yes | The UUID returned by `execute_python_code` when `background=true`. Must be a valid canonical UUID format. |
+
+<Note>
+  The risk gateway validates `job_id` as a canonical UUID before dispatch. Non-UUID values are rejected with error code `QWED-MCP-RISK-008`.
+</Note>
 
 ### Response format
 
@@ -263,7 +273,7 @@ Use these QWED SDK imports in your `execute_python_code` scripts to replicate th
 | `verify_config_secrets` | `from qwed_sdk.guards.config_guard import ConfigGuard` |
 
 <Warning>
-  If you see an `"Unknown tool"` error in Claude Desktop, it means the LLM is trying to call a removed v0.1.x tool. Tell Claude: "The verify\_\* tools have been removed. Use execute\_python\_code to write and run a Python verification script."
+  If you see a `BLOCKED` response with error code `QWED-MCP-RISK-001` in Claude Desktop, it means the LLM is trying to call a tool not in the governance policy table (likely a removed v0.1.x tool). Tell Claude: "The verify\_\* tools have been removed. Use execute\_python\_code to write and run a Python verification script."
 </Warning>
 
 ---
@@ -539,6 +549,86 @@ If validation fails, the server logs the error and exits immediately. This preve
 
 ---
 
+## RiskBasedExecutionGateway (governance)
+
+Verification-first governance gateway that validates all MCP tool calls before dispatch. Every call to `execute_python_code` or `verification_status` passes through this gateway automatically.
+
+### Description
+
+`RiskBasedExecutionGateway` enforces deterministic policy checks on every tool invocation. It normalizes arguments, runs code safety analysis, enforces admin policy, and returns a structured governance decision. If the gateway blocks a request, the MCP server returns the decision directly without executing the tool.
+
+The gateway is instantiated automatically when the MCP server starts — you do not need to configure it separately.
+
+### How it works
+
+1. **Policy lookup** — The gateway checks the tool name against its internal policy table. Unknown tools are blocked immediately (`QWED-MCP-RISK-001`).
+2. **Argument validation** — Required arguments are checked for type and presence. For `execute_python_code`, the `code` parameter must be a non-empty string and `background` must be a boolean.
+3. **Code safety verification** — For `execute_python_code`, the gateway runs AST-based analysis to detect dangerous patterns (e.g., `eval`, `exec`, `os.system`, `subprocess`, `pickle.loads`). The analyzer resolves import aliases to catch obfuscated calls.
+4. **Admin policy enforcement** — Even if code passes safety verification, the gateway checks `QWED_MCP_TRUSTED_CODE_EXECUTION`. If not enabled, the request is blocked with `BLOCKED_ADMIN_POLICY`.
+5. **UUID validation** — For `verification_status`, the `job_id` must be a valid canonical UUID.
+
+### Usage
+
+The gateway is used internally by the MCP server. You can also use it directly in custom integrations:
+
+```python
+from qwed_mcp.security import RiskBasedExecutionGateway
+
+gateway = RiskBasedExecutionGateway()
+
+decision = gateway.evaluate_and_route("execute_python_code", {
+    "code": "print('hello world')",
+    "background": False,
+})
+
+print(decision["verified"])          # True or False
+print(decision["status"])            # "ALLOW_VERIFIED", "BLOCKED", or "BLOCKED_ADMIN_POLICY"
+print(decision["verification_id"])   # Deterministic SHA-256 fingerprint
+print(decision["normalized_arguments"])  # Cleaned arguments
+```
+
+### Decision response fields
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `verified` | `bool` | `True` if the request is approved for execution |
+| `status` | `str` | `ALLOW_VERIFIED`, `BLOCKED`, or `BLOCKED_ADMIN_POLICY` |
+| `risk_level` | `str` | `high` or `low` depending on the tool |
+| `verification_id` | `str` | Deterministic SHA-256 fingerprint of the tool name and normalized arguments |
+| `normalized_arguments` | `dict` | Cleaned and validated arguments |
+| `message` | `str` | Human-readable explanation of the decision |
+| `error_code` | `str` | Present on blocked decisions. See [governance error codes](#governance-error-codes) |
+
+### Governance error codes
+
+| Error code | Tool | Trigger |
+| --- | --- | --- |
+| `QWED-MCP-RISK-001` | Any | Unknown tool name not in the policy table |
+| `QWED-MCP-RISK-002` | Any | Tool exists in policy but has no governance handler |
+| `QWED-MCP-RISK-003` | `execute_python_code` | Missing or empty `code` argument |
+| `QWED-MCP-RISK-004` | `execute_python_code` | `background` is not a boolean |
+| `QWED-MCP-RISK-005` | `execute_python_code` | Code safety verification failed or raised an error |
+| `QWED-MCP-RISK-006` | `execute_python_code` | Code passed verification but `QWED_MCP_TRUSTED_CODE_EXECUTION` is not `true` |
+| `QWED-MCP-RISK-007` | `verification_status` | Missing or empty `job_id` argument |
+| `QWED-MCP-RISK-008` | `verification_status` | `job_id` is not a valid canonical UUID |
+
+### Tool policies
+
+The gateway defines built-in policies for each registered tool:
+
+| Tool | Risk level | Requires verification |
+| --- | --- | --- |
+| `execute_python_code` | `high` | Yes |
+| `verification_status` | `low` | Yes |
+
+Tools not in this table are blocked by default with `QWED-MCP-RISK-001`.
+
+<Info>
+  The `verification_id` is a deterministic SHA-256 hash of the tool name and normalized arguments. Two identical requests always produce the same `verification_id`, which you can use for auditing and deduplication.
+</Info>
+
+---
+
 ## Error handling
 
 All tool responses include `stdout`, `stderr`, and a return code summary. A non-zero return code indicates the script raised an exception or exited with an error.
@@ -547,7 +637,10 @@ All tool responses include `stdout`, `stderr`, and a return code summary. A non-
 
 | Error | Cause | Solution |
 | --- | --- | --- |
-| `Code execution is disabled` | `QWED_MCP_TRUSTED_CODE_EXECUTION` not set | Server admin sets env var to `true` |
-| `No code provided` | Empty `code` parameter | Provide Python code in the `code` field |
+| `BLOCKED: Unknown MCP tool` | Tool name not in the governance policy table | Use `execute_python_code` or `verification_status` |
+| `BLOCKED: Missing required non-empty 'code' argument` | Empty or missing `code` parameter | Provide Python code in the `code` field |
+| `BLOCKED: QWED blocked python execution` | Code contains dangerous patterns | Remove `eval`, `exec`, `os.system`, `subprocess`, or similar calls |
+| `BLOCKED_ADMIN_POLICY` | `QWED_MCP_TRUSTED_CODE_EXECUTION` not set | Server admin sets env var to `true` |
+| `BLOCKED: Invalid job_id format` | `job_id` is not a canonical UUID | Use the UUID returned by the background job |
 | `Execution timed out after 30.0 seconds` | Script exceeded synchronous time limit | Optimize the script, break into smaller steps, or use `background=true` |
 | `ModuleNotFoundError` in stderr | Missing QWED SDK package | Install the required package (e.g., `pip install qwed-legal`) |
