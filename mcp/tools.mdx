@@ -563,7 +563,7 @@ The gateway is instantiated automatically when the MCP server starts — you do 
 
 1. **Policy lookup** — The gateway checks the tool name against its internal policy table. Unknown tools are blocked immediately (`QWED-MCP-RISK-001`).
 2. **Argument validation** — Required arguments are checked for type and presence. For `execute_python_code`, the `code` parameter must be a non-empty string and `background` must be a boolean.
-3. **Code safety verification** — For `execute_python_code`, the gateway runs AST-based analysis to detect dangerous patterns (e.g., `eval`, `exec`, `os.system`, `subprocess`, `pickle.loads`). The analyzer resolves import aliases to catch obfuscated calls.
+3. **Code safety verification** — For `execute_python_code`, the gateway runs AST-based analysis to detect dangerous patterns (e.g., `eval`, `exec`, `compile`, `open`, `__import__`, `os.system`, `os.popen`, `subprocess`, `pickle.loads`, `marshal.loads`). The analyzer resolves import aliases and `from ... import` renames to catch obfuscated calls such as `import os as x; x.system(...)` or `from os import popen as op; op(...)`. Raw pattern-based checks are used as a fallback only when AST parsing fails.
 4. **Admin policy enforcement** — Even if code passes safety verification, the gateway checks `QWED_MCP_TRUSTED_CODE_EXECUTION`. If not enabled, the request is blocked with `BLOCKED_ADMIN_POLICY`.
 5. **UUID validation** — For `verification_status`, the `job_id` must be a valid canonical UUID.
 
@@ -639,7 +639,7 @@ All tool responses include `stdout`, `stderr`, and a return code summary. A non-
 | --- | --- | --- |
 | `BLOCKED: Unknown MCP tool` | Tool name not in the governance policy table | Use `execute_python_code` or `verification_status` |
 | `BLOCKED: Missing required non-empty 'code' argument` | Empty or missing `code` parameter | Provide Python code in the `code` field |
-| `BLOCKED: QWED blocked python execution` | Code contains dangerous patterns | Remove `eval`, `exec`, `os.system`, `subprocess`, or similar calls |
+| `BLOCKED: QWED blocked python execution` | Code contains dangerous patterns | Remove `eval`, `exec`, `compile`, `open`, `__import__`, `os.system`, `os.popen`, `subprocess`, `pickle.loads`, `marshal.loads`, or similar calls. Aliased imports are also detected. |
 | `BLOCKED_ADMIN_POLICY` | `QWED_MCP_TRUSTED_CODE_EXECUTION` not set | Server admin sets env var to `true` |
 | `BLOCKED: Invalid job_id format` | `job_id` is not a canonical UUID | Use the UUID returned by the background job |
 | `Execution timed out after 30.0 seconds` | Script exceeded synchronous time limit | Optimize the script, break into smaller steps, or use `background=true` |
