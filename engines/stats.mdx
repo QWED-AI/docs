@@ -73,33 +73,39 @@ result = client.compute_statistics(
 )
 ```
 
-Supported operations: `mean`, `median`, `std`, `var`, `sum`, `count`, `min`, `max`, `mode`.
+| Operation | Description |
+| --------- | ----------- |
+| `mean` | Arithmetic mean of the column |
+| `median` | Median value |
+| `std` | Standard deviation |
+| `var` | Variance |
+| `sum` | Sum of all values |
+| `count` | Number of non-NaN values |
+| `min` | Minimum value |
+| `max` | Maximum value |
+| `mode` | Most frequent value (fails if multimodal) |
 
 ### Fail-closed validation
 
-Direct operations follow fail-closed semantics. The engine returns `SUCCESS` only when the result is clearly defined and verifiable. It returns `ERROR` for undefined, ambiguous, or non-verifiable cases:
+`compute_statistics` returns `SUCCESS` only when the result is clearly defined and safely verifiable. It returns `ERROR` in the following cases:
 
-| Condition | Behavior |
-| --------- | -------- |
-| Empty series (no rows) | Returns `ERROR` — operation is undefined |
-| All values are `NaN` | Returns `ERROR` — no valid observations |
-| `mode` with multiple equally frequent values | Returns `ERROR` — result is ambiguous |
-| Result is `NaN` | Returns `ERROR` — undefined result |
+| Condition | Error |
+| --------- | ----- |
+| Empty series (zero rows) | `{operation} is undefined for an empty series` |
+| All values are NaN | `{operation} is undefined because the series has no valid non-NaN values` |
+| Multiple modes (multimodal data) | `mode is ambiguous because {n} equally frequent values exist` |
+| Result is NaN | `{operation} produced an undefined result (NaN)` |
 
 ```python
 import pandas as pd
-from qwed_sdk import QWEDClient
 
-client = QWEDClient(api_key="qwed_...")
-
-df = pd.DataFrame({"color": ["red", "blue", "red", "blue"]})
-
-# Ambiguous mode — two values tied for most frequent
-result = client.compute_statistics(data=df, column="color", operation="mode")
+# Empty series — returns ERROR
+df_empty = pd.DataFrame({"col": pd.Series([], dtype="float64")})
+result = client.compute_statistics(data=df_empty, column="col", operation="mean")
 print(result["status"])  # ERROR
-print(result["error"])   # "mode is ambiguous because 2 equally frequent values exist"
-```
 
-<Tip>
-If you need to handle multimodal results or operate on empty data, use `verify_stats` with a natural-language query instead. The code-generation path gives you full control over edge-case logic.
-</Tip>
+# Multimodal data — returns ERROR for mode
+df_multi = pd.DataFrame({"col": [1, 1, 2, 2]})
+result = client.compute_statistics(data=df_multi, column="col", operation="mode")
+print(result["status"])  # ERROR
+```
