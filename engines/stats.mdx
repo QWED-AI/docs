@@ -69,6 +69,37 @@ For simple operations, bypass code generation:
 result = client.compute_statistics(
     data=df,
     column="sales",
-    operation="mean"  # mean, median, std, var, sum, count, min, max
+    operation="mean"  # mean, median, std, var, sum, count, min, max, mode
 )
 ```
+
+Supported operations: `mean`, `median`, `std`, `var`, `sum`, `count`, `min`, `max`, `mode`.
+
+### Fail-closed validation
+
+Direct operations follow fail-closed semantics. The engine returns `SUCCESS` only when the result is clearly defined and verifiable. It returns `ERROR` for undefined, ambiguous, or non-verifiable cases:
+
+| Condition | Behavior |
+| --------- | -------- |
+| Empty series (no rows) | Returns `ERROR` — operation is undefined |
+| All values are `NaN` | Returns `ERROR` — no valid observations |
+| `mode` with multiple equally frequent values | Returns `ERROR` — result is ambiguous |
+| Result is `NaN` | Returns `ERROR` — undefined result |
+
+```python
+import pandas as pd
+from qwed_sdk import QWEDClient
+
+client = QWEDClient(api_key="qwed_...")
+
+df = pd.DataFrame({"color": ["red", "blue", "red", "blue"]})
+
+# Ambiguous mode — two values tied for most frequent
+result = client.compute_statistics(data=df, column="color", operation="mode")
+print(result["status"])  # ERROR
+print(result["error"])   # "mode is ambiguous because 2 equally frequent values exist"
+```
+
+<Tip>
+If you need to handle multimodal results or operate on empty data, use `verify_stats` with a natural-language query instead. The code-generation path gives you full control over edge-case logic.
+</Tip>
