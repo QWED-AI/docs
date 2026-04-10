@@ -35,12 +35,23 @@ docker-compose ps
 
 ```bash
 # .env file
-QWED_API_KEY=qwed_your_key
-QWED_DATABASE_URL=postgresql://user:pass@localhost:5432/qwed
-QWED_REDIS_URL=redis://localhost:6379
-QWED_LLM_PROVIDER=openai
+
+# Required — server will not start without these
+API_KEY_SECRET=your-generated-secret
+QWED_CORS_ORIGINS=https://app.yourcompany.com
+
+# Infrastructure
+DATABASE_URL=postgresql://user:pass@localhost:5432/qwed
+REDIS_URL=redis://localhost:6379
+
+# LLM provider
+ACTIVE_PROVIDER=openai
 OPENAI_API_KEY=sk-...
 ```
+
+<Warning>
+`API_KEY_SECRET` and `QWED_CORS_ORIGINS` are mandatory as of v5.0.0. See the [deployment guide](/advanced/deployment#environment-variables-reference) for the full reference.
+</Warning>
 
 ### API Configuration
 
