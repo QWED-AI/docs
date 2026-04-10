@@ -26,7 +26,7 @@ A `Dockerfile` is provided in the root directory. It builds the QWED core servic
 
 ```bash
 # Build the image manually
-docker build -t qwed-core:2.0.0 .
+docker build -t qwed-core:5.0.0 .
 ```
 
 ### Docker Compose
@@ -171,7 +171,9 @@ gunicorn qwed_new.api.main:app -w 4 -k uvicorn.workers.UvicornWorker --bind 0.0.
 |----------|-------------|---------|----------|
 | `DATABASE_URL` | Postgres connection string | `sqlite:///./qwed.db` | Yes (Prod) |
 | `REDIS_URL` | Redis connection string | `redis://localhost:6379/0` | Yes (Prod) |
-| `API_KEY_SECRET` | Secret key for signing JWTs | `change-me...` | **YES** |
+| `API_KEY_SECRET` | Secret key for signing JWTs | None (must be set) | **YES** |
+| `QWED_CORS_ORIGINS` | Comma-separated list of allowed CORS origins | None (must be set) | **YES** |
+| `QWED_SKIP_ENV_INTEGRITY_CHECK` | Set to `true` to bypass startup environment integrity check | `false` | No |
 
 ### Security Configuration
 | Variable | Description | Default |
@@ -213,6 +215,8 @@ Before going to production, ensure the following:
 - [ ] Enable persistence (RDB/AOF).
 
 ### 3. Security
+- [ ] **Set `API_KEY_SECRET`**: This is mandatory — generate a secure value with `python -c "import secrets; print(secrets.token_urlsafe(48))"`.
+- [ ] **Set `QWED_CORS_ORIGINS`**: Explicitly list your allowed origins (e.g., `https://app.yourcompany.com`). The server will not start without this.
 - [ ] **Rotate Keys**: Change all default passwords and secrets.
 - [ ] **SSL/TLS**: Ensure the API is behind a Load Balancer with a valid SSL certificate.
 - [ ] **Network Policies**: Restrict access to database/Redis.

@@ -40,6 +40,10 @@ QWED_DATABASE_URL=postgresql://user:pass@localhost:5432/qwed
 QWED_REDIS_URL=redis://localhost:6379
 QWED_LLM_PROVIDER=openai
 OPENAI_API_KEY=sk-...
+
+# Required — server will not start without these
+API_KEY_SECRET=your-generated-secret  # python -c "import secrets; print(secrets.token_urlsafe(48))"
+QWED_CORS_ORIGINS=https://app.yourcompany.com
 ```
 
 ### API Configuration
@@ -72,7 +76,11 @@ CMD ["uvicorn", "qwed_new.api.main:app", "--host", "0.0.0.0"]
 
 ```bash
 docker build -t qwed-api .
-docker run -p 8000:8000 -e QWED_API_KEY=... qwed-api
+docker run -p 8000:8000 \
+  -e QWED_API_KEY=... \
+  -e API_KEY_SECRET=... \
+  -e QWED_CORS_ORIGINS="https://app.yourcompany.com" \
+  qwed-api
 ```
 
 ## Kubernetes
@@ -144,7 +152,9 @@ qwed_cache_hit_rate
 ## Security
 
 1. **Always use HTTPS** in production
-2. **Set strong API keys**
-3. **Enable rate limiting**
-4. **Use network isolation**
-5. **Rotate secrets regularly**
+2. **Set `API_KEY_SECRET`** — mandatory, no default value
+3. **Set `QWED_CORS_ORIGINS`** — mandatory, explicitly list allowed origins
+4. **Set strong API keys**
+5. **Enable rate limiting**
+6. **Use network isolation**
+7. **Rotate secrets regularly**
