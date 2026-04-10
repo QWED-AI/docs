@@ -26,7 +26,7 @@ A `Dockerfile` is provided in the root directory. It builds the QWED core servic
 
 ```bash
 # Build the image manually
-docker build -t qwed-core:2.0.0 .
+docker build -t qwed-core:5.0.0 .
 ```
 
 ### Docker Compose
@@ -39,7 +39,37 @@ We provide a `docker-compose.yml` that orchestrates:
 - **prometheus**: Metrics collection.
 - **grafana**: Observability dashboards.
 
-To start the stack:
+Before starting the stack, create a `.env` file in the `deploy/` directory with the required environment variables:
+
+```bash
+# Required — the server will not start without these
+DATABASE_URL=postgresql://qwed:your_password@postgres:5432/qwed_db
+QWED_CORS_ORIGINS=https://app.yourcompany.com
+API_KEY_SECRET=your-generated-secret
+
+# Optional
+REDIS_URL=redis://redis:6379/0
+OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4317
+
+# Postgres
+POSTGRES_USER=qwed
+POSTGRES_PASSWORD=your_password
+POSTGRES_DB=qwed_db
+
+# Grafana
+GF_SECURITY_ADMIN_USER=admin
+GF_SECURITY_ADMIN_PASSWORD=your_grafana_password
+```
+
+<Warning>
+`DATABASE_URL`, `QWED_CORS_ORIGINS`, and `API_KEY_SECRET` are **required**. Docker Compose will refuse to start if any of these are missing. Generate `API_KEY_SECRET` with:
+
+```bash
+python -c "import secrets; print(secrets.token_urlsafe(48))"
+```
+</Warning>
+
+Start the stack:
 
 ```bash
 docker-compose up -d
@@ -48,16 +78,12 @@ docker-compose up -d
 Access the services:
 - **API**: http://localhost:8000
 - **API Docs**: http://localhost:8000/docs
-- **Grafana**: http://localhost:3000 (admin/qwed_admin)
+- **Grafana**: http://localhost:3000
 - **Jaeger**: http://localhost:16686
-
-> 🏢 **Enterprise Support Coming Soon:** Managed hosting, dedicated support, and SLA guarantees. Contact support@qwedai.com
 
 ### Docker requirement for code execution
 
 Both the Stats Engine and the Consensus Engine (in `high`/`maximum` mode) execute model-generated Python inside Docker containers. Docker is **required** — there are no in-process fallbacks. If Docker is unavailable, these endpoints return HTTP 503.
-
-In a Docker Compose environment, the `qwed-core` container mounts the host's Docker socket (`/var/run/docker.sock`). Ensure the user running Docker Compose has appropriate permissions.
 
 ---
 
@@ -78,11 +104,15 @@ For production environments, we provide Kubernetes manifests in `deploy/kubernet
    ```
 
 2. **Configure Secrets & ConfigMaps**
-   Edit `deploy/kubernetes/secret.yaml` with your real API keys and database credentials.
+   Edit `deploy/kubernetes/secret.yaml` and replace all `__REPLACE_WITH_*__` placeholders with your real values. The `DATABASE_URL` is now stored in the Secret (not the ConfigMap) because it contains credentials.
    ```bash
    kubectl apply -f deploy/kubernetes/configmap.yaml
    kubectl apply -f deploy/kubernetes/secret.yaml
    ```
+
+   <Tip>
+   For production, use [Sealed Secrets](https://sealed-secrets.netlify.app/) or [External Secrets Operator](https://external-secrets.io/) instead of storing plain-text values in `secret.yaml`.
+   </Tip>
 
 3. **Deploy Application**
    ```bash
@@ -171,7 +201,12 @@ gunicorn qwed_new.api.main:app -w 4 -k uvicorn.workers.UvicornWorker --bind 0.0.
 |----------|-------------|---------|----------|
 | `DATABASE_URL` | Postgres connection string | `sqlite:///./qwed.db` | Yes (Prod) |
 | `REDIS_URL` | Redis connection string | `redis://localhost:6379/0` | Yes (Prod) |
-| `API_KEY_SECRET` | Secret key for signing JWTs | `change-me...` | **YES** |
+| `API_KEY_SECRET` | Secret for PBKDF2 API-key hashing | None | **Yes** |
+| `QWED_CORS_ORIGINS` | Comma-separated allowed CORS origins | None | **Yes** |
+
+<Warning>
+`API_KEY_SECRET` no longer has a default value. The server will refuse to start if it is not set. This prevents accidental deployment with a weak default secret.
+</Warning>
 
 ### Security Configuration
 | Variable | Description | Default |
@@ -180,6 +215,7 @@ gunicorn qwed_new.api.main:app -w 4 -k uvicorn.workers.UvicornWorker --bind 0.0.
 | `SIMILARITY_THRESHOLD` | Prompt injection detection threshold | 0.6 |
 | `DOCKER_TIMEOUT` | Code execution timeout (seconds) | 10 |
 | `DOCKER_MEMORY_LIMIT` | Container memory limit | 512m |
+| `QWED_SKIP_ENV_INTEGRITY_CHECK` | Skip `.pth` file verification on startup | `false` |
 
 ### AI Providers
 | Variable | Description | Default |
@@ -213,6 +249,8 @@ Before going to production, ensure the following:
 - [ ] Enable persistence (RDB/AOF).
 
 ### 3. Security
+- [ ] **Set `API_KEY_SECRET`**: Generate a strong secret — the server will not start without it.
+- [ ] **Set `QWED_CORS_ORIGINS`**: Restrict to your application domains — the server will not start without it.
 - [ ] **Rotate Keys**: Change all default passwords and secrets.
 - [ ] **SSL/TLS**: Ensure the API is behind a Load Balancer with a valid SSL certificate.
 - [ ] **Network Policies**: Restrict access to database/Redis.

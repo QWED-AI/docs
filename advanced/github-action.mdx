@@ -30,7 +30,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Verify Calculation
-        uses: QWED-AI/qwed-verification@v2.2.0
+        uses: QWED-AI/qwed-verification@v5.0.0
         with:
           api_key: ${{ secrets.QWED_API_KEY }}
           action: verify
@@ -55,6 +55,9 @@ Use these extension-specific actions when you want domain-focused checks in your
 | --- | --- | --- | --- |
 | `api_key` | QWED API key (optional for local mode) | No | - |
 | `action` | Action type: `verify`, `scan-secrets`, `scan-code`, `verify-shell` | No | `verify` |
+| `provider` | LLM provider (`openai`, `anthropic`, `gemini`) | No | - |
+| `model` | Model name (e.g., `gpt-4o`, `claude-sonnet-4-20250514`) | No | - |
+| `mask_pii` | Mask PII in inputs and outputs | No | `false` |
 | `query` | The user query (e.g., "Derivative of x^2"). Required for `math` and `logic` engines. | Conditional | - |
 | `llm_output` | The LLM output to verify. Required for the `code` engine. | Conditional | - |
 | `engine` | Verification engine: `math`, `logic`, `code`, `sql`, `shell` | No | `math` |
@@ -68,6 +71,39 @@ Use these extension-specific actions when you want domain-focused checks in your
   - **logic** — requires `query`
   - **code** — requires `llm_output` (passed as the code to analyze)
 </Note>
+
+### Provider and model selection
+
+<Info>New in v5.0.0</Info>
+
+You can now specify which LLM provider and model the action uses. When you pass `api_key`, QWED automatically maps it to the correct provider-specific environment variable (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, or `GOOGLE_API_KEY`) based on your `provider` selection.
+
+```yaml
+- name: Verify with Claude
+  uses: QWED-AI/qwed-verification@v5.0.0
+  with:
+    api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+    provider: anthropic
+    model: claude-sonnet-4-20250514
+    action: verify
+    engine: math
+    query: "sqrt(144) = 12"
+```
+
+### PII masking
+
+Set `mask_pii: "true"` to automatically redact personally identifiable information (email addresses, phone numbers, SSNs) from inputs and outputs before they reach the LLM.
+
+```yaml
+- name: Verify with PII masking
+  uses: QWED-AI/qwed-verification@v5.0.0
+  with:
+    api_key: ${{ secrets.QWED_API_KEY }}
+    mask_pii: "true"
+    action: verify
+    engine: logic
+    query: "User john@example.com claims order total is correct"
+```
 
 ## Outputs
 
@@ -85,7 +121,7 @@ Use these extension-specific actions when you want domain-focused checks in your
 
 ```yaml
 - name: Check Math
-  uses: QWED-AI/qwed-verification@v2.2.0
+  uses: QWED-AI/qwed-verification@v5.0.0
   with:
     api_key: ${{ secrets.QWED_API_KEY }}
     action: verify
@@ -97,7 +133,7 @@ Use these extension-specific actions when you want domain-focused checks in your
 
 ```yaml
 - name: Check Logic
-  uses: QWED-AI/qwed-verification@v2.2.0
+  uses: QWED-AI/qwed-verification@v5.0.0
   with:
     api_key: ${{ secrets.QWED_API_KEY }}
     action: verify
@@ -109,7 +145,7 @@ Use these extension-specific actions when you want domain-focused checks in your
 
 ```yaml
 - name: Security Check
-  uses: QWED-AI/qwed-verification@v2.2.0
+  uses: QWED-AI/qwed-verification@v5.0.0
   with:
     api_key: ${{ secrets.QWED_API_KEY }}
     action: verify
@@ -121,7 +157,7 @@ Use these extension-specific actions when you want domain-focused checks in your
 
 ```yaml
 - name: Scan Code
-  uses: QWED-AI/qwed-verification@v2.2.0
+  uses: QWED-AI/qwed-verification@v5.0.0
   with:
     api_key: ${{ secrets.QWED_API_KEY }}
     action: scan-code

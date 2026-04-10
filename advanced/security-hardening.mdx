@@ -44,8 +44,18 @@ If you use Vault, you can use `envconsul` or the Vault Agent Injector to populat
 envconsul -prefix qwed/prod/ qwed-api
 ```
 
-### Critical Secrets
+### Required secrets
+
+<Info>Changed in v5.0.0</Info>
+
+`API_KEY_SECRET` is now **mandatory** — the server will not start without it. This secret is used for PBKDF2 API-key hashing. Generate one with:
+
+```bash
+python -c "import secrets; print(secrets.token_urlsafe(48))"
+```
+
 Ensure these secrets are rotated regularly:
+- `API_KEY_SECRET` (used for API key hashing — **required**)
 - `OPENAI_API_KEY` (and other provider keys)
 - `JWT_SECRET_KEY` (used for signing session tokens)
 - `DATABASE_URL` (if using an external database)
@@ -78,6 +88,12 @@ export RATE_LIMIT_REQUESTS_PER_MINUTE=50
 export RATE_LIMIT_WINDOW_SECONDS=60
 ```
 
+#### Thread-safe in-memory limiter
+
+<Info>New in v5.0.0</Info>
+
+The in-memory rate limiter is now thread-safe. All check-and-record operations are protected by a lock, which prevents race conditions when multiple threads handle concurrent requests in a single process. This eliminates a class of bypass where two requests arriving simultaneously could both pass the limit check before either was recorded.
+
 #### Redis backing (recommended)
 The default in-memory limiter does not scale across multiple worker processes or replicas. For high-availability deployments, we recommend using a Redis-backed rate limiter to ensure consistent enforcement across your cluster.
 
@@ -85,14 +101,23 @@ The default in-memory limiter does not scale across multiple worker processes or
 The Redis-backed rate limiter uses a **fail-closed** policy. If Redis becomes unreachable at runtime, requests are denied rather than allowed through. This prevents a Redis outage from silently disabling rate limiting. An in-memory fallback is only used when Redis is unavailable at initialization time.
 </Note>
 
-### CORS Configuration
-By default, QWED is configured for development (`*`). You **must** restrict this in production to prevent unauthorized cross-origin requests.
+### CORS configuration
 
-Set the `CORS_ALLOWED_ORIGINS` environment variable to a comma-separated list of trusted domains.
+<Info>Changed in v5.0.0</Info>
+
+QWED no longer defaults to `*` for CORS origins. The `QWED_CORS_ORIGINS` environment variable is **required** — the server will refuse to start if it is not set.
+
+Set it to a comma-separated list of trusted origins:
 
 ```bash
-export CORS_ALLOWED_ORIGINS="https://app.yourcompany.com,https://admin.yourcompany.com"
+export QWED_CORS_ORIGINS="https://app.yourcompany.com,https://admin.yourcompany.com"
 ```
+
+<Warning>
+If you were previously relying on the default `*` origin, you must now explicitly set `QWED_CORS_ORIGINS` before upgrading. This is a breaking change in v5.0.0.
+</Warning>
+
+When `QWED_CORS_ORIGINS` is set to a wildcard (`*`), credentialed requests (`allow_credentials`) are automatically disabled to comply with the CORS specification.
 
 ---
 
