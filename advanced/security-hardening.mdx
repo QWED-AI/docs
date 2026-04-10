@@ -44,6 +44,7 @@ If you use Vault, you can use `envconsul` or the Vault Agent Injector to populat
 envconsul -prefix qwed/prod/ qwed-api
 ```
 
+### Critical secrets
 ### Required secrets
 
 <Info>Changed in v5.0.0</Info>
@@ -57,8 +58,17 @@ python -c "import secrets; print(secrets.token_urlsafe(48))"
 Ensure these secrets are rotated regularly:
 - `API_KEY_SECRET` (used for API key hashing — **required**)
 - `OPENAI_API_KEY` (and other provider keys)
+- `API_KEY_SECRET` (used for signing JWTs — **mandatory**, the server will not start without it)
 - `JWT_SECRET_KEY` (used for signing session tokens)
 - `DATABASE_URL` (if using an external database)
+
+<Warning>
+As of v5.0.0, `API_KEY_SECRET` no longer has a default value. You must set it explicitly before starting the server. Generate a secure value with:
+
+```bash
+python -c "import secrets; print(secrets.token_urlsafe(48))"
+```
+</Warning>
 
 ---
 
@@ -71,8 +81,8 @@ Restrict network access to the QWED API server:
 - **Internal Access**: The QWED application port (default `8000`) should **not** be directly exposed to the internet.
 - **Database**: Block all public access to the database port (e.g., `5432`). Only allow connections from the QWED application subnet.
 
-### Rate Limiting (Production)
-QWED includes a default in-memory rate limiter. For production, you should tune these limits and consider a distributed solution.
+### Rate limiting (production)
+QWED includes a default in-memory rate limiter that is thread-safe — all check and record operations are protected by a lock, so it is safe to use with multi-threaded ASGI servers. For production, you should tune these limits and consider a distributed solution.
 
 #### Configuration
 You can adjust the rate limits using environment variables:
@@ -103,6 +113,8 @@ The Redis-backed rate limiter uses a **fail-closed** policy. If Redis becomes un
 
 ### CORS configuration
 
+QWED requires you to explicitly configure allowed CORS origins. The `QWED_CORS_ORIGINS` environment variable must be set to a comma-separated list of trusted domains — the server will refuse to start if this variable is empty or unset.
+
 <Info>Changed in v5.0.0</Info>
 
 QWED no longer defaults to `*` for CORS origins. The `QWED_CORS_ORIGINS` environment variable is **required** — the server will refuse to start if it is not set.
@@ -114,6 +126,10 @@ export QWED_CORS_ORIGINS="https://app.yourcompany.com,https://admin.yourcompany.
 ```
 
 <Warning>
+Previous versions defaulted to allowing all origins (`*`) for development convenience. As of v5.0.0, CORS origins must be explicitly configured. If you need to allow all origins during local development, set `QWED_CORS_ORIGINS="*"` — but never use this in production.
+</Warning>
+
+When the origin list is set to `*`, the `allow_credentials` CORS header is automatically set to `false` to prevent credential leakage. For specific origin lists, credentials are allowed.
 If you were previously relying on the default `*` origin, you must now explicitly set `QWED_CORS_ORIGINS` before upgrading. This is a breaking change in v5.0.0.
 </Warning>
 
@@ -221,10 +237,17 @@ While QWED handles internal verification, you must implement the following "Huma
 - **Output Monitoring**: Log and randomly audit verified outputs to ensure the verification engine itself hasn't been bypassed.
 
 #### LLM05: Supply Chain Vulnerabilities
-- **Startup environment integrity**: QWED now enforces environment integrity at startup by verifying all Python `.pth` startup hook files against a built-in allowlist. If any unrecognized `.pth` file is found, the server refuses to start. You can extend the allowlist for custom deployments using the `QWED_ALLOWED_STARTUP_PTH_FILES` environment variable (comma-separated list of filenames).
+- **Startup environment integrity**: QWED enforces environment integrity at startup by verifying all Python `.pth` startup hook files against a built-in allowlist. If any unrecognized `.pth` file is found, the server refuses to start. You can extend the allowlist for custom deployments using the `QWED_ALLOWED_STARTUP_PTH_FILES` environment variable (comma-separated list of filenames).
 
   ```bash
   export QWED_ALLOWED_STARTUP_PTH_FILES="my_custom_plugin.pth,internal_tool.pth"
+  ```
+
+  If you need to bypass the environment integrity check entirely (for example, in development environments with non-standard `.pth` files), set `QWED_SKIP_ENV_INTEGRITY_CHECK=true`. The server will log a warning when this bypass is active.
+
+  ```bash
+  # Development only — do not use in production
+  export QWED_SKIP_ENV_INTEGRITY_CHECK=true
   ```
 
 - **Startup hook detection**: Use [`StartupHookGuard`](/sdks/guards#startuphookguard) to scan for malicious `.pth` files in Python `site-packages` before your application starts. This defends against supply chain attacks that inject code-execution hooks via compromised PyPI packages.

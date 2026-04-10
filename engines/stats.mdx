@@ -91,15 +91,18 @@ result = client.compute_statistics(
 
 | Condition | Error |
 | --------- | ----- |
-| Empty series (zero rows) | `{operation} is undefined for an empty series` |
-| All values are NaN | `{operation} is undefined because the series has no valid non-NaN values` |
+| Column not found | `Column '{name}' not found` |
+| Unknown operation | `Unknown operation '{name}'` |
 | Multiple modes (multimodal data) | `mode is ambiguous because {n} equally frequent values exist` |
-| Result is NaN | `{operation} produced an undefined result (NaN)` |
+| Mode with no values | `mode produced an undefined result (NaN)` |
+| Result is NaN (includes empty series or all-NaN columns) | `{operation} produced an undefined result (NaN)` |
+
+Empty series and all-NaN columns are caught by the NaN result check — if the underlying pandas operation returns `NaN`, the method returns an `ERROR` status rather than propagating the undefined value.
 
 ```python
 import pandas as pd
 
-# Empty series — returns ERROR
+# Empty series — returns ERROR (NaN result)
 df_empty = pd.DataFrame({"col": pd.Series([], dtype="float64")})
 result = client.compute_statistics(data=df_empty, column="col", operation="mean")
 print(result["status"])  # ERROR

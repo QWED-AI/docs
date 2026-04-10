@@ -106,6 +106,10 @@ Some endpoints have specific limits:
 | `/agent/register` | 10/hour |
 | `/attestation/verify` | 1000/hour |
 
+## Thread-safe in-memory limiter
+
+The default in-memory rate limiter is thread-safe. All check-and-record operations (per-key and global) are protected by a lock, making it safe to use with multi-threaded ASGI servers such as Uvicorn with multiple workers. The `get_reset_time` method also operates under the lock to prevent stale reads.
+
 ## Fail-closed enforcement
 
 When using Redis-backed rate limiting, the rate limiter operates with a **fail-closed** policy. If the Redis backend encounters an error at runtime, requests are denied rather than allowed through. This ensures that a temporary Redis outage does not silently bypass rate limits.

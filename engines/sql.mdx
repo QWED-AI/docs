@@ -54,12 +54,27 @@ print(result.vulnerabilities)
 # [{"type": "destructive_delete", "severity": "high"}]
 ```
 
-| Operation | Severity |
-| --------- | -------- |
-| DROP      | Critical |
-| DELETE    | High     |
-| TRUNCATE  | High     |
-| UPDATE    | High     |
+| Operation  | Severity |
+| ---------- | -------- |
+| DROP       | Critical |
+| DELETE     | High     |
+| TRUNCATE   | High     |
+| UPDATE     | High     |
+| INSERT     | High     |
+| ALTER      | High     |
+| CREATE     | High     |
+| MERGE      | High     |
+
+### Administrative commands
+
+The SQL engine also blocks administrative SQL commands by default:
+
+| Command     | Risk     |
+| ----------- | -------- |
+| GRANT       | Critical |
+| REVOKE      | Critical |
+| SET         | Medium   |
+| TRANSACTION | Medium   |
 
 ## Supported Dialects
 
