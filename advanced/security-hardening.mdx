@@ -131,7 +131,6 @@ Previous versions defaulted to allowing all origins (`*`) for development conven
 
 When the origin list is set to `*`, the `allow_credentials` CORS header is automatically set to `false` to prevent credential leakage. For specific origin lists, credentials are allowed.
 If you were previously relying on the default `*` origin, you must now explicitly set `QWED_CORS_ORIGINS` before upgrading. This is a breaking change in v5.0.0.
-</Warning>
 
 When `QWED_CORS_ORIGINS` is set to a wildcard (`*`), credentialed requests (`allow_credentials`) are automatically disabled to comply with the CORS specification.
 
