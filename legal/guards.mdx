@@ -55,6 +55,19 @@ print(result.difference_days)    # 13
   Allow +/- this many days when verifying the deadline. Useful for accommodating minor rounding differences.
 </ParamField>
 
+### Response fields
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `verified` | `bool` | Whether the claimed deadline matches the computed deadline |
+| `signing_date` | `datetime` | Parsed signing date |
+| `claimed_deadline` | `datetime` | The deadline claimed by the LLM |
+| `computed_deadline` | `datetime` | The correct deadline computed by the guard |
+| `term_parsed` | `str` | The original term string |
+| `difference_days` | `int` | Absolute difference in days between claimed and computed |
+| `message` | `str` | Human-readable verification message |
+| `verification_mode` | `str` | Always `"SYMBOLIC"` for legal verification |
+
 ### Features
 
 | Feature | Description |
@@ -91,6 +104,12 @@ LLMs get percentage math wrong:
 - Float precision errors on large amounts
 - Tiered liability miscalculations
 
+### Constructor parameters
+
+<ParamField path="tolerance_percent" type="float" default="0.01">
+  Tolerance for floating-point comparison as a percentage. For example, `0.01` means 0.01% tolerance. Adjust for stricter or more lenient verification.
+</ParamField>
+
 ### The Solution
 
 ```python
@@ -109,7 +128,33 @@ print(result.computed_cap)  # 10,000,000
 print(result.difference)    # 5,000,000
 ```
 
-### Additional Methods
+### `verify_cap` parameters
+
+<ParamField path="contract_value" type="float" required>
+  Total value of the contract.
+</ParamField>
+
+<ParamField path="cap_percentage" type="float" required>
+  Liability cap as a percentage (e.g., `200` for 200%).
+</ParamField>
+
+<ParamField path="claimed_cap" type="float" required>
+  The cap amount claimed by the LLM.
+</ParamField>
+
+### Response fields
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `verified` | `bool` | Whether the claimed cap matches the computed cap |
+| `contract_value` | `Decimal` | The contract value used |
+| `cap_percentage` | `Decimal` | The percentage used |
+| `claimed_cap` | `Decimal` | The cap claimed by the LLM |
+| `computed_cap` | `Decimal` | The correct cap computed by the guard |
+| `difference` | `Decimal` | Absolute difference between claimed and computed |
+| `message` | `str` | Human-readable verification message |
+
+### Additional methods
 
 ```python
 # Tiered liability
@@ -277,6 +322,24 @@ print(result.verified)   # False - mismatch detected
 print(result.conflicts)  # ["Governing law 'Delaware' (US state) but forum 'London' is non-US..."]
 ```
 
+### Parameters
+
+<ParamField path="parties_countries" type="list[str]" required>
+  List of ISO country codes for contract parties (e.g., `["US", "UK"]`).
+</ParamField>
+
+<ParamField path="governing_law" type="str" required>
+  The stated governing law — can be a country code or US state name/abbreviation (e.g., `"Delaware"`, `"DE"`, `"UK"`).
+</ParamField>
+
+<ParamField path="forum" type="str">
+  The stated forum or venue for dispute resolution.
+</ParamField>
+
+<ParamField path="jurisdiction_type" type="JurisdictionType" default="JurisdictionType.EXCLUSIVE">
+  Type of jurisdiction clause. Accepts `JurisdictionType.EXCLUSIVE`, `JurisdictionType.NON_EXCLUSIVE`, or `JurisdictionType.HYBRID`.
+</ParamField>
+
 ### Features
 
 | Feature | Description |
@@ -285,6 +348,22 @@ print(result.conflicts)  # ["Governing law 'Delaware' (US state) but forum 'Lond
 | **Forum Selection** | Checks forum vs governing law alignment |
 | **CISG Detection** | Warns about international sale of goods conventions |
 | **Convention Check** | Verifies Hague, NY Convention applicability |
+| **Legal System Mismatch** | Detects cross-border Common Law vs Civil Law conflicts |
+
+### Verify forum selection
+
+Use `verify_forum_selection` to validate a forum independently, with optional contract value threshold checks for US federal court diversity jurisdiction:
+
+```python
+result = guard.verify_forum_selection(
+    forum="Delaware",
+    contract_value=50_000,
+    parties_countries=["US", "DE"]
+)
+
+print(result.verified)   # True
+print(result.warnings)   # ["Contract value $50,000 may not meet diversity jurisdiction threshold..."]
+```
 
 ### Convention Check
 
@@ -329,6 +408,28 @@ print(result.expiration_date)   # 2024-01-15
 print(result.days_remaining)    # -867 (negative = expired)
 ```
 
+### Parameters
+
+<ParamField path="claim_type" type="str" required>
+  Type of legal claim (e.g., `"breach_of_contract"`, `"negligence"`, `"fraud"`). See supported claim types below.
+</ParamField>
+
+<ParamField path="jurisdiction" type="str" required>
+  State or country name (e.g., `"California"`, `"New York"`, `"UK"`).
+</ParamField>
+
+<ParamField path="incident_date" type="str" required>
+  Date the incident occurred (ISO format).
+</ParamField>
+
+<ParamField path="filing_date" type="str" required>
+  Date the claim was or will be filed (ISO format).
+</ParamField>
+
+<ParamField path="claimed_within_period" type="bool">
+  Optional LLM claim to verify. When provided, the guard checks whether the LLM's assertion (within/outside period) matches the computed result.
+</ParamField>
+
 ### Supported jurisdictions
 
 12 jurisdictions are supported with periods for 10 claim types.
@@ -352,7 +453,16 @@ print(result.days_remaining)    # -867 (negative = expired)
 
 `breach_of_contract`, `breach_of_warranty`, `negligence`, `professional_malpractice`, `fraud`, `personal_injury`, `property_damage`, `employment`, `product_liability`, `defamation`
 
-### Compare Jurisdictions
+### Get limitation period
+
+Look up the limitation period for a specific claim type and jurisdiction without performing a full verification:
+
+```python
+years = guard.get_limitation_period("fraud", "Germany")
+print(years)  # 10.0
+```
+
+### Compare jurisdictions
 
 ```python
 comparison = guard.compare_jurisdictions(
@@ -454,13 +564,24 @@ print(result["status"])    # "FAIRNESS_VERIFIED" or "JUDICIAL_BIAS_DETECTED"
 3. **Re-evaluation** - Runs the modified prompt through the LLM
 4. **Deterministic Comparison** - Checks if outcomes match exactly
 
-### Detection Types
+### Response fields
 
-| Status | Description |
+| Field | Type | Description |
+| --- | --- | --- |
+| `verified` | `bool` | Whether the decision is fair |
+| `status` | `str` | `FAIRNESS_VERIFIED` or `NO_SWAP_REQUIRED` (on success) |
+| `risk` | `str` | `JUDICIAL_BIAS_DETECTED` or `LLM_GENERATION_FAILED` (on failure) |
+| `message` | `str` | Explanation of the result |
+| `variance` | `dict` | Present when bias detected — contains `original` and `counterfactual` decisions |
+
+### Detection types
+
+| Status / Risk | Description |
 | --- | --- |
 | `FAIRNESS_VERIFIED` | Decision unchanged after attribute swap |
 | `JUDICIAL_BIAS_DETECTED` | Decision changed based on protected attributes |
 | `NO_SWAP_REQUIRED` | No protected attributes to swap (empty dict passed) |
+| `LLM_GENERATION_FAILED` | The LLM client returned `None` for the counterfactual prompt |
 
 <Warning>
   FairnessGuard requires an LLM client at initialization. Without it, `verify_decision_fairness()` will raise a `ValueError`.
