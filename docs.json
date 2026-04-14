@@ -303,7 +303,8 @@
                   "advanced/compliance",
                   "advanced/pii-masking",
                   "advanced/attestations",
-                  "advanced/state-guard"
+                  "advanced/state-guard",
+                  "advanced/agent-state-guard"
                 ]
               }
             ]
