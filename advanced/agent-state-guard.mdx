@@ -1,0 +1,321 @@
+---
+title: "AgentStateGuard"
+sidebarTitle: "AgentStateGuard"
+description: "Deterministic structural and semantic verification of agent state payloads before any commit. Validates JSON schemas, enforces transition rules, and performs governed atomic state writes."
+---
+
+AgentStateGuard verifies proposed agent state payloads deterministically before any side effects occur. It enforces strict JSON parsing, schema validation, and configurable transition rules to prevent agents from corrupting their own state.
+
+## When to use AgentStateGuard
+
+Use AgentStateGuard when your AI agents maintain structured state (such as task lists, workflow progress, or configuration) and you need guarantees that:
+
+- State payloads conform to a strict schema before they are persisted
+- State transitions follow monotonic, immutable, or ordered-enum constraints
+- Writes to disk are atomic — either fully committed or not written at all
+
+<Info>AgentStateGuard operates entirely in-process. It does not require network access or an API key. All verification is deterministic and fail-closed.</Info>
+
+## How it works
+
+AgentStateGuard uses a three-phase approach:
+
+1. **Structural verification (Phase 1)** — Validates that a proposed JSON state payload conforms to a strict schema. Rejects duplicate keys, non-standard JSON constants (`NaN`, `Infinity`), and unexpected fields. Numbers are parsed as `Decimal` to preserve deterministic numeric semantics.
+2. **Semantic transition verification (Phase 2)** — Given a current state and a proposed state, verifies that the transition satisfies configured rules: immutable paths cannot change, integer paths must increase monotonically, enum paths must advance forward, and keyed arrays must preserve order.
+3. **Governed atomic commit (Phase 3)** — After verification passes, writes the normalized state to disk atomically using `tempfile` + `os.replace`. The write target must be within configured allowed roots and must end in `.json`.
+
+All three phases are fail-closed — if any check fails, no side effects occur.
+
+## Usage
+
+### Phase 1: structural verification
+
+```python
+import json
+from qwed_new.guards.agent_state_guard import AgentStateGuard
+
+schema = {
+    "type": "object",
+    "properties": {
+        "agent_id": {"type": "string"},
+        "status": {"type": "string", "enum": ["pending", "running", "completed"]},
+        "step_count": {"type": "integer"},
+        "tasks": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "id": {"type": "string"},
+                    "done": {"type": "boolean"},
+                },
+                "required": ["id", "done"],
+                "additionalProperties": False,
+            },
+        },
+    },
+    "required": ["agent_id", "status", "step_count", "tasks"],
+    "additionalProperties": False,
+}
+
+guard = AgentStateGuard(required_schema=schema)
+
+result = guard.verify_state_payload(json.dumps({
+    "agent_id": "a1",
+    "status": "pending",
+    "step_count": 1,
+    "tasks": [{"id": "task-1", "done": False}]
+}))
+
+print(result["verified"])          # True
+print(result["status"])            # "VERIFIED"
+print(result["normalized_state"])  # Keys sorted deterministically
+```
+
+### Phase 2: transition verification
+
+```python
+guard = AgentStateGuard(
+    required_schema=schema,
+    transition_rules={
+        "immutable_paths": ["$.agent_id"],
+        "monotonic_integer_paths": ["$.step_count"],
+        "ordered_enum_paths": {
+            "$.status": ["pending", "running", "completed"],
+        },
+        "keyed_object_array_paths": {
+            "$.tasks": {
+                "key": "id",
+                "monotonic_boolean_fields": ["done"],
+                "allow_new_items": True,
+            }
+        },
+    },
+)
+
+current = json.dumps({
+    "agent_id": "a1",
+    "status": "pending",
+    "step_count": 1,
+    "tasks": [{"id": "task-1", "done": False}]
+})
+
+proposed = json.dumps({
+    "agent_id": "a1",
+    "status": "running",
+    "step_count": 2,
+    "tasks": [
+        {"id": "task-1", "done": True},
+        {"id": "task-2", "done": False}
+    ]
+})
+
+result = guard.verify_state_transition(current, proposed)
+
+print(result["verified"])  # True
+print(result["normalized_previous_state"]["status"])  # "pending"
+print(result["normalized_state"]["status"])            # "running"
+```
+
+### Phase 3: atomic commit
+
+```python
+guard = AgentStateGuard(
+    required_schema=schema,
+    transition_rules={
+        "immutable_paths": ["$.agent_id"],
+        "monotonic_integer_paths": ["$.step_count"],
+        "ordered_enum_paths": {
+            "$.status": ["pending", "running", "completed"],
+        },
+        "keyed_object_array_paths": {
+            "$.tasks": {
+                "key": "id",
+                "monotonic_boolean_fields": ["done"],
+                "allow_new_items": True,
+            }
+        },
+    },
+    allowed_commit_roots=["/var/agent-state"],
+)
+
+result = guard.verify_transition_and_commit_state(
+    current_state_json=current,
+    proposed_state_json=proposed,
+    target_path="/var/agent-state/agent_a1.json",
+)
+
+if result["verified"]:
+    print(result["committed_path"])   # "/var/agent-state/agent_a1.json"
+    print(result["committed_bytes"])  # Number of bytes written
+```
+
+<Warning>The `target_path` must be an absolute path ending in `.json`, and its parent directory must already exist. The path must fall within one of the configured `allowed_commit_roots`.</Warning>
+
+## API reference
+
+### `AgentStateGuard(required_schema, transition_rules, allowed_commit_roots)`
+
+Creates a new AgentStateGuard instance. The schema and transition rules are frozen on construction — later mutations to the original dicts have no effect.
+
+<ParamField path="required_schema" type="dict" required>
+  A strict JSON schema definition. Must include a `type` field (`object`, `array`, `string`, `integer`, `number`, `boolean`, or `null`). Object schemas must define `properties` and may include `required` and `additionalProperties` (boolean). Array schemas must define `items`. Enum constraints use the `enum` key with a non-empty list.
+</ParamField>
+
+<ParamField path="transition_rules" type="dict | None" default="None">
+  Semantic transition rules. At least one rule must have a non-empty value for transition verification to be enabled. Supported keys are described in the [transition rules](#transition-rules) section.
+</ParamField>
+
+<ParamField path="allowed_commit_roots" type="list[str] | None" default="None">
+  List of absolute directory paths where atomic commits are permitted. Required for `verify_transition_and_commit_state`. Each entry must be an absolute path string.
+</ParamField>
+
+### `verify_state_payload(proposed_state_json)`
+
+Validates a proposed state payload against the configured schema.
+
+<ParamField path="proposed_state_json" type="str" required>
+  A JSON string representing the proposed agent state. Must be a non-empty string containing valid JSON.
+</ParamField>
+
+**Returns** a decision object:
+
+| Key | Type | Description |
+|-----|------|-------------|
+| `verified` | `bool` | `True` if the payload passed all structural checks |
+| `status` | `str` | `"VERIFIED"` or `"BLOCKED"` |
+| `proof` | `str` | Explanation of the verification result (on success) |
+| `normalized_state` | `dict` | The payload with keys sorted deterministically (on success) |
+| `error_code` | `str` | Error code (on failure) |
+| `message` | `str` | Human-readable error description (on failure) |
+
+### `verify_state_transition(current_state_json, proposed_state_json)`
+
+Validates a state transition against both structural and semantic rules.
+
+<ParamField path="current_state_json" type="str" required>
+  JSON string representing the current agent state.
+</ParamField>
+
+<ParamField path="proposed_state_json" type="str" required>
+  JSON string representing the proposed new agent state.
+</ParamField>
+
+**Returns** a decision object with the same fields as `verify_state_payload`, plus:
+
+| Key | Type | Description |
+|-----|------|-------------|
+| `normalized_previous_state` | `dict` | The canonicalized current state (on success) |
+
+### `verify_transition_and_commit_state(current_state_json, proposed_state_json, target_path)`
+
+Verifies the transition and atomically writes the normalized state to disk if verification passes.
+
+<ParamField path="current_state_json" type="str" required>
+  JSON string representing the current agent state.
+</ParamField>
+
+<ParamField path="proposed_state_json" type="str" required>
+  JSON string representing the proposed new agent state.
+</ParamField>
+
+<ParamField path="target_path" type="str" required>
+  Absolute path to the target `.json` file. The parent directory must exist, and the path must fall within a configured `allowed_commit_roots` directory.
+</ParamField>
+
+**Returns** a decision object with the same fields as `verify_state_transition`, plus:
+
+| Key | Type | Description |
+|-----|------|-------------|
+| `committed_path` | `str` | Absolute path where the state was written (on success) |
+| `committed_bytes` | `int` | Number of bytes written (on success) |
+
+## Transition rules
+
+Transition rules define semantic constraints that must hold between the current and proposed state. All paths use dot-style JSON path notation starting with `$.`.
+
+### `immutable_paths`
+
+A list of paths whose values must not change between states.
+
+```python
+"immutable_paths": ["$.agent_id", "$.created_at"]
+```
+
+### `monotonic_integer_paths`
+
+A list of paths whose integer values must never decrease.
+
+```python
+"monotonic_integer_paths": ["$.step_count", "$.version"]
+```
+
+### `ordered_enum_paths`
+
+A dictionary mapping paths to ordered lists of allowed values. The value at each path must advance forward (or stay the same) in the list — it cannot move backward.
+
+```python
+"ordered_enum_paths": {
+    "$.status": ["pending", "running", "completed"]
+}
+```
+
+### `keyed_object_array_paths`
+
+A dictionary mapping array paths to rules for keyed object arrays. Each rule specifies:
+
+| Key | Type | Required | Default | Description |
+|-----|------|----------|---------|-------------|
+| `key` | `str` | Yes | — | The field used to identify each object in the array |
+| `monotonic_boolean_fields` | `list[str]` | No | `[]` | Boolean fields that can transition from `false` to `true` but never back |
+| `allow_new_items` | `bool` | No | `true` | Whether new items can be appended to the array |
+
+Existing items must preserve their order and cannot be removed. All non-boolean fields on existing items are immutable.
+
+```python
+"keyed_object_array_paths": {
+    "$.tasks": {
+        "key": "id",
+        "monotonic_boolean_fields": ["done"],
+        "allow_new_items": True,
+    }
+}
+```
+
+## Error codes
+
+| Code | Phase | Description |
+|------|-------|-------------|
+| `QWED-AGENT-STATE-101` | 1 | Input is not a non-empty JSON string |
+| `QWED-AGENT-STATE-102` | 1 | Invalid JSON (syntax error, duplicate keys, or non-standard constants) |
+| `QWED-AGENT-STATE-103` | 1 | Schema validation failed (missing keys, wrong types, unexpected fields) |
+| `QWED-AGENT-STATE-104` | 2 | Transition rules not configured or all rules are empty |
+| `QWED-AGENT-STATE-105` | 2 | Current state failed structural verification |
+| `QWED-AGENT-STATE-106` | 2 | Transition rule violation (immutable path changed, value regressed, etc.) |
+| `QWED-AGENT-STATE-107` | 3 | Commit target validation failed (no allowed roots, invalid path, outside roots) |
+| `QWED-AGENT-STATE-108` | 3 | Atomic file write failed |
+
+## Security considerations
+
+- **Strict JSON parsing**: Duplicate keys and non-standard constants (`NaN`, `Infinity`, `-Infinity`) are rejected. Numbers are parsed as `Decimal` to avoid floating-point non-determinism.
+- **Frozen configuration**: Schemas and transition rules are deeply frozen on construction using `MappingProxyType` and tuples. Callers cannot mutate the guard's configuration after initialization.
+- **Fail-closed design**: Every method returns a `BLOCKED` decision object on failure — no exceptions leak past the public API unless the constructor arguments themselves are invalid.
+- **Path traversal prevention**: Commit targets are resolved to absolute paths and validated against the `allowed_commit_roots` allowlist. Only `.json` file extensions are permitted.
+- **Atomic writes**: State files are written via `tempfile.NamedTemporaryFile` followed by `os.replace`, which is atomic on POSIX systems. The temporary file is cleaned up even if the rename fails.
+- **Depth limit**: Schema validation enforces a maximum recursion depth of 64 to prevent stack overflow from deeply nested payloads.
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="StateGuard" icon="rotate-left" href="/advanced/state-guard">
+    Workspace rollback using shadow git snapshots
+  </Card>
+  <Card title="Agent verification" icon="robot" href="/advanced/agent-verification">
+    Pre-execution verification for AI agents
+  </Card>
+  <Card title="SDK guards" icon="shield" href="/sdks/guards">
+    All available security guards
+  </Card>
+  <Card title="Attestations" icon="certificate" href="/advanced/attestations">
+    Cryptographic proof of verification
+  </Card>
+</CardGroup>

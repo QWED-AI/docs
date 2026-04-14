@@ -24,6 +24,7 @@ pip install qwed
 | `SovereigntyGuard` | Enforces data residency policies |
 | `ProcessVerifier` | Validates IRAC structure and milestone completion |
 | `StateGuard` | Deterministic workspace rollback using shadow git snapshots |
+| `AgentStateGuard` | Structural and semantic verification of agent state payloads with atomic commit |
 | `SystemGuard` | Validates shell commands |
 | `ConfigGuard` | Scans configuration for exposed secrets |
 | `StartupHookGuard` | Detects malicious Python `.pth` startup hooks (supply chain defense) |
@@ -386,6 +387,70 @@ guard = StartupHookGuard(
 )
 result = guard.verify_environment_integrity()
 ```
+
+---
+
+## AgentStateGuard
+
+Deterministically verifies proposed agent state payloads against strict JSON schemas before any side effects occur. Supports structural validation, semantic transition rules (immutable paths, monotonic integers, ordered enums, keyed object arrays), and governed atomic commit to disk.
+
+```python
+import json
+from qwed_new.guards.agent_state_guard import AgentStateGuard
+
+guard = AgentStateGuard(
+    required_schema={
+        "type": "object",
+        "properties": {
+            "agent_id": {"type": "string"},
+            "status": {"type": "string", "enum": ["pending", "running", "completed"]},
+            "step_count": {"type": "integer"},
+        },
+        "required": ["agent_id", "status", "step_count"],
+        "additionalProperties": False,
+    },
+    transition_rules={
+        "immutable_paths": ["$.agent_id"],
+        "monotonic_integer_paths": ["$.step_count"],
+        "ordered_enum_paths": {
+            "$.status": ["pending", "running", "completed"],
+        },
+    },
+)
+
+# Verify a state transition
+result = guard.verify_state_transition(
+    current_state_json=json.dumps({"agent_id": "a1", "status": "pending", "step_count": 1}),
+    proposed_state_json=json.dumps({"agent_id": "a1", "status": "running", "step_count": 2}),
+)
+
+print(result["verified"])  # True
+print(result["status"])    # "VERIFIED"
+```
+
+### Parameters
+
+<ParamField path="required_schema" type="dict" required>
+  A strict JSON schema definition with `type`, `properties`, `required`, and `additionalProperties` fields. Supports nested objects, arrays, strings, integers, numbers, booleans, and null types.
+</ParamField>
+
+<ParamField path="transition_rules" type="dict | None" default="None">
+  Semantic transition rules: `immutable_paths`, `monotonic_integer_paths`, `ordered_enum_paths`, and `keyed_object_array_paths`.
+</ParamField>
+
+<ParamField path="allowed_commit_roots" type="list[str] | None" default="None">
+  Absolute directory paths where atomic commits are permitted. Required for `verify_transition_and_commit_state`.
+</ParamField>
+
+### Methods
+
+**`verify_state_payload(proposed_state_json)`** — Validates a JSON string against the configured schema. Returns a decision object with `verified`, `status`, and `normalized_state`.
+
+**`verify_state_transition(current_state_json, proposed_state_json)`** — Validates a state transition against structural and semantic rules. Returns decision with `normalized_previous_state` and `normalized_state`.
+
+**`verify_transition_and_commit_state(current_state_json, proposed_state_json, target_path)`** — Verifies the transition and atomically writes the normalized state to disk. Returns decision with `committed_path` and `committed_bytes`.
+
+See the [AgentStateGuard guide](/advanced/agent-state-guard) for full API reference, transition rule details, and error codes.
 
 ---
 
