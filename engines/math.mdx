@@ -268,6 +268,47 @@ result = client.verify_math(
 # ✓ Verified within tolerance
 ```
 
+### Tolerance bounding
+
+QWED automatically caps the tolerance you can pass to `verify_math` based on the magnitude of the computed result. This prevents an overly large tolerance from masking incorrect answers as "VERIFIED".
+
+The maximum allowed tolerance is the greater of:
+
+- **1% of the computed value's absolute magnitude**, or
+- **0.01** (a fixed floor for small results)
+
+If the requested tolerance exceeds this bound, the response returns `status: "BLOCKED"` with an explanation instead of performing the comparison.
+
+```python
+# Blocked — tolerance of 1000 far exceeds the bound for a result of 2
+result = client.verify_math(
+    expression="1 + 1",
+    expected_value=999,
+    tolerance=1000
+)
+print(result["status"])  # "BLOCKED"
+print(result["error"])   # "Tolerance exceeds deterministic verification bound"
+print(result["max_allowed_tolerance"])  # "0.02000000"
+```
+
+For larger computed values the cap scales proportionally, so legitimate use cases are unaffected:
+
+```python
+# Allowed — tolerance of 50 is within 1% of the ~10,500 result
+result = client.verify_math(
+    expression="10000 * (1 + 5/100)",
+    expected_value=10540,
+    tolerance=50
+)
+print(result["status"])  # "VERIFIED"
+```
+
+The same policy applies in both decimal and float precision modes.
+
+<Warning>
+Negative, non-finite (`inf`, `NaN`), and non-numeric tolerance values are rejected with `status: "BLOCKED"` and an `"Invalid tolerance"` error.
+</Warning>
+
 ---
 
 ## Trust boundary
@@ -308,13 +349,15 @@ Because the LLM translation step is non-deterministic, the natural language pipe
 
 ## Edge Cases
 
-| Scenario              | Behavior                    |
-| --------------------- | --------------------------- |
-| Division by zero      | Returns error, not verified |
-| Undefined expressions | Returns "UNDEFINED" status  |
-| Complex numbers       | Fully supported             |
-| Very large numbers    | Uses arbitrary precision    |
-| Symbolic variables    | Verified algebraically      |
+| Scenario              | Behavior                              |
+| --------------------- | ------------------------------------- |
+| Division by zero      | Returns error, not verified           |
+| Undefined expressions | Returns "UNDEFINED" status            |
+| Complex numbers       | Fully supported                       |
+| Very large numbers    | Uses arbitrary precision              |
+| Symbolic variables    | Verified algebraically                |
+| Oversized tolerance   | Returns "BLOCKED" status with details |
+| Invalid tolerance     | Returns "BLOCKED" with error message  |
 
 ---
 
