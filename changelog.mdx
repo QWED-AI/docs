@@ -3,6 +3,21 @@ title: "Changelog"
 description: "All notable changes to QWED Protocol — releases, features, security fixes, and improvements."
 ---
 
+## v5.0.1 — Legacy CodeExecutor hard-blocked
+**Released: April 18, 2026** · [GitHub PR #149](https://github.com/QWED-AI/qwed-verification/pull/149)
+
+> Permanently disables the legacy `CodeExecutor` class that used raw `exec()`. Any direct usage now raises a `RuntimeError` directing callers to `SecureCodeExecutor`.
+
+### Security
+
+- **Legacy CodeExecutor hard-blocked** — `CodeExecutor.execute()` now raises a `RuntimeError` on every call, closing the last remaining path to in-process code execution. The public API endpoints (`/verify/stats`, `/verify/consensus`) are unaffected because they already use `SecureCodeExecutor` since v4.0.4. This change impacts self-hosted deployments that imported `CodeExecutor` directly.
+
+### Migration
+
+If you import `CodeExecutor` in custom code, replace it with `SecureCodeExecutor`. See the [security hardening guide](/advanced/security-hardening#legacy-codeexecutor-removed) for a migration example.
+
+---
+
 ## v5.0.0 — Enforcement boundary hardening
 **Released: April 4, 2026** · [GitHub Release](https://github.com/QWED-AI/qwed-verification/releases/tag/v5.0.0)
 
