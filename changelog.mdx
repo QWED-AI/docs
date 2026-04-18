@@ -3,6 +3,21 @@ title: "Changelog"
 description: "All notable changes to QWED Protocol — releases, features, security fixes, and improvements."
 ---
 
+## v5.0.2 — Default-deny for unknown tool approvals
+**Released: April 18, 2026** · [GitHub PR #150](https://github.com/QWED-AI/qwed-verification/pull/150)
+
+> The tool approval system now blocks all unknown tools by default, regardless of their heuristic risk score. Previously, unknown tools with a low risk score were auto-approved.
+
+### Security
+
+- **Default-deny for unknown tools** — Tool calls that are not on the safe operations list or the dangerous operations list are now blocked unconditionally. Before this change, unknown tools with a risk score below 0.3 were auto-approved. Now they require explicit allowlisting. The blocked response includes the tool name and its computed risk score for debugging.
+
+### Migration
+
+If your agents use custom tools that were previously auto-approved based on risk score, you must add them to the safe operations allowlist. Any tool not explicitly listed is now denied with a message like `Unknown tool 'your_tool' requires explicit allowlisting (risk_score=0.0)`.
+
+---
+
 ## v5.0.1 — Legacy CodeExecutor hard-blocked
 **Released: April 18, 2026** · [GitHub PR #149](https://github.com/QWED-AI/qwed-verification/pull/149)
 

@@ -755,7 +755,7 @@ X-Agent-Token: qwed_agent_...
 
 ### POST /agents/{agent_id}/tools/{tool_name}
 
-Submit an agent tool call for risk evaluation before execution.
+Submit an agent tool call for risk evaluation before execution. Unknown tools (not on the safe or dangerous operations list) are denied by default, regardless of risk score. See [tool approval policy](/advanced/agent-verification#tool-approval-policy) for details.
 
 **Request:**
 
@@ -767,6 +767,14 @@ Submit an agent tool call for risk evaluation before execution.
   }
 }
 ```
+
+**Possible outcomes:**
+
+| Outcome | When |
+|---------|------|
+| Approved | Tool is on the safe operations list |
+| Blocked (manual approval required) | Tool is on the dangerous operations list |
+| Blocked (default-deny) | Tool is not on either list |
 
 ---
 
