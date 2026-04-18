@@ -187,13 +187,24 @@ All API error paths now use a centralized `redact_pii()` function that masks ema
 
 ### Fail-closed code execution
 
-<Info>New in v4.0.4</Info>
+<Info>New in v4.0.4 · Updated in v5.0.1</Info>
 
 All model-generated Python code — in both the Stats and Consensus engines — runs exclusively inside a Docker sandbox (`SecureCodeExecutor`). The in-process Wasm and restricted execution fallbacks that existed in earlier versions have been permanently disabled.
 
 If the Docker daemon is unreachable, the affected endpoints return HTTP 503 rather than degrading to an insecure execution mode. The executor performs a live health check (`docker.ping()`) on every request to detect runtime failures that would not be caught by a startup-time flag.
 
 This design ensures that a Docker outage is surfaced as a visible service disruption rather than silently downgrading security.
+
+#### Legacy `CodeExecutor` hard-blocked
+
+The legacy `CodeExecutor` class, which previously executed arbitrary Python through raw `exec()`, has been permanently disabled. Any attempt to call `CodeExecutor.execute()` raises a `RuntimeError`:
+
+```
+CodeExecutor is disabled because raw exec() is not a valid QWED
+verification boundary. Use SecureCodeExecutor instead.
+```
+
+This hard-block applies to all callers, regardless of input. The class retains its interface for backward compatibility but enforces a fail-closed contract — no code path can reactivate in-process execution. All code execution must go through `SecureCodeExecutor`, which provides Docker container isolation, resource limits, network isolation, and pre-execution AST validation.
 
 ### Safe expression evaluation
 

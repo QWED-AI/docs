@@ -3,6 +3,17 @@ title: "Changelog"
 description: "All notable changes to QWED Protocol — releases, features, security fixes, and improvements."
 ---
 
+## v5.0.1 — Legacy CodeExecutor hard-block
+**Released: April 18, 2026** · [GitHub PR #149](https://github.com/QWED-AI/qwed-verification/pull/149)
+
+> Permanently disables the legacy `CodeExecutor` execution path. The class now raises a `RuntimeError` on every call, ensuring no code path can bypass the secure Docker sandbox.
+
+### Security
+
+- **Legacy `CodeExecutor` hard-blocked** — The `CodeExecutor.execute()` method now unconditionally raises a `RuntimeError` instead of executing arbitrary Python via `exec()`. All code execution must go through `SecureCodeExecutor`, which provides Docker container isolation, pre-execution AST validation, and resource limits. This eliminates the last remaining path that could have allowed in-process code execution.
+
+---
+
 ## v5.0.0 — Enforcement boundary hardening
 **Released: April 4, 2026** · [GitHub Release](https://github.com/QWED-AI/qwed-verification/releases/tag/v5.0.0)
 
