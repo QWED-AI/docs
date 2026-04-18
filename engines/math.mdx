@@ -343,13 +343,15 @@ Because the LLM translation step is non-deterministic, the natural language pipe
 
 ## Edge Cases
 
-| Scenario              | Behavior                    |
-| --------------------- | --------------------------- |
-| Division by zero      | Returns error, not verified |
-| Undefined expressions | Returns "UNDEFINED" status  |
-| Complex numbers       | Fully supported             |
-| Very large numbers    | Uses arbitrary precision    |
-| Symbolic variables    | Verified algebraically      |
+| Scenario              | Behavior                              |
+| --------------------- | ------------------------------------- |
+| Division by zero      | Returns error, not verified           |
+| Undefined expressions | Returns "UNDEFINED" status            |
+| Complex numbers       | Fully supported                       |
+| Very large numbers    | Uses arbitrary precision              |
+| Symbolic variables    | Verified algebraically                |
+| Oversized tolerance   | Returns "BLOCKED" status with details |
+| Invalid tolerance     | Returns "BLOCKED" with error message  |
 
 ---
 

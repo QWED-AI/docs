@@ -3,6 +3,36 @@ title: "Changelog"
 description: "All notable changes to QWED Protocol — releases, features, security fixes, and improvements."
 ---
 
+## v5.0.3 — `verify_logic_rule` fail-closed
+**Released: April 18, 2026** · [GitHub PR #152](https://github.com/QWED-AI/qwed-verification/pull/152)
+
+> The legacy `VerificationEngine.verify_logic_rule()` method now raises `NotImplementedError` instead of silently returning `None`. Callers must migrate to `LogicVerifier`.
+
+### Security
+
+- **`verify_logic_rule` fail-closed** — Previously, `VerificationEngine.verify_logic_rule(rule, context)` was a no-op that silently returned `None`, which could be misinterpreted as a passing verification. It now raises `NotImplementedError` with the message `verify_logic_rule is deprecated and fail-closed; use LogicVerifier instead`. This ensures that any code path relying on the legacy method fails explicitly rather than producing ambiguous results.
+
+### Migration
+
+Replace any usage of `VerificationEngine.verify_logic_rule()` with the dedicated `LogicVerifier` class:
+
+```python
+# Before (no longer works)
+from qwed_new.core.verifier import VerificationEngine
+engine = VerificationEngine()
+result = engine.verify_logic_rule(rule="if x > 5 then allow", context={"x": 10})
+
+# After
+from qwed_new.core.logic_verifier import LogicVerifier
+verifier = LogicVerifier()
+result = verifier.verify_conclusion(
+    premises=["x is 10", "x > 5 implies allow"],
+    conclusion="allow"
+)
+```
+
+---
+
 ## v5.0.2 — Default-deny for unknown tool approvals
 **Released: April 18, 2026** · [GitHub PR #150](https://github.com/QWED-AI/qwed-verification/pull/150)
 
