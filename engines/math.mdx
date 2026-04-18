@@ -258,7 +258,7 @@ When `use_decimal=True` (the default), the engine uses `Decimal` internally rega
 
 ## Tolerance settings
 
-For floating-point comparisons:
+For floating-point comparisons, you can specify a tolerance:
 
 ```python
 result = client.verify_math(
@@ -270,44 +270,38 @@ result = client.verify_math(
 
 ### Tolerance bounding
 
-QWED automatically caps the tolerance you can pass to `verify_math` based on the magnitude of the computed result. This prevents an overly large tolerance from masking incorrect answers as "VERIFIED".
+To prevent inflated tolerances from masking incorrect results, the math engine enforces a deterministic upper bound on the `tolerance` parameter. The maximum allowed tolerance is computed as a function of the result's magnitude:
 
-The maximum allowed tolerance is the greater of:
-
-- **1% of the computed value's absolute magnitude**, or
-- **0.01** (a fixed floor for small results)
-
-If the requested tolerance exceeds this bound, the response returns `status: "BLOCKED"` with an explanation instead of performing the comparison.
-
-```python
-# Blocked — tolerance of 1000 far exceeds the bound for a result of 2
-result = client.verify_math(
-    expression="1 + 1",
-    expected_value=999,
-    tolerance=1000
-)
-print(result["status"])  # "BLOCKED"
-print(result["error"])   # "Tolerance exceeds deterministic verification bound"
-print(result["max_allowed_tolerance"])  # "0.02000000"
+```
+max_tolerance = max(0.01, abs(calculated_value) * 0.01)
 ```
 
-For larger computed values the cap scales proportionally, so legitimate use cases are unaffected:
+If the requested tolerance exceeds this bound, the verification is rejected with a `BLOCKED` status instead of returning a potentially misleading `VERIFIED` result. This applies to both decimal and float precision modes.
 
 ```python
-# Allowed — tolerance of 50 is within 1% of the ~10,500 result
+# Blocked — tolerance far exceeds the computed bound
+result = client.verify_math("1 + 1", expected_value=999, tolerance=1000)
+# result["status"] == "BLOCKED"
+# result["error"] == "Tolerance exceeds deterministic verification bound"
+# result["max_allowed_tolerance"] == "0.02000000"
+
+# Allowed — tolerance is within bound for a large result
 result = client.verify_math(
-    expression="10000 * (1 + 5/100)",
+    "10000 * (1 + 5/100)",
     expected_value=10540,
-    tolerance=50
+    tolerance=50,
 )
-print(result["status"])  # "VERIFIED"
+# result["status"] == "VERIFIED"
 ```
 
-The same policy applies in both decimal and float precision modes.
+The engine also rejects invalid tolerance values (negative numbers, `NaN`, `Infinity`, or non-numeric strings) with a `BLOCKED` status and an `"Invalid tolerance"` error message.
 
-<Warning>
-Negative, non-finite (`inf`, `NaN`), and non-numeric tolerance values are rejected with `status: "BLOCKED"` and an `"Invalid tolerance"` error.
-</Warning>
+| Tolerance input | Behavior |
+| --- | --- |
+| Within computed bound | Normal verification proceeds |
+| Exceeds computed bound | `BLOCKED` with `max_allowed_tolerance` in response |
+| Negative, `NaN`, or `Infinity` | `BLOCKED` with `"Invalid tolerance"` error |
+| Non-numeric string | `BLOCKED` with `"Invalid tolerance"` error |
 
 ---
 

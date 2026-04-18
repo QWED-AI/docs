@@ -166,6 +166,29 @@ Symbolic expressions that cannot be evaluated to a numeric value include `is_sym
 
 **Error cases:** Division by zero, `log(0)`, and square root of negative numbers in the real domain return `is_valid: false` with a descriptive `error` and `message`.
 
+**Tolerance bounding:** When verifying an expression against an expected value with a `tolerance` parameter, the engine enforces a deterministic upper bound on the tolerance. The maximum allowed tolerance is `max(0.01, abs(calculated_value) * 0.01)`. If the requested tolerance exceeds this bound, the request returns a `BLOCKED` status. Invalid tolerance values (negative, `NaN`, `Infinity`, or non-numeric) are also rejected with `BLOCKED`.
+
+**Response (tolerance exceeded):**
+
+```json
+{
+  "is_correct": false,
+  "error": "Tolerance exceeds deterministic verification bound",
+  "requested_tolerance": "1000",
+  "max_allowed_tolerance": "0.02000000",
+  "calculated_value": "2.000000",
+  "precision_mode": "decimal",
+  "status": "BLOCKED"
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `requested_tolerance` | string | The tolerance value that was submitted |
+| `max_allowed_tolerance` | string | The maximum tolerance the engine allows for the computed result |
+| `calculated_value` | string | The engine's computed result |
+| `precision_mode` | string | `"decimal"` or `"float"` depending on the computation path |
+
 ---
 
 ### POST /verify/logic
