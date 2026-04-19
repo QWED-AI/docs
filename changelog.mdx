@@ -3,6 +3,34 @@ title: "Changelog"
 description: "All notable changes to QWED Protocol — releases, features, security fixes, and improvements."
 ---
 
+## v5.0.5 — Ambiguous math expressions fail closed
+**Released: April 19, 2026** · [GitHub PR #154](https://github.com/QWED-AI/qwed-verification/pull/154)
+
+> The math verification API now rejects ambiguous expressions with `BLOCKED` instead of returning `is_valid: true`. Expressions like `1/2(3+1)` where implicit multiplication follows division are no longer treated as valid.
+
+### Security
+
+- **Ambiguous math expressions fail closed** — When `POST /verify/math` detects an expression with implicit multiplication after division (e.g., `1/2(3+1)`), the parsing is ambiguous because it could mean `(1/2)*(3+1)` or `1/(2*(3+1))`. Previously, the endpoint returned `is_valid: true` with a `warning: "ambiguous"` field, which downstream code could interpret as a successful verification. The endpoint now returns `is_valid: false`, `result: false`, and `status: "BLOCKED"`, making the rejection explicit. The `warning: "ambiguous"` and `message` fields are still included to explain why the expression was blocked.
+
+### Response example
+
+```json
+{
+  "is_valid": false,
+  "result": false,
+  "status": "BLOCKED",
+  "warning": "ambiguous",
+  "message": "Expression may be ambiguous due to implicit multiplication after division",
+  "simplified": "..."
+}
+```
+
+### Impact
+
+If your code submits expressions with implicit multiplication after division (e.g., `1/2x`, `6/3(2+1)`) and relies on `is_valid: true`, those requests now return `is_valid: false` with `status: "BLOCKED"`. Rewrite the expression with explicit parentheses or an explicit `*` operator to remove the ambiguity.
+
+---
+
 ## v5.0.4 — `verify_identity` fail-closed
 **Released: April 19, 2026** · [GitHub PR #153](https://github.com/QWED-AI/qwed-verification/pull/153)
 
