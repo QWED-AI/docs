@@ -3,18 +3,32 @@ title: "Changelog"
 description: "All notable changes to QWED Protocol — releases, features, security fixes, and improvements."
 ---
 
-## v5.0.6 — `uniqueItems` schema validation fails closed
+## v5.0.6 — Schema `uniqueItems` fail-closed
 **Released: April 19, 2026** · [GitHub PR #155](https://github.com/QWED-AI/qwed-verification/pull/155)
 
-> The Schema Verifier now fails closed when `uniqueItems` validation cannot be completed deterministically. Arrays with unhashable or incomparable elements are rejected instead of silently passing.
+> The schema verifier now reports a validation error when `uniqueItems` cannot be checked deterministically, instead of silently passing.
 
 ### Security
 
-- **`uniqueItems` fail-closed** — When a JSON Schema sets `uniqueItems: true` and the array contains elements that cannot be hashed or serialized for comparison (e.g., objects containing Python `set` values), the verifier previously caught the `TypeError`/`ValueError` and silently passed validation. It now reports a `uniqueness_validation_error` issue with `is_valid: false` and `status: "INVALID"`, making the rejection explicit. The issue message includes the underlying error for debugging.
+- **`uniqueItems` validation fail-closed** — When a JSON schema specifies `"uniqueItems": true` and the array contains items that cannot be hashed for comparison (e.g., deeply nested or mixed-type structures), the schema verifier previously caught the error silently and skipped the uniqueness check entirely. An attacker could craft array payloads with unhashable items to bypass the duplicate detection. The verifier now emits a `uniqueness_validation_error` issue with the message `"uniqueItems could not be verified deterministically"`, ensuring the validation fails rather than passing by default.
+
+### Response example
+
+When `uniqueItems` validation cannot complete, the schema verifier now returns an issue like:
+
+```json
+{
+  "path": "$.tags",
+  "issue_type": "uniqueness_validation_error",
+  "expected": "provably unique items",
+  "actual": "uniqueness check could not be completed",
+  "message": "uniqueItems could not be verified deterministically: <error details>"
+}
+```
 
 ### Impact
 
-If your schemas use `uniqueItems: true` and your data contains elements that are not JSON-serializable or not hashable, those arrays now fail validation instead of silently passing. Ensure all array elements are JSON-compatible types (strings, numbers, booleans, plain objects, or arrays) to avoid the new `uniqueness_validation_error` issue.
+If your schemas use `"uniqueItems": true` with arrays containing unhashable items (objects or lists that cause `TypeError` or `ValueError` during comparison), those arrays now produce a validation error instead of passing silently. Ensure your array items are serializable and comparable, or handle the `uniqueness_validation_error` issue type in your response processing.
 
 ---
 
