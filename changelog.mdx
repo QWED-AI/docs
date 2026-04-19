@@ -3,89 +3,52 @@ title: "Changelog"
 description: "All notable changes to QWED Protocol â€” releases, features, security fixes, and improvements."
 ---
 
-## Unreleased
+## v5.1.0 â€" Agent state governance and fail-closed hardening
+**Released: April 19, 2026** Â· [GitHub Release](https://github.com/QWED-AI/qwed-verification/releases/tag/v5.1.0)
 
-These entries document post-`v5.0.0` hardening work that has landed in the core repository but has not yet been rolled into a newer tagged release. Keep them here until the next official release is published.
+> Minor release extending QWED from action verification into state governance while closing adversarial fail-open gaps identified after v5.0.0. Includes AgentStateGuard plus a focused hardening wave across execution, tool governance, mathematical verification, API semantics, and schema validation.
 
-### Schema `uniqueItems` fail-closed
-**Documented from [GitHub PR #155](https://github.com/QWED-AI/qwed-verification/pull/155)**
+### New capability
 
-> The schema verifier now reports a validation error when `uniqueItems` cannot be checked deterministically, instead of silently passing.
+- **AgentStateGuard** â€" Deterministic state verification with strict structural validation, semantic transition checks, and governed atomic state commits. This extends QWED from action-only verification to state and memory governance. See the [AgentStateGuard guide](/advanced/agent-state-guard) for usage details.
 
-- **`uniqueItems` validation fail-closed** â€” When a JSON schema specifies `"uniqueItems": true` and the array contains items that cannot be hashed for comparison, the schema verifier now emits a `uniqueness_validation_error` instead of silently skipping the uniqueness check.
+### Fail-closed hardening
 
-```json
-{
-  "path": "$.tags",
-  "issue_type": "uniqueness_validation_error",
-  "expected": "provably unique items",
-  "actual": "uniqueness check could not be completed",
-  "message": "uniqueItems could not be verified deterministically: <error details>"
-}
+- **Legacy `CodeExecutor` hard-blocked** â€" `CodeExecutor.execute()` now raises a `RuntimeError` on every call, closing the final in-process raw execution path. Public API endpoints remain on `SecureCodeExecutor`. If you still import `CodeExecutor` in custom code, migrate to `SecureCodeExecutor`. See the [security hardening guide](/advanced/security-hardening#legacy-codeexecutor-hard-blocked) for the migration example.
+- **Unknown tools default-denied** â€" The tool approval system now blocks all unknown tools by default, regardless of their heuristic risk score. Tool calls that are not explicitly allowlisted are blocked unconditionally and must be approved through an explicit policy path.
+- **Bounded math tolerance** â€" `verify_math()` rejects oversized, negative, non-finite, and malformed tolerances instead of letting callers weaken correctness checks. See [math engine tolerance bounding](/engines/math#tolerance-bounding) for details.
+- **`verify_logic_rule` fail-closed** â€" The legacy `VerificationEngine.verify_logic_rule()` method now raises `NotImplementedError` instead of silently returning `None`. Use `LogicVerifier` instead.
+- **`verify_identity` fail-closed** â€" If no formal proof is established, numerical sampling no longer returns an ambiguous equivalence-style result. The engine now responds with `BLOCKED`, `is_equivalent: false`, and `method: "numerical_sampling_rejected"`.
+- **Ambiguous math expressions fail closed** â€" `POST /verify/math` now returns `is_valid: false`, `result: false`, and `status: "BLOCKED"` when implicit multiplication after division is detected, instead of returning `is_valid: true`.
+- **Schema `uniqueItems` fail-closed** â€" When `uniqueItems` cannot be verified deterministically, the schema verifier now emits a `uniqueness_validation_error` instead of silently passing. See the [schema verifier `uniqueItems`](/engines/schema#uniqueitems--fail-closed-validation) section for details.
+
+### Upgrade notes
+
+<Warning>
+Several behaviors changed from ambiguous or silent-pass to explicit failure. Review these before upgrading.
+</Warning>
+
+- `CodeExecutor` is no longer usable as a legacy execution path. Migrate any direct imports to `SecureCodeExecutor`.
+- Unknown tools now require explicit allowlisting and are no longer auto-approved at low heuristic risk.
+- `verify_math()` may return `BLOCKED` for tolerances that exceed the deterministic policy bound.
+- `verify_logic_rule()` no longer returns an ambiguous non-result; callers must migrate to `LogicVerifier`.
+- Sampling-only `verify_identity()` matches now return `BLOCKED`, not `UNKNOWN`.
+- Ambiguous `/verify/math` expressions now return `BLOCKED` with `is_valid: false`.
+- `uniqueItems` validation failures are now explicit schema errors instead of silent passes.
+
+### SDK version bumps
+
+- `qwed` (PyPI): `5.0.0` â†' `5.1.0`
+- `qwed_sdk` (Python): `5.0.0` â†' `5.1.0`
+- `@qwed-ai/sdk` (npm): `5.0.0` â†' `5.1.0`
+
+### Install
+
+```bash
+pip install qwed==5.1.0
+docker pull qwedai/qwed-verification:5.1.0
+npm install @qwed-ai/sdk@5.1.0
 ```
-
-### Ambiguous math expressions fail closed
-**Documented from [GitHub PR #154](https://github.com/QWED-AI/qwed-verification/pull/154)**
-
-> The math verification API now rejects ambiguous expressions with `BLOCKED` instead of returning `is_valid: true`.
-
-- **Ambiguous math expressions fail closed** â€” When `POST /verify/math` detects implicit multiplication after division, it now returns `is_valid: false`, `result: false`, and `status: "BLOCKED"` while preserving an explicit ambiguity warning.
-
-```json
-{
-  "is_valid": false,
-  "result": false,
-  "status": "BLOCKED",
-  "warning": "ambiguous",
-  "message": "Expression may be ambiguous due to implicit multiplication after division",
-  "simplified": "..."
-}
-```
-
-### `verify_identity` fail-closed
-**Documented from [GitHub PR #153](https://github.com/QWED-AI/qwed-verification/pull/153)**
-
-> Identity verification now fails closed when only numerical sampling matches.
-
-- **`verify_identity` fail-closed** â€” If no formal proof is established, numerical sampling no longer returns an ambiguous equivalence-style result. The engine now responds with `BLOCKED`, `is_equivalent: false`, and `method: "numerical_sampling_rejected"`.
-
-### `verify_logic_rule` fail-closed
-**Documented from [GitHub PR #152](https://github.com/QWED-AI/qwed-verification/pull/152)**
-
-> The legacy `VerificationEngine.verify_logic_rule()` method now raises `NotImplementedError` instead of silently returning `None`.
-
-- **`verify_logic_rule` fail-closed** â€” Any legacy call path now fails explicitly and directs callers to `LogicVerifier`.
-
-```python
-# Before (no longer works)
-from qwed_new.core.verifier import VerificationEngine
-engine = VerificationEngine()
-result = engine.verify_logic_rule(rule="if x > 5 then allow", context={"x": 10})
-
-# After
-from qwed_new.core.logic_verifier import LogicVerifier
-verifier = LogicVerifier()
-result = verifier.verify_conclusion(
-    premises=["x is 10", "x > 5 implies allow"],
-    conclusion="allow"
-)
-```
-
-### Default-deny for unknown tool approvals
-**Documented from [GitHub PR #150](https://github.com/QWED-AI/qwed-verification/pull/150)**
-
-> The tool approval system now blocks all unknown tools by default, regardless of their heuristic risk score.
-
-- **Default-deny for unknown tools** â€” Tool calls that are not explicitly allowlisted are now blocked unconditionally and must be approved through an explicit policy path.
-
-### Legacy `CodeExecutor` hard-blocked
-**Documented from [GitHub PR #149](https://github.com/QWED-AI/qwed-verification/pull/149)**
-
-> Permanently disables the legacy `CodeExecutor` class that used raw `exec()`.
-
-- **Legacy `CodeExecutor` hard-blocked** â€” `CodeExecutor.execute()` now raises a `RuntimeError` on every call, closing the final in-process raw execution path. Public API endpoints remain on `SecureCodeExecutor`.
-
-If you still import `CodeExecutor` in custom code, migrate to `SecureCodeExecutor`. See the [security hardening guide](/advanced/security-hardening#legacy-codeexecutor-hard-blocked) for the migration example.
 
 ---
 
