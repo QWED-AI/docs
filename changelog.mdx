@@ -3,6 +3,21 @@ title: "Changelog"
 description: "All notable changes to QWED Protocol — releases, features, security fixes, and improvements."
 ---
 
+## v5.0.6 — `uniqueItems` schema validation fails closed
+**Released: April 19, 2026** · [GitHub PR #155](https://github.com/QWED-AI/qwed-verification/pull/155)
+
+> The Schema Verifier now fails closed when `uniqueItems` validation cannot be completed deterministically. Arrays with unhashable or incomparable elements are rejected instead of silently passing.
+
+### Security
+
+- **`uniqueItems` fail-closed** — When a JSON Schema sets `uniqueItems: true` and the array contains elements that cannot be hashed or serialized for comparison (e.g., objects containing Python `set` values), the verifier previously caught the `TypeError`/`ValueError` and silently passed validation. It now reports a `uniqueness_validation_error` issue with `is_valid: false` and `status: "INVALID"`, making the rejection explicit. The issue message includes the underlying error for debugging.
+
+### Impact
+
+If your schemas use `uniqueItems: true` and your data contains elements that are not JSON-serializable or not hashable, those arrays now fail validation instead of silently passing. Ensure all array elements are JSON-compatible types (strings, numbers, booleans, plain objects, or arrays) to avoid the new `uniqueness_validation_error` issue.
+
+---
+
 ## v5.0.5 — Ambiguous math expressions fail closed
 **Released: April 19, 2026** · [GitHub PR #154](https://github.com/QWED-AI/qwed-verification/pull/154)
 
