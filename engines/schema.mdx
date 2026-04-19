@@ -41,35 +41,46 @@ response = client.verify_schema(
 # -> ❌ MATH ERROR: total (300) != sum(items) (30)
 ```
 
-## `uniqueItems` validation
+## Array validation
 
-When your schema includes `"uniqueItems": true`, the engine checks that every element in the array is distinct. If the engine cannot complete the uniqueness check — for example, because an item triggers a `TypeError` or `ValueError` during comparison — it reports a `uniqueness_validation_error` instead of silently passing. This fail-closed behavior ensures that unverifiable arrays are never treated as valid.
+The Schema Verifier supports standard JSON Schema array keywords including `uniqueItems`.
+
+### `uniqueItems` — fail-closed validation
+
+When a schema sets `uniqueItems: true`, the verifier checks that every element in the array is distinct. If an element is unhashable or otherwise cannot be compared deterministically (for example, an object containing a Python `set`), the verifier **fails closed** — it reports a `uniqueness_validation_error` issue instead of silently passing.
+
+This ensures that unverifiable arrays are never treated as valid.
+
+**Issue types returned for `uniqueItems`:**
+
+| Issue type | Meaning |
+|---|---|
+| `uniqueness_violation` | Duplicate items were found in the array |
+| `uniqueness_validation_error` | Uniqueness could not be verified deterministically (fail-closed) |
+
+**Example — duplicate items:**
 
 ```python
-schema = {
-    "type": "object",
-    "properties": {
-        "tags": {
-            "type": "array",
-            "uniqueItems": True,
-            "items": {"type": "string"}
-        }
-    }
-}
+schema = {"type": "array", "uniqueItems": True}
 
-# Duplicate items are caught
-response = client.verify_schema(
-    obj={"tags": ["billing", "billing"]},
-    schema=schema
-)
-# -> ❌ uniqueness_violation: Array contains duplicate items
+result = client.verify_schema(obj=[1, 2, 2, 3], schema=schema)
+# -> is_valid: false, issue_type: "uniqueness_violation"
+```
 
-# Items that cannot be compared deterministically also fail
-# -> ❌ uniqueness_validation_error: uniqueItems could not be verified deterministically
+**Example — uncheckable items fail closed:**
+
+```python
+schema = {"type": "array", "uniqueItems": True}
+
+# Items containing unhashable types cannot be compared deterministically
+result = client.verify_schema(obj=[{"bad": {1, 2}}, {"bad": {3, 4}}], schema=schema)
+# -> is_valid: false, status: "INVALID"
+# -> issue_type: "uniqueness_validation_error"
+# -> message: "uniqueItems could not be verified deterministically: ..."
 ```
 
 <Info>
-  This fail-closed behavior was introduced in v5.0.6. Earlier versions silently skipped the uniqueness check when items could not be compared. See the [changelog](/changelog#v506--schema-uniqueitems-fail-closed) for details.
+This fail-closed behavior is part of the current post-`v5.0.0` hardening work and will roll into the next official tagged release notes once that release is published.
 </Info>
 
 ## When to use
