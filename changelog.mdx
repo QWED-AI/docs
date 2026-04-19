@@ -1,6 +1,6 @@
 ---
 title: "Changelog"
-description: "All notable changes to QWED Protocol — releases, features, security fixes, and improvements."
+description: "All notable changes to QWED Protocol â€” releases, features, security fixes, and improvements."
 ---
 
 ## Unreleased
@@ -12,7 +12,7 @@ These entries document post-`v5.0.0` hardening work that has landed in the core 
 
 > The schema verifier now reports a validation error when `uniqueItems` cannot be checked deterministically, instead of silently passing.
 
-- **`uniqueItems` validation fail-closed** — When a JSON schema specifies `"uniqueItems": true` and the array contains items that cannot be hashed for comparison, the schema verifier now emits a `uniqueness_validation_error` instead of silently skipping the uniqueness check.
+- **`uniqueItems` validation fail-closed** â€” When a JSON schema specifies `"uniqueItems": true` and the array contains items that cannot be hashed for comparison, the schema verifier now emits a `uniqueness_validation_error` instead of silently skipping the uniqueness check.
 
 ```json
 {
@@ -29,7 +29,7 @@ These entries document post-`v5.0.0` hardening work that has landed in the core 
 
 > The math verification API now rejects ambiguous expressions with `BLOCKED` instead of returning `is_valid: true`.
 
-- **Ambiguous math expressions fail closed** — When `POST /verify/math` detects implicit multiplication after division, it now returns `is_valid: false`, `result: false`, and `status: "BLOCKED"` while preserving an explicit ambiguity warning.
+- **Ambiguous math expressions fail closed** â€” When `POST /verify/math` detects implicit multiplication after division, it now returns `is_valid: false`, `result: false`, and `status: "BLOCKED"` while preserving an explicit ambiguity warning.
 
 ```json
 {
@@ -47,14 +47,14 @@ These entries document post-`v5.0.0` hardening work that has landed in the core 
 
 > Identity verification now fails closed when only numerical sampling matches.
 
-- **`verify_identity` fail-closed** — If no formal proof is established, numerical sampling no longer returns an ambiguous equivalence-style result. The engine now responds with `BLOCKED`, `is_equivalent: false`, and `method: "numerical_sampling_rejected"`.
+- **`verify_identity` fail-closed** â€” If no formal proof is established, numerical sampling no longer returns an ambiguous equivalence-style result. The engine now responds with `BLOCKED`, `is_equivalent: false`, and `method: "numerical_sampling_rejected"`.
 
 ### `verify_logic_rule` fail-closed
 **Documented from [GitHub PR #152](https://github.com/QWED-AI/qwed-verification/pull/152)**
 
 > The legacy `VerificationEngine.verify_logic_rule()` method now raises `NotImplementedError` instead of silently returning `None`.
 
-- **`verify_logic_rule` fail-closed** — Any legacy call path now fails explicitly and directs callers to `LogicVerifier`.
+- **`verify_logic_rule` fail-closed** â€” Any legacy call path now fails explicitly and directs callers to `LogicVerifier`.
 
 ```python
 # Before (no longer works)
@@ -76,42 +76,42 @@ result = verifier.verify_conclusion(
 
 > The tool approval system now blocks all unknown tools by default, regardless of their heuristic risk score.
 
-- **Default-deny for unknown tools** — Tool calls that are not explicitly allowlisted are now blocked unconditionally and must be approved through an explicit policy path.
+- **Default-deny for unknown tools** â€” Tool calls that are not explicitly allowlisted are now blocked unconditionally and must be approved through an explicit policy path.
 
 ### Legacy `CodeExecutor` hard-blocked
 **Documented from [GitHub PR #149](https://github.com/QWED-AI/qwed-verification/pull/149)**
 
 > Permanently disables the legacy `CodeExecutor` class that used raw `exec()`.
 
-- **Legacy `CodeExecutor` hard-blocked** — `CodeExecutor.execute()` now raises a `RuntimeError` on every call, closing the final in-process raw execution path. Public API endpoints remain on `SecureCodeExecutor`.
+- **Legacy `CodeExecutor` hard-blocked** â€” `CodeExecutor.execute()` now raises a `RuntimeError` on every call, closing the final in-process raw execution path. Public API endpoints remain on `SecureCodeExecutor`.
 
 If you still import `CodeExecutor` in custom code, migrate to `SecureCodeExecutor`. See the [security hardening guide](/advanced/security-hardening#legacy-codeexecutor-hard-blocked) for the migration example.
 
 ---
 
-## v5.0.0 — Enforcement boundary hardening
-**Released: April 4, 2026** · [GitHub Release](https://github.com/QWED-AI/qwed-verification/releases/tag/v5.0.0)
+## v5.0.0 â€” Enforcement boundary hardening
+**Released: April 4, 2026** Â· [GitHub Release](https://github.com/QWED-AI/qwed-verification/releases/tag/v5.0.0)
 
 > Major release making QWED's verification boundary fail-closed, deterministic about what it proves, and harder to bypass under adversarial conditions. Consolidates 98 commits and 20 merged PRs since v4.0.1, including the full enforcement hardening series.
 
 ### Breaking changes
 
-- **`INCONCLUSIVE` is a new verification status** — Natural-language math responses now return `INCONCLUSIVE` when verifying LLM-translated expressions, because the translation step is non-deterministic. Downstream consumers must handle this status alongside `VERIFIED`, `ERROR`, and `BLOCKED`.
-- **`BLOCKED` and `UNKNOWN` are explicit outcomes** — These are no longer treated as generic failures. Consumers should map them to distinct UI states or retry logic.
-- **`ActionContext` is mandatory for agent verification** — All `verify_action` requests must include `conversation_id` and `step_number`. Requests without them are rejected with `QWED-AGENT-CTX-001`.
-- **`security_checks` field removed** — Exfiltration and MCP poison checks are now server-enforced and unconditional. The `security_checks` request field and the TypeScript SDK `checkExfiltration`/`checkMcpPoison` options no longer exist.
-- **`/metrics` endpoints require admin authentication** — `GET /metrics` and `GET /metrics/prometheus` now require an authenticated admin or owner role. Update monitoring integrations accordingly.
-- **Docker required for stats and consensus verification** — The in-process execution fallbacks have been removed. If Docker is unavailable, `/verify/stats` and `/verify/consensus` return HTTP 503.
+- **`INCONCLUSIVE` is a new verification status** â€” Natural-language math responses now return `INCONCLUSIVE` when verifying LLM-translated expressions, because the translation step is non-deterministic. Downstream consumers must handle this status alongside `VERIFIED`, `ERROR`, and `BLOCKED`.
+- **`BLOCKED` and `UNKNOWN` are explicit outcomes** â€” These are no longer treated as generic failures. Consumers should map them to distinct UI states or retry logic.
+- **`ActionContext` is mandatory for agent verification** â€” All `verify_action` requests must include `conversation_id` and `step_number`. Requests without them are rejected with `QWED-AGENT-CTX-001`.
+- **`security_checks` field removed** â€” Exfiltration and MCP poison checks are now server-enforced and unconditional. The `security_checks` request field and the TypeScript SDK `checkExfiltration`/`checkMcpPoison` options no longer exist.
+- **`/metrics` endpoints require admin authentication** â€” `GET /metrics` and `GET /metrics/prometheus` now require an authenticated admin or owner role. Update monitoring integrations accordingly.
+- **Docker required for stats and consensus verification** â€” The in-process execution fallbacks have been removed. If Docker is unavailable, `/verify/stats` and `/verify/consensus` return HTTP 503.
 
 ### Security
 
-- **Fail-closed verification boundary** — Disabled unsafe in-process execution fallbacks; stats and consensus paths now require the secure Docker sandbox.
-- **Logic verifier eval() removed** — The raw `eval()` fallback in logic constraint parsing has been removed. If `SafeEvaluator` is unavailable, the verifier raises a `RuntimeError`.
-- **Consensus rate limiting** — `POST /verify/consensus` now enforces per-tenant rate limiting, matching other verification endpoints.
-- **Consensus fact self-attestation removed** — The fact engine no longer participates in automatic consensus engine selection, preventing self-referential verification loops.
-- **Redis fail-closed** — The sliding window rate limiter now denies requests on Redis errors instead of allowing them.
-- **Timing-safe token verification** — Agent token comparison uses `hmac.compare_digest` to prevent timing side-channel attacks.
-- **Environment integrity enforcement** — The API server runs `verify_environment_integrity()` at startup before database initialization.
+- **Fail-closed verification boundary** â€” Disabled unsafe in-process execution fallbacks; stats and consensus paths now require the secure Docker sandbox.
+- **Logic verifier eval() removed** â€” The raw `eval()` fallback in logic constraint parsing has been removed. If `SafeEvaluator` is unavailable, the verifier raises a `RuntimeError`.
+- **Consensus rate limiting** â€” `POST /verify/consensus` now enforces per-tenant rate limiting, matching other verification endpoints.
+- **Consensus fact self-attestation removed** â€” The fact engine no longer participates in automatic consensus engine selection, preventing self-referential verification loops.
+- **Redis fail-closed** â€” The sliding window rate limiter now denies requests on Redis errors instead of allowing them.
+- **Timing-safe token verification** â€” Agent token comparison uses `hmac.compare_digest` to prevent timing side-channel attacks.
+- **Environment integrity enforcement** â€” The API server runs `verify_environment_integrity()` at startup before database initialization.
 
 ### Trust boundary metadata
 
@@ -134,18 +134,18 @@ See the [`POST /verify/natural_language`](/api/endpoints#post-verifynatural_lang
 
 ### Agent hardening
 
-- **Action context mandatory** — All `verify_action` requests must include `conversation_id` and `step_number`. Requests without them are rejected with `QWED-AGENT-CTX-001`.
-- **Replay detection** — Reusing a `(conversation_id, step_number)` pair is blocked (`QWED-AGENT-LOOP-002`).
-- **Loop detection** — Repeating the same action 3+ consecutive times triggers a denial (`QWED-AGENT-LOOP-003`).
-- **In-flight step reservations** — Prevents race conditions when multiple agent calls run concurrently.
-- **Budget denial isolation** — Budget-exceeded denials do not consume conversation state, so the agent can retry after the budget resets.
-- **Stats exception masking** — The Stats Engine no longer leaks internal exception details to API callers.
+- **Action context mandatory** â€” All `verify_action` requests must include `conversation_id` and `step_number`. Requests without them are rejected with `QWED-AGENT-CTX-001`.
+- **Replay detection** â€” Reusing a `(conversation_id, step_number)` pair is blocked (`QWED-AGENT-LOOP-002`).
+- **Loop detection** â€” Repeating the same action 3+ consecutive times triggers a denial (`QWED-AGENT-LOOP-003`).
+- **In-flight step reservations** â€” Prevents race conditions when multiple agent calls run concurrently.
+- **Budget denial isolation** â€” Budget-exceeded denials do not consume conversation state, so the agent can retry after the budget resets.
+- **Stats exception masking** â€” The Stats Engine no longer leaks internal exception details to API callers.
 
 ### SDK version bumps
 
-- `qwed` (PyPI): `4.0.1` → `5.0.0`
-- `qwed_sdk` (Python): `2.1.0-dev` → `5.0.0`
-- `@qwed-ai/sdk` (npm): `4.0.1` → `5.0.0`
+- `qwed` (PyPI): `4.0.1` â†’ `5.0.0`
+- `qwed_sdk` (Python): `2.1.0-dev` â†’ `5.0.0`
+- `@qwed-ai/sdk` (npm): `4.0.1` â†’ `5.0.0`
 - TypeScript SDK: Removed `security_checks` from agent verification helpers; `tool_schema` remains.
 
 ### Upgrade
@@ -165,32 +165,32 @@ If you use agent verification, all requests must now include `conversation_id` a
 </Warning>
 
 ---
-## v4.0.5 — Stats exception masking
-**Released: April 3, 2026** · [GitHub PR #118](https://github.com/QWED-AI/qwed-verification/pull/118)
+## v4.0.5 â€” Stats exception masking
+**Released: April 3, 2026** Â· [GitHub PR #118](https://github.com/QWED-AI/qwed-verification/pull/118)
 
 > Prevents the Stats Engine from leaking internal exception details to API callers. Clients now receive a generic error message when stats code generation fails.
 
 ### Security
 
-- **Stats translation error masking** — When stats code generation fails, the API now returns `"Internal verification error"` instead of the raw exception message. This prevents accidental exposure of file paths, API keys, or other sensitive data that may appear in exception text.
-- **Server-side logging preserved** — The exception type is still logged server-side for operator debugging, but the log no longer includes the full exception message.
+- **Stats translation error masking** â€” When stats code generation fails, the API now returns `"Internal verification error"` instead of the raw exception message. This prevents accidental exposure of file paths, API keys, or other sensitive data that may appear in exception text.
+- **Server-side logging preserved** â€” The exception type is still logged server-side for operator debugging, but the log no longer includes the full exception message.
 
 ---
 
-## v4.0.4 — Fail-closed execution enforcement
-**Released: April 3, 2026** · [GitHub PR #117](https://github.com/QWED-AI/qwed-verification/pull/117)
+## v4.0.4 â€” Fail-closed execution enforcement
+**Released: April 3, 2026** Â· [GitHub PR #117](https://github.com/QWED-AI/qwed-verification/pull/117)
 
 > Removes unsafe in-process execution fallbacks from statistical and consensus verification. All model-generated Python now runs exclusively in the secure Docker sandbox.
 
 ### Breaking changes
 
-- **Docker required for stats verification** — The Wasm and restricted Python fallback execution paths have been removed from the Stats Engine. If Docker is unavailable, `/verify/stats` returns HTTP 503 instead of executing code in-process.
-- **Consensus Python engine uses Docker** — The Python verification engine within consensus verification now runs through `SecureCodeExecutor` instead of the in-process `CodeExecutor`. If Docker is unavailable during `high` or `maximum` mode, `/verify/consensus` returns HTTP 503.
+- **Docker required for stats verification** â€” The Wasm and restricted Python fallback execution paths have been removed from the Stats Engine. If Docker is unavailable, `/verify/stats` returns HTTP 503 instead of executing code in-process.
+- **Consensus Python engine uses Docker** â€” The Python verification engine within consensus verification now runs through `SecureCodeExecutor` instead of the in-process `CodeExecutor`. If Docker is unavailable during `high` or `maximum` mode, `/verify/consensus` returns HTTP 503.
 
 ### Security
 
-- **Fail-closed sandbox gating** — Both the Stats Engine and the Consensus Engine refuse to execute model-generated code when the Docker sandbox is not available, preventing any downgrade to in-process execution.
-- **Live Docker health checks** — `SecureCodeExecutor.is_available()` now pings the Docker daemon on each request instead of relying on cached startup state, catching mid-operation Docker failures.
+- **Fail-closed sandbox gating** â€” Both the Stats Engine and the Consensus Engine refuse to execute model-generated code when the Docker sandbox is not available, preventing any downgrade to in-process execution.
+- **Live Docker health checks** â€” `SecureCodeExecutor.is_available()` now pings the Docker daemon on each request instead of relying on cached startup state, catching mid-operation Docker failures.
 
 ### API changes
 
@@ -199,41 +199,41 @@ If you use agent verification, all requests must now include `conversation_id` a
 
 ---
 
-## v4.0.3 — Server-enforced agent security
-**Released: April 2, 2026** · [GitHub PR #116](https://github.com/QWED-AI/qwed-verification/pull/116)
+## v4.0.3 â€” Server-enforced agent security
+**Released: April 2, 2026** Â· [GitHub PR #116](https://github.com/QWED-AI/qwed-verification/pull/116)
 
 > Closes critical verification boundary gaps by enforcing agent security checks server-side, adding rate limiting to consensus verification, and removing unsafe fallback paths.
 
 ### Breaking changes
 
-- **`security_checks` removed from agent verification** — Exfiltration and MCP poison checks are now enforced server-side on every request. The `security_checks` request field and the TypeScript SDK `checkExfiltration`/`checkMcpPoison` options have been removed. `tool_schema` remains available to trigger MCP poison inspection.
+- **`security_checks` removed from agent verification** â€” Exfiltration and MCP poison checks are now enforced server-side on every request. The `security_checks` request field and the TypeScript SDK `checkExfiltration`/`checkMcpPoison` options have been removed. `tool_schema` remains available to trigger MCP poison inspection.
 
 ### Security
 
-- **Logic verifier fail-closed** — The raw `eval()` fallback in logic constraint parsing has been removed. If `SafeEvaluator` is unavailable, the verifier raises an error instead of falling back to unrestricted evaluation.
-- **Consensus rate limiting** — The `POST /verify/consensus` endpoint is now rate-limited per API key, matching other verification endpoints.
-- **Consensus fact self-attestation removed** — The Fact engine is no longer automatically selected during consensus verification. It produced self-referential results without external context.
+- **Logic verifier fail-closed** â€” The raw `eval()` fallback in logic constraint parsing has been removed. If `SafeEvaluator` is unavailable, the verifier raises an error instead of falling back to unrestricted evaluation.
+- **Consensus rate limiting** â€” The `POST /verify/consensus` endpoint is now rate-limited per API key, matching other verification endpoints.
+- **Consensus fact self-attestation removed** â€” The Fact engine is no longer automatically selected during consensus verification. It produced self-referential results without external context.
 
 ---
 
-## v4.0.2 — Security Cleanup
-**Released: April 1, 2026** · [GitHub PR #114](https://github.com/QWED-AI/qwed-verification/pull/114)
+## v4.0.2 â€” Security Cleanup
+**Released: April 1, 2026** Â· [GitHub PR #114](https://github.com/QWED-AI/qwed-verification/pull/114)
 
 > Hardens expression evaluation, improves error handling across the SDK and consensus engine, and removes unused code flagged by CodeQL.
 
 ### Security
 
-- **eval() fully eliminated** — SymPy and Z3 expression evaluation now uses a custom AST-walking interpreter instead of `compile()` + `eval()`. The evaluator validates every AST node against a strict allow-list, then interprets the tree directly in a restricted namespace.
-- **CodeGuard integration** — Expressions are screened by `CodeGuard` (when available) as a second defense layer between AST validation and evaluation.
-- **Keyword unpacking blocked** — Call nodes with `**kwargs`-style keyword unpacking are now rejected during AST validation.
+- **eval() fully eliminated** â€” SymPy and Z3 expression evaluation now uses a custom AST-walking interpreter instead of `compile()` + `eval()`. The evaluator validates every AST node against a strict allow-list, then interprets the tree directly in a restricted namespace.
+- **CodeGuard integration** â€” Expressions are screened by `CodeGuard` (when available) as a second defense layer between AST validation and evaluation.
+- **Keyword unpacking blocked** â€” Call nodes with `**kwargs`-style keyword unpacking are now rejected during AST validation.
 
 ### Improvements
 
-- **Exact SymPy arithmetic** — Numeric literals are coerced to `sympy.Integer` / `sympy.Float` during evaluation, preventing floating-point drift in intermediate math comparisons.
-- **Consensus failure recording** — Unexpected errors during async engine aggregation are now logged and recorded as an `EngineResult` entry instead of being silently dropped.
-- **Telemetry initialization** — Replaced the `_initialized` flag with `@lru_cache` for one-time cached initialization.
-- **SDK import cycle broken** — `qwed_sdk.cache` no longer imports from `qwed_sdk.qwed_local` for terminal colors; it uses `colorama` directly with a plain-text fallback.
-- **Integration imports hardened** — Optional framework imports (LangChain, CrewAI, LlamaIndex) now default to `None` explicitly instead of using bare `except: pass`.
+- **Exact SymPy arithmetic** â€” Numeric literals are coerced to `sympy.Integer` / `sympy.Float` during evaluation, preventing floating-point drift in intermediate math comparisons.
+- **Consensus failure recording** â€” Unexpected errors during async engine aggregation are now logged and recorded as an `EngineResult` entry instead of being silently dropped.
+- **Telemetry initialization** â€” Replaced the `_initialized` flag with `@lru_cache` for one-time cached initialization.
+- **SDK import cycle broken** â€” `qwed_sdk.cache` no longer imports from `qwed_sdk.qwed_local` for terminal colors; it uses `colorama` directly with a plain-text fallback.
+- **Integration imports hardened** â€” Optional framework imports (LangChain, CrewAI, LlamaIndex) now default to `None` explicitly instead of using bare `except: pass`.
 
 ### Chores
 
@@ -243,32 +243,32 @@ If you use agent verification, all requests must now include `conversation_id` a
 
 ---
 
-## v4.0.1 — Sentinel Guard Sync 🔄
-**Released: March 23, 2026** · [GitHub Release](https://github.com/QWED-AI/qwed-verification/releases/tag/v4.0.1) · [PyPI](https://pypi.org/project/qwed/4.0.1/)
+## v4.0.1 â€” Sentinel Guard Sync ðŸ”„
+**Released: March 23, 2026** Â· [GitHub Release](https://github.com/QWED-AI/qwed-verification/releases/tag/v4.0.1) Â· [PyPI](https://pypi.org/project/qwed/4.0.1/)
 
 > Patch release aligning the TypeScript SDK, backend API schemas, and security guard integrations introduced in v4.0.0.
 
-### 🆕 New Endpoints
+### ðŸ†• New Endpoints
 
-- **`POST /verify/process`** — Glass-box reasoning process verifier with IRAC structural compliance and custom milestone validation.
-- **Agent Security Checks** — `POST /agents/{id}/verify` now accepts `security_checks: { exfiltration, mcp_poison }` to run `ExfiltrationGuard` and `MCPPoisonGuard` before verification.
+- **`POST /verify/process`** â€” Glass-box reasoning process verifier with IRAC structural compliance and custom milestone validation.
+- **Agent Security Checks** â€” `POST /agents/{id}/verify` now accepts `security_checks: { exfiltration, mcp_poison }` to run `ExfiltrationGuard` and `MCPPoisonGuard` before verification.
 
-### 🔒 Security Fixes
+### ðŸ”’ Security Fixes
 
-- **Information Disclosure** — Removed raw exception messages from `/verify/rag` error responses; clients receive only `INTERNAL_VERIFICATION_ERROR`.
-- **Symbolic Precision** — `RAGVerifyRequest.max_drm_rate` changed from `float | str` → `str` with `field_validator` enforcing Fraction-compatible values.
-- **Response Consistency** — RAG error responses now return `"verified": false` matching the success path schema.
+- **Information Disclosure** â€” Removed raw exception messages from `/verify/rag` error responses; clients receive only `INTERNAL_VERIFICATION_ERROR`.
+- **Symbolic Precision** â€” `RAGVerifyRequest.max_drm_rate` changed from `float | str` â†’ `str` with `field_validator` enforcing Fraction-compatible values.
+- **Response Consistency** â€” RAG error responses now return `"verified": false` matching the success path schema.
 
-### 🛠️ SDK Changes (`@qwed-ai/sdk@4.0.1`)
+### ðŸ› ï¸ SDK Changes (`@qwed-ai/sdk@4.0.1`)
 
 - Added `verifyProcess()` method for IRAC/milestone validation.
-- `verifyRAG()` — `maxDrmRate` type changed from `number` to `string`.
-- `verifyAgent()` — Payload aligned with backend schema, agent IDs URL-encoded.
+- `verifyRAG()` â€” `maxDrmRate` type changed from `number` to `string`.
+- `verifyAgent()` â€” Payload aligned with backend schema, agent IDs URL-encoded.
 - New types: `Process`, `RAG`, `Security` in `VerificationType` enum.
 
-### 🧪 Tests
+### ðŸ§ª Tests
 
-- `test_api_phase17_endpoints.py` — covers `/verify/process`, `/verify/rag` exception masking, and agent security check blocking.
+- `test_api_phase17_endpoints.py` â€” covers `/verify/process`, `/verify/rag` exception masking, and agent security check blocking.
 
 ```bash
 pip install qwed==4.0.1
@@ -278,40 +278,40 @@ npm install @qwed-ai/sdk@4.0.1
 
 ---
 
-## v4.0.0 — Sentinel Edition 🛡️
-**Released: March 12, 2026** · [GitHub Release](https://github.com/QWED-AI/qwed-verification/releases/tag/v4.0.0) · [PyPI](https://pypi.org/project/qwed/4.0.0/)
+## v4.0.0 â€” Sentinel Edition ðŸ›¡ï¸
+**Released: March 12, 2026** Â· [GitHub Release](https://github.com/QWED-AI/qwed-verification/releases/tag/v4.0.0) Â· [PyPI](https://pypi.org/project/qwed/4.0.0/)
 
-> **147 commits** since v3.0.1 — the largest update in QWED history.
+> **147 commits** since v3.0.1 â€” the largest update in QWED history.
 
-### 🔧 v4.0.0 patch — Provider fallbacks, .env loading, and Gemini stability
+### ðŸ”§ v4.0.0 patch â€” Provider fallbacks, .env loading, and Gemini stability
 
-- **Native Gemini provider** — Gemini now runs through a dedicated provider with native support for math, logic, stats, fact, and image verification. All API calls enforce a 30-second timeout and automatically strip Markdown code fences from responses.
-- **Centralized .env loading** — Environment variables now load in a deterministic priority order: project `.env` first, then `~/.qwed/.env`. This prevents configuration drift between CLI and server contexts.
-- **Gemini AST stability** — Fixed intermittent JSON parse failures when Gemini returns code-fenced responses during logic translation.
+- **Native Gemini provider** â€” Gemini now runs through a dedicated provider with native support for math, logic, stats, fact, and image verification. All API calls enforce a 30-second timeout and automatically strip Markdown code fences from responses.
+- **Centralized .env loading** â€” Environment variables now load in a deterministic priority order: project `.env` first, then `~/.qwed/.env`. This prevents configuration drift between CLI and server contexts.
+- **Gemini AST stability** â€” Fixed intermittent JSON parse failures when Gemini returns code-fenced responses during logic translation.
 
-### 🆕 Agentic Security Guards (Phase 17)
+### ðŸ†• Agentic Security Guards (Phase 17)
 
 A brand-new guard subsystem for securing AI agent tool chains and RAG pipelines:
 
-- **RAGGuard** — Detects prompt injection, data poisoning, and context manipulation in RAG pipelines. IRAC-compliant reporting.
-- **ExfiltrationGuard** — Prevents data exfiltration through agent tool calls by analyzing output patterns and destination validation.
-- **MCP Poison Guard** — Detects poisoned or tampered MCP tool definitions before agent execution.
+- **RAGGuard** â€” Detects prompt injection, data poisoning, and context manipulation in RAG pipelines. IRAC-compliant reporting.
+- **ExfiltrationGuard** â€” Prevents data exfiltration through agent tool calls by analyzing output patterns and destination validation.
+- **MCP Poison Guard** â€” Detects poisoned or tampered MCP tool definitions before agent execution.
 
 All three guards went through **five rounds** of security review via CodeRabbit and SonarCloud.
 
-### 🆕 New Standalone Guards
+### ðŸ†• New Standalone Guards
 
-- **SovereigntyGuard** — Enforces data residency policies and local routing rules (GDPR, data localization).
-- **ToxicFlowGuard** — Stateful detection of toxic tool-chaining patterns across multi-step agent workflows.
-- **SelfInitiatedCoTGuard (S-CoT)** — Verifies self-initiated Chain-of-Thought logic paths for reasoning integrity.
+- **SovereigntyGuard** â€” Enforces data residency policies and local routing rules (GDPR, data localization).
+- **ToxicFlowGuard** â€” Stateful detection of toxic tool-chaining patterns across multi-step agent workflows.
+- **SelfInitiatedCoTGuard (S-CoT)** â€” Verifies self-initiated Chain-of-Thought logic paths for reasoning integrity.
 
-### 🆕 Process Determinism
+### ðŸ†• Process Determinism
 
 A new class of deterministic verification:
 
-- **ProcessVerifier** — IRAC/milestone-based process verification with decimal scoring, budget-aware timeouts, and structured compliance reporting. Ensures AI-driven workflows follow deterministic process steps — not just correct answers, but correct *procedures*.
+- **ProcessVerifier** â€” IRAC/milestone-based process verification with decimal scoring, budget-aware timeouts, and structured compliance reporting. Ensures AI-driven workflows follow deterministic process steps â€” not just correct answers, but correct *procedures*.
 
-### 🔒 Critical Security Fixes
+### ðŸ”’ Critical Security Fixes
 
 - Replaced direct `eval()` with AST-validated execution (Code Injection Prevention). Further hardened in v4.0.2 with a full AST-walking interpreter.
 - Patched critical sandbox escape and namespace mismatch.
@@ -321,7 +321,7 @@ A new class of deterministic verification:
 - Fixed all 19 Snyk Code findings.
 - Secured exception handling across `verify_logic`, `ControlPlane`, `verify_stats`, `agent_tool_call`.
 
-### 🐳 Docker Hardening
+### ðŸ³ Docker Hardening
 
 - Pinned base image digests with hash-verified requirements
 - Non-root user execution with `gosu`/`runuser`
@@ -332,15 +332,15 @@ A new class of deterministic verification:
 docker pull qwedai/qwed-verification:4.0.0
 ```
 
-### 🔧 CI/CD Infrastructure
+### ðŸ”§ CI/CD Infrastructure
 
-- **Sentry SDK** — Error tracking and monitoring.
-- **CircleCI** — Python matrix testing (3.10, 3.11, 3.12).
-- **SonarCloud** — Code quality and coverage.
-- **Snyk** — Security scanning with SARIF output.
-- **Docker Auto-Publish** — Automated image push on every release.
+- **Sentry SDK** â€” Error tracking and monitoring.
+- **CircleCI** â€” Python matrix testing (3.10, 3.11, 3.12).
+- **SonarCloud** â€” Code quality and coverage.
+- **Snyk** â€” Security scanning with SARIF output.
+- **Docker Auto-Publish** â€” Automated image push on every release.
 
-### 📝 Documentation & Badges
+### ðŸ“ Documentation & Badges
 
 - OpenSSF Best Practices badge (Silver)
 - Snyk security badge and partner attribution
@@ -349,24 +349,24 @@ docker pull qwedai/qwed-verification:4.0.0
 
 ---
 
-## v3.0.1 — Ironclad Update 🦾
-**Released: February 4, 2026** · [GitHub Release](https://github.com/QWED-AI/qwed-verification/releases/tag/v3.0.1)
+## v3.0.1 â€” Ironclad Update ðŸ¦¾
+**Released: February 4, 2026** Â· [GitHub Release](https://github.com/QWED-AI/qwed-verification/releases/tag/v3.0.1)
 
-### 🛡️ Critical Security Hardening
+### ðŸ›¡ï¸ Critical Security Hardening
 - **CodeQL Remediation**: Resolved 50+ alerts including ReDoS, Clear-text Logging, and Exception Exposure.
 - **Workflow Permissions**: Enforced `permissions: contents: read` across all GitHub Actions to adhere to Least Privilege.
 - **PII Protection**: Implemented robust `redact_pii` logic in all API endpoints and exception handlers.
 
-### 📝 Compliance
+### ðŸ“ Compliance
 - **Snyk Attribution**: Added Snyk attribution to README and Documentation footer for Partner Program compliance.
 
-### 🐛 Bug Fixes
+### ðŸ› Bug Fixes
 - **API Stability**: Fixed unhandled exceptions in `verify_logic` and `agent_tool_call` endpoints.
 
 ---
 
-## v2.4.1 — The Reasoning Engine 🚀
-**Released: January 20, 2026** · [GitHub Release](https://github.com/QWED-AI/qwed-verification/releases/tag/v2.4.1)
+## v2.4.1 â€” The Reasoning Engine ðŸš€
+**Released: January 20, 2026** Â· [GitHub Release](https://github.com/QWED-AI/qwed-verification/releases/tag/v2.4.1)
 
 ### New Features
 - **Optimization Engine (`verify_optimization`)**: Added `LogicVerifier` support for Z3's `Optimize` context.
