@@ -345,8 +345,8 @@ enum VerificationStatus {
 | `VERIFIED` | Claim is formally verified |
 | `CORRECTION_NEEDED` | Claim is incorrect — correct value included in response |
 | `INCONCLUSIVE` | Verification succeeded on the translated expression but the LLM translation step is non-deterministic |
-| `BLOCKED` | Request blocked by security policy |
-| `UNKNOWN` | Verification could not produce a definitive result (e.g., numerical sampling fallback) |
+| `BLOCKED` | Request blocked by security policy or fail-closed verification (e.g., identity sampling without formal proof) |
+| `UNKNOWN` | Verification could not produce a definitive result |
 | `ERROR` | Internal verification error |
 
 ## Error handling

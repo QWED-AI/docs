@@ -78,7 +78,7 @@ result = client.verify_math("sin(x)^2 + cos(x)^2 = 1")
 Identity verification uses symbolic simplification first. If SymPy proves the identity algebraically, the result is `VERIFIED`. When symbolic simplification is inconclusive, the engine samples five test points as a fallback. Only points that can be successfully evaluated count toward agreement — domain-restricted expressions (e.g., `log(x)` at `x = -1`) are skipped rather than causing a false negative.
 
 <Warning>
-Numerical sampling cannot prove equivalence. If all sample points agree but no formal proof was established, the engine **fails closed** — it returns `BLOCKED` with `is_equivalent: false` and `confidence: 0.0` instead of claiming the expressions are equivalent. This prevents crafted expressions that happen to match at the fixed sample points from passing verification. Treat `BLOCKED` results as unverified.
+Numerical sampling cannot prove equivalence. If all sample points agree but no formal proof was established, the engine now **fails closed** — returning `BLOCKED` with `is_equivalent: false`, `method: "numerical_sampling_rejected"`, and `confidence: 0.0`. Two expressions can match at fixed points without being algebraically identical, so sampling-only agreement is rejected outright. Treat `BLOCKED` results as unverified.
 </Warning>
 
 ### 3. Derivatives
