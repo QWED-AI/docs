@@ -3,45 +3,58 @@ title: "Changelog"
 description: "All notable changes to QWED Protocol — releases, features, security fixes, and improvements."
 ---
 
-## v5.0.4 — `verify_identity` fail-closed
-**Released: April 19, 2026** · [GitHub PR #153](https://github.com/QWED-AI/qwed-verification/pull/153)
+## Unreleased
 
-> `verify_identity()` now fails closed when numerical sampling matches but no formal proof exists — returning `BLOCKED` with `is_equivalent: false` instead of `UNKNOWN` with `is_equivalent: null`.
+These entries document post-`v5.0.0` hardening work that has landed in the core repository but has not yet been rolled into a newer tagged release. Keep them here until the next official release is published.
 
-### Security
+### Schema `uniqueItems` fail-closed
+**Documented from [GitHub PR #155](https://github.com/QWED-AI/qwed-verification/pull/155)**
 
-- **`verify_identity` fail-closed** — When symbolic simplification is inconclusive and the numerical sampling fallback finds agreement at all fixed test points, the engine previously returned `UNKNOWN` with `is_equivalent: null` and `confidence: 0.0`. This ambiguous result could be misinterpreted as partial equivalence. The engine now returns `BLOCKED` with `is_equivalent: false`, `method: "numerical_sampling_rejected"`, and `confidence: 0.0`, making it explicit that sampling-only agreement is not a valid proof.
+> The schema verifier now reports a validation error when `uniqueItems` cannot be checked deterministically, instead of silently passing.
 
-### Migration
+- **`uniqueItems` validation fail-closed** — When a JSON schema specifies `"uniqueItems": true` and the array contains items that cannot be hashed for comparison, the schema verifier now emits a `uniqueness_validation_error` instead of silently skipping the uniqueness check.
 
-No action required if you already treat `UNKNOWN` results as unverified. If your code branches on `status == "UNKNOWN"` for identity verification results, update it to check for `"BLOCKED"` instead:
-
-```python
-result = engine.verify_identity("expr_a", "expr_b")
-
-# Before
-if result["status"] == "UNKNOWN":
-    handle_inconclusive()
-
-# After
-if result["status"] == "BLOCKED":
-    handle_rejected()
+```json
+{
+  "path": "$.tags",
+  "issue_type": "uniqueness_validation_error",
+  "expected": "provably unique items",
+  "actual": "uniqueness check could not be completed",
+  "message": "uniqueItems could not be verified deterministically: <error details>"
+}
 ```
 
----
+### Ambiguous math expressions fail closed
+**Documented from [GitHub PR #154](https://github.com/QWED-AI/qwed-verification/pull/154)**
 
-## v5.0.3 — `verify_logic_rule` fail-closed
-**Released: April 18, 2026** · [GitHub PR #152](https://github.com/QWED-AI/qwed-verification/pull/152)
+> The math verification API now rejects ambiguous expressions with `BLOCKED` instead of returning `is_valid: true`.
 
-> The legacy `VerificationEngine.verify_logic_rule()` method now raises `NotImplementedError` instead of silently returning `None`. Callers must migrate to `LogicVerifier`.
+- **Ambiguous math expressions fail closed** — When `POST /verify/math` detects implicit multiplication after division, it now returns `is_valid: false`, `result: false`, and `status: "BLOCKED"` while preserving an explicit ambiguity warning.
 
-### Security
+```json
+{
+  "is_valid": false,
+  "result": false,
+  "status": "BLOCKED",
+  "warning": "ambiguous",
+  "message": "Expression may be ambiguous due to implicit multiplication after division",
+  "simplified": "..."
+}
+```
 
-- **`verify_logic_rule` fail-closed** — Previously, `VerificationEngine.verify_logic_rule(rule, context)` was a no-op that silently returned `None`, which could be misinterpreted as a passing verification. It now raises `NotImplementedError` with the message `verify_logic_rule is deprecated and fail-closed; use LogicVerifier instead`. This ensures that any code path relying on the legacy method fails explicitly rather than producing ambiguous results.
+### `verify_identity` fail-closed
+**Documented from [GitHub PR #153](https://github.com/QWED-AI/qwed-verification/pull/153)**
 
-### Migration
+> Identity verification now fails closed when only numerical sampling matches.
 
-Replace any usage of `VerificationEngine.verify_logic_rule()` with the dedicated `LogicVerifier` class:
+- **`verify_identity` fail-closed** — If no formal proof is established, numerical sampling no longer returns an ambiguous equivalence-style result. The engine now responds with `BLOCKED`, `is_equivalent: false`, and `method: "numerical_sampling_rejected"`.
+
+### `verify_logic_rule` fail-closed
+**Documented from [GitHub PR #152](https://github.com/QWED-AI/qwed-verification/pull/152)**
+
+> The legacy `VerificationEngine.verify_logic_rule()` method now raises `NotImplementedError` instead of silently returning `None`.
+
+- **`verify_logic_rule` fail-closed** — Any legacy call path now fails explicitly and directs callers to `LogicVerifier`.
 
 ```python
 # Before (no longer works)
@@ -58,35 +71,21 @@ result = verifier.verify_conclusion(
 )
 ```
 
----
+### Default-deny for unknown tool approvals
+**Documented from [GitHub PR #150](https://github.com/QWED-AI/qwed-verification/pull/150)**
 
-## v5.0.2 — Default-deny for unknown tool approvals
-**Released: April 18, 2026** · [GitHub PR #150](https://github.com/QWED-AI/qwed-verification/pull/150)
+> The tool approval system now blocks all unknown tools by default, regardless of their heuristic risk score.
 
-> The tool approval system now blocks all unknown tools by default, regardless of their heuristic risk score. Previously, unknown tools with a low risk score were auto-approved.
+- **Default-deny for unknown tools** — Tool calls that are not explicitly allowlisted are now blocked unconditionally and must be approved through an explicit policy path.
 
-### Security
+### Legacy `CodeExecutor` hard-blocked
+**Documented from [GitHub PR #149](https://github.com/QWED-AI/qwed-verification/pull/149)**
 
-- **Default-deny for unknown tools** — Tool calls that are not on the safe operations list or the dangerous operations list are now blocked unconditionally. Before this change, unknown tools with a risk score below 0.3 were auto-approved. Now they require explicit allowlisting. The blocked response includes the tool name and its computed risk score for debugging.
+> Permanently disables the legacy `CodeExecutor` class that used raw `exec()`.
 
-### Migration
+- **Legacy `CodeExecutor` hard-blocked** — `CodeExecutor.execute()` now raises a `RuntimeError` on every call, closing the final in-process raw execution path. Public API endpoints remain on `SecureCodeExecutor`.
 
-If your agents use custom tools that were previously auto-approved based on risk score, you must add them to the safe operations allowlist. Any tool not explicitly listed is now denied with a message like `Unknown tool 'your_tool' requires explicit allowlisting (risk_score=0.0)`.
-
----
-
-## v5.0.1 — Legacy CodeExecutor hard-blocked
-**Released: April 18, 2026** · [GitHub PR #149](https://github.com/QWED-AI/qwed-verification/pull/149)
-
-> Permanently disables the legacy `CodeExecutor` class that used raw `exec()`. Any direct usage now raises a `RuntimeError` directing callers to `SecureCodeExecutor`.
-
-### Security
-
-- **Legacy CodeExecutor hard-blocked** — `CodeExecutor.execute()` now raises a `RuntimeError` on every call, closing the last remaining path to in-process code execution. The public API endpoints (`/verify/stats`, `/verify/consensus`) are unaffected because they already use `SecureCodeExecutor` since v4.0.4. This change impacts self-hosted deployments that imported `CodeExecutor` directly.
-
-### Migration
-
-If you import `CodeExecutor` in custom code, replace it with `SecureCodeExecutor`. See the [security hardening guide](/advanced/security-hardening#legacy-codeexecutor-removed) for a migration example.
+If you still import `CodeExecutor` in custom code, migrate to `SecureCodeExecutor`. See the [security hardening guide](/advanced/security-hardening#legacy-codeexecutor-hard-blocked) for the migration example.
 
 ---
 

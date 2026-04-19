@@ -162,7 +162,20 @@ Verify mathematical expressions or equations using SymPy symbolic computation.
 }
 ```
 
-Symbolic expressions that cannot be evaluated to a numeric value include `is_symbolic: true`. Expressions involving complex numbers include `is_complex: true`. Ambiguous expressions (e.g., implicit multiplication after division) return a `warning: "ambiguous"` field.
+Symbolic expressions that cannot be evaluated to a numeric value include `is_symbolic: true`. Expressions involving complex numbers include `is_complex: true`.
+
+**Ambiguous expressions:** Expressions with implicit multiplication after division (e.g., `1/2(3+1)`) are rejected with `is_valid: false`, `result: false`, and `status: "BLOCKED"`. The response includes `warning: "ambiguous"` and a `message` explaining why. Rewrite the expression with explicit parentheses or a `*` operator to remove the ambiguity.
+
+```json
+{
+  "is_valid": false,
+  "result": false,
+  "status": "BLOCKED",
+  "warning": "ambiguous",
+  "message": "Expression may be ambiguous due to implicit multiplication after division",
+  "simplified": "..."
+}
+```
 
 **Error cases:** Division by zero, `log(0)`, and square root of negative numbers in the real domain return `is_valid: false` with a descriptive `error` and `message`.
 
