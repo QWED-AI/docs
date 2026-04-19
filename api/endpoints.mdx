@@ -26,7 +26,7 @@ curl https://api.qwedai.com/v1/health
 {
   "status": "healthy",
   "service": "QWED Platform",
-  "version": "5.0.0",
+  "version": "5.1.0",
   "timestamp": "2024-12-20T12:00:00Z"
 }
 ```
@@ -118,7 +118,7 @@ The `status` field was previously set to the inner engine result (e.g., `VERIFIE
 
 ### POST /verify/math
 
-<Info>Updated in v5.0.4: `verify_identity()` numerical sampling fallback now returns `BLOCKED` with `is_equivalent: false` instead of `UNKNOWN`. This fail-closed behavior ensures that sampling-only agreement is never mistaken for a verified identity.</Info>
+<Info>Updated in v5.1.0: `verify_identity()` numerical sampling fallback now returns `BLOCKED` with `is_equivalent: false` instead of `UNKNOWN`. This fail-closed behavior ensures that sampling-only agreement is never mistaken for a verified identity.</Info>
 
 Verify mathematical expressions or equations using SymPy symbolic computation.
 
