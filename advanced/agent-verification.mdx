@@ -184,7 +184,32 @@ LOOP-004 fingerprints are only committed to the sliding window when the action d
 | AUTONOMOUS | 2 | Most actions autonomous |
 | TRUSTED | 3 | Full autonomy |
 
-## Risk Assessment
+## Tool approval policy
+
+<Info>Changed in v5.0.2</Info>
+
+The `ToolApprovalSystem` classifies every tool call into one of three categories before execution:
+
+| Category | Behavior | Examples |
+|----------|----------|----------|
+| **Safe (allowlisted)** | Auto-approved | `read_database`, `query_data`, `search_web`, `send_email`, `log_message`, `get_weather` |
+| **Dangerous (blocklisted)** | Blocked — requires manual approval | `delete_database`, `drop_table`, `send_money`, `delete_files`, `shutdown_server`, `revoke_access` |
+| **Unknown** | Blocked — requires explicit allowlisting | Any tool not in the safe or dangerous list |
+
+Unknown tools are **denied by default**, regardless of their heuristic risk score. Previously, unknown tools with a low risk score (below 0.3) were auto-approved. This fail-closed behavior ensures that new or unexpected tools cannot execute without being explicitly added to the allowlist.
+
+When an unknown tool is blocked, the response includes the tool name and the computed risk score for debugging:
+
+```json
+{
+  "approved": false,
+  "blocked_reason": "Unknown tool 'my_custom_tool' requires explicit allowlisting (risk_score=0.2)"
+}
+```
+
+To allow a custom tool, add it to the safe operations list in your `ToolApprovalSystem` configuration.
+
+## Risk assessment
 
 Actions are assessed for risk:
 
@@ -195,7 +220,7 @@ Actions are assessed for risk:
 | HIGH | file_write, database_write |
 | CRITICAL | execute_code, file_delete, DROP |
 
-## Decision Matrix
+## Decision matrix
 
 | Trust Level | LOW Risk | MEDIUM Risk | HIGH Risk | CRITICAL Risk |
 |-------------|----------|-------------|-----------|---------------|
