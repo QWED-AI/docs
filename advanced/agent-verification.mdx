@@ -229,6 +229,46 @@ Actions are assessed for risk:
 | 2 (Autonomous) | APPROVED | APPROVED | PENDING | DENIED |
 | 3 (Trusted) | APPROVED | APPROVED | APPROVED | APPROVED |
 
+## Tool approval policy
+
+<Info>Changed in v5.0.2</Info>
+
+The tool approval system categorizes every tool call into one of three groups before execution:
+
+| Category | Behavior | Examples |
+|----------|----------|---------|
+| **Safe operations** | Auto-approved | `read_database`, `query_data`, `search_web` |
+| **Dangerous operations** | Blocked, requires manual approval | `delete_database`, `drop_table`, `send_money` |
+| **Unknown operations** | Blocked (default-deny) | Any tool not in the safe or dangerous list |
+
+Unknown tools are always denied, regardless of their computed risk score. The blocked response includes the tool name and risk score for debugging:
+
+```text
+Unknown tool 'my_custom_tool' requires explicit allowlisting (risk_score=0.2)
+```
+
+<Warning>
+Before v5.0.2, unknown tools with a risk score below 0.3 were auto-approved. If your agents rely on custom tools that were previously approved through this heuristic, you must add them to the safe operations allowlist. See the [changelog](/changelog) for migration details.
+</Warning>
+
+### Adding tools to the allowlist
+
+Register custom tools as safe operations when configuring your agent's permissions:
+
+```python
+agent = client.register_agent(
+    name="DataAnalyst",
+    type="supervised",
+    principal_id="user_123",
+    permissions={
+        "allowed_engines": ["math", "logic", "sql"],
+        "allowed_tools": ["my_custom_tool", "fetch_report"],
+        "blocked_tools": ["execute_code"],
+    },
+    budget={"max_daily_cost_usd": 100}
+)
+```
+
 ## Budget Enforcement
 
 ```python

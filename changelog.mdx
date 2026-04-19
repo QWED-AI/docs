@@ -3,33 +3,89 @@ title: "Changelog"
 description: "All notable changes to QWED Protocol — releases, features, security fixes, and improvements."
 ---
 
-## v5.0.2 — Tool approval default-deny
-**Released: April 18, 2026** · [GitHub PR #150](https://github.com/QWED-AI/qwed-verification/pull/150)
+## Unreleased
 
-> Unknown tool calls are now denied by default, regardless of heuristic risk score. Previously, unknown tools with a low risk score were auto-approved.
+These entries document post-`v5.0.0` hardening work that has landed in the core repository but has not yet been rolled into a newer tagged release. Keep them here until the next official release is published.
 
-### Security
+### Schema `uniqueItems` fail-closed
+**Documented from [GitHub PR #155](https://github.com/QWED-AI/qwed-verification/pull/155)**
 
-- **Default-deny for unknown tools** — The `ToolApprovalSystem` no longer auto-approves unknown tool calls that score below the 0.3 risk threshold. All tools not explicitly in the safe or dangerous lists are now blocked, with a message indicating the tool requires explicit allowlisting. This closes a gap where novel or unexpected tools could bypass approval by appearing low-risk to the heuristic scorer.
+> The schema verifier now reports a validation error when `uniqueItems` cannot be checked deterministically, instead of silently passing.
 
-### Migration
+- **`uniqueItems` validation fail-closed** — When a JSON schema specifies `"uniqueItems": true` and the array contains items that cannot be hashed for comparison, the schema verifier now emits a `uniqueness_validation_error` instead of silently skipping the uniqueness check.
 
-If you rely on custom tools that were previously auto-approved due to a low risk score, you must now add them to the safe operations allowlist. See the [agent verification guide](/advanced/agent-verification#tool-approval-policy) for the full classification table.
+```json
+{
+  "path": "$.tags",
+  "issue_type": "uniqueness_validation_error",
+  "expected": "provably unique items",
+  "actual": "uniqueness check could not be completed",
+  "message": "uniqueItems could not be verified deterministically: <error details>"
+}
+```
 
----
+### Ambiguous math expressions fail closed
+**Documented from [GitHub PR #154](https://github.com/QWED-AI/qwed-verification/pull/154)**
 
-## v5.0.1 — Legacy CodeExecutor hard-blocked
-**Released: April 18, 2026** · [GitHub PR #149](https://github.com/QWED-AI/qwed-verification/pull/149)
+> The math verification API now rejects ambiguous expressions with `BLOCKED` instead of returning `is_valid: true`.
 
-> Permanently disables the legacy `CodeExecutor` class that used raw `exec()`. Any direct usage now raises a `RuntimeError` directing callers to `SecureCodeExecutor`.
+- **Ambiguous math expressions fail closed** — When `POST /verify/math` detects implicit multiplication after division, it now returns `is_valid: false`, `result: false`, and `status: "BLOCKED"` while preserving an explicit ambiguity warning.
 
-### Security
+```json
+{
+  "is_valid": false,
+  "result": false,
+  "status": "BLOCKED",
+  "warning": "ambiguous",
+  "message": "Expression may be ambiguous due to implicit multiplication after division",
+  "simplified": "..."
+}
+```
 
-- **Legacy CodeExecutor hard-blocked** — `CodeExecutor.execute()` now raises a `RuntimeError` on every call, closing the last remaining path to in-process code execution. The public API endpoints (`/verify/stats`, `/verify/consensus`) are unaffected because they already use `SecureCodeExecutor` since v4.0.4. This change impacts self-hosted deployments that imported `CodeExecutor` directly.
+### `verify_identity` fail-closed
+**Documented from [GitHub PR #153](https://github.com/QWED-AI/qwed-verification/pull/153)**
 
-### Migration
+> Identity verification now fails closed when only numerical sampling matches.
 
-If you import `CodeExecutor` in custom code, replace it with `SecureCodeExecutor`. See the [security hardening guide](/advanced/security-hardening#legacy-codeexecutor-removed) for a migration example.
+- **`verify_identity` fail-closed** — If no formal proof is established, numerical sampling no longer returns an ambiguous equivalence-style result. The engine now responds with `BLOCKED`, `is_equivalent: false`, and `method: "numerical_sampling_rejected"`.
+
+### `verify_logic_rule` fail-closed
+**Documented from [GitHub PR #152](https://github.com/QWED-AI/qwed-verification/pull/152)**
+
+> The legacy `VerificationEngine.verify_logic_rule()` method now raises `NotImplementedError` instead of silently returning `None`.
+
+- **`verify_logic_rule` fail-closed** — Any legacy call path now fails explicitly and directs callers to `LogicVerifier`.
+
+```python
+# Before (no longer works)
+from qwed_new.core.verifier import VerificationEngine
+engine = VerificationEngine()
+result = engine.verify_logic_rule(rule="if x > 5 then allow", context={"x": 10})
+
+# After
+from qwed_new.core.logic_verifier import LogicVerifier
+verifier = LogicVerifier()
+result = verifier.verify_conclusion(
+    premises=["x is 10", "x > 5 implies allow"],
+    conclusion="allow"
+)
+```
+
+### Default-deny for unknown tool approvals
+**Documented from [GitHub PR #150](https://github.com/QWED-AI/qwed-verification/pull/150)**
+
+> The tool approval system now blocks all unknown tools by default, regardless of their heuristic risk score.
+
+- **Default-deny for unknown tools** — Tool calls that are not explicitly allowlisted are now blocked unconditionally and must be approved through an explicit policy path.
+
+### Legacy `CodeExecutor` hard-blocked
+**Documented from [GitHub PR #149](https://github.com/QWED-AI/qwed-verification/pull/149)**
+
+> Permanently disables the legacy `CodeExecutor` class that used raw `exec()`.
+
+- **Legacy `CodeExecutor` hard-blocked** — `CodeExecutor.execute()` now raises a `RuntimeError` on every call, closing the final in-process raw execution path. Public API endpoints remain on `SecureCodeExecutor`.
+
+If you still import `CodeExecutor` in custom code, migrate to `SecureCodeExecutor`. See the [security hardening guide](/advanced/security-hardening#legacy-codeexecutor-hard-blocked) for the migration example.
 
 ---
 
@@ -187,30 +243,30 @@ If you use agent verification, all requests must now include `conversation_id` a
 
 ---
 
-## v4.0.1 — Sentinel Guard Sync 🔄
+## v4.0.1 — Sentinel Guard Sync ðŸ”„
 **Released: March 23, 2026** · [GitHub Release](https://github.com/QWED-AI/qwed-verification/releases/tag/v4.0.1) · [PyPI](https://pypi.org/project/qwed/4.0.1/)
 
 > Patch release aligning the TypeScript SDK, backend API schemas, and security guard integrations introduced in v4.0.0.
 
-### 🆕 New Endpoints
+### ðŸ†• New Endpoints
 
 - **`POST /verify/process`** — Glass-box reasoning process verifier with IRAC structural compliance and custom milestone validation.
 - **Agent Security Checks** — `POST /agents/{id}/verify` now accepts `security_checks: { exfiltration, mcp_poison }` to run `ExfiltrationGuard` and `MCPPoisonGuard` before verification.
 
-### 🔒 Security Fixes
+### ðŸ”’ Security Fixes
 
 - **Information Disclosure** — Removed raw exception messages from `/verify/rag` error responses; clients receive only `INTERNAL_VERIFICATION_ERROR`.
 - **Symbolic Precision** — `RAGVerifyRequest.max_drm_rate` changed from `float | str` → `str` with `field_validator` enforcing Fraction-compatible values.
 - **Response Consistency** — RAG error responses now return `"verified": false` matching the success path schema.
 
-### 🛠️ SDK Changes (`@qwed-ai/sdk@4.0.1`)
+### ðŸ› ï¸ SDK Changes (`@qwed-ai/sdk@4.0.1`)
 
 - Added `verifyProcess()` method for IRAC/milestone validation.
 - `verifyRAG()` — `maxDrmRate` type changed from `number` to `string`.
 - `verifyAgent()` — Payload aligned with backend schema, agent IDs URL-encoded.
 - New types: `Process`, `RAG`, `Security` in `VerificationType` enum.
 
-### 🧪 Tests
+### ðŸ§ª Tests
 
 - `test_api_phase17_endpoints.py` — covers `/verify/process`, `/verify/rag` exception masking, and agent security check blocking.
 
@@ -222,18 +278,18 @@ npm install @qwed-ai/sdk@4.0.1
 
 ---
 
-## v4.0.0 — Sentinel Edition 🛡️
+## v4.0.0 — Sentinel Edition ðŸ›¡ï¸
 **Released: March 12, 2026** · [GitHub Release](https://github.com/QWED-AI/qwed-verification/releases/tag/v4.0.0) · [PyPI](https://pypi.org/project/qwed/4.0.0/)
 
 > **147 commits** since v3.0.1 — the largest update in QWED history.
 
-### 🔧 v4.0.0 patch — Provider fallbacks, .env loading, and Gemini stability
+### ðŸ”§ v4.0.0 patch — Provider fallbacks, .env loading, and Gemini stability
 
 - **Native Gemini provider** — Gemini now runs through a dedicated provider with native support for math, logic, stats, fact, and image verification. All API calls enforce a 30-second timeout and automatically strip Markdown code fences from responses.
 - **Centralized .env loading** — Environment variables now load in a deterministic priority order: project `.env` first, then `~/.qwed/.env`. This prevents configuration drift between CLI and server contexts.
 - **Gemini AST stability** — Fixed intermittent JSON parse failures when Gemini returns code-fenced responses during logic translation.
 
-### 🆕 Agentic Security Guards (Phase 17)
+### ðŸ†• Agentic Security Guards (Phase 17)
 
 A brand-new guard subsystem for securing AI agent tool chains and RAG pipelines:
 
@@ -243,19 +299,19 @@ A brand-new guard subsystem for securing AI agent tool chains and RAG pipelines:
 
 All three guards went through **five rounds** of security review via CodeRabbit and SonarCloud.
 
-### 🆕 New Standalone Guards
+### ðŸ†• New Standalone Guards
 
 - **SovereigntyGuard** — Enforces data residency policies and local routing rules (GDPR, data localization).
 - **ToxicFlowGuard** — Stateful detection of toxic tool-chaining patterns across multi-step agent workflows.
 - **SelfInitiatedCoTGuard (S-CoT)** — Verifies self-initiated Chain-of-Thought logic paths for reasoning integrity.
 
-### 🆕 Process Determinism
+### ðŸ†• Process Determinism
 
 A new class of deterministic verification:
 
 - **ProcessVerifier** — IRAC/milestone-based process verification with decimal scoring, budget-aware timeouts, and structured compliance reporting. Ensures AI-driven workflows follow deterministic process steps — not just correct answers, but correct *procedures*.
 
-### 🔒 Critical Security Fixes
+### ðŸ”’ Critical Security Fixes
 
 - Replaced direct `eval()` with AST-validated execution (Code Injection Prevention). Further hardened in v4.0.2 with a full AST-walking interpreter.
 - Patched critical sandbox escape and namespace mismatch.
@@ -265,7 +321,7 @@ A new class of deterministic verification:
 - Fixed all 19 Snyk Code findings.
 - Secured exception handling across `verify_logic`, `ControlPlane`, `verify_stats`, `agent_tool_call`.
 
-### 🐳 Docker Hardening
+### ðŸ³ Docker Hardening
 
 - Pinned base image digests with hash-verified requirements
 - Non-root user execution with `gosu`/`runuser`
@@ -276,7 +332,7 @@ A new class of deterministic verification:
 docker pull qwedai/qwed-verification:4.0.0
 ```
 
-### 🔧 CI/CD Infrastructure
+### ðŸ”§ CI/CD Infrastructure
 
 - **Sentry SDK** — Error tracking and monitoring.
 - **CircleCI** — Python matrix testing (3.10, 3.11, 3.12).
@@ -284,7 +340,7 @@ docker pull qwedai/qwed-verification:4.0.0
 - **Snyk** — Security scanning with SARIF output.
 - **Docker Auto-Publish** — Automated image push on every release.
 
-### 📝 Documentation & Badges
+### ðŸ“ Documentation & Badges
 
 - OpenSSF Best Practices badge (Silver)
 - Snyk security badge and partner attribution
@@ -293,23 +349,23 @@ docker pull qwedai/qwed-verification:4.0.0
 
 ---
 
-## v3.0.1 — Ironclad Update 🦾
+## v3.0.1 — Ironclad Update ðŸ¦¾
 **Released: February 4, 2026** · [GitHub Release](https://github.com/QWED-AI/qwed-verification/releases/tag/v3.0.1)
 
-### 🛡️ Critical Security Hardening
+### ðŸ›¡ï¸ Critical Security Hardening
 - **CodeQL Remediation**: Resolved 50+ alerts including ReDoS, Clear-text Logging, and Exception Exposure.
 - **Workflow Permissions**: Enforced `permissions: contents: read` across all GitHub Actions to adhere to Least Privilege.
 - **PII Protection**: Implemented robust `redact_pii` logic in all API endpoints and exception handlers.
 
-### 📝 Compliance
+### ðŸ“ Compliance
 - **Snyk Attribution**: Added Snyk attribution to README and Documentation footer for Partner Program compliance.
 
-### 🐛 Bug Fixes
+### ðŸ› Bug Fixes
 - **API Stability**: Fixed unhandled exceptions in `verify_logic` and `agent_tool_call` endpoints.
 
 ---
 
-## v2.4.1 — The Reasoning Engine 🚀
+## v2.4.1 — The Reasoning Engine ðŸš€
 **Released: January 20, 2026** · [GitHub Release](https://github.com/QWED-AI/qwed-verification/releases/tag/v2.4.1)
 
 ### New Features
