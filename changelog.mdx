@@ -3,6 +3,21 @@ title: "Changelog"
 description: "All notable changes to QWED Protocol — releases, features, security fixes, and improvements."
 ---
 
+## v5.0.5 — `verify/math` ambiguous expression fail-closed
+**Released: April 19, 2026** · [GitHub PR #154](https://github.com/QWED-AI/qwed-verification/pull/154)
+
+> Ambiguous math expressions with implicit multiplication after division (e.g., `1/2(3+1)`) now fail closed with `BLOCKED` instead of returning `is_valid: true`.
+
+### Security
+
+- **Ambiguous expression fail-closed** — The `POST /verify/math` endpoint previously returned `is_valid: true` for expressions containing implicit multiplication after division (e.g., `1/2(3+1)`), despite the order of operations being ambiguous. The engine now returns `is_valid: false`, `result: false`, and `status: "BLOCKED"` with `warning: "ambiguous"`. This prevents ambiguous expressions from passing verification with a potentially incorrect interpretation.
+
+### Impact
+
+No migration is required unless your code relies on `is_valid: true` for ambiguous expressions. Update those checks to handle `status: "BLOCKED"`, `is_valid: false`, and `result: false` instead.
+
+---
+
 ## v5.0.4 — `verify_identity` fail-closed
 **Released: April 19, 2026** · [GitHub PR #153](https://github.com/QWED-AI/qwed-verification/pull/153)
 
