@@ -3,6 +3,33 @@ title: "Changelog"
 description: "All notable changes to QWED Protocol — releases, features, security fixes, and improvements."
 ---
 
+## v5.0.4 — `verify_identity` fail-closed
+**Released: April 19, 2026** · [GitHub PR #153](https://github.com/QWED-AI/qwed-verification/pull/153)
+
+> `verify_identity()` now fails closed when numerical sampling matches but no formal proof exists — returning `BLOCKED` with `is_equivalent: false` instead of `UNKNOWN` with `is_equivalent: null`.
+
+### Security
+
+- **`verify_identity` fail-closed** — When symbolic simplification is inconclusive and the numerical sampling fallback finds agreement at all fixed test points, the engine previously returned `UNKNOWN` with `is_equivalent: null` and `confidence: 0.0`. This ambiguous result could be misinterpreted as partial equivalence. The engine now returns `BLOCKED` with `is_equivalent: false`, `method: "numerical_sampling_rejected"`, and `confidence: 0.0`, making it explicit that sampling-only agreement is not a valid proof.
+
+### Migration
+
+No action required if you already treat `UNKNOWN` results as unverified. If your code branches on `status == "UNKNOWN"` for identity verification results, update it to check for `"BLOCKED"` instead:
+
+```python
+result = engine.verify_identity("expr_a", "expr_b")
+
+# Before
+if result["status"] == "UNKNOWN":
+    handle_inconclusive()
+
+# After
+if result["status"] == "BLOCKED":
+    handle_rejected()
+```
+
+---
+
 ## v5.0.3 — `verify_logic_rule` fail-closed
 **Released: April 18, 2026** · [GitHub PR #152](https://github.com/QWED-AI/qwed-verification/pull/152)
 

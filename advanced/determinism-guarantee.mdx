@@ -154,7 +154,7 @@ This means a `VERIFIED` result from the Math Engine's direct endpoint (`POST /ve
 
 ### Numerical sampling fallback
 
-The identity verification fallback (numerical sampling at fixed test points) now returns `UNKNOWN` with `confidence: 0.0` instead of `LIKELY_EQUIVALENT` with `confidence: 0.99`. Matching at a handful of sample points does not constitute a formal proof and should not be treated as one.
+The identity verification fallback (numerical sampling at fixed test points) now **fails closed** — returning `BLOCKED` with `is_equivalent: false` and `confidence: 0.0`. Previously this returned `UNKNOWN` with `is_equivalent: null` (and before that, `LIKELY_EQUIVALENT` with `confidence: 0.99`). Matching at a handful of sample points does not constitute a formal proof, so the engine now rejects the result outright rather than leaving the outcome ambiguous.
 
 ---
 
