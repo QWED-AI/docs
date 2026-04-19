@@ -195,7 +195,7 @@ If the Docker daemon is unreachable, the affected endpoints return HTTP 503 rath
 
 This design ensures that a Docker outage is surfaced as a visible service disruption rather than silently downgrading security.
 
-#### Legacy CodeExecutor removed
+#### Legacy `CodeExecutor` hard-blocked
 
 The legacy `CodeExecutor` class — which previously used raw `exec()` to run model-generated Python — is now permanently hard-blocked. Any call to `CodeExecutor.execute()` raises a `RuntimeError` directing you to use `SecureCodeExecutor` instead.
 
