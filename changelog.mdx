@@ -3,18 +3,44 @@ title: "Changelog"
 description: "All notable changes to QWED Protocol — releases, features, security fixes, and improvements."
 ---
 
-## v5.0.5 — `verify/math` ambiguous expression fail-closed
-**Released: April 19, 2026** · [GitHub PR #154](https://github.com/QWED-AI/qwed-verification/pull/154)
+## Unreleased
 
-> Ambiguous math expressions with implicit multiplication after division (e.g., `1/2(3+1)`) now fail closed with `BLOCKED` instead of returning `is_valid: true`.
+These entries document post-`v5.0.0` hardening work that has landed in the core repository but has not yet been rolled into a newer tagged release. Keep them here until the next official release is published.
 
-### Security
+### Schema `uniqueItems` fail-closed
+**Documented from [GitHub PR #155](https://github.com/QWED-AI/qwed-verification/pull/155)**
 
-- **Ambiguous expression fail-closed** — The `POST /verify/math` endpoint previously returned `is_valid: true` for expressions containing implicit multiplication after division (e.g., `1/2(3+1)`), despite the order of operations being ambiguous. The engine now returns `is_valid: false`, `result: false`, and `status: "BLOCKED"` with `warning: "ambiguous"`. This prevents ambiguous expressions from passing verification with a potentially incorrect interpretation.
+> The schema verifier now reports a validation error when `uniqueItems` cannot be checked deterministically, instead of silently passing.
 
-### Impact
+- **`uniqueItems` validation fail-closed** — When a JSON schema specifies `"uniqueItems": true` and the array contains items that cannot be hashed for comparison, the schema verifier now emits a `uniqueness_validation_error` instead of silently skipping the uniqueness check.
 
-No migration is required unless your code relies on `is_valid: true` for ambiguous expressions. Update those checks to handle `status: "BLOCKED"`, `is_valid: false`, and `result: false` instead.
+```json
+{
+  "path": "$.tags",
+  "issue_type": "uniqueness_validation_error",
+  "expected": "provably unique items",
+  "actual": "uniqueness check could not be completed",
+  "message": "uniqueItems could not be verified deterministically: <error details>"
+}
+```
+
+### Ambiguous math expressions fail closed
+**Documented from [GitHub PR #154](https://github.com/QWED-AI/qwed-verification/pull/154)**
+
+> The math verification API now rejects ambiguous expressions with `BLOCKED` instead of returning `is_valid: true`.
+
+- **Ambiguous math expressions fail closed** — When `POST /verify/math` detects implicit multiplication after division, it now returns `is_valid: false`, `result: false`, and `status: "BLOCKED"` while preserving an explicit ambiguity warning.
+
+```json
+{
+  "is_valid": false,
+  "result": false,
+  "status": "BLOCKED",
+  "warning": "ambiguous",
+  "message": "Expression may be ambiguous due to implicit multiplication after division",
+  "simplified": "..."
+}
+```
 
 ---
 

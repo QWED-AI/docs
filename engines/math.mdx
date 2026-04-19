@@ -341,7 +341,31 @@ Because the LLM translation step is non-deterministic, the natural language pipe
 
 ---
 
-## Edge Cases
+## Ambiguous expressions
+
+Expressions with implicit multiplication after division are ambiguous — for example, `1/2(3+1)` could mean `(1/2)*(3+1)` or `1/(2*(3+1))`. Rather than guessing, the math engine **fails closed** and returns `BLOCKED`:
+
+```python
+result = client.verify_math("1/2(3+1)")
+# result["is_valid"] == False
+# result["status"] == "BLOCKED"
+# result["warning"] == "ambiguous"
+```
+
+To resolve this, rewrite the expression with explicit parentheses or a `*` operator:
+
+```python
+# Explicit grouping — no ambiguity
+result = client.verify_math("(1/2)*(3+1)")
+# ✓ Verified: 2.0
+
+result = client.verify_math("1/(2*(3+1))")
+# ✓ Verified: 0.125
+```
+
+---
+
+## Edge cases
 
 | Scenario              | Behavior                              |
 | --------------------- | ------------------------------------- |
@@ -353,7 +377,7 @@ Because the LLM translation step is non-deterministic, the natural language pipe
 | Oversized tolerance   | Returns "BLOCKED" status with details |
 | Invalid tolerance     | Returns "BLOCKED" with error message  |
 | Sampling-only identity match | Returns "BLOCKED" — no formal proof established |
-| Ambiguous expressions | Returns "BLOCKED" — implicit multiplication after division is rejected |
+| Ambiguous implicit multiplication | Returns "BLOCKED" — rewrite with explicit operators |
 
 ---
 

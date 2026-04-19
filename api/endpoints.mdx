@@ -164,9 +164,7 @@ Verify mathematical expressions or equations using SymPy symbolic computation.
 
 Symbolic expressions that cannot be evaluated to a numeric value include `is_symbolic: true`. Expressions involving complex numbers include `is_complex: true`.
 
-**Ambiguous expressions:** Expressions with implicit multiplication after division (e.g., `1/2(3+1)`) are blocked rather than evaluated, because the intended order of operations is ambiguous. The engine fails closed with `is_valid: false`, `result: false`, and `status: "BLOCKED"`.
-
-**Response (ambiguous expression):**
+**Ambiguous expressions:** Expressions with implicit multiplication after division (e.g., `1/2(3+1)`) are rejected with `is_valid: false`, `result: false`, and `status: "BLOCKED"`. The response includes `warning: "ambiguous"` and a `message` explaining why. Rewrite the expression with explicit parentheses or a `*` operator to remove the ambiguity.
 
 ```json
 {
@@ -175,9 +173,7 @@ Symbolic expressions that cannot be evaluated to a numeric value include `is_sym
   "status": "BLOCKED",
   "warning": "ambiguous",
   "message": "Expression may be ambiguous due to implicit multiplication after division",
-  "simplified": "2",
-  "note": "Interpreted using standard order of operations",
-  "original": "1/(2*(3 + 1))"
+  "simplified": "..."
 }
 ```
 
