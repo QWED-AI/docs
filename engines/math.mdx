@@ -78,7 +78,7 @@ result = client.verify_math("sin(x)^2 + cos(x)^2 = 1")
 Identity verification uses symbolic simplification first. If SymPy proves the identity algebraically, the result is `VERIFIED`. When symbolic simplification is inconclusive, the engine samples five test points as a fallback. Only points that can be successfully evaluated count toward agreement — domain-restricted expressions (e.g., `log(x)` at `x = -1`) are skipped rather than causing a false negative.
 
 <Warning>
-Numerical sampling cannot prove equivalence. Even if all sample points agree, the result is `UNKNOWN` with `confidence: 0.0` because two expressions can match at fixed points without being algebraically identical. Treat `UNKNOWN` results as unverified.
+Numerical sampling cannot prove equivalence. If all sample points agree but no formal proof was established, the engine **fails closed** — it returns `BLOCKED` with `is_equivalent: false` and `confidence: 0.0` instead of claiming the expressions are equivalent. This prevents crafted expressions that happen to match at the fixed sample points from passing verification. Treat `BLOCKED` results as unverified.
 </Warning>
 
 ### 3. Derivatives
@@ -258,7 +258,7 @@ When `use_decimal=True` (the default), the engine uses `Decimal` internally rega
 
 ## Tolerance settings
 
-For floating-point comparisons:
+For floating-point comparisons, you can specify a tolerance:
 
 ```python
 result = client.verify_math(
@@ -267,6 +267,41 @@ result = client.verify_math(
 )
 # ✓ Verified within tolerance
 ```
+
+### Tolerance bounding
+
+To prevent inflated tolerances from masking incorrect results, the math engine enforces a deterministic upper bound on the `tolerance` parameter. The maximum allowed tolerance is computed as a function of the result's magnitude:
+
+```
+max_tolerance = max(0.01, abs(calculated_value) * 0.01)
+```
+
+If the requested tolerance exceeds this bound, the verification is rejected with a `BLOCKED` status instead of returning a potentially misleading `VERIFIED` result. This applies to both decimal and float precision modes.
+
+```python
+# Blocked — tolerance far exceeds the computed bound
+result = client.verify_math("1 + 1", expected_value=999, tolerance=1000)
+# result["status"] == "BLOCKED"
+# result["error"] == "Tolerance exceeds deterministic verification bound"
+# result["max_allowed_tolerance"] == "0.02000000"
+
+# Allowed — tolerance is within bound for a large result
+result = client.verify_math(
+    "10000 * (1 + 5/100)",
+    expected_value=10540,
+    tolerance=50,
+)
+# result["status"] == "VERIFIED"
+```
+
+The engine also rejects invalid tolerance values (negative numbers, `NaN`, `Infinity`, or non-numeric strings) with a `BLOCKED` status and an `"Invalid tolerance"` error message.
+
+| Tolerance input | Behavior |
+| --- | --- |
+| Within computed bound | Normal verification proceeds |
+| Exceeds computed bound | `BLOCKED` with `max_allowed_tolerance` in response |
+| Negative, `NaN`, or `Infinity` | `BLOCKED` with `"Invalid tolerance"` error |
+| Non-numeric string | `BLOCKED` with `"Invalid tolerance"` error |
 
 ---
 
@@ -306,15 +341,43 @@ Because the LLM translation step is non-deterministic, the natural language pipe
 
 ---
 
-## Edge Cases
+## Ambiguous expressions
 
-| Scenario              | Behavior                    |
-| --------------------- | --------------------------- |
-| Division by zero      | Returns error, not verified |
-| Undefined expressions | Returns "UNDEFINED" status  |
-| Complex numbers       | Fully supported             |
-| Very large numbers    | Uses arbitrary precision    |
-| Symbolic variables    | Verified algebraically      |
+Expressions with implicit multiplication after division are ambiguous — for example, `1/2(3+1)` could mean `(1/2)*(3+1)` or `1/(2*(3+1))`. Rather than guessing, the math engine **fails closed** and returns `BLOCKED`:
+
+```python
+result = client.verify_math("1/2(3+1)")
+# result["is_valid"] == False
+# result["status"] == "BLOCKED"
+# result["warning"] == "ambiguous"
+```
+
+To resolve this, rewrite the expression with explicit parentheses or a `*` operator:
+
+```python
+# Explicit grouping — no ambiguity
+result = client.verify_math("(1/2)*(3+1)")
+# ✓ Verified: 2.0
+
+result = client.verify_math("1/(2*(3+1))")
+# ✓ Verified: 0.125
+```
+
+---
+
+## Edge cases
+
+| Scenario              | Behavior                              |
+| --------------------- | ------------------------------------- |
+| Division by zero      | Returns error, not verified           |
+| Undefined expressions | Returns "UNDEFINED" status            |
+| Complex numbers       | Fully supported                       |
+| Very large numbers    | Uses arbitrary precision              |
+| Symbolic variables    | Verified algebraically                |
+| Oversized tolerance   | Returns "BLOCKED" status with details |
+| Invalid tolerance     | Returns "BLOCKED" with error message  |
+| Sampling-only identity match | Returns "BLOCKED" — no formal proof established |
+| Ambiguous implicit multiplication | Returns "BLOCKED" — rewrite with explicit operators |
 
 ---
 
