@@ -7,7 +7,7 @@ description: "Harden QWED for production with prompt injection defense, secret m
 This guide provides instructions for hardening your QWED deployment for production environments. It covers prompt injection defense, secret management, network security, authentication, and compliance with OWASP LLM Top 10.
 
 <Note>
-Only **QWED v5.0.x** is currently supported with security patches and updates. Versions 4.x and earlier are end-of-life. If you are running a prior version, upgrade before applying the guidance below.
+Only **QWED v5.x** is currently supported with security patches and updates. Versions 4.x and earlier are end-of-life. If you are running a prior version, upgrade before applying the guidance below.
 </Note>
 
 ## 1. Secret Management
@@ -214,6 +214,14 @@ result = executor.execute(code)
 ```
 
 This change has no effect on the public API — the `/verify/stats` and `/verify/consensus` endpoints already use `SecureCodeExecutor` since v4.0.4. It only affects self-hosted deployments that imported `CodeExecutor` directly.
+
+### Default-deny for unknown tool approvals
+
+<Info>New in v5.1.0</Info>
+
+The tool approval system now blocks all unknown tools by default, regardless of their heuristic risk score. In previous versions, tools with a risk score below `0.3` were automatically approved even if they were not in the allowlist. As of v5.1.0, any tool that is not explicitly allowlisted is denied unconditionally.
+
+If you manage a custom tool allowlist, ensure all tools your agents use are explicitly registered. Unregistered tools return a blocked response with the message `"Unknown tool '<name>' requires explicit allowlisting"`.
 
 ### Safe expression evaluation
 
