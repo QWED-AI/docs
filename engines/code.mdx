@@ -4,6 +4,8 @@ title: "Code Engine"
 description: "QWED's Code Engine uses CrossHair symbolic execution to verify Python code correctness, detect vulnerabilities like SQL injection and XSS, without running code."
 ---
 
+<Info>Updated in v5.1.0: The legacy `CodeExecutor` class is now hard-blocked. All code execution uses `SecureCodeExecutor` exclusively. See the [changelog](/changelog#fail-closed-hardening) for migration details.</Info>
+
 The Code Engine uses [CrossHair](https://github.com/pschanely/crosshair), a symbolic execution tool for Python, to verify code correctness without running it.
 
 ---

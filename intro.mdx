@@ -6,7 +6,7 @@ icon: "shield-check"
 ---
 
 <Note>
-**QWED v5.0.0 Enforcement Boundary Hardening** is now live — fail-closed verification, deterministic trust boundaries, and agent hardening. [See what's new →](https://docs.qwedai.com/changelog)
+**QWED v5.1.0 Agent State Governance** is now live — AgentStateGuard for deterministic state verification, plus fail-closed hardening across math, logic, code execution, and schema validation. [See what's new →](/changelog#v510--agent-state-governance-and-fail-closed-hardening)
 </Note>
 
 ## What is QWED?
@@ -135,17 +135,17 @@ qwed verify-logic "(AND (GT x 5) (LT y 10))"
   Explore core, analysis, and specialized engines.
 </Card>
 
-## What's new in v4.0.1
+## What's new in v5.1.0
 
 <AccordionGroup>
-  <Accordion title="Agentic Security Guards" icon="shield-halved" defaultOpen>
-    RAGGuard, ExfiltrationGuard, MCP Poison Guard, and additional guard hardening.
+  <Accordion title="AgentStateGuard" icon="shield-halved" defaultOpen>
+    Deterministic structural and semantic verification of agent state payloads with governed atomic commits. [Learn more →](/advanced/agent-state-guard)
   </Accordion>
-  <Accordion title="Process Determinism" icon="list-check">
-    ProcessVerifier for milestone-driven deterministic validation and compliance reporting.
+  <Accordion title="Fail-closed hardening" icon="lock">
+    Legacy CodeExecutor blocked, unknown tools default-denied, bounded math tolerance, ambiguous expressions rejected, schema uniqueItems fail-closed, and identity sampling rejected.
   </Accordion>
-  <Accordion title="Security Hardening" icon="lock">
-    Critical hardening updates across execution safety, parser boundaries, and protocol checks.
+  <Accordion title="Progress-aware doom loop guard" icon="rotate">
+    LOOP-004 state-aware replay protection detects agents repeating actions on unchanged world state.
   </Accordion>
 </AccordionGroup>
 
