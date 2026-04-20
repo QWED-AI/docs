@@ -10,13 +10,13 @@ description: "All notable changes to QWED Protocol — releases, features, secur
 
 ### New capability
 
-- **AgentStateGuard** — Deterministic state verification with strict structural validation, semantic transition checks, and governed atomic state commits. Extends QWED from action-only verification to state and memory governance. See [AgentStateGuard](/advanced/agent-state-guard) for usage.
+- **AgentStateGuard** — Deterministic state verification with strict structural validation, semantic transition checks, and governed atomic state commits. Extends QWED from action-only verification to state and memory governance. See the [AgentStateGuard guide](/advanced/agent-state-guard) for usage details.
 
 ### Fail-closed hardening
 
 - **Legacy `CodeExecutor` hard-blocked** — `CodeExecutor.execute()` now raises a `RuntimeError` on every call, closing the final in-process raw execution path. Migrate any direct imports to `SecureCodeExecutor`. See the [security hardening guide](/advanced/security-hardening#legacy-codeexecutor-hard-blocked) for the migration example.
-- **Unknown tools default-denied** — `ToolApprovalSystem` now blocks unknown tools regardless of heuristic risk score. Tool calls not explicitly allowlisted must be approved through an explicit policy path.
-- **Bounded math tolerance** — `verify_math()` rejects oversized, negative, non-finite, and malformed tolerances instead of letting callers weaken correctness checks. The maximum allowed tolerance is `max(0.01, abs(calculated_value) * 0.01)`.
+- **Unknown tools default-denied** — `ToolApprovalSystem` now blocks all unknown tools by default, regardless of heuristic risk score. Tool calls not explicitly allowlisted must be approved through an explicit policy path.
+- **Bounded math tolerance** — `verify_math()` rejects oversized, negative, non-finite, and malformed tolerances instead of letting callers weaken correctness checks. See [math engine tolerance bounding](/engines/math#tolerance-bounding) for details.
 - **Legacy logic path fails closed** — `verify_logic_rule()` now raises `NotImplementedError` instead of returning `None`. Migrate to `LogicVerifier`.
 
 ```python
@@ -48,7 +48,7 @@ result = verifier.verify_conclusion(
 }
 ```
 
-- **Schema uniqueness fail-closed** — `SchemaVerifier` now emits a `uniqueness_validation_error` when `uniqueItems` cannot be proven deterministically, instead of silently passing.
+- **Schema uniqueness fail-closed** — `SchemaVerifier` now emits a `uniqueness_validation_error` when `uniqueItems` cannot be proven deterministically, instead of silently passing. See the [schema verifier `uniqueItems`](/engines/schema#uniqueitems--fail-closed-validation) section for details.
 
 ```json
 {
@@ -67,27 +67,33 @@ result = verifier.verify_conclusion(
 - Stats verifier edge-case coverage expansion.
 - CodeQL and cleanup follow-ups.
 
+### Upgrade notes
+
+<Warning>
+Several behaviors changed from ambiguous or silent-pass to explicit failure. Review these before upgrading.
+</Warning>
+
+- `CodeExecutor` is no longer usable as a legacy execution path. Migrate any direct imports to `SecureCodeExecutor`.
+- Unknown tools now require explicit allowlisting and are no longer auto-approved at low heuristic risk.
+- `verify_math()` may return `BLOCKED` for tolerances that exceed the deterministic policy bound.
+- `verify_logic_rule()` no longer returns an ambiguous non-result; callers must migrate to `LogicVerifier`.
+- Sampling-only `verify_identity()` matches now return `BLOCKED`, not `UNKNOWN`.
+- Ambiguous `/verify/math` expressions now return `BLOCKED` with `is_valid: false`.
+- `uniqueItems` validation failures are now explicit schema errors instead of silent passes.
+
 ### SDK version bumps
 
 - `qwed` (PyPI): `5.0.0` → `5.1.0`
 - `qwed_sdk` (Python): `5.0.0` → `5.1.0`
 - `@qwed-ai/sdk` (npm): `5.0.0` → `5.1.0`
 
-### Upgrade
+### Install
 
 ```bash
 pip install qwed==5.1.0
 docker pull qwedai/qwed-verification:5.1.0
 npm install @qwed-ai/sdk@5.1.0
 ```
-
-<Warning>
-If you import `CodeExecutor` directly, migrate to `SecureCodeExecutor`. The legacy class now raises `RuntimeError` unconditionally.
-</Warning>
-
-<Warning>
-Unknown tools are now blocked by default. Register tools explicitly in your allowlist before calling `POST /agents/{id}/tools/{tool_name}`.
-</Warning>
 
 ---
 
