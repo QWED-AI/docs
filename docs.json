@@ -27,6 +27,11 @@
           "href": "https://github.com/QWED-AI/qwed-verification/"
         },
         {
+          "anchor": "Marketplace",
+          "icon": "shop",
+          "href": "https://github.com/marketplace/qwed-security"
+        },
+        {
           "anchor": "PyPI",
           "icon": "python",
           "href": "https://pypi.org/project/qwed/"
@@ -379,7 +384,7 @@
     "primary": {
       "type": "button",
       "label": "Get Started",
-      "href": "/intro"
+      "href": "/getting-started/installation"
     }
   },
   "footer": {
@@ -501,7 +506,11 @@
   "seo": {
     "indexing": "all",
     "metatags": {
-      "canonical": "https://docs.qwedai.com"
+      "canonical": "https://docs.qwedai.com",
+      "og:image": "https://qwedai.com/og-docs.png",
+      "og:site_name": "QWED Documentation",
+      "og:type": "website",
+      "twitter:card": "summary_large_image"
     }
   },
   "appearance": {
