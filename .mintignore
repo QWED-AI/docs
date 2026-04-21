@@ -5,3 +5,15 @@
 # Draft content
 drafts/
 *.draft.mdx
+
+# Development and debug files
+*.log
+*.err
+*.out
+*.py
+*.txt
+!troubleshooting.mdx
+docs_bak.json
+footer_test.json
+intercept.js
+AGENTS.md
