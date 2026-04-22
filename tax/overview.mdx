@@ -155,6 +155,26 @@ QWED-Tax uses strict Pydantic models with `Decimal` precision to prevent floatin
     </Expandable>
   </ParamField>
 
+  <ParamField body="WorkArrangement" type="BaseModel">
+    Input for `ReciprocityGuard` — describes where an employee lives and works.
+    <Expandable title="properties">
+      <ParamField body="employee_id" type="str" required>Employee identifier</ParamField>
+      <ParamField body="residence_address" type="Address" required>Employee's residence address</ParamField>
+      <ParamField body="work_address" type="Address" required>Employee's work address (or HQ if remote)</ParamField>
+      <ParamField body="is_remote" type="bool" default="false">Whether the employee works remotely</ParamField>
+    </Expandable>
+  </ParamField>
+
+  <ParamField body="Address" type="BaseModel">
+    A US address used by `AddressGuard` and `WorkArrangement`.
+    <Expandable title="properties">
+      <ParamField body="street" type="str" required>Street address</ParamField>
+      <ParamField body="city" type="str" required>City name</ParamField>
+      <ParamField body="state" type="State" required>US state enum</ParamField>
+      <ParamField body="zip_code" type="str" required>Five-digit ZIP code</ParamField>
+    </Expandable>
+  </ParamField>
+
   <ParamField body="VerificationResult" type="BaseModel">
     Standard result returned by payroll verification guards.
     <Expandable title="properties">
