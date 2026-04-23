@@ -9,7 +9,7 @@ The primary usage patterns for QWED-Tax are the **TaxPreFlight** auditor for int
 
 ## TaxPreFlight
 
-The `TaxPreFlight` class runs all applicable guards against a transaction intent dictionary. It checks worker classification, economic nexus, trader set-offs, capital gains, corporate loans, startup valuations, international remittances, and expense/TDS compliance in a single call.
+The `TaxPreFlight` class routes a transaction intent to the guards required for its `action`. Every intent must declare a supported action and include a complete, verifiable claim for that action — `TaxPreFlight` **fails closed** and blocks execution whenever the payload is missing required fields, contains non-numeric or non-finite values, or references an unsupported action.
 
 ```python
 from qwed_tax.verifier import TaxPreFlight
@@ -19,15 +19,13 @@ preflight = TaxPreFlight()
 
 # 2. Capture Intent (from AI Agent)
 intent = {
-    "action": "hire_worker",
+    "action": "hire",
     "worker_type": "1099",  # LLM Decision
     "worker_facts": {
         "provides_tools": True,       # Fact: We gave them a laptop
         "reimburses_expenses": True,  # Fact: We pay for travel
-        "indefinite_relationship": True
+        "indefinite_relationship": True,
     },
-    "state": "NY",
-    "sales_data": {"amount": 600000}  # Fact: YTD Sales
 }
 
 # 3. Audit
@@ -38,70 +36,111 @@ if not report["allowed"]:
     print(f"BLOCKED: {report['blocks']}")
     # Do NOT call Gusto/Stripe API
 else:
-    print("Verified. Proceeding to Fintech API.")
+    print(f"Verified. Checks run: {report['checks_run']}")
     # call_gusto_api()
 ```
 
-### Intent fields reference
+### Report shape
 
-The `audit_transaction` method inspects the following fields. Only include the fields relevant to your transaction — guards are skipped when their required fields are absent.
+`audit_transaction` returns a report with the following fields:
 
-| Field | Type | Used by |
+<ResponseField name="allowed" type="boolean">
+  `true` only when every selected guard passes. Treat any `false` as a hard block.
+</ResponseField>
+<ResponseField name="action" type="string | null">
+  The canonical action the intent resolved to (for example, `"hire"`). When the caller submits an unsupported action, this echoes back the raw value they sent; when the payload is entirely missing or empty, it is `null`.
+</ResponseField>
+<ResponseField name="blocks" type="string[]">
+  One or more human-readable block reasons when `allowed` is `false`.
+</ResponseField>
+<ResponseField name="checks_run" type="string[]">
+  Names of the guards that actually executed (for example, `["worker_classification"]`). Empty when the intent was rejected before any guard ran.
+</ResponseField>
+<ResponseField name="advisories" type="string[]">
+  Optional advisory messages emitted by guards (for example, required TDS deduction amounts).
+</ResponseField>
+
+### Supported actions
+
+Every intent must set `action` to one of the supported values below. Actions are normalized (trimmed, lowercased, spaces converted to underscores) before routing, and the listed aliases are accepted for backwards compatibility.
+
+| Action | Aliases | Runs |
 | --- | --- | --- |
-| `worker_type` | `str` | ClassificationGuard |
-| `worker_facts` | `dict` | ClassificationGuard |
-| `state` | `str` | NexusGuard |
-| `sales_data` | `dict` (`amount`, `transactions`) | NexusGuard |
-| `tax_decision` | `str` | NexusGuard |
-| `loss_head` | `str` | SpeculationGuard |
-| `loss_amount` | `float` | SpeculationGuard |
-| `offset_head` | `str` | SpeculationGuard |
-| `asset_type` | `str` | CapitalGainsGuard |
-| `dates` | `dict` (`buy`, `sell`) | CapitalGainsGuard |
-| `claimed_rate` | `str` | CapitalGainsGuard |
-| `lender_type` | `str` | RelatedPartyGuard |
-| `borrower_role` | `str` | RelatedPartyGuard |
-| `interest_rate` | `float` | RelatedPartyGuard |
-| `market_rate` | `float` | RelatedPartyGuard |
-| `investment_round` | `str` | ValuationGuard (when `"convertible_note"`) |
-| `investment_amount` | `str` | ValuationGuard |
-| `cap_price` | `str` | ValuationGuard |
-| `discount` | `str` | ValuationGuard |
-| `next_round_price` | `str` | ValuationGuard |
-| `remittance_amount_usd` | `float` | RemittanceGuard |
-| `purpose` | `str` | RemittanceGuard |
-| `fy_usage` | `float` | RemittanceGuard |
-| `expense_category` | `str` | InputCreditGuard |
-| `amount` | `float` | InputCreditGuard, TDSGuard |
-| `tax_paid` | `float` | InputCreditGuard |
-| `service_type` | `str` | TDSGuard |
-| `ytd_payment` | `float` | TDSGuard |
+| `hire` | `hire_worker`, `worker_classification` | ClassificationGuard |
+| `economic_nexus` | `sales_tax_check`, `sales_tax_assessment` | NexusGuard |
+| `trade_tax` | — | SpeculationGuard, CapitalGainsGuard |
+| `corporate_action` | — | RelatedPartyGuard, ValuationGuard |
+| `remit_money` | — | RemittanceGuard |
+| `expense_claim` | — | InputCreditGuard |
+| `pay_invoice` | — | TDSGuard |
 
-### Capital gains date validation
+Any other `action` (including missing, empty, or non-string values) is blocked with a message listing the supported actions.
 
-The `audit_transaction` method validates that both `buy` and `sell` dates are present when `asset_type` and `dates` are provided in the intent. If either is missing, the transaction is blocked:
+### Required fields per action
+
+Each action requires a complete claim shape. If any listed field is missing, `null`, or empty, the transaction is blocked before guards run — no guard is invoked with partial inputs.
+
+| Action | Required fields |
+| --- | --- |
+| `hire` | `worker_type`, `worker_facts.provides_tools`, `worker_facts.reimburses_expenses`, `worker_facts.indefinite_relationship` |
+| `economic_nexus` | `state`, `sales_data.amount`, `sales_data.transactions`, `tax_decision` |
+| `trade_tax` (trader set-off) | `loss_head`, `offset_head`, `loss_amount` |
+| `trade_tax` (capital gains) | `asset_type`, `dates.buy`, `dates.sell`, `claimed_rate` |
+| `corporate_action` (loans) | `lender_type`, `borrower_role`, `interest_rate`, `market_rate` |
+| `corporate_action` (valuation) | `investment_round`, `investment_amount`, `cap_price`, `discount`, `next_round_price` |
+| `remit_money` | `remittance_amount_usd`, `purpose`, `fy_usage` |
+| `expense_claim` | `expense_category`, `amount`, `tax_paid` |
+| `pay_invoice` | `service_type`, `amount`, `ytd_payment` |
+
+<Note>
+  For `trade_tax` and `corporate_action`, at least one of the claim shapes above must be fully present. Providing trigger fields for a claim but omitting any of its required fields is treated as an incomplete claim and fails closed. Startup valuation (`corporate_action`) additionally only runs when `investment_round == "convertible_note"`; other rounds are blocked with an explicit message.
+</Note>
+
+### Numeric inputs must be finite
+
+Guards that work with money — `RemittanceGuard` and `TDSGuard` — reject non-numeric, `NaN`, and infinite values. The surrounding `audit_transaction` call surfaces these as block reasons so an upstream LLM cannot smuggle through a malformed number.
 
 ```python
 report = preflight.audit_transaction({
-    "asset_type": "equity",
-    "dates": {}  # Missing buy and sell dates
+    "action": "pay_invoice",
+    "service_type": "PROFESSIONAL_FEES",
+    "amount": float("inf"),
+    "ytd_payment": 0,
 })
 # report["allowed"] = False
-# report["blocks"] = ["Capital gains checks require both buy and sell dates."]
+# report["blocks"] contains:
+#   "TDS verification requires finite invoice_amount and ytd_payment values."
 ```
 
-### TDS advisories
+### TDS advisories now block
 
-When a TDS deduction is required, it appears in the `advisories` field (the transaction is not blocked, but you are informed):
+When `pay_invoice` resolves to a required TDS deduction, the report is **blocked** (not just advised) so the AI agent cannot wire the gross amount without first withholding tax. The advisory message is still populated for UI surfacing.
 
 ```python
 report = preflight.audit_transaction({
+    "action": "pay_invoice",
     "service_type": "PROFESSIONAL_FEES",
     "amount": 50000,
-    "ytd_payment": 0
+    "ytd_payment": 0,
 })
-# report["allowed"] = True
+# report["allowed"] = False
 # report["advisories"] = ["TDS Required: Deduct 5000.00 from payment."]
+# report["blocks"] = [
+#     "Invoice payment requires TDS deduction of 5000.00 before execution."
+# ]
+```
+
+### Example: unsupported action
+
+```python
+report = preflight.audit_transaction({"action": "do_everything"})
+# report["allowed"] = False
+# report["action"] = "do_everything"
+# report["blocks"] = [
+#     "TaxPreFlight requires a supported action. Supported actions: "
+#     "corporate_action, economic_nexus, expense_claim, hire, "
+#     "pay_invoice, remit_money, trade_tax."
+# ]
 ```
 
 ## TaxVerifier
@@ -247,7 +286,11 @@ import { TaxPreFlight } from '@qwed-ai/tax';
 const result = TaxPreFlight.audit({
   action: "hire",
   worker_type: "1099",
-  worker_facts: { provides_tools: true, reimburses_expenses: true }
+  worker_facts: {
+    provides_tools: true,
+    reimburses_expenses: true,
+    indefinite_relationship: true,
+  },
 });
 
 if (!result.allowed) {
