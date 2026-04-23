@@ -11,6 +11,10 @@ The primary usage patterns for QWED-Tax are the **TaxPreFlight** auditor for int
 
 The `TaxPreFlight` class runs all applicable guards against a transaction intent dictionary. It checks worker classification, economic nexus, trader set-offs, capital gains, corporate loans, startup valuations, international remittances, and expense/TDS compliance in a single call.
 
+<Note>
+  `TaxPreFlight` is **fail-closed**. An intent that is empty, not a `dict`, uses an unsupported `action`, or does not contain a complete verifiable claim is **blocked by default** — it never silently passes through.
+</Note>
+
 ```python
 from qwed_tax.verifier import TaxPreFlight
 
@@ -41,6 +45,79 @@ else:
     print("Verified. Proceeding to Fintech API.")
     # call_gusto_api()
 ```
+
+### Supported actions
+
+Every intent must include an `action` field. `TaxPreFlight` normalizes the action (trims whitespace, lowercases, and replaces spaces with underscores) before routing. If the action is missing, not a non-empty string, or not in the supported set, the intent is blocked with a report that lists every supported action.
+
+| Action | Purpose | Required claim fields |
+| --- | --- | --- |
+| `hire` | Worker classification (W-2 vs 1099) | `worker_type`, `worker_facts.provides_tools`, `worker_facts.reimburses_expenses`, `worker_facts.indefinite_relationship` |
+| `economic_nexus` | US sales-tax nexus check | `state`, `sales_data.amount`, `sales_data.transactions`, `tax_decision` |
+| `trade_tax` | Trader set-off or capital gains | `loss_head`, `offset_head`, `loss_amount` — **or** — `asset_type`, `dates.buy`, `dates.sell`, `claimed_rate` |
+| `corporate_action` | Related-party loans or startup valuations | `lender_type`, `borrower_role`, `interest_rate`, `market_rate` — **or** — `investment_round="convertible_note"` plus `investment_amount`, `cap_price`, `discount`, `next_round_price` |
+| `remit_money` | International remittance (LRS/TCS) | `remittance_amount_usd`, `purpose`, `fy_usage` |
+| `expense_claim` | Input Tax Credit eligibility | `expense_category`, `amount`, `tax_paid` |
+| `pay_invoice` | Withholding / TDS on vendor payment | `service_type`, `amount`, `ytd_payment` |
+
+The following legacy action names are accepted and canonicalized automatically:
+
+| Alias | Canonical action |
+| --- | --- |
+| `hire_worker` | `hire` |
+| `worker_classification` | `hire` |
+| `sales_tax_check` | `economic_nexus` |
+| `sales_tax_assessment` | `economic_nexus` |
+
+### Fail-closed routing
+
+`audit_transaction` returns `allowed=False` whenever routing cannot produce a complete verifiable claim. The three blocking conditions are:
+
+<Tabs>
+  <Tab title="Empty or invalid payload">
+    ```python
+    preflight.audit_transaction({})
+    # {
+    #   "allowed": False,
+    #   "action": None,
+    #   "blocks": ["TaxPreFlight requires a non-empty intent payload with an explicit action."],
+    #   "checks_run": []
+    # }
+    ```
+  </Tab>
+  <Tab title="Unsupported action">
+    ```python
+    preflight.audit_transaction({"action": "refund_customer"})
+    # {
+    #   "allowed": False,
+    #   "action": "refund_customer",
+    #   "blocks": [
+    #     "TaxPreFlight requires a supported action. Supported actions: "
+    #     "corporate_action, economic_nexus, expense_claim, hire, pay_invoice, "
+    #     "remit_money, trade_tax."
+    #   ],
+    #   "checks_run": []
+    # }
+    ```
+  </Tab>
+  <Tab title="Incomplete claim">
+    ```python
+    preflight.audit_transaction({"action": "trade_tax", "asset_type": "equity"})
+    # {
+    #   "allowed": False,
+    #   "action": "trade_tax",
+    #   "blocks": [
+    #     "Action 'trade_tax' did not include a complete verifiable claim. "
+    #     "Supported claim shapes: trader_setoff (loss_head, offset_head, loss_amount); "
+    #     "capital_gains (asset_type, dates.buy, dates.sell, claimed_rate)."
+    #   ],
+    #   "checks_run": []
+    # }
+    ```
+  </Tab>
+</Tabs>
+
+The report always echoes the canonical action (after alias resolution) in the `action` field and an empty `checks_run` list when the intent was rejected before any guard executed.
 
 ### Intent fields reference
 
@@ -79,29 +156,37 @@ The `audit_transaction` method inspects the following fields. Only include the f
 
 ### Capital gains date validation
 
-The `audit_transaction` method validates that both `buy` and `sell` dates are present when `asset_type` and `dates` are provided in the intent. If either is missing, the transaction is blocked:
+For `action="trade_tax"`, the capital-gains route requires both `dates.buy` and `dates.sell` along with `asset_type` and `claimed_rate`. If any required field is missing, the transaction is blocked with a field-level diagnostic:
 
 ```python
 report = preflight.audit_transaction({
+    "action": "trade_tax",
     "asset_type": "equity",
-    "dates": {}  # Missing buy and sell dates
+    "dates": {"buy": "2024-01-01"},  # sell missing
+    "claimed_rate": "20"
 })
 # report["allowed"] = False
-# report["blocks"] = ["Capital gains checks require both buy and sell dates."]
+# report["blocks"] = [
+#   "Action 'trade_tax' is missing required fields for capital_gains: dates.sell."
+# ]
 ```
 
 ### TDS advisories
 
-When a TDS deduction is required, it appears in the `advisories` field (the transaction is not blocked, but you are informed):
+When `action="pay_invoice"` requires a TDS deduction, the transaction is **blocked** and the required deduction is surfaced in both `advisories` and `blocks`. The agent must re-issue the payment net of TDS before execution can proceed:
 
 ```python
 report = preflight.audit_transaction({
+    "action": "pay_invoice",
     "service_type": "PROFESSIONAL_FEES",
     "amount": 50000,
     "ytd_payment": 0
 })
-# report["allowed"] = True
+# report["allowed"] = False
 # report["advisories"] = ["TDS Required: Deduct 5000.00 from payment."]
+# report["blocks"] = [
+#   "Invoice payment requires TDS deduction of 5000.00 before execution."
+# ]
 ```
 
 ## TaxVerifier
