@@ -85,7 +85,7 @@ graph TD
 
 The system supports two entry points:
 
-- **`TaxPreFlight`** — Intent-based auditor that runs all applicable guards against an AI agent's transaction intent.
+- **`TaxPreFlight`** — Intent-based auditor that routes each transaction to the guards required for its declared `action` and **fails closed** on missing, malformed, or unsupported intents.
 - **`TaxVerifier`** — Jurisdiction-scoped verifier (`US` or `INDIA`) for direct guard access.
 
 ## Z3 theorem prover integration
