@@ -399,6 +399,8 @@ result = guard.verify_fd_rate(
 - **Treaty Rate Limit:** When a DTAA treaty rate is provided, the credit is further capped at the treaty-limited amount.
 - **Excess Lapsed:** Any foreign tax paid above the allowable credit is reported as lapsed.
 
+Numeric inputs are parsed through a hardened Decimal helper. Monetary outputs (`allowable_credit`, `excess_tax_lapsed`) are returned as stable plain-string Decimals rather than floats to preserve exact precision across serialization boundaries.
+
 ```python
 from qwed_tax.guards.dtaa_guard import DTAAGuard
 
@@ -410,7 +412,7 @@ result = guard.verify_foreign_tax_credit(
     foreign_tax_paid=200,
     home_tax_rate=15.0
 )
-# allowable_credit: 150.0, excess_tax_lapsed: 50.0
+# {"verified": True, "allowable_credit": "150", "excess_tax_lapsed": "50", ...}
 
 # With treaty rate — credit further capped by treaty limit
 result = guard.verify_foreign_tax_credit(
@@ -419,19 +421,34 @@ result = guard.verify_foreign_tax_credit(
     home_tax_rate=30.0,
     foreign_tax_limit_rate=10.0  # Treaty caps at 10%
 )
-# allowable_credit: 100.0, excess_tax_lapsed: 100.0
+# {"verified": True, "allowable_credit": "100", "excess_tax_lapsed": "100", ...}
 ```
 
 | Parameter | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
-| `foreign_income` | `float` | Yes | — | Income earned in foreign jurisdiction |
-| `foreign_tax_paid` | `float` | Yes | — | Tax paid in foreign jurisdiction |
-| `home_tax_rate` | `float` | Yes | — | Home country tax rate (percentage) |
-| `foreign_tax_limit_rate` | `float` | No | `None` | DTAA treaty rate limit (percentage). When `None`, no treaty cap is applied |
+| `foreign_income` | `Decimal \| str \| int \| float` | Yes | — | Income earned in foreign jurisdiction. Must be finite and non-negative |
+| `foreign_tax_paid` | `Decimal \| str \| int \| float` | Yes | — | Tax paid in foreign jurisdiction. Must be finite and non-negative |
+| `home_tax_rate` | `Decimal \| str \| int \| float` | Yes | — | Home country tax rate (percentage). Must be finite and non-negative |
+| `foreign_tax_limit_rate` | `Decimal \| str \| int \| float` | No | `None` | DTAA treaty rate limit (percentage). Must be non-negative when provided. When `None`, no treaty cap is applied |
+
+**Response fields:**
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `verified` | `bool` | `True` when inputs are valid and credit is computed. `False` on non-numeric, non-finite, boolean, or negative inputs |
+| `message` | `str` | Human-readable explanation, including the capped amount and the components that produced the cap (Home / Treaty) |
+| `allowable_credit` | `str` | Decimal-as-string representation of the allowable FTC. Defaults to `"0"` on validation failure |
+| `excess_tax_lapsed` | `str` | Decimal-as-string representation of foreign tax above the allowable credit |
+
+<Note>
+  The guard **fails closed**: any non-numeric, non-finite (NaN / Infinity), boolean, or negative input returns `verified: False` with a descriptive `message` and zeroed credit fields rather than raising an exception.
+</Note>
 
 ### TransferPricingGuard (Arm's Length Price)
 
 **Goal:** Verify that related-party transactions are priced within an acceptable range of the Arm's Length Price (ALP). Ref: OECD Guidelines, US Sec 482, India Sec 92C.
+
+Monetary inputs accept `Decimal`, `str`, `int`, or `float`. Outputs (`safe_harbour_range`, `potential_adjustment`, `adjustment_required`) are returned as stable plain-string Decimals.
 
 ```python
 from qwed_tax.guards.transfer_pricing_guard import TransferPricingGuard
@@ -446,15 +463,19 @@ result = guard.verify_arms_length_price(
 )
 # {"verified": False, "risk": "TRANSFER_PRICING_ADJUSTMENT",
 #  "message": "Price 80 deviates from ALP 100 beyond 3.0% tolerance.",
-#  "safe_harbour_range": [97.0, 103.0], "potential_adjustment": 20.0}
+#  "safe_harbour_range": ["97.00", "103.00"], "potential_adjustment": "20.00"}
 ```
 
 | Parameter | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
-| `transaction_price` | `float` | Yes | — | Actual price charged to/by related party |
-| `benchmark_price` | `float` | Yes | — | Arm's Length Price (ALP) from analysis |
+| `transaction_price` | `Decimal \| str \| int \| float` | Yes | — | Actual price charged to/by related party. Must be finite |
+| `benchmark_price` | `Decimal \| str \| int \| float` | Yes | — | Arm's Length Price (ALP) from analysis. Must be finite |
 | `method` | `str` | No | `"CUP"` | Transfer pricing method (e.g., CUP, TNMM) |
-| `tolerance_percent` | `float` | No | `3.0` | Safe harbour tolerance percentage |
+| `tolerance_percent` | `Decimal \| str \| int \| float` | No | `"3.0"` | Safe harbour tolerance percentage. Must be finite |
+
+<Note>
+  On any non-numeric, non-finite, or boolean input the guard **fails closed** and returns `{"verified": False, "risk": "INVALID_NUMERIC_INPUT", "message": "...", "safe_harbour_range": [], "potential_adjustment": "0"}`.
+</Note>
 
 ### PoEMGuard (Place of Effective Management)
 
@@ -486,6 +507,7 @@ result = guard.determine_residency(
     key_management_location="India"
 )
 # {"verified": True, "residency": "RESIDENT", "is_aboi": False,
+#  "metrics": {"assets_outside_ratio": "0.2", "employees_outside_ratio": "0.2", "payroll_outside_ratio": "0.2"},
 #  "reason": "Fails ABOI test AND Key Management is in India (PoEM established)."}
 ```
 
@@ -493,15 +515,23 @@ result = guard.determine_residency(
 | --- | --- | --- | --- |
 | `company_name` | `str` | Yes | Name of the company |
 | `is_foreign_incorp` | `bool` | Yes | Whether incorporated outside India |
-| `turnover_total` | `float` | Yes | Total turnover |
-| `turnover_outside_india` | `float` | Yes | Turnover outside India |
-| `assets_total` | `float` | Yes | Total assets |
-| `assets_outside_india` | `float` | Yes | Assets outside India |
-| `employees_total` | `int` | Yes | Total employee count |
-| `employees_outside_india` | `int` | Yes | Employees outside India |
-| `payroll_total` | `float` | Yes | Total payroll expense |
-| `payroll_outside_india` | `float` | Yes | Payroll expense outside India |
+| `turnover_total` | `Decimal \| str \| int \| float` | Yes | Total turnover. Validated for input shape; not used in the ABOI ratio |
+| `turnover_outside_india` | `Decimal \| str \| int \| float` | Yes | Turnover outside India. Validated for input shape; not used in the ABOI ratio |
+| `assets_total` | `Decimal \| str \| int \| float` | Yes | Total assets. Must be non-negative |
+| `assets_outside_india` | `Decimal \| str \| int \| float` | Yes | Assets outside India. Must be non-negative and ≤ `assets_total` |
+| `employees_total` | `int` | Yes | Total employee count. Must be non-negative |
+| `employees_outside_india` | `int` | Yes | Employees outside India. Must be non-negative and ≤ `employees_total` |
+| `payroll_total` | `Decimal \| str \| int \| float` | Yes | Total payroll expense. Must be non-negative |
+| `payroll_outside_india` | `Decimal \| str \| int \| float` | Yes | Payroll expense outside India. Must be non-negative and ≤ `payroll_total` |
 | `key_management_location` | `str` | Yes | Where key management decisions are made |
+
+**Response fields:**
+
+The `metrics` object returns each ratio as a stable plain-string Decimal rounded to four decimal places (`ROUND_HALF_UP`). The underlying unrounded ratios are used for the ABOI 50% threshold comparison.
+
+<Note>
+  The guard **fails closed** with `{"verified": False, "residency": "UNVERIFIABLE", "reason": "..."}` when any numeric input is non-numeric, non-finite, boolean, or negative, or when an "outside India" component exceeds its total (assets, employees, or payroll).
+</Note>
 
 ### RemittanceGuard (FEMA/LRS)
 
@@ -510,6 +540,8 @@ result = guard.determine_residency(
 - **LRS Limit:** Enforces \$250,000 annual limit per PAN.
 - **Prohibited List:** Blocks Gambling, Lottery, Racing, and **Margin Trading**.
 - **TCS Logic:** Applies 20% tax for generic remittance, 5% for Education/Medical. Education with loan funding is 0.5%. Threshold exemption of INR 7,00,000.
+
+`verify_lrs_limit` accepts `Decimal`, `str`, `int`, or `float` for `amount_usd` and `financial_year_usage`. Non-numeric, non-finite, or boolean inputs fail closed with `{"verified": False, "error": "BLOCKED: ..."}`. `calculate_tcs` returns a `Decimal` and raises `ValueError` on invalid numeric input.
 
 | Purpose | TCS rate | Notes |
 | --- | --- | --- |
