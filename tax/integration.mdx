@@ -137,6 +137,24 @@ The report always echoes the canonical action (after alias resolution) in the `a
   Optional advisory messages emitted by guards (for example, required TDS deduction amounts).
 </ResponseField>
 
+### Redacting block reasons in untrusted contexts
+
+`report["blocks"]` contains human-readable diagnostics that may echo back fields from the original intent — including worker facts, nexus sales figures, remittance purposes, or vendor service types. Treat these strings as **internal-only**: log them to your audit trail, but do not render them verbatim in end-user surfaces, demo output, or any context where a downstream consumer could infer protected payroll or customer data.
+
+In example and demo scripts bundled with `qwed-tax` (`examples/verify_tax_expansion.py`), outcomes are printed as high-level pass/fail only and verification details are intentionally redacted:
+
+```python
+def _print_outcome(label: str, report: dict, allowed_text: str, blocked_text: str) -> None:
+    """Print a safe high-level outcome without echoing raw block reasons."""
+    print(f"{label}: {allowed_text if report['allowed'] else blocked_text}")
+    if report["allowed"]:
+        return
+
+    print("   Verification details intentionally redacted.")
+```
+
+Mirror this pattern when surfacing preflight results outside a trusted audit boundary.
+
 ### Supported actions
 
 Every intent must set `action` to one of the supported values below. Actions are normalized (trimmed, lowercased, spaces converted to underscores) before routing, and the listed aliases are accepted for backwards compatibility.
