@@ -5,7 +5,63 @@ description: "All notable changes to QWED Protocol — releases, features, secur
 
 All notable changes to the QWED platform, listed by release.
 
-**Jump to:** [v5.1.0](#v5-1-0-—-agent-state-governance-and-fail-closed-hardening) · [v5.0.0](#v5-0-0-—-enforcement-boundary-hardening) · [v4.0.5](#v4-0-5-—-stats-exception-masking) · [v4.0.4](#v4-0-4-—-fail-closed-execution-enforcement) · [v4.0.3](#v4-0-3-—-server-enforced-agent-security) · [v4.0.2](#v4-0-2-—-security-cleanup) · [v4.0.1](#v4-0-1-—-sentinel-guard-sync) · [v4.0.0](#v4-0-0-—-sentinel-edition) · [v3.0.1](#v3-0-1-—-ironclad-update) · [v2.4.1](#v2-4-1-—-the-reasoning-engine)
+**Jump to:** [QWED-Tax decimal hardening](#qwed-tax-—-decimal-hardening-in-financial-guards) · [v5.1.0](#v5-1-0-—-agent-state-governance-and-fail-closed-hardening) · [v5.0.0](#v5-0-0-—-enforcement-boundary-hardening) · [v4.0.5](#v4-0-5-—-stats-exception-masking) · [v4.0.4](#v4-0-4-—-fail-closed-execution-enforcement) · [v4.0.3](#v4-0-3-—-server-enforced-agent-security) · [v4.0.2](#v4-0-2-—-security-cleanup) · [v4.0.1](#v4-0-1-—-sentinel-guard-sync) · [v4.0.0](#v4-0-0-—-sentinel-edition) · [v3.0.1](#v3-0-1-—-ironclad-update) · [v2.4.1](#v2-4-1-—-the-reasoning-engine)
+
+---
+
+## QWED-Tax — Decimal hardening in financial guards
+**Released: April 24, 2026**
+
+> Patch release across the QWED-Tax cross-border and financial guards. Hardens decimal parsing, fails closed on malformed numeric inputs, and stabilizes JSON output so monetary and ratio fields survive round-trips through non-Python consumers without float drift.
+
+### Fail-closed numeric parsing
+
+All financial guards below now route numeric fields through a shared `parse_decimal_input` helper that rejects booleans, `NaN`, infinite values, and non-numeric strings before any math runs. Previously, a bare `Decimal(str(value))` call would either propagate a raw `InvalidOperation` or silently produce `NaN`/`Infinity` that corrupted downstream comparisons.
+
+- **`DTAAGuard.verify_foreign_tax_credit`** — Rejects non-numeric, non-finite, boolean, and negative values for `foreign_income`, `foreign_tax_paid`, `home_tax_rate`, and `foreign_tax_limit_rate`. Returns `{"verified": false, "message": "<field> must be a ... numeric value.", "allowable_credit": "0", "excess_tax_lapsed": "0"}` on invalid input.
+- **`TransferPricingGuard.verify_arms_length_price`** — Invalid `transaction_price`, `benchmark_price`, or `tolerance_percent` now return `{"verified": false, "risk": "INVALID_NUMERIC_INPUT", "safe_harbour_range": [], "potential_adjustment": "0"}` instead of raising.
+- **`PoEMGuard.determine_residency`** — Malformed turnover/asset/payroll values, negative values, and impossible invariants (`assets_outside_india > assets_total`, etc.) now return `{"verified": false, "residency": "UNVERIFIABLE", "reason": "..."}`. Employee counts must be non-negative and `employees_outside_india` cannot exceed `employees_total`.
+
+Additional guards hardened with the same numeric contract: `indirect_tax_guard`, `nexus_guard`, `related_party_guard`, `remittance_guard`, `speculation_guard`, `tds_guard`, and the US `withholding_guard`.
+
+### Breaking changes
+
+<Warning>
+  Monetary and ratio fields are now returned as plain-text Decimal **strings**, not Python `float`s. If you previously read `result["allowable_credit"]` as a number, update your consumers to parse the string (for example, `Decimal(result["allowable_credit"])`).
+</Warning>
+
+- **`DTAAGuard`** — `allowable_credit` and `excess_tax_lapsed` changed from `float` to Decimal string (e.g., `"150.0"` instead of `150.0`).
+- **`TransferPricingGuard`** — `safe_harbour_range` changed from `[float, float]` to `[str, str]`. `potential_adjustment` (renamed from the legacy `adjustment_required` on the verified path) is now a Decimal string. The `tolerance_percent` default is now `Decimal("3.0")` instead of `3.0`.
+- **`PoEMGuard`** — `metrics.assets_outside_ratio`, `metrics.employees_outside_ratio`, and `metrics.payroll_outside_ratio` changed from `float` to Decimal string, quantized to four decimal places. The ABOI decision continues to use the unrounded ratios internally.
+
+### PoEM validation flow
+
+`PoEMGuard.determine_residency` was refactored to separate parsing, validation, ratio computation, and ratio quantization. The split is internal, but two observable effects follow:
+
+- Validation errors are surfaced as structured `UNVERIFIABLE` responses rather than Python exceptions.
+- Reported ratios are rounded for display only; the `is_aboi` decision is still computed from the raw ratios, so no boundary cases flip from `RESIDENT` to `NON-RESIDENT` purely from rounding.
+
+### Example — migration
+
+```python
+from decimal import Decimal
+from qwed_tax.guards.dtaa_guard import DTAAGuard
+
+guard = DTAAGuard()
+result = guard.verify_foreign_tax_credit(
+    foreign_income=1000,
+    foreign_tax_paid=200,
+    home_tax_rate=15.0,
+)
+
+# Before
+# allowable_credit = result["allowable_credit"]            # 150.0 (float)
+
+# After
+allowable_credit = Decimal(result["allowable_credit"])     # Decimal("150.0")
+```
+
+See the [QWED-Tax guards reference](/tax/guards) for full parameter and return-shape details for each guard.
 
 ---
 
