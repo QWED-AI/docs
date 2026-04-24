@@ -5,7 +5,19 @@ description: "All notable changes to QWED Protocol — releases, features, secur
 
 All notable changes to the QWED platform, listed by release.
 
-**Jump to:** [QWED-Tax decimal hardening](#qwed-tax-—-decimal-hardening-in-financial-guards) · [v5.1.0](#v5-1-0-—-agent-state-governance-and-fail-closed-hardening) · [v5.0.0](#v5-0-0-—-enforcement-boundary-hardening) · [v4.0.5](#v4-0-5-—-stats-exception-masking) · [v4.0.4](#v4-0-4-—-fail-closed-execution-enforcement) · [v4.0.3](#v4-0-3-—-server-enforced-agent-security) · [v4.0.2](#v4-0-2-—-security-cleanup) · [v4.0.1](#v4-0-1-—-sentinel-guard-sync) · [v4.0.0](#v4-0-0-—-sentinel-edition) · [v3.0.1](#v3-0-1-—-ironclad-update) · [v2.4.1](#v2-4-1-—-the-reasoning-engine)
+**Jump to:** [QWED-Tax example redaction](#qwed-tax-—-redacted-preflight-block-details-in-examples) · [QWED-Tax decimal hardening](#qwed-tax-—-decimal-hardening-in-financial-guards) · [v5.1.0](#v5-1-0-—-agent-state-governance-and-fail-closed-hardening) · [v5.0.0](#v5-0-0-—-enforcement-boundary-hardening) · [v4.0.5](#v4-0-5-—-stats-exception-masking) · [v4.0.4](#v4-0-4-—-fail-closed-execution-enforcement) · [v4.0.3](#v4-0-3-—-server-enforced-agent-security) · [v4.0.2](#v4-0-2-—-security-cleanup) · [v4.0.1](#v4-0-1-—-sentinel-guard-sync) · [v4.0.0](#v4-0-0-—-sentinel-edition) · [v3.0.1](#v3-0-1-—-ironclad-update) · [v2.4.1](#v2-4-1-—-the-reasoning-engine)
+
+---
+
+## QWED-Tax — Redacted preflight block details in examples
+**Released: April 24, 2026**
+
+> Example scripts bundled with `qwed-tax` no longer print raw `TaxPreFlight` block reasons. Demo output is reduced to a high-level allow/block outcome so that running the examples cannot incidentally leak field values from the sample intents.
+
+- **`examples/verify_tax_expansion.py`** — Replaces direct prints of `report["blocks"]` with a `_print_outcome` helper that emits only the pass/fail verdict and a fixed `"Verification details intentionally redacted."` notice on blocks.
+- **Guidance** — New [Redacting block reasons in untrusted contexts](/tax/integration#redacting-block-reasons-in-untrusted-contexts) section in the Tax integration reference documents the expected handling for `report["blocks"]` outside a trusted audit boundary.
+
+No runtime behavior in `TaxPreFlight.audit_transaction` changes; the report shape (`allowed`, `action`, `blocks`, `checks_run`, `advisories`) is unchanged.
 
 ---
 
