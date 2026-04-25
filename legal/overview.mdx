@@ -1,44 +1,69 @@
 ---
 sidebar_position: 1
-title: "QWED Legal: deterministic verification for legal AI"
+title: "QWED Legal: deterministic verification guards for legal AI"
 sidebarTitle: "Overview"
-description: "QWED Legal uses deterministic verification for legal AI to catch contract contradictions, citation hallucinations, liability errors, and provenance violations."
+description: "QWED Legal is a deterministic rejection layer for computational legal claims. It verifies dates, amounts, and structured constraints, and fails closed when proof is not possible."
 ---
 
 # QWED-Legal
 
-**The Paralegal for AI-Powered Contract Review** 🏛️
+**Deterministic verification guards for computational legal claims.**
 
-> When lawyers used ChatGPT and cited 6 fake court cases (Mata v. Avianca), QWED-Legal would have caught them before the $5,000 fine.
+> Block unproven legal claims before they become liabilities.
 
 ## What is QWED-Legal?
 
-QWED-Legal is a deterministic verification layer for AI-generated legal document analysis. It catches:
+QWED-Legal is a verification layer for **deterministic, computational legal claims**. It is designed to sit between untrusted LLM or workflow output and any downstream legal action.
 
-- **Date calculation errors** (30 business days miscalculated)
-- **Contradictory clauses** (Clause A says X, Clause B says Not X)
-- **Liability miscalculations** (200% of $5M ≠ $15M)
-- **Hallucinated citations** (fake case names, invalid reporters)
-- **Provenance violations** (missing disclosures, tampered content, unauthorized models)
+QWED-Legal verifies only what can be deterministically proven, such as:
+
+- **Date calculations** (business days, holidays, leap years)
+- **Liability arithmetic** (cap percentages, tiered amounts, indemnity multipliers)
+- **Structured contradictions** between modeled clauses
+- **Citation format** for supported reporters
+- **Provenance metadata** (hash integrity, disclosure markers, allowed models)
+
+Interpretive legal reasoning is **not** automatically trusted. When proof is not possible, the correct outcome is to reject the claim or mark it unverified.
 
 ```bash
 pip install qwed-legal
 ```
 
-## The 10 Guards of Legal Verification
+## Verification boundaries
 
-| Guard | Engine | Use Case |
-|-------|--------|----------|
-| **DeadlineGuard** | python-dateutil + holidays | Business days, leap years, jurisdiction holidays |
-| **LiabilityGuard** | Decimal + SymPy | Cap %, tiered liability, indemnity limits |
-| **ClauseGuard** | Text heuristics + Z3 | Text-based contradiction detection with optional Z3 verification |
-| **CitationGuard** | Regex patterns | US, UK, and India citation format validation |
-| **JurisdictionGuard** | Rule-based logic | Choice of law, forum selection, CISG |
-| **StatuteOfLimitationsGuard** | Date calculations | Claim periods by jurisdiction |
-| **IRACGuard** | Regex patterns | Legal reasoning structure verification |
-| **FairnessGuard** | Counterfactual testing | Algorithmic bias detection |
-| **ContradictionGuard** | Z3 SMT Solver | Formal logic contradiction verification |
-| **ProvenanceGuard** | SHA-256 + regex | AI content provenance and disclosure compliance |
+QWED-Legal operates under strict limits:
+
+- Only deterministic claims can be verified.
+- Ambiguous or interpretive output is rejected or marked unverified.
+- Legal reasoning is **not** assumed correct without proof.
+- If something cannot be proven, it must not pass.
+
+QWED-Legal is **not**:
+
+- a legal reasoning engine
+- a source of legal truth
+- a replacement for lawyers
+- a contract drafting or review platform
+- a guarantee that every legal output can be verified
+
+## Guard coverage
+
+Not every guard provides full formal verification. Some operate on partial rules or structured validation and should **not** be treated as complete legal proof.
+
+| Guard | Status | What it checks |
+|-------|--------|----------------|
+| **DeadlineGuard** | `DETERMINISTIC` | Date arithmetic and business-day calculations for supported, structured inputs |
+| **LiabilityGuard** | `DETERMINISTIC` | Cap and tiered amount computations for supported numeric inputs |
+| **ClauseGuard** | `PARTIAL / HEURISTIC` | Limited text-based clause consistency and contradiction checks |
+| **CitationGuard** | `PARTIAL / HEURISTIC` | Citation shape / format validation, not authoritative existence proof |
+| **JurisdictionGuard** | `PARTIAL / HEURISTIC` | Structured checks around governing law and forum combinations |
+| **StatuteOfLimitationsGuard** | `PARTIAL / HEURISTIC` | Limitation-period calculations for supported jurisdictions and claim types |
+| **IRACGuard** | `PARTIAL / HEURISTIC` | IRAC structure and consistency checks, not proof of legal reasoning |
+| **FairnessGuard** | `PARTIAL / HEURISTIC` | Counterfactual consistency checks (requires an external LLM client) |
+| **ContradictionGuard** | `PARTIAL / HEURISTIC` | Structured contradiction checks for a limited set of modeled clause categories |
+| **ProvenanceGuard** | `DETERMINISTIC` | SHA-256 hash integrity, disclosure markers, model allowlist, timestamp validity |
+
+A valid result from a `PARTIAL / HEURISTIC` guard does **not** mean the underlying legal claim is correct. It means the claim matched a supported structural pattern.
 
 ## Quick Example
 
@@ -51,12 +76,12 @@ guard = DeadlineGuard()
 result = guard.verify(
     signing_date="2026-01-15",
     term="30 business days",
-    claimed_deadline="2026-02-14"  # LLM claimed this
+    claimed_deadline="2026-02-14",
 )
 
-print(result.verified)   # False!
-print(result.computed_deadline)  # 2026-02-27 (correct)
-# ❌ ERROR: Deadline mismatch. Expected 2026-02-27, but LLM claimed 2026-02-14.
+print(result.verified)            # False
+print(result.computed_deadline)   # 2026-02-27
+print(result.message)
 ```
 
 ### Verify a Legal Citation
@@ -67,10 +92,12 @@ from qwed_legal import CitationGuard
 guard = CitationGuard()
 result = guard.verify("Brown v. Board of Education, 347 U.S. 483 (1954)")
 
-print(result.valid)  # True - valid citation format
+print(result.valid)  # True - matches a supported citation format
 print(result.parsed_components)
 # {'volume': 347, 'reporter': 'U.S.', 'page': '483'}
 ```
+
+A valid format result does **not** prove that the cited authority exists or is controlling. It only means the citation matched a supported structural pattern.
 
 ## Architecture
 
@@ -125,32 +152,29 @@ flowchart LR
     CTG --> Result
 ```
 
-## Audit Log: Real Hallucinations Caught
+## Examples of claims QWED-Legal can reject
 
-| Contract Input | LLM Claim | QWED Verdict |
-|----------------|-----------|--------------|
-| "Net 30 Business Days from Dec 20" | Jan 19 | 🛑 **BLOCKED** (Actual: Feb 2) |
-| "Liability Cap: 2x Fees ($50k)" | $200,000 | 🛑 **BLOCKED** (Actual: $100,000) |
-| "Seller may terminate with 30 days notice" + "Neither party may terminate before 90 days" | "Clauses are consistent" | 🛑 **BLOCKED** (Conflict detected) |
-| "Smith v. Jones, 999 FAKE 123" | Valid citation | 🛑 **BLOCKED** (Unknown reporter) |
+These are examples of supported checks catching unsupported claims. They are **not** proof that every legal hallucination is detectable.
 
-## Why Not Just Trust the LLM?
+| Input | Claimed result | Example outcome |
+|-------|----------------|-----------------|
+| "Net 30 business days from Dec 20" | Wrong computed date | Blocked by `DeadlineGuard` |
+| "Liability cap: 2x fees" | Wrong cap arithmetic | Blocked by `LiabilityGuard` |
+| Structured liability conflict | "Clauses are consistent" | Blocked by `ContradictionGuard` |
+| Unsupported citation reporter | "Valid citation" | Blocked by `CitationGuard` format checks |
 
-LLMs are **probabilistic**. They can:
+## Why not just trust the LLM?
 
-- **Hallucinate case citations** (Mata v. Avianca scandal)
-- **Miscalculate business days** (ignore holidays, weekends)
-- **Miss contradictory clauses** (termination notice vs minimum term)
-- **Get percentage math wrong** (200% of $5M ≠ $15M)
+LLMs are **probabilistic** and can fail in legally significant ways:
 
-QWED-Legal uses **deterministic** verification:
+| Failure mode | Example | Risk |
+|--------------|---------|------|
+| Fabricated authority | AI cites a nonexistent or malformed legal source | Sanctions, bad filings |
+| Deadline mistakes | "30 business days" miscomputed | Missed obligations, defaults |
+| Clause inconsistency | Two provisions cannot both be true | Disputes, unenforceable terms |
+| False certainty | Model states a legal conclusion without proof | Liability, audit failure |
 
-| LLM Output | QWED Verification | Engine |
-|------------|-------------------|--------|
-| "Deadline is Feb 14" | Calculate business days | python-dateutil |
-| "Liability cap is $15M" | Decimal math | SymPy |
-| "Clauses are consistent" | Z3 satisfiability | Z3 SMT |
-| "Citation is valid" | Bluebook regex | Pattern matching |
+QWED-Legal treats LLM output as **untrusted input**. It does not assume correctness, and it requires proof for the properties it is able to verify. When proof is not possible, the correct outcome is to fail closed.
 
 ## Jurisdiction Support
 
