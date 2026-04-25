@@ -5,9 +5,18 @@ sidebarTitle: "The 10 Guards"
 description: "Reference for QWED Legal guards covering deadlines, liability, contradictions, citations, jurisdiction checks, and AI content provenance."
 ---
 
-Each guard uses a deterministic engine to verify a specific aspect of legal documents.
+Each guard uses a deterministic engine to verify a specific aspect of legal documents. Guards advertise one of two verification statuses:
+
+- `DETERMINISTIC` — full formal verification for supported, structured inputs.
+- `PARTIAL / HEURISTIC` — structural or rule-based checks that should not be treated as complete legal proof.
+
+<Warning>
+  A passing `PARTIAL / HEURISTIC` result confirms only that the supported structural pattern was matched. It does not prove that the underlying legal claim is correct or authoritative.
+</Warning>
 
 ## 1. DeadlineGuard 📅
+
+**Status:** `DETERMINISTIC`
 
 **Purpose:** Verify date calculations in contracts.
 
@@ -94,6 +103,8 @@ print(business_days)  # Number of business days excluding weekends and holidays
 
 ## 2. LiabilityGuard 💰
 
+**Status:** `DETERMINISTIC`
+
 **Purpose:** Verify liability cap and indemnity calculations.
 
 ### The Problem
@@ -178,6 +189,8 @@ result = guard.verify_indemnity_limit(
 
 ## 3. ClauseGuard ⚖️
 
+**Status:** `PARTIAL / HEURISTIC`
+
 **Purpose:** Detect contradictory clauses using text heuristics and optional Z3 verification.
 
 ### The problem
@@ -235,7 +248,13 @@ print(result.message)     # "✅ VERIFIED: Constraints are satisfiable."
 
 ## 4. CitationGuard 📚
 
-**Purpose:** Verify legal citations are properly formatted and potentially real.
+**Status:** `PARTIAL / HEURISTIC`
+
+**Purpose:** Verify legal citations are properly formatted.
+
+<Warning>
+  A valid citation result confirms only that the citation matched a supported structural pattern. It does **not** prove that a cited authority exists, is binding, or is controlling.
+</Warning>
 
 ### The Problem
 
@@ -294,6 +313,8 @@ print(result.parsed_components)
 ---
 
 ## 5. JurisdictionGuard 🌍
+
+**Status:** `PARTIAL / HEURISTIC`
 
 **Purpose:** Verify choice of law and forum selection clauses.
 
@@ -379,7 +400,9 @@ print(result.verified)  # True - both are CISG members
 
 ## 6. StatuteOfLimitationsGuard ⏰
 
-**Purpose:** Verify claim limitation periods by jurisdiction.
+**Status:** `PARTIAL / HEURISTIC`
+
+**Purpose:** Verify claim limitation periods by jurisdiction. Results should be treated as valid only for supported, unambiguous, and modeled inputs.
 
 ### The Problem
 
@@ -476,7 +499,9 @@ comparison = guard.compare_jurisdictions(
 
 ## 7. IRACGuard 📝
 
-**Purpose:** Verify that legal reasoning follows the IRAC framework (Issue, Rule, Application, Conclusion).
+**Status:** `PARTIAL / HEURISTIC`
+
+**Purpose:** Verify that legal reasoning follows the IRAC framework (Issue, Rule, Application, Conclusion). This is a structural check, not a proof of legal reasoning quality.
 
 ### The Problem
 
@@ -529,7 +554,9 @@ print(result["missing"])   # ['issue', 'rule', 'application', 'conclusion']
 
 ## 8. FairnessGuard ⚖️
 
-**Purpose:** Detect algorithmic bias using counterfactual testing.
+**Status:** `PARTIAL / HEURISTIC`
+
+**Purpose:** Detect algorithmic bias using counterfactual testing. This is a counterfactual consistency check, not a full fairness proof.
 
 ### The Problem
 
@@ -591,7 +618,9 @@ print(result["status"])    # "FAIRNESS_VERIFIED" or "JUDICIAL_BIAS_DETECTED"
 
 ## 9. ContradictionGuard 🔍
 
-**Purpose:** Detect logical contradictions in contracts using Z3 SMT Solver.
+**Status:** `PARTIAL / HEURISTIC`
+
+**Purpose:** Detect logical contradictions in contracts using the Z3 SMT Solver, scoped to a limited set of modeled clause categories.
 
 ### The Problem
 
@@ -650,6 +679,8 @@ The `Clause` dataclass requires:
 ---
 
 ## 10. ProvenanceGuard 🔗
+
+**Status:** `DETERMINISTIC`
 
 **Purpose:** Verify AI-generated content carries proper provenance metadata and disclosure markers.
 

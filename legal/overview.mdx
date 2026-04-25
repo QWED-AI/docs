@@ -25,20 +25,43 @@ QWED-Legal is a deterministic verification layer for AI-generated legal document
 pip install qwed-legal
 ```
 
+## Verification boundaries
+
+QWED-Legal verifies **only what can be deterministically proven** — dates, amounts, and structured constraints. Interpretive legal reasoning is not automatically trusted.
+
+<Warning>
+  QWED-Legal is a **deterministic rejection layer**, not a general-purpose legal reasoning engine. If a claim cannot be proven, it must not pass.
+</Warning>
+
+| Aspect | QWED-Legal does | QWED-Legal does **not** do |
+| --- | --- | --- |
+| Scope | Verify narrow deterministic claims (dates, amounts, structured constraints) | Draft, summarize, or generate legal text |
+| Approach | Deterministic checks where possible | Probabilistic generation or interpretive reasoning |
+| Certainty | 100% certainty for supported deterministic checks | Prove subjective, ambiguous, or interpretive conclusions |
+| Failure mode | Fails closed when proof is unavailable | Provide a "best guess" answer |
+| Role | Block or mark unverified claims before they reach downstream systems | Replace lawyers, drafting tools, or research assistants |
+
+When verification is not possible, the correct outcome is to fail closed — reject the claim or mark it unverified.
+
 ## The 10 Guards of Legal Verification
 
-| Guard | Engine | Use Case |
-|-------|--------|----------|
-| **DeadlineGuard** | python-dateutil + holidays | Business days, leap years, jurisdiction holidays |
-| **LiabilityGuard** | Decimal + SymPy | Cap %, tiered liability, indemnity limits |
-| **ClauseGuard** | Text heuristics + Z3 | Text-based contradiction detection with optional Z3 verification |
-| **CitationGuard** | Regex patterns | US, UK, and India citation format validation |
-| **JurisdictionGuard** | Rule-based logic | Choice of law, forum selection, CISG |
-| **StatuteOfLimitationsGuard** | Date calculations | Claim periods by jurisdiction |
-| **IRACGuard** | Regex patterns | Legal reasoning structure verification |
-| **FairnessGuard** | Counterfactual testing | Algorithmic bias detection |
-| **ContradictionGuard** | Z3 SMT Solver | Formal logic contradiction verification |
-| **ProvenanceGuard** | SHA-256 + regex | AI content provenance and disclosure compliance |
+Each guard advertises a verification status so you know how strong a passing result is:
+
+- `DETERMINISTIC` — full formal verification for the supported, structured inputs.
+- `PARTIAL / HEURISTIC` — structural or rule-based checks that should not be treated as complete legal proof.
+
+| Guard | Status | Engine | Use case |
+|-------|--------|--------|----------|
+| **DeadlineGuard** | `DETERMINISTIC` | python-dateutil + holidays | Business days, leap years, jurisdiction holidays |
+| **LiabilityGuard** | `DETERMINISTIC` | Decimal + SymPy | Cap %, tiered liability, indemnity limits |
+| **ProvenanceGuard** | `DETERMINISTIC` | SHA-256 + regex | AI content provenance and disclosure compliance |
+| **ContradictionGuard** | `PARTIAL / HEURISTIC` | Z3 SMT Solver | Structured contradiction checks for modeled clause categories |
+| **ClauseGuard** | `PARTIAL / HEURISTIC` | Text heuristics + Z3 | Limited clause consistency and contradiction checks |
+| **CitationGuard** | `PARTIAL / HEURISTIC` | Regex patterns | Citation shape and format validation (not authoritative existence proof) |
+| **JurisdictionGuard** | `PARTIAL / HEURISTIC` | Rule-based logic | Structured checks around governing law, forum, and CISG |
+| **StatuteOfLimitationsGuard** | `PARTIAL / HEURISTIC` | Date calculations | Limitation-period calculations for supported jurisdictions and claim types |
+| **IRACGuard** | `PARTIAL / HEURISTIC` | Regex patterns | IRAC structure and consistency checks (not proof of legal reasoning) |
+| **FairnessGuard** | `PARTIAL / HEURISTIC` | Counterfactual testing | Counterfactual consistency checks (not full fairness proof) |
 
 ## Quick Example
 
