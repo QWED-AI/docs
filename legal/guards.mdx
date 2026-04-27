@@ -230,17 +230,42 @@ print(result.conflicts)
 
 ### Z3-based verification
 
-For power users who want to define precise logical constraints:
+For power users who want to define precise logical constraints. `verify_using_z3()` only accepts explicit Z3 `BoolRef` expressions — it does **not** parse free-form text. Callers must model the legal meaning themselves.
 
 ```python
+from z3 import Bool, Implies, Not
+from qwed_legal import ClauseGuard
+
+guard = ClauseGuard()
+
+can_terminate_early = Bool("can_terminate_early")
+min_term_satisfied = Bool("min_term_satisfied")
+
 result = guard.verify_using_z3([
-    "constraint_a",
-    "constraint_b",
+    Implies(can_terminate_early, Not(min_term_satisfied)),
+    can_terminate_early,
+    min_term_satisfied,
 ])
 
-print(result.consistent)  # True if constraints are satisfiable
-print(result.message)     # "✅ VERIFIED: Constraints are satisfiable."
+print(result.consistent)  # False - constraints are unsatisfiable
+print(result.message)     # "CONTRADICTION: Provided Z3 constraints are unsatisfiable..."
 ```
+
+#### Fail-closed behavior
+
+`verify_using_z3()` is fail-closed: it returns `consistent=False` for any input it cannot prove satisfiable. The following inputs are rejected as `UNVERIFIABLE` rather than silently passing:
+
+| Input | Result | Message prefix |
+| --- | --- | --- |
+| Empty list `[]` | `consistent=False` | `UNVERIFIABLE: verify_using_z3 requires explicit Z3 constraint expressions...` |
+| Non-`BoolRef` values (e.g. strings, ints) | `consistent=False` | `UNVERIFIABLE: verify_using_z3 only accepts explicit Z3 Boolean expressions...` |
+| Z3 returns `unknown` | `consistent=False` | `UNVERIFIABLE: Z3 returned unknown for the provided constraints.` |
+| Satisfiable (`sat`) | `consistent=True` | `VERIFIED: Provided Z3 constraints are satisfiable.` |
+| Unsatisfiable (`unsat`) | `consistent=False` | `CONTRADICTION: Provided Z3 constraints are unsatisfiable...` |
+
+<Warning>
+  Passing raw strings or other non-Z3 values is rejected. The guard reports the 1-based position of each invalid constraint so callers can identify the offending entries.
+</Warning>
 
 ---
 
