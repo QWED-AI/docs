@@ -230,17 +230,37 @@ print(result.conflicts)
 
 ### Z3-based verification
 
-For power users who want to define precise logical constraints:
+For power users who want to define precise logical constraints, `verify_using_z3()` checks satisfiability of explicit Z3 Boolean expressions. The method does **not** parse free-form legal text — callers must encode legal meaning as Z3 expressions themselves.
 
 ```python
-result = guard.verify_using_z3([
-    "constraint_a",
-    "constraint_b",
-])
+from qwed_legal import ClauseGuard
+from z3 import Int
 
-print(result.consistent)  # True if constraints are satisfiable
-print(result.message)     # "✅ VERIFIED: Constraints are satisfiable."
+guard = ClauseGuard()
+
+# Model "term must be exactly 12 months" AND "term must be exactly 24 months"
+months = Int("months")
+result = guard.verify_using_z3([months == 12, months == 24])
+
+print(result.consistent)  # False - constraints are unsatisfiable
+print(result.message)     # "CONTRADICTION: Provided Z3 constraints are unsatisfiable..."
 ```
+
+#### Fail-closed behavior
+
+`verify_using_z3()` fails closed (`consistent=False`) whenever it cannot produce a proof. This prevents callers from mistaking "no answer" for "verified".
+
+| Input | Result | Message prefix |
+| --- | --- | --- |
+| Empty list `[]` | `consistent=False` | `UNVERIFIABLE: verify_using_z3 requires explicit Z3 constraint expressions...` |
+| Non-Z3 values (e.g. raw strings) | `consistent=False` | `UNVERIFIABLE: verify_using_z3 only accepts explicit Z3 Boolean expressions...` |
+| Z3 returns `unknown` | `consistent=False` | `UNVERIFIABLE: Z3 returned unknown for the provided constraints.` |
+| Z3 returns `unsat` | `consistent=False` | `CONTRADICTION: Provided Z3 constraints are unsatisfiable...` |
+| Z3 returns `sat` | `consistent=True` | `VERIFIED: Provided Z3 constraints are satisfiable.` |
+
+<Warning>
+  Passing raw strings or other non-`BoolRef` values to `verify_using_z3()` is rejected. The guard reports the position of each unsupported constraint so callers can fix the input rather than receive a false "verified" result.
+</Warning>
 
 ---
 
