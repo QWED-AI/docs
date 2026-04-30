@@ -21,6 +21,7 @@ All notable changes to the QWED platform, listed by release.
 - **Mixed typed/untyped code** stays unverifiable: a single skipped function is enough to set `is_verified: false` and `status: "unverifiable"`.
 - **Aggregation now distinguishes** `functions_discovered`, `functions_checked`, `functions_verified`, `functions_skipped`, `functions_unverifiable`, and `counterexamples_found`.
 - `is_verified: true` now requires at least one function actually checked, all checked functions proven, no skipped or unverifiable functions, and no counterexamples.
+- The result dict now also exposes `is_safe` and `verified` as aliases for `is_verified`, and pre-verification exits (`crosshair_not_available`, `syntax_error`) return the same fail-closed shape with zeroed counters.
 
 ### Result shape
 

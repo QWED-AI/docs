@@ -62,16 +62,18 @@ if result["status"] == "TIMEOUT":
 The result dictionary always includes the following counters:
 
 <ResponseField name="is_verified" type="boolean">
-  `True` only if symbolic proof actually succeeded for every discovered function. Defaults to `False` whenever proof was incomplete.
+  `True` only if symbolic proof actually succeeded for every discovered function. Defaults to `False` whenever proof was incomplete. The result also exposes `is_safe` and `verified` as aliases for the same boolean.
 </ResponseField>
 
 <ResponseField name="status" type="string">
   One of:
   - `verified` — all functions were proven symbolically.
+  - `counterexamples_found` — CrossHair produced concrete counterexamples.
   - `no_verifiable_functions` — code had no functions, or no typed functions could be checked.
   - `unverifiable` — at least one function was skipped or could not be proven (e.g. missing type annotations).
-  - `counterexamples_found` — CrossHair produced concrete counterexamples.
   - `verification_error` — verification did not complete cleanly.
+  - `crosshair_not_available` — CrossHair is not installed in the runtime.
+  - `syntax_error` — the submitted code could not be parsed.
 </ResponseField>
 
 <ResponseField name="message" type="string">
@@ -127,6 +129,8 @@ assert result["functions_unverifiable"] == 1
 ```
 
 Mixed code that contains both typed and untyped functions also fails closed — a single skipped function is enough to set `is_verified=False` and `status="unverifiable"`. Code that contains no functions at all returns `status="no_verifiable_functions"` rather than a pass-like result.
+
+Pre-verification exits (`crosshair_not_available`, `syntax_error`) return the same fail-closed shape — `is_verified=False` and zeroed counters — so callers can rely on the same fields regardless of how verification ended.
 
 ## Configuration Guide
 
