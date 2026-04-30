@@ -12,29 +12,46 @@ All notable changes to the QWED platform, listed by release.
 ## QWED-Verification — Symbolic verifier fail-closed without proof
 **Released: April 30, 2026**
 
-> Patch in `SymbolicVerifier.verify_code` that closes a fail-open gap where absence of symbolic proof was reported as a successful verification. Code with no functions, untyped functions, or any skipped functions is now correctly rejected.
+> Fix in `SymbolicVerifier.verify_code()` that closes a fail-open gap where absence of symbolic proof could be reported as a successful verification. The verifier now fails closed unless a real CrossHair proof was actually performed.
 
 ### What changed
 
-- **No functions found** — Source containing only top-level statements now returns `is_verified: false` with `status: "no_verifiable_functions"` instead of `status: "no_functions_to_check"` and `is_verified: true`.
-- **Untyped functions** — Functions without type hints are skipped by CrossHair. They are now recorded as both skipped and unverifiable, with an `unverifiable` issue, instead of being counted as verified.
-- **Mixed typed and untyped** — A single skipped or unverifiable function now prevents an overall `is_verified: true` result, even if other functions were proven.
-- **Result aggregation** — The result dictionary now distinguishes `functions_discovered`, `functions_checked`, `functions_verified`, `functions_skipped`, `functions_unverifiable`, and `counterexamples_found`, plus a human-readable `message` and an extended `status` set (`verified`, `no_verifiable_functions`, `unverifiable`, `counterexamples_found`, `verification_error`).
+- **Code with no functions** now returns `is_verified: false` and `status: "no_verifiable_functions"` instead of a pass-like `no_functions_to_check` result.
+- **Untyped functions** are reported as `skipped` and `unverifiable`, never as verified. CrossHair requires type annotations.
+- **Mixed typed/untyped code** stays unverifiable: a single skipped function is enough to set `is_verified: false` and `status: "unverifiable"`.
+- **Aggregation now distinguishes** `functions_discovered`, `functions_checked`, `functions_verified`, `functions_skipped`, `functions_unverifiable`, and `counterexamples_found`.
+- `is_verified: true` now requires at least one function actually checked, all checked functions proven, no skipped or unverifiable functions, and no counterexamples.
+- The result dict now also exposes `is_safe` and `verified` as aliases for `is_verified`, and pre-verification exits (`crosshair_not_available`, `syntax_error`) return the same fail-closed shape with zeroed counters.
 
-### Pass condition
+### Result shape
 
-`is_verified` is `true` only when **all** of the following hold:
+```json
+{
+  "is_verified": false,
+  "status": "unverifiable",
+  "message": "Symbolic verification was incomplete; at least one function could not be proven.",
+  "functions_discovered": 2,
+  "functions_checked": 1,
+  "functions_verified": 1,
+  "functions_skipped": 1,
+  "functions_unverifiable": 1,
+  "counterexamples_found": 0,
+  "issues": [
+    {
+      "type": "unverifiable",
+      "function": "untyped_add",
+      "description": "Function skipped: no type annotations for symbolic verification"
+    }
+  ]
+}
+```
 
-- At least one function was actually checked (`functions_checked > 0`).
-- Every checked function was proven (`functions_verified == functions_checked`).
-- No functions were skipped or unverifiable.
-- No counterexamples were found.
-
-See [Fail-closed result semantics](/advanced/symbolic-limits#fail-closed-result-semantics) for field definitions and end-to-end examples.
+See [Symbolic Limits — Fail-closed verification results](/advanced/symbolic-limits#fail-closed-verification-results) for full field documentation.
 
 ### Upgrade notes
 
 <Warning>
+Callers that previously treated `status: "no_functions_to_check"` as success must now treat the new `status: "no_verifiable_functions"`, `"unverifiable"`, and `"verification_error"` values as failures. The `is_verified` boolean is the safest single indicator of a real proof.
 Callers that previously treated `is_verified: true` as proof of correctness without inspecting `functions_checked` may have been accepting unverified code. Re-run any cached verification results, and ensure downstream gates require `functions_checked > 0` in addition to `is_verified`.
 </Warning>
 
