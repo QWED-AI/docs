@@ -55,6 +55,79 @@ if result["status"] == "TIMEOUT":
     print("Symbolic execution timed out, using AST analysis")
 ```
 
+## Fail-closed verification results
+
+`verify_code()` is fail-closed: absence of proof is never reported as success. `is_verified` is only `True` when at least one function was actually checked, every checked function was proven, and no functions were skipped, unverifiable, or produced counterexamples.
+
+The result dictionary always includes the following counters:
+
+<ResponseField name="is_verified" type="boolean">
+  `True` only if symbolic proof actually succeeded for every discovered function. Defaults to `False` whenever proof was incomplete.
+</ResponseField>
+
+<ResponseField name="status" type="string">
+  One of:
+  - `verified` — all functions were proven symbolically.
+  - `no_verifiable_functions` — code had no functions, or no typed functions could be checked.
+  - `unverifiable` — at least one function was skipped or could not be proven (e.g. missing type annotations).
+  - `counterexamples_found` — CrossHair produced concrete counterexamples.
+  - `verification_error` — verification did not complete cleanly.
+</ResponseField>
+
+<ResponseField name="message" type="string">
+  Human-readable explanation of the status.
+</ResponseField>
+
+<ResponseField name="functions_discovered" type="integer">
+  Total functions found in the submitted code.
+</ResponseField>
+
+<ResponseField name="functions_checked" type="integer">
+  Functions that were actually run through symbolic execution. A skipped function does not count as checked.
+</ResponseField>
+
+<ResponseField name="functions_verified" type="integer">
+  Functions that were proven by CrossHair without counterexamples.
+</ResponseField>
+
+<ResponseField name="functions_skipped" type="integer">
+  Functions skipped because they cannot be analyzed (for example, no type annotations).
+</ResponseField>
+
+<ResponseField name="functions_unverifiable" type="integer">
+  Functions that could not be proven, including skipped functions and functions whose verification raised an error.
+</ResponseField>
+
+<ResponseField name="counterexamples_found" type="integer">
+  Number of concrete counterexamples produced by CrossHair.
+</ResponseField>
+
+<ResponseField name="issues" type="array">
+  List of issue objects with `type` (`unverifiable`, `counterexample`, or `error`), `function` name, and `description`.
+</ResponseField>
+
+### Why untyped code fails closed
+
+CrossHair requires type annotations to perform symbolic execution. Functions without type hints are reported as `skipped` and `unverifiable`, and the overall result fails closed:
+
+```python
+code = """
+def add(a, b):
+    return a + b
+"""
+
+result = verifier.verify_code(code)
+
+assert result["is_verified"] is False
+assert result["status"] == "no_verifiable_functions"
+assert result["functions_discovered"] == 1
+assert result["functions_checked"] == 0
+assert result["functions_skipped"] == 1
+assert result["functions_unverifiable"] == 1
+```
+
+Mixed code that contains both typed and untyped functions also fails closed — a single skipped function is enough to set `is_verified=False` and `status="unverifiable"`. Code that contains no functions at all returns `status="no_verifiable_functions"` rather than a pass-like result.
+
 ## Configuration Guide
 
 ### Conservative (Fast, Less Coverage)
