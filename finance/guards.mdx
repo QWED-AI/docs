@@ -259,7 +259,32 @@ result = guard.verify_ytm(
 # result.computed_ytm = 0.0566...
 ```
 
----
+### Rate Format Rules
+
+<Warning>
+**Since v2.1.0:** `_parse_rate()` no longer silently guesses whether an input is a percentage or decimal. The old heuristic (`val < 1 → decimal, else percentage`) has been removed.
+</Warning>
+
+| Input | Parsed Value | Rule |
+| --- | --- | --- |
+| `"5.25%"` | `0.0525` | Explicit `%` → divide by 100 |
+| `"0.0525"` | `0.0525` | No `%` → use as-is (decimal fraction) |
+| `"1.5"` | `1.5` | No `%` → use as-is (150% for distressed debt) |
+
+```python
+# ✅ Correct: use explicit % for percentage values
+guard.verify_ytm(..., llm_output="5.25%")
+
+# ✅ Correct: use decimal fraction directly
+guard.verify_ytm(..., llm_output="0.0525")
+
+# ⚠️ Breaking: "5.25" now means 525%, NOT 5.25%
+# Use "5.25%" instead
+```
+
+<Note>
+This same parsing logic is used consistently across `BondGuard._parse_rate()` and `FinanceVerifier.verify_irr()`, eliminating cross-guard inconsistencies.
+</Note>
 
 ## 9. FX Guard (Currency Arbitration)
 

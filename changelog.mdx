@@ -5,9 +5,74 @@ description: "All notable changes to QWED Protocol — releases, features, secur
 
 All notable changes to the QWED platform, listed by release.
 
-**Jump to:** [QWED-Verification symbolic verifier fail-closed](#qwed-verification--symbolic-verifier-fail-closed-without-proof) · [QWED-Verification strict additionalProperties](#qwed-verification--strict-additionalproperties-fail-closed) · [QWED-Tax example redaction](#qwed-tax-—-redacted-preflight-block-details-in-examples) · [QWED-Tax decimal hardening](#qwed-tax-—-decimal-hardening-in-financial-guards) · [v5.1.0](#v5-1-0-—-agent-state-governance-and-fail-closed-hardening) · [v5.0.0](#v5-0-0-—-enforcement-boundary-hardening) · [v4.0.5](#v4-0-5-—-stats-exception-masking) · [v4.0.4](#v4-0-4-—-fail-closed-execution-enforcement) · [v4.0.3](#v4-0-3-—-server-enforced-agent-security) · [v4.0.2](#v4-0-2-—-security-cleanup) · [v4.0.1](#v4-0-1-—-sentinel-guard-sync) · [v4.0.0](#v4-0-0-—-sentinel-edition) · [v3.0.1](#v3-0-1-—-ironclad-update) · [v2.4.1](#v2-4-1-—-the-reasoning-engine)
+**Jump to:** [QWED-Finance security audit — OpenResponses fail-closed](#qwed-finance--openresponses-fail-closed-and-computed-status) · [QWED-Finance security audit — rate parsing](#qwed-finance--rate-parsing-heuristic-removed) · [QWED-Verification symbolic verifier fail-closed](#qwed-verification--symbolic-verifier-fail-closed-without-proof) · [QWED-Verification strict additionalProperties](#qwed-verification--strict-additionalproperties-fail-closed) · [QWED-Tax example redaction](#qwed-tax-—-redacted-preflight-block-details-in-examples) · [QWED-Tax decimal hardening](#qwed-tax-—-decimal-hardening-in-financial-guards) · [v5.1.0](#v5-1-0-—-agent-state-governance-and-fail-closed-hardening) · [v5.0.0](#v5-0-0-—-enforcement-boundary-hardening) · [v4.0.5](#v4-0-5-—-stats-exception-masking) · [v4.0.4](#v4-0-4-—-fail-closed-execution-enforcement) · [v4.0.3](#v4-0-3-—-server-enforced-agent-security) · [v4.0.2](#v4-0-2-—-security-cleanup) · [v4.0.1](#v4-0-1-—-sentinel-guard-sync) · [v4.0.0](#v4-0-0-—-sentinel-edition) · [v3.0.1](#v3-0-1-—-ironclad-update) · [v2.4.1](#v2-4-1-—-the-reasoning-engine)
 
 ---
+
+## QWED-Finance — OpenResponses fail-closed and COMPUTED status
+**Released: April 30, 2026** · [GitHub PR #21](https://github.com/QWED-AI/qwed-finance/pull/21)
+
+> Closes the most critical finding from the QWED-Finance security audit: the OpenResponses integration no longer auto-approves tools without a verification function, and built-in tool calls no longer falsely claim `verified: true`.
+
+### What changed
+
+- **Fail-closed default** — Tools registered without a `verification_fn` now return `ToolCallStatus.REJECTED` instead of `ToolCallStatus.APPROVED`. A cryptographic receipt is generated for every rejection, ensuring compliance audit trail coverage.
+- **`ToolCallStatus.COMPUTED`** — New enum member distinguishing "we computed this result deterministically" from "we verified an LLM claim." All four built-in tools (`calculate_npv`, `calculate_loan_payment`, `check_aml_compliance`, `price_option`) now return `COMPUTED`.
+- **`format_for_responses_api`** — `COMPUTED` results output `"status": "computed_only"` and `"verified": false` in the streaming payload, preventing downstream agents from trusting unverified computations.
+- **Error boundary** — `verification_fn` execution is wrapped in `try/except`. If a custom verifier raises, it returns `ToolCallStatus.ERROR` instead of crashing the agent loop.
+- **AML country consolidation** — `_verify_aml` now delegates to `ComplianceGuard.high_risk_countries` (14 countries) instead of a hardcoded subset (5 countries).
+- **Black-Scholes input guard** — `price_option` rejects zero/negative values for `spot_price`, `strike_price`, `time_to_expiry`, and `volatility` before computing.
+- **Precision preservation** — NPV and loan outputs use `Decimal.quantize()` instead of `float()`, preventing IEEE 754 artifacts in monetary results.
+
+### Breaking changes
+
+<Warning>
+`ToolCallStatus.COMPUTED` is new. Consumers checking `status == APPROVED` must also handle `COMPUTED` as a valid non-error state.
+
+Tools registered without `verification_fn` now return `REJECTED`. Add a `verification_fn` to all registered tools.
+</Warning>
+
+### Audit references
+
+| Finding | Description | Fix |
+| --- | --- | --- |
+| S-01 | `handle_tool_call()` fail-open default | `APPROVED` → `REJECTED` |
+| S-02 | Built-in functions hardcoded `verified: True` | `APPROVED` → `COMPUTED` |
+| S-04 | `float(npv)` precision leak | `Decimal.quantize()` |
+| S-06 | AML 5 vs 14 country mismatch | Delegate to `ComplianceGuard` |
+
+---
+
+## QWED-Finance — Rate parsing heuristic removed
+**Released: April 30, 2026** · [GitHub PR #22](https://github.com/QWED-AI/qwed-finance/pull/22)
+
+> Removes silent rate format guessing from `BondGuard._parse_rate()` and `FinanceVerifier.verify_irr()`. Both functions used different heuristics that produced 100x errors for the same input.
+
+### What changed
+
+- **`BondGuard._parse_rate()`** — Removed `val < 1` heuristic. Bare numbers without `%` are now treated as decimal fractions (e.g., `"1.5"` → `1.5`, not `0.015`).
+- **`FinanceVerifier.verify_irr()`** — Removed `llm_rate > 1` heuristic. Uses same explicit logic: `%` suffix → divide by 100, otherwise use as-is.
+- **`_solve_ytm` clamp** — Widened Newton-Raphson convergence clamp from `1.0` (100%) to `10.0` (1000%) to support distressed debt scenarios.
+
+### Breaking changes
+
+<Warning>
+Code that passes bare numbers ≥ 1 to `_parse_rate()` expecting auto-division will break. Use explicit `%` suffix: `"5.25%"` instead of `"5.25"`.
+</Warning>
+
+| Input | Before | After |
+| --- | --- | --- |
+| `"5.25%"` | `0.0525` ✅ | `0.0525` ✅ |
+| `"0.0525"` | `0.0525` ✅ | `0.0525` ✅ |
+| `"1.5"` | `0.015` ❌ | `1.5` ✅ |
+
+### Audit references
+
+| Finding | Description | Fix |
+| --- | --- | --- |
+| C-04 | `_parse_rate` silent heuristic | Removed `val < 1` |
+| H-01 | `verify_irr` guessing | Removed `llm_rate > 1` |
+| S-05 | Cross-guard inconsistency | Unified parsing logic |
 
 ## QWED-Verification — Symbolic verifier fail-closed without proof
 **Released: April 30, 2026**
