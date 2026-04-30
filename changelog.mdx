@@ -52,6 +52,7 @@ See [Symbolic Limits — Fail-closed verification results](/advanced/symbolic-li
 
 <Warning>
 Callers that previously treated `status: "no_functions_to_check"` as success must now treat the new `status: "no_verifiable_functions"`, `"unverifiable"`, and `"verification_error"` values as failures. The `is_verified` boolean is the safest single indicator of a real proof.
+Callers that previously treated `is_verified: true` as proof of correctness without inspecting `functions_checked` may have been accepting unverified code. Re-run any cached verification results, and ensure downstream gates require `functions_checked > 0` in addition to `is_verified`.
 </Warning>
 
 ---

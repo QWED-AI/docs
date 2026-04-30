@@ -239,6 +239,111 @@ if result["status"] == "bounds_transform_error":
     print(result["issues"])   # [{"type": "error", "description": "..."}]
 ```
 
+## Fail-closed result semantics
+
+`SymbolicVerifier.verify_code()` treats absence of proof as failure. A result is only `is_verified: true` when CrossHair actually proved every function it checked. Code that contains no functions, contains untyped functions, or mixes typed and untyped functions cannot pass.
+
+### Result fields
+
+The result dictionary distinguishes how each function was handled, so you can tell the difference between "verified" and "not actually checked":
+
+| Field | Meaning |
+|-------|---------|
+| `is_verified` | `true` only if at least one function was checked, all checked functions were proven, no functions were skipped or unverifiable, and no counterexamples were found. |
+| `status` | One of `verified`, `no_verifiable_functions`, `unverifiable`, `counterexamples_found`, or `verification_error`. |
+| `message` | Human-readable explanation of the status. |
+| `functions_discovered` | Total functions found in the source. |
+| `functions_checked` | Functions actually submitted to CrossHair. |
+| `functions_verified` | Functions CrossHair proved. |
+| `functions_skipped` | Functions skipped (for example, missing type annotations). |
+| `functions_unverifiable` | Functions that could not be proven, including skipped functions and verification errors. |
+| `counterexamples_found` | Number of counterexample issues reported. |
+| `issues` | Per-function issue records. Skipped functions appear with `type: "unverifiable"`. |
+
+### Status values
+
+| `status` | When it applies |
+|----------|-----------------|
+| `verified` | At least one function was checked and every checked function was proven. |
+| `no_verifiable_functions` | No functions were found, or every discovered function was skipped (for example, all untyped). |
+| `unverifiable` | At least one function was skipped or could not be proven. Some functions may still have been verified. |
+| `counterexamples_found` | CrossHair returned at least one counterexample. |
+| `verification_error` | Verification did not complete cleanly for another reason. |
+
+### Typed function — passes
+
+```python
+from qwed_new.core.symbolic_verifier import SymbolicVerifier
+
+verifier = SymbolicVerifier(timeout_seconds=5)
+
+result = verifier.verify_code("""
+def add(x: int, y: int) -> int:
+    return x + y
+""")
+
+result["is_verified"]            # True
+result["status"]                 # "verified"
+result["functions_checked"]      # 1
+result["functions_verified"]     # 1
+result["functions_unverifiable"] # 0
+```
+
+### Untyped function — fails closed
+
+CrossHair requires type hints. Untyped functions are now reported as skipped and unverifiable rather than silently passing:
+
+```python
+result = verifier.verify_code("""
+def add(a, b):
+    return a + b
+""")
+
+result["is_verified"]              # False
+result["status"]                   # "no_verifiable_functions"
+result["functions_discovered"]     # 1
+result["functions_checked"]        # 0
+result["functions_skipped"]        # 1
+result["functions_unverifiable"]   # 1
+result["issues"][0]["type"]        # "unverifiable"
+```
+
+### Mixed typed and untyped — fails closed
+
+Even if some functions verify, a single skipped function prevents an overall pass:
+
+```python
+result = verifier.verify_code("""
+def typed_add(a: int, b: int) -> int:
+    return a + b
+
+def untyped_add(a, b):
+    return a + b
+""")
+
+result["is_verified"]            # False
+result["status"]                 # "unverifiable"
+result["functions_discovered"]   # 2
+result["functions_checked"]      # 1
+result["functions_verified"]     # 1
+result["functions_skipped"]      # 1
+```
+
+### Code with no functions — fails closed
+
+Source that contains only top-level statements has nothing to prove and is no longer reported as `is_verified: true`:
+
+```python
+result = verifier.verify_code("x = 1 + 2\nprint(x)\n")
+
+result["is_verified"]   # False
+result["status"]        # "no_verifiable_functions"
+```
+
+<Warning>
+Do not gate downstream behavior on `is_verified` alone without also inspecting `functions_checked`. If `functions_checked == 0`, no symbolic proof was performed regardless of any other field.
+</Warning>
+
 ## Summary
 
 | Question | Answer |
