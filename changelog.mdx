@@ -5,7 +5,41 @@ description: "All notable changes to QWED Protocol — releases, features, secur
 
 All notable changes to the QWED platform, listed by release.
 
-**Jump to:** [QWED-Tax example redaction](#qwed-tax-—-redacted-preflight-block-details-in-examples) · [QWED-Tax decimal hardening](#qwed-tax-—-decimal-hardening-in-financial-guards) · [v5.1.0](#v5-1-0-—-agent-state-governance-and-fail-closed-hardening) · [v5.0.0](#v5-0-0-—-enforcement-boundary-hardening) · [v4.0.5](#v4-0-5-—-stats-exception-masking) · [v4.0.4](#v4-0-4-—-fail-closed-execution-enforcement) · [v4.0.3](#v4-0-3-—-server-enforced-agent-security) · [v4.0.2](#v4-0-2-—-security-cleanup) · [v4.0.1](#v4-0-1-—-sentinel-guard-sync) · [v4.0.0](#v4-0-0-—-sentinel-edition) · [v3.0.1](#v3-0-1-—-ironclad-update) · [v2.4.1](#v2-4-1-—-the-reasoning-engine)
+**Jump to:** [QWED-Verification strict additionalProperties](#qwed-verification--strict-additionalproperties-fail-closed) · [QWED-Tax example redaction](#qwed-tax-—-redacted-preflight-block-details-in-examples) · [QWED-Tax decimal hardening](#qwed-tax-—-decimal-hardening-in-financial-guards) · [v5.1.0](#v5-1-0-—-agent-state-governance-and-fail-closed-hardening) · [v5.0.0](#v5-0-0-—-enforcement-boundary-hardening) · [v4.0.5](#v4-0-5-—-stats-exception-masking) · [v4.0.4](#v4-0-4-—-fail-closed-execution-enforcement) · [v4.0.3](#v4-0-3-—-server-enforced-agent-security) · [v4.0.2](#v4-0-2-—-security-cleanup) · [v4.0.1](#v4-0-1-—-sentinel-guard-sync) · [v4.0.0](#v4-0-0-—-sentinel-edition) · [v3.0.1](#v3-0-1-—-ironclad-update) · [v2.4.1](#v2-4-1-—-the-reasoning-engine)
+
+---
+
+## QWED-Verification — Strict `additionalProperties` fail-closed
+**Released: April 30, 2026**
+
+> Patch in `SchemaVerifier` that closes a fail-open gap when `strict=True` and a schema sets `"additionalProperties": false`. Payloads with undeclared properties are now rejected as invalid instead of silently passing with an advisory warning.
+
+### What changed
+
+- **`SchemaVerifier._validate_object`** — Undeclared properties under `"additionalProperties": false` in strict mode are now recorded with `severity: "ERROR"` instead of `"WARNING"`. Because overall validity is computed from `ERROR`-severity issues, the payload now correctly returns `is_valid: false` and `status: "INVALID"`.
+- Nested objects with `"additionalProperties": false` propagate the same fail-closed behavior at any depth (for example, `$.user.role`).
+- Non-strict mode (`strict=False`) is unchanged: `additionalProperties: false` remains permissive and does not block validation.
+
+### Issue shape
+
+```json
+{
+  "path": "$.role",
+  "issue_type": "additional_property",
+  "expected": "no additional properties",
+  "actual": "role",
+  "severity": "ERROR",
+  "message": "Additional property 'role' not allowed"
+}
+```
+
+See [Schema Verifier — `additionalProperties: false`](/engines/schema#additionalproperties-false--strict-fail-closed-validation) for the full strict and nested examples.
+
+### Upgrade notes
+
+<Warning>
+If you previously relied on strict-mode payloads passing despite undeclared properties, those payloads will now fail validation. Either remove the extra fields, declare them in `properties`, or call `verify_schema` with `strict=False` for advisory-only behavior.
+</Warning>
 
 ---
 
