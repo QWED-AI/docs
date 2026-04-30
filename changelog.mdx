@@ -20,6 +20,8 @@ All notable changes to the QWED platform, listed by release.
 - **Untyped functions** — Functions without type hints are skipped by CrossHair. They are now recorded as both skipped and unverifiable, with an `unverifiable` issue, instead of being counted as verified.
 - **Mixed typed and untyped** — A single skipped or unverifiable function now prevents an overall `is_verified: true` result, even if other functions were proven.
 - **Result aggregation** — The result dictionary now distinguishes `functions_discovered`, `functions_checked`, `functions_verified`, `functions_skipped`, `functions_unverifiable`, and `counterexamples_found`, plus a human-readable `message` and an extended `status` set (`verified`, `no_verifiable_functions`, `unverifiable`, `counterexamples_found`, `verification_error`).
+- **Uniform schema** — Pre-verification exits (`crosshair_not_available`, `syntax_error`) now return the full result schema with all counters set to `0` and `is_verified: false`, so callers can read counters unconditionally.
+- **Aliases** — Results now expose `is_safe` and `verified` alongside `is_verified` for compatibility with safety-gate consumers.
 
 ### Pass condition
 

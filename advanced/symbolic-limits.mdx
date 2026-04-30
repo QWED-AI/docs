@@ -168,12 +168,14 @@ if result["status"] == "bounds_transform_error":
 
 ### Result fields
 
-The result dictionary distinguishes how each function was handled, so you can tell the difference between "verified" and "not actually checked":
+Every call to `verify_code()` returns the same uniform schema, including pre-verification exits such as missing CrossHair or syntax errors. This lets you treat the result shape as stable and inspect counters without conditional checks.
 
 | Field | Meaning |
 |-------|---------|
 | `is_verified` | `true` only if at least one function was checked, all checked functions were proven, no functions were skipped or unverifiable, and no counterexamples were found. |
-| `status` | One of `verified`, `no_verifiable_functions`, `unverifiable`, `counterexamples_found`, or `verification_error`. |
+| `is_safe` | Alias of `is_verified`. |
+| `verified` | Alias of `is_verified`. |
+| `status` | One of `verified`, `no_verifiable_functions`, `unverifiable`, `counterexamples_found`, `verification_error`, `crosshair_not_available`, or `syntax_error`. |
 | `message` | Human-readable explanation of the status. |
 | `functions_discovered` | Total functions found in the source. |
 | `functions_checked` | Functions actually submitted to CrossHair. |
@@ -185,13 +187,22 @@ The result dictionary distinguishes how each function was handled, so you can te
 
 ### Status values
 
+The verifier evaluates statuses in this order; the first match wins:
+
+| Order | `status` | When it applies |
+|-------|----------|-----------------|
+| 1 | `verified` | At least one function was checked and every checked function was proven. |
+| 2 | `counterexamples_found` | CrossHair returned at least one counterexample. |
+| 3 | `no_verifiable_functions` | No functions were found, or every discovered function was skipped (for example, all untyped). |
+| 4 | `unverifiable` | At least one function was skipped or could not be proven, but no counterexamples were produced. |
+| 5 | `verification_error` | Verification did not complete cleanly for another reason. |
+
+Two additional statuses are returned before per-function checks begin:
+
 | `status` | When it applies |
 |----------|-----------------|
-| `verified` | At least one function was checked and every checked function was proven. |
-| `no_verifiable_functions` | No functions were found, or every discovered function was skipped (for example, all untyped). |
-| `unverifiable` | At least one function was skipped or could not be proven. Some functions may still have been verified. |
-| `counterexamples_found` | CrossHair returned at least one counterexample. |
-| `verification_error` | Verification did not complete cleanly for another reason. |
+| `crosshair_not_available` | The CrossHair package is not installed. All counters are `0` and `is_verified` is `false`. |
+| `syntax_error` | The source could not be parsed. `message` carries the parser error. |
 
 ### Typed function — passes
 
