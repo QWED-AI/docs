@@ -41,6 +41,84 @@ response = client.verify_schema(
 # -> ❌ MATH ERROR: total (300) != sum(items) (30)
 ```
 
+## Object validation
+
+The Schema Verifier supports standard JSON Schema object keywords including `properties`, `required`, and `additionalProperties`.
+
+### `additionalProperties: false` — strict fail-closed validation
+
+When a schema sets `"additionalProperties": false` and the verifier runs with `strict=True` (the default), any property that is not declared in `properties` causes the payload to fail validation. The verifier records each undeclared property as an `ERROR`-severity `additional_property` issue, so `is_valid` is `false` and `status` is `INVALID`.
+
+In non-strict mode (`strict=False`), `additionalProperties: false` is treated as advisory and undeclared properties do not block validation.
+
+**Issue types returned for `additionalProperties`:**
+
+| Issue type | Severity | Meaning |
+|---|---|---|
+| `additional_property` | `ERROR` (strict) | An undeclared property was present and `additionalProperties` is `false` |
+
+**Example — strict mode rejects extra fields:**
+
+```python
+schema = {
+    "type": "object",
+    "properties": {
+        "name": {"type": "string"}
+    },
+    "required": ["name"],
+    "additionalProperties": False
+}
+
+result = client.verify_schema(
+    obj={"name": "rahul", "role": "admin"},
+    schema=schema,
+    strict=True
+)
+# -> is_valid: false, status: "INVALID"
+# -> issue_type: "additional_property", severity: "ERROR"
+# -> message: "Additional property 'role' not allowed"
+```
+
+**Example — declared-only payloads pass:**
+
+```python
+result = client.verify_schema(
+    obj={"name": "rahul"},
+    schema=schema,
+    strict=True
+)
+# -> is_valid: true, status: "VALID"
+```
+
+**Example — nested objects also fail closed:**
+
+```python
+schema = {
+    "type": "object",
+    "properties": {
+        "user": {
+            "type": "object",
+            "properties": {"name": {"type": "string"}},
+            "required": ["name"],
+            "additionalProperties": False
+        }
+    },
+    "required": ["user"]
+}
+
+result = client.verify_schema(
+    obj={"user": {"name": "rahul", "role": "admin"}},
+    schema=schema,
+    strict=True
+)
+# -> is_valid: false, status: "INVALID"
+# -> path: "$.user.role", issue_type: "additional_property", severity: "ERROR"
+```
+
+<Info>
+This fail-closed behavior for strict `additionalProperties: false` was hardened in the v5.1.x line. See the [changelog](/changelog#qwed-verification--strict-additionalproperties-fail-closed) for the release notes.
+</Info>
+
 ## Array validation
 
 The Schema Verifier supports standard JSON Schema array keywords including `uniqueItems`.
