@@ -5,7 +5,38 @@ description: "All notable changes to QWED Protocol — releases, features, secur
 
 All notable changes to the QWED platform, listed by release.
 
-**Jump to:** [QWED-Verification strict additionalProperties](#qwed-verification--strict-additionalproperties-fail-closed) · [QWED-Tax example redaction](#qwed-tax-—-redacted-preflight-block-details-in-examples) · [QWED-Tax decimal hardening](#qwed-tax-—-decimal-hardening-in-financial-guards) · [v5.1.0](#v5-1-0-—-agent-state-governance-and-fail-closed-hardening) · [v5.0.0](#v5-0-0-—-enforcement-boundary-hardening) · [v4.0.5](#v4-0-5-—-stats-exception-masking) · [v4.0.4](#v4-0-4-—-fail-closed-execution-enforcement) · [v4.0.3](#v4-0-3-—-server-enforced-agent-security) · [v4.0.2](#v4-0-2-—-security-cleanup) · [v4.0.1](#v4-0-1-—-sentinel-guard-sync) · [v4.0.0](#v4-0-0-—-sentinel-edition) · [v3.0.1](#v3-0-1-—-ironclad-update) · [v2.4.1](#v2-4-1-—-the-reasoning-engine)
+**Jump to:** [QWED-Verification symbolic verifier fail-closed](#qwed-verification--symbolic-verifier-fail-closed-without-proof) · [QWED-Verification strict additionalProperties](#qwed-verification--strict-additionalproperties-fail-closed) · [QWED-Tax example redaction](#qwed-tax-—-redacted-preflight-block-details-in-examples) · [QWED-Tax decimal hardening](#qwed-tax-—-decimal-hardening-in-financial-guards) · [v5.1.0](#v5-1-0-—-agent-state-governance-and-fail-closed-hardening) · [v5.0.0](#v5-0-0-—-enforcement-boundary-hardening) · [v4.0.5](#v4-0-5-—-stats-exception-masking) · [v4.0.4](#v4-0-4-—-fail-closed-execution-enforcement) · [v4.0.3](#v4-0-3-—-server-enforced-agent-security) · [v4.0.2](#v4-0-2-—-security-cleanup) · [v4.0.1](#v4-0-1-—-sentinel-guard-sync) · [v4.0.0](#v4-0-0-—-sentinel-edition) · [v3.0.1](#v3-0-1-—-ironclad-update) · [v2.4.1](#v2-4-1-—-the-reasoning-engine)
+
+---
+
+## QWED-Verification — Symbolic verifier fail-closed without proof
+**Released: April 30, 2026**
+
+> Patch in `SymbolicVerifier.verify_code` that closes a fail-open gap where absence of symbolic proof was reported as a successful verification. Code with no functions, untyped functions, or any skipped functions is now correctly rejected.
+
+### What changed
+
+- **No functions found** — Source containing only top-level statements now returns `is_verified: false` with `status: "no_verifiable_functions"` instead of `status: "no_functions_to_check"` and `is_verified: true`.
+- **Untyped functions** — Functions without type hints are skipped by CrossHair. They are now recorded as both skipped and unverifiable, with an `unverifiable` issue, instead of being counted as verified.
+- **Mixed typed and untyped** — A single skipped or unverifiable function now prevents an overall `is_verified: true` result, even if other functions were proven.
+- **Result aggregation** — The result dictionary now distinguishes `functions_discovered`, `functions_checked`, `functions_verified`, `functions_skipped`, `functions_unverifiable`, and `counterexamples_found`, plus a human-readable `message` and an extended `status` set (`verified`, `no_verifiable_functions`, `unverifiable`, `counterexamples_found`, `verification_error`).
+
+### Pass condition
+
+`is_verified` is `true` only when **all** of the following hold:
+
+- At least one function was actually checked (`functions_checked > 0`).
+- Every checked function was proven (`functions_verified == functions_checked`).
+- No functions were skipped or unverifiable.
+- No counterexamples were found.
+
+See [Fail-closed result semantics](/advanced/symbolic-limits#fail-closed-result-semantics) for field definitions and end-to-end examples.
+
+### Upgrade notes
+
+<Warning>
+Callers that previously treated `is_verified: true` as proof of correctness without inspecting `functions_checked` may have been accepting unverified code. Re-run any cached verification results, and ensure downstream gates require `functions_checked > 0` in addition to `is_verified`.
+</Warning>
 
 ---
 
