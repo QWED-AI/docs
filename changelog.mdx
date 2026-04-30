@@ -5,7 +5,20 @@ description: "All notable changes to QWED Protocol — releases, features, secur
 
 All notable changes to the QWED platform, listed by release.
 
-**Jump to:** [QWED-Tax example redaction](#qwed-tax-—-redacted-preflight-block-details-in-examples) · [QWED-Tax decimal hardening](#qwed-tax-—-decimal-hardening-in-financial-guards) · [v5.1.0](#v5-1-0-—-agent-state-governance-and-fail-closed-hardening) · [v5.0.0](#v5-0-0-—-enforcement-boundary-hardening) · [v4.0.5](#v4-0-5-—-stats-exception-masking) · [v4.0.4](#v4-0-4-—-fail-closed-execution-enforcement) · [v4.0.3](#v4-0-3-—-server-enforced-agent-security) · [v4.0.2](#v4-0-2-—-security-cleanup) · [v4.0.1](#v4-0-1-—-sentinel-guard-sync) · [v4.0.0](#v4-0-0-—-sentinel-edition) · [v3.0.1](#v3-0-1-—-ironclad-update) · [v2.4.1](#v2-4-1-—-the-reasoning-engine)
+**Jump to:** [Schema strict additionalProperties fail-closed](#schema-verifier-—-strict-additionalproperties-fail-closed) · [QWED-Tax example redaction](#qwed-tax-—-redacted-preflight-block-details-in-examples) · [QWED-Tax decimal hardening](#qwed-tax-—-decimal-hardening-in-financial-guards) · [v5.1.0](#v5-1-0-—-agent-state-governance-and-fail-closed-hardening) · [v5.0.0](#v5-0-0-—-enforcement-boundary-hardening) · [v4.0.5](#v4-0-5-—-stats-exception-masking) · [v4.0.4](#v4-0-4-—-fail-closed-execution-enforcement) · [v4.0.3](#v4-0-3-—-server-enforced-agent-security) · [v4.0.2](#v4-0-2-—-security-cleanup) · [v4.0.1](#v4-0-1-—-sentinel-guard-sync) · [v4.0.0](#v4-0-0-—-sentinel-edition) · [v3.0.1](#v3-0-1-—-ironclad-update) · [v2.4.1](#v2-4-1-—-the-reasoning-engine)
+
+---
+
+## Schema Verifier — Strict `additionalProperties` fail-closed
+**Released: April 30, 2026**
+
+> `SchemaVerifier` now fails closed when `strict=True` and a schema sets `additionalProperties: false`. Payloads with undeclared properties are rejected as `INVALID` instead of being recorded as a non-blocking warning.
+
+- **Severity change** — Strict-mode `additional_property` issues are now emitted at severity `ERROR` instead of `WARNING`. Because validity is computed from `ERROR`-level issues, payloads that previously slipped through with a warning now correctly return `is_valid: false`.
+- **Nested objects** — The same fail-closed behavior applies recursively. Extra fields on nested objects that set `additionalProperties: false` are also rejected.
+- **Non-strict behavior unchanged** — With `strict=False`, extra properties remain non-blocking and the payload is still treated as valid.
+
+See the [Schema Verifier object validation](/engines/schema#strict-mode-and-additionalproperties-false) section for the full behavior matrix and examples.
 
 ---
 

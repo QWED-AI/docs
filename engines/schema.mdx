@@ -83,8 +83,78 @@ result = client.verify_schema(obj=[{"bad": {1, 2}}, {"bad": {3, 4}}], schema=sch
 This fail-closed behavior shipped in v5.1.0. See the [changelog](/changelog#v5-1-0-—-agent-state-governance-and-fail-closed-hardening) for the full release notes.
 </Info>
 
+## Object validation
+
+### Strict mode and `additionalProperties: false`
+
+When a schema sets `additionalProperties: false` and you call the verifier with `strict=True`, undeclared properties on the payload now cause verification to **fail closed**. The verifier emits an `additional_property` issue with severity `ERROR`, and the overall result is `INVALID`.
+
+Previously, undeclared properties in strict mode were recorded with severity `WARNING`. Because validity was determined only by `ERROR`-level issues, payloads with forbidden extra fields could still return `VALID`. A strict schema denial is a structural validation failure, not an advisory warning, so strict mode now rejects these payloads outright.
+
+This applies at every level of the schema — extra properties on nested objects that set `additionalProperties: false` are also rejected.
+
+**Behavior matrix:**
+
+| Mode | `additionalProperties` | Extra field present | Result |
+|---|---|---|---|
+| `strict=True` | `false` | yes | `is_valid: false`, `status: "INVALID"`, `severity: "ERROR"` |
+| `strict=True` | `false` | no | `is_valid: true`, `status: "VALID"` |
+| `strict=False` | `false` | yes | `is_valid: true`, `status: "VALID"` (permissive) |
+
+**Example — strict mode rejects extra fields:**
+
+```python
+schema = {
+    "type": "object",
+    "properties": {
+        "name": {"type": "string"}
+    },
+    "required": ["name"],
+    "additionalProperties": False,
+}
+
+result = verifier.verify(
+    {"name": "rahul", "role": "admin"},
+    schema,
+    strict=True,
+)
+# -> is_valid: false, status: "INVALID"
+# -> issue: { "type": "additional_property", "severity": "ERROR",
+#             "message": "Additional property 'role' not allowed" }
+```
+
+**Example — nested objects also fail closed:**
+
+```python
+schema = {
+    "type": "object",
+    "properties": {
+        "user": {
+            "type": "object",
+            "properties": {"name": {"type": "string"}},
+            "required": ["name"],
+            "additionalProperties": False,
+        }
+    },
+    "required": ["user"],
+}
+
+result = verifier.verify(
+    {"user": {"name": "rahul", "role": "admin"}},
+    schema,
+    strict=True,
+)
+# -> is_valid: false
+# -> issue path: "$.user.role"
+```
+
+<Info>
+This fail-closed behavior is enabled only when `strict=True`. With `strict=False`, extra properties remain non-blocking and the payload is still treated as valid, preserving permissive workflows.
+</Info>
+
 ## When to use
 
 - **Invoice Processing:** Ensure line items sum to the total.
 - **Financial Reports:** Ensure balance sheets balance.
 - **Tax Forms:** Ensure calculated fields match underlying data.
+- **Strict API contracts:** Reject payloads with undeclared fields when `strict=True` and `additionalProperties: false` are combined.
