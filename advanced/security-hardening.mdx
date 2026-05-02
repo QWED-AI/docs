@@ -215,17 +215,18 @@ result = executor.execute(code)
 
 This change has no effect on the public API — the `/verify/stats` and `/verify/consensus` endpoints already use `SecureCodeExecutor` since v4.0.4. It only affects self-hosted deployments that imported `CodeExecutor` directly.
 
-#### `CodeVerifier` import failure blocks execution
+#### `CodeVerifier` failures block execution
 
-If `SecureCodeExecutor` cannot import `CodeVerifier` (the primary structured safety verifier), it now fails closed and refuses to authorize execution. Earlier builds fell back to a basic keyword scan (`_basic_safety_check()`) as the authorization gate when the verifier was unavailable, which weakened the execution boundary from structured verification to heuristic filtering.
+If `SecureCodeExecutor` cannot use `CodeVerifier` (the primary structured safety verifier), it now fails closed and refuses to authorize execution. Earlier builds fell back to a basic keyword scan (`_basic_safety_check()`) as the authorization gate when the verifier was unavailable, which weakened the execution boundary from structured verification to heuristic filtering.
 
-The hardened behavior:
+The hardened behavior covers both unavailability and runtime errors:
 
-- Import failure of `CodeVerifier` returns `(False, "CodeVerifier unavailable; cannot validate code safety.")` from the safety check.
-- `SecureCodeExecutor.execute()` returns `(success=False, error="Code safety validation failed: ...", result=None)` and never reaches `containers.run()`.
-- The basic keyword scan is retained only as advisory context. If it also flags the code, its reason is appended to the error message (`"... Advisory-only fallback also flagged: <reason>"`), but it can never authorize execution on its own.
+- **Import failure** — If `CodeVerifier` cannot be imported, the safety check returns `(False, "CodeVerifier unavailable; cannot validate code safety.")`.
+- **Runtime failure** — If `CodeVerifier.verify_code()` raises any exception during validation, the executor logs a sanitized error and returns the same deterministic denial through the shared `_build_fail_closed_safety_denial()` helper. The exception message is not echoed to callers.
+- **Execution blocked** — `SecureCodeExecutor.execute()` returns `(success=False, error="Code safety validation failed: ...", result=None)` and never reaches `containers.run()`.
+- **Advisory-only keyword scan** — The basic keyword scan is retained only as diagnostic context. If it also flags the code, its reason is appended to the error message (`"... Advisory-only fallback also flagged: <reason>"`), but it can never authorize execution on its own.
 
-This guarantees that a missing or broken primary verifier surfaces as a blocked execution rather than a silent downgrade to heuristic-only filtering.
+This guarantees that a missing, broken, or crashing primary verifier surfaces as a blocked execution rather than a silent downgrade to heuristic-only filtering.
 
 ### Default-deny for unknown tool approvals
 

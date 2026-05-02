@@ -5,27 +5,29 @@ description: "All notable changes to QWED Protocol — releases, features, secur
 
 All notable changes to the QWED platform, listed by release.
 
-**Jump to:** [QWED-Verification SecureCodeExecutor fail-closed on missing CodeVerifier](#qwed-verification--securecodeexecutor-fail-closed-on-missing-codeverifier) · [QWED-Finance security audit — OpenResponses fail-closed](#qwed-finance--openresponses-fail-closed-and-computed-status) · [QWED-Finance security audit — rate parsing](#qwed-finance--rate-parsing-heuristic-removed) · [QWED-Verification symbolic verifier fail-closed](#qwed-verification--symbolic-verifier-fail-closed-without-proof) · [QWED-Verification strict additionalProperties](#qwed-verification--strict-additionalproperties-fail-closed) · [QWED-Tax example redaction](#qwed-tax-—-redacted-preflight-block-details-in-examples) · [QWED-Tax decimal hardening](#qwed-tax-—-decimal-hardening-in-financial-guards) · [v5.1.0](#v5-1-0-—-agent-state-governance-and-fail-closed-hardening) · [v5.0.0](#v5-0-0-—-enforcement-boundary-hardening) · [v4.0.5](#v4-0-5-—-stats-exception-masking) · [v4.0.4](#v4-0-4-—-fail-closed-execution-enforcement) · [v4.0.3](#v4-0-3-—-server-enforced-agent-security) · [v4.0.2](#v4-0-2-—-security-cleanup) · [v4.0.1](#v4-0-1-—-sentinel-guard-sync) · [v4.0.0](#v4-0-0-—-sentinel-edition) · [v3.0.1](#v3-0-1-—-ironclad-update) · [v2.4.1](#v2-4-1-—-the-reasoning-engine)
+**Jump to:** [QWED-Verification SecureCodeExecutor fail-closed on CodeVerifier failures](#qwed-verification--securecodeexecutor-fail-closed-on-codeverifier-failures) · [QWED-Finance security audit — OpenResponses fail-closed](#qwed-finance--openresponses-fail-closed-and-computed-status) · [QWED-Finance security audit — rate parsing](#qwed-finance--rate-parsing-heuristic-removed) · [QWED-Verification symbolic verifier fail-closed](#qwed-verification--symbolic-verifier-fail-closed-without-proof) · [QWED-Verification strict additionalProperties](#qwed-verification--strict-additionalproperties-fail-closed) · [QWED-Tax example redaction](#qwed-tax-—-redacted-preflight-block-details-in-examples) · [QWED-Tax decimal hardening](#qwed-tax-—-decimal-hardening-in-financial-guards) · [v5.1.0](#v5-1-0-—-agent-state-governance-and-fail-closed-hardening) · [v5.0.0](#v5-0-0-—-enforcement-boundary-hardening) · [v4.0.5](#v4-0-5-—-stats-exception-masking) · [v4.0.4](#v4-0-4-—-fail-closed-execution-enforcement) · [v4.0.3](#v4-0-3-—-server-enforced-agent-security) · [v4.0.2](#v4-0-2-—-security-cleanup) · [v4.0.1](#v4-0-1-—-sentinel-guard-sync) · [v4.0.0](#v4-0-0-—-sentinel-edition) · [v3.0.1](#v3-0-1-—-ironclad-update) · [v2.4.1](#v2-4-1-—-the-reasoning-engine)
 
 ---
 
-## QWED-Verification — SecureCodeExecutor fail-closed on missing CodeVerifier
+## QWED-Verification — SecureCodeExecutor fail-closed on CodeVerifier failures
 **Released: May 2, 2026** · [GitHub PR #168](https://github.com/QWED-AI/qwed-verification/pull/168)
 
-> Closes issue #166 by ensuring `SecureCodeExecutor` blocks execution when the primary `CodeVerifier` import fails, rather than degrading to a heuristic keyword scan as the authorization gate.
+> Closes issue #166 by ensuring `SecureCodeExecutor` blocks execution whenever `CodeVerifier` is unavailable or fails at runtime, rather than degrading to a heuristic keyword scan as the authorization gate.
 
 ### What changed
 
-- **Removed permissive fallback** — `SecureCodeExecutor._is_safe_code()` no longer returns the result of `_basic_safety_check()` as the authorization decision when `CodeVerifier` import fails.
+- **Removed permissive fallback** — `SecureCodeExecutor._is_safe_code()` no longer returns the result of `_basic_safety_check()` as the authorization decision when `CodeVerifier` cannot validate the code.
 - **Fail-closed on import error** — If `CodeVerifier` cannot be imported, the safety check returns `(False, "CodeVerifier unavailable; cannot validate code safety.")` and execution does not reach `containers.run()`.
+- **Fail-closed on runtime error** — Any exception raised by `CodeVerifier.verify_code()` is caught, logged with a sanitized message, and routed through the same denial path. Callers never receive the underlying exception text.
+- **Shared denial helper** — A new `_build_fail_closed_safety_denial()` method produces a deterministic denial response for both import and runtime failure paths.
 - **Advisory-only keyword scan** — The basic keyword scan is preserved as diagnostic context. When it flags code during a `CodeVerifier` outage, its reason is appended to the error (`"... Advisory-only fallback also flagged: <reason>"`), but it cannot authorize execution.
-- **Regression coverage** — `tests/test_secure_executor_coverage.py` now asserts that import failure blocks otherwise safe code, that `containers.run()` is never invoked when the verifier is unavailable, and that the advisory fallback only adds context to the error message.
+- **Regression coverage** — `tests/test_secure_executor_coverage.py` now asserts that import failure blocks otherwise safe code, that runtime failures inside `CodeVerifier.verify_code()` also fail closed, that `containers.run()` is never invoked when the verifier is unavailable, and that the advisory fallback only adds context to the error message.
 
 ### Why
 
-If the primary verification boundary is unavailable, execution must not proceed. A heuristic blacklist can be useful for diagnostics, but it must not replace the main verifier as an execution gate.
+If the primary verification boundary is unavailable or crashes, execution must not proceed. A heuristic blacklist can be useful for diagnostics, but it must not replace the main verifier as an execution gate.
 
-See the [security hardening guide](/advanced/security-hardening#codeverifier-import-failure-blocks-execution) for the updated behavior.
+See the [security hardening guide](/advanced/security-hardening#codeverifier-failures-block-execution) for the updated behavior.
 
 ---
 
