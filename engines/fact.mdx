@@ -3,19 +3,17 @@ sidebar_position: "6"
 title: "Fact Engine"
 description: "The Fact Engine verifies claims using TF-IDF similarity, keyword overlap, entity matching, and negation detection."
 ---
-# Fact Engine
-
 
 The Fact Engine verifies factual claims using **deterministic methods first**, without requiring LLM calls for most claims.
 
 ## Features
 
-- **TF-IDF Semantic Similarity** - No LLM needed!
-- **Keyword Overlap Analysis** - Fast and deterministic
-- **Entity Matching** - Numbers, dates, names
-- **Citation Extraction** - With relevance scoring
-- **Negation Detection** - Catch contradictions
-- **LLM Fallback** - Only when confidence is low
+- **TF-IDF semantic similarity** - No LLM needed.
+- **Keyword overlap analysis** - Fast and deterministic.
+- **Entity matching** - Numbers, dates, names.
+- **Citation extraction** - With relevance scoring.
+- **Negation detection** - Catch contradictions.
+- **LLM fallback** - Only when confidence is low.
 
 ## Usage
 
@@ -37,12 +35,12 @@ print(result.methods_used)  # ["semantic_similarity", "entity_matching"]
 
 ## Scoring methods
 
-| Method              | What It Checks           | Weight |
+| Method              | What it checks           | Weight |
 | ------------------- | ------------------------ | ------ |
-| Semantic Similarity | TF-IDF cosine distance   | 0.25   |
-| Keyword Overlap     | Shared important words   | 0.20   |
-| Entity Match        | Numbers, dates, names    | 0.35   |
-| Negation Conflict   | Contradicting statements | 0.20   |
+| Semantic similarity | TF-IDF cosine distance   | 0.25   |
+| Keyword overlap     | Shared important words   | 0.20   |
+| Entity match        | Numbers, dates, names    | 0.35   |
+| Negation conflict   | Contradicting statements | 0.20   |
 
 ## Why deterministic?
 

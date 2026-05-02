@@ -5,42 +5,36 @@ sidebarTitle: "Overview"
 description: "QWED Finance uses deterministic verification, SymPy, and Z3 to prevent hallucinations in financial AI, agent workflows, and transaction calculations."
 ---
 
-# QWED-Finance
-
-**The Seatbelt for Banking Agents** 🏦
+**Deterministic verification for financial AI (v2.1.0).**
 
 > When an LLM told a customer his Chase card had "$12,889" in rewards, QWED-Finance would have caught the hallucination before it caused a lawsuit.
 
-# QWED Finance (v2.0.1)
+QWED Finance is a specialized guardrail library designed to prevent financial hallucinations in Large Language Models (LLMs). It uses **neurosymbolic AI** — combining the flexibility of GenAI with the mathematical certainty of symbolic solvers (SymPy, Z3, mpmath) and standard financial algorithms.
 
-**Deterministic Verification for Financial AI**
-
-QWED Finance is a specialized guardrail library designed to prevent financial hallucinations in Large Language Models (LLMs). It uses **Neurosymbolic AI**—combining the flexibility of GenAI with the mathematical certainty of symbolic solvers (SymPy, Z3) and standard financial algorithms.
-
-> **New in v2.0.1:** Added **BondGuard**, **FXGuard**, and **RiskGuard** for institutional-grade analytics.
+> **New in v2.1.0:** Security audit hardening — fail-closed enforcement across `OpenResponsesIntegration`, unified AML high-risk country list, `BondGuard._parse_rate()` returns `Decimal`, and full `Decimal`/`mpmath` migration for `BondGuard`, `DerivativesGuard`, and `RiskGuard`. Greeks are now Decimal-quantized strings.
 
 ## Why QWED Finance?
 
 LLMs struggle with basic math and strict logic. In finance, close enough is not good enough.
 
-*   **Problem:** LLM says "IRR is 12%" (when it's actually 11.8%)
-*   **Solution:** QWED calculates the *exact* IRR symbolically and either validates or corrects the LLM.
+- **Problem:** LLM says "IRR is 12%" (when it's actually 11.8%)
+- **Solution:** QWED calculates the *exact* IRR symbolically and either validates or corrects the LLM.
 
 ## Key features
 
-*   ✅ **10 Specialized Guards:** Compliance, Calendar, Derivatives, Messages, Query, Cross, Bond, FX, Risk, ISO.
-*   ✅ **GitHub Action v2.0:** Integrated CI/CD verifier with SARIF support for security dashboards.
-*   ✅ **Audit Trails:** Cryptographic attestation of verification results.
-*   ✅ **Deterministic verification:** When deterministic engines apply, results are exact rather than probabilistic.
+- **10 specialized guards:** Compliance, Calendar, Derivatives, Messages, Query, Cross, Bond, FX, Risk, ISO.
+- **GitHub Action v2.0:** Integrated CI/CD verifier with SARIF support for security dashboards.
+- **Audit trails:** Cryptographic attestation of verification results.
+- **Deterministic verification:** When deterministic engines apply, results are exact rather than probabilistic.
 
 ## The 4 pillars of banking verification
 
-| Pillar | Guard | Engine | Use Case |
+| Pillar | Guard | Engine | Use case |
 |--------|-------|--------|----------|
-| **Calculation** | Finance + Calendar + Derivatives | SymPy | NPV, IRR, Options pricing |
+| **Calculation** | Finance + Calendar + Derivatives | SymPy | NPV, IRR, options pricing |
 | **Regulation** | Compliance | Z3 | KYC/AML, OFAC sanctions |
 | **Interoperability** | Message | XML Schema | ISO 20022, SWIFT MT |
-| **Data Safety** | Query | SQLGlot | SQL injection prevention |
+| **Data safety** | Query | SQLGlot | SQL injection prevention |
 
 ## Quick example
 
@@ -70,7 +64,7 @@ flowchart TB
         LLM["LLM (GPT-4, Claude)"]
     end
     
-    subgraph QWED["🛡️ QWED-Finance v2.0.1"]
+    subgraph QWED["🛡️ QWED-Finance v2.1.0"]
         direction TB
         subgraph Guards["Verification Guards"]
             CG["Compliance Guard<br/>(Z3 Logic)"]
