@@ -4,7 +4,7 @@ title: "Monitoring"
 description: "Track QWED verification success rate, response time, and errors in production. Includes Datadog integration examples and key metrics to monitor for health."
 ---
 
-## Key Metrics to Track
+## Key metrics to track
 
 ### 1. Verification Success Rate
 
@@ -107,9 +107,9 @@ except Exception as e:
 
 ---
 
-## Monitoring Dashboard Example
+## Monitoring dashboard example
 
-### Grafana Dashboard
+### Grafana dashboard
 
 ```json
 {
@@ -147,9 +147,9 @@ except Exception as e:
 
 ---
 
-## Alerting Rules
+## Alerting rules
 
-### Critical Alerts
+### Critical alerts
 
 **1. High Error Rate**
 
@@ -191,9 +191,9 @@ except Exception as e:
 
 ---
 
-## Logging Best Practices
+## Logging best practices
 
-### Structured Logging
+### Structured logging
 
 ```python
 import logging
@@ -233,9 +233,9 @@ def verify_with_logging(query, user_id):
 
 ---
 
-## Health Checks
+## Health checks
 
-### Endpoint Health Check
+### Endpoint health check
 
 ```python
 from flask import Flask, jsonify
@@ -269,7 +269,7 @@ def qwed_health():
 
 ---
 
-## Troubleshooting Alerts
+## Troubleshooting alerts
 
 When alerts fire:
 

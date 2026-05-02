@@ -4,7 +4,7 @@ title: "Open Responses"
 description: "Intercept and verify LLM tool calls in agentic loops with QWED-Finance. OpenAI-compatible tool schemas and verified results with cryptographic receipts."
 ---
 
-## Quick Start
+## Quick start
 
 ```python
 from qwed_finance import OpenResponsesIntegration
@@ -30,7 +30,7 @@ Built-in tool calls (NPV, loan, AML, options) return `ToolCallStatus.COMPUTED` �
 
 ---
 
-## Fail-Closed Default
+## Fail-closed default
 
 <Note>
 **Since v2.1.0:** Tools registered without a `verification_fn` are **rejected by default**. This enforces the QWED principle: *"Verification decides IF."*
@@ -53,7 +53,7 @@ result = qwed.handle_tool_call("transfer_funds", {"amount": 999})
 
 ---
 
-## Tool Call Statuses
+## Tool call statuses
 
 | Status | Meaning | `verified` in output |
 | --- | --- | --- |
@@ -65,7 +65,7 @@ result = qwed.handle_tool_call("transfer_funds", {"amount": 999})
 
 ---
 
-## Tool Call Flow
+## Tool call flow
 
 ```text
 ┌─────────────┐     ┌─────────────┐     ┌─────────────────┐
@@ -92,7 +92,7 @@ result = qwed.handle_tool_call("transfer_funds", {"amount": 999})
 
 ---
 
-## Available Built-in Tools
+## Available built-in tools
 
 | Tool | Description | Engine | Status |
 | --- | --- | --- | --- |
@@ -105,15 +105,15 @@ result = qwed.handle_tool_call("transfer_funds", {"amount": 999})
 All built-in tools return `COMPUTED` status because they perform deterministic calculations without comparing against an LLM claim.
 </Info>
 
-### AML Country Consistency
+### AML country consistency
 
 The `check_aml_compliance` tool delegates to `ComplianceGuard.high_risk_countries` for its sanctions list, ensuring a **single source of truth** across the entire QWED-Finance system.
 
-### Black-Scholes Input Validation
+### Black-Scholes input validation
 
 The `price_option` tool rejects non-positive inputs for `spot_price`, `strike_price`, `time_to_expiry`, and `volatility` before computing, preventing `ZeroDivisionError` at the math boundary.
 
-### Black-Scholes Single Source of Truth
+### Black-Scholes single source of truth
 
 <Note>
 **Since N-01 fix:** `price_option` delegates to `DerivativesGuard.verify_black_scholes()` — the same `mpmath` (30 dp) implementation used by direct guard calls. This guarantees that pricing through the OpenResponses integration and pricing through `DerivativesGuard` produce **identical** outputs for identical inputs.
@@ -139,7 +139,7 @@ print(result.result["delta"])  # e.g. "0.6368" — Decimal-quantized string
 
 ---
 
-## Item Wrapper (Streaming)
+## Item wrapper (streaming)
 
 Format results for streaming compatibility:
 
@@ -151,7 +151,7 @@ result = qwed.handle_tool_call("calculate_npv", args)
 item = qwed.format_for_responses_api(result, tool_call_id="call_abc123")
 ```
 
-### COMPUTED Item Structure
+### COMPUTED item structure
 
 ```json
 {
@@ -166,7 +166,7 @@ item = qwed.format_for_responses_api(result, tool_call_id="call_abc123")
 }
 ```
 
-### APPROVED Item Structure
+### APPROVED item structure
 
 ```json
 {
@@ -183,7 +183,7 @@ item = qwed.format_for_responses_api(result, tool_call_id="call_abc123")
 
 ---
 
-## OpenAI Integration
+## OpenAI integration
 
 ```python
 from openai import OpenAI
@@ -215,7 +215,7 @@ for tool_call in response.choices[0].message.tool_calls:
 
 ---
 
-## Custom Tools
+## Custom tools
 
 Register your own verified tools. A `verification_fn` is **required** — tools without one are rejected.
 
@@ -247,7 +247,7 @@ If your `verification_fn` raises an exception, it will be caught by the error bo
 
 ---
 
-## Audit Trail
+## Audit trail
 
 All tool call outcomes — including rejections — produce cryptographic receipts:
 

@@ -5,7 +5,7 @@ description: "Deploy QWED to production using Docker, Kubernetes, or bare metal.
 
 This guide provides instructions for deploying QWED in various environments.
 
-## Table of Contents
+## Table of contents
 1. [Docker Deployment](#docker-deployment)
 2. [Kubernetes Deployment](#kubernetes-deployment)
 3. [Manual / Bare Metal Deployment](#manual--bare-metal-deployment)
@@ -16,7 +16,7 @@ This guide provides instructions for deploying QWED in various environments.
 
 ---
 
-## Docker Deployment
+## Docker deployment
 
 The easiest way to run QWED locally or on a single server is using Docker Compose.
 
@@ -87,7 +87,7 @@ Both the Stats Engine and the Consensus Engine (in `high`/`maximum` mode) execut
 
 ---
 
-## Kubernetes Deployment
+## Kubernetes deployment
 
 For production environments, we provide Kubernetes manifests in `deploy/kubernetes/`.
 
@@ -96,7 +96,7 @@ For production environments, we provide Kubernetes manifests in `deploy/kubernet
 - `kubectl` configured.
 - A PostgreSQL database and Redis instance (managed services recommended for production).
 
-### Deployment Steps
+### Deployment steps
 
 1. **Create Namespace**
    ```bash
@@ -125,7 +125,7 @@ For production environments, we provide Kubernetes manifests in `deploy/kubernet
    kubectl get pods -n qwed
    ```
 
-### Horizontal Pod Autoscaling (HPA)
+### Horizontal pod autoscaling (HPA)
 
 For high-traffic environments, we recommend enabling HPA (requires Metrics Server):
 
@@ -153,7 +153,7 @@ spec:
 
 ---
 
-## Manual / Bare Metal Deployment
+## Manual / bare metal deployment
 
 If you prefer to run the application directly on a host or VM:
 
@@ -194,7 +194,7 @@ gunicorn qwed_new.api.main:app -w 4 -k uvicorn.workers.UvicornWorker --bind 0.0.
 
 ---
 
-## Environment Variables Reference
+## Environment variables reference
 
 ### Infrastructure
 | Variable | Description | Default | Required |
@@ -237,7 +237,7 @@ gunicorn qwed_new.api.main:app -w 4 -k uvicorn.workers.UvicornWorker --bind 0.0.
 
 ---
 
-## Production Checklist
+## Production checklist
 
 Before going to production, ensure the following:
 
@@ -267,7 +267,7 @@ Before going to production, ensure the following:
 
 ## Troubleshooting
 
-### 1. Docker Permission Denied
+### 1. Docker permission denied
 **Error:** `docker: Got permission denied while trying to connect to the Docker daemon socket`
 **Solution:** Ensure the user running the app is in the `docker` group, or (for Docker Compose) ensure the socket is mounted correctly and the container user has permissions.
 
@@ -281,9 +281,9 @@ Before going to production, ensure the following:
 
 ---
 
-## Operations & Monitoring
+## Operations and monitoring
 
-### View Recent Security Events
+### View recent security events
 
 ```bash
 # Python script
@@ -304,7 +304,7 @@ with get_session() as session:
 "
 ```
 
-### Security Metrics Dashboard
+### Security metrics dashboard
 
 ```bash
 # Block rate by hour

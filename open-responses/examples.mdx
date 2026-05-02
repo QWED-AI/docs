@@ -11,7 +11,7 @@ Real-world examples of using QWED Open Responses for agent verification.
 
 ---
 
-## Example 1: Financial Calculator Agent
+## Example 1: financial calculator agent
 
 ### Scenario
 
@@ -58,7 +58,7 @@ result = verifier.verify_structured_output(
 # ✅ VERIFIED: 25% of 200 = 50 is correct
 ```
 
-### Catching Errors
+### Catching errors
 
 ```python
 # Agent makes mistake: "25% of 200 is 60"
@@ -79,7 +79,7 @@ result = verifier.verify_structured_output(
 
 ---
 
-## Example 2: Blocking Dangerous Tools
+## Example 2: blocking dangerous tools
 
 ### Scenario
 
@@ -107,7 +107,7 @@ tool_guard = ToolGuard(
 )
 ```
 
-### Blocked Calls
+### Blocked calls
 
 ```python
 # Agent tries to call dangerous tool
@@ -122,7 +122,7 @@ result = verifier.verify_tool_call(
 # Pattern matched: 'rm -rf'
 ```
 
-### Allowed Calls
+### Allowed calls
 
 ```python
 # Safe tool call
@@ -137,7 +137,7 @@ result = verifier.verify_tool_call(
 
 ---
 
-## Example 3: PII Detection
+## Example 3: PII detection
 
 ### Scenario
 
@@ -174,7 +174,7 @@ result = verifier.verify({
 # Reason: PII detected (SSN pattern: 123-45-6789)
 ```
 
-### Redacted Output
+### Redacted output
 
 ```python
 # SafetyGuard can also redact instead of block
@@ -189,7 +189,7 @@ result = verifier.verify({"content": summary}, guards=[safety_guard])
 
 ---
 
-## Example 4: State Machine Validation
+## Example 4: state machine validation
 
 ### Scenario
 
@@ -214,7 +214,7 @@ state_guard = StateGuard(
 )
 ```
 
-### Valid Transition
+### Valid transition
 
 ```python
 result = verifier.verify_tool_call(
@@ -230,7 +230,7 @@ result = verifier.verify_tool_call(
 # ✅ VERIFIED: processing → shipped is valid
 ```
 
-### Invalid Transition (Blocked)
+### Invalid transition (blocked)
 
 ```python
 result = verifier.verify_tool_call(
@@ -250,9 +250,9 @@ result = verifier.verify_tool_call(
 
 ---
 
-## Example 5: LangChain Integration
+## Example 5: LangChain integration
 
-### Full Agent with Verification
+### Full agent with verification
 
 ```python
 from langchain_openai import ChatOpenAI
@@ -309,7 +309,7 @@ result = executor.invoke({
 
 ---
 
-## Example 6: Budget Control
+## Example 6: budget control
 
 ### Scenario
 
@@ -331,7 +331,7 @@ safety_guard = SafetyGuard(
 )
 ```
 
-### Budget Enforcement
+### Budget enforcement
 
 ```python
 # After many calls...
@@ -354,7 +354,7 @@ result = verifier.verify_tool_call(
 
 ---
 
-## Example 7: Argument Type Validation
+## Example 7: argument type validation
 
 ### Scenario
 
@@ -399,7 +399,7 @@ result = verifier.verify_tool_call(
 
 ---
 
-## Best Practices
+## Best practices
 
 ### 1. Layer Multiple Guards
 

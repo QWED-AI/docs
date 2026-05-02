@@ -36,7 +36,7 @@ print(result.engines_used)     # 3
 print(result.agreement_status) # "unanimous"
 ```
 
-## Verification Modes
+## Verification modes
 
 | Mode      | Engines             | Speed  | Confidence | Docker required |
 | --------- | ------------------- | ------ | ---------- | --------------- |
@@ -52,7 +52,7 @@ The `high` and `maximum` modes include the Python engine, which requires the sec
 The Python engine in `high` and `maximum` modes requires Docker. If the secure Docker sandbox is unavailable, consensus verification returns HTTP 503 instead of falling back to in-process code execution.
 </Note>
 
-## Async Execution
+## Async execution
 
 ```python
 import asyncio
@@ -66,7 +66,7 @@ async def verify_many():
     return results
 ```
 
-## Circuit Breaker
+## Circuit breaker
 
 When an engine fails repeatedly, it's automatically disabled:
 

@@ -18,7 +18,7 @@ pip install qwed-ucp fastapi uvicorn
 
 ---
 
-## Basic Usage
+## Basic usage
 
 ```python
 from fastapi import FastAPI
@@ -37,7 +37,7 @@ async def create_checkout(checkout: dict):
 
 ---
 
-## Configuration Options
+## Configuration options
 
 ```python
 app.add_middleware(
@@ -52,7 +52,7 @@ app.add_middleware(
 
 ---
 
-## Response Headers
+## Response headers
 
 The middleware adds verification headers to all responses:
 
@@ -64,7 +64,7 @@ The middleware adds verification headers to all responses:
 
 ---
 
-## Error Response
+## Error response
 
 When verification fails, the middleware returns a 422 response:
 
@@ -86,7 +86,7 @@ When verification fails, the middleware returns a 422 response:
 
 ---
 
-## Manual Verification
+## Manual verification
 
 For more control, use the dependency injection pattern:
 
@@ -111,7 +111,7 @@ async def create_checkout(
 
 ---
 
-## Complete Example
+## Complete example
 
 ```python
 """UCP Merchant Server with QWED-UCP Verification"""

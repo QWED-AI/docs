@@ -6,7 +6,7 @@ description: "Validate QWED integration with a comprehensive checklist. Python c
 
 This guide helps you verify that QWED is integrated correctly into your application.
 
-## Why Test Your Integration?
+## Why test your integration?
 
 Without proper testing, you might:
 
@@ -15,7 +15,7 @@ Without proper testing, you might:
 - ❌ Get incorrect verification results
 - ❌ Have silent failures in production
 
-## Quick Validation Checklist
+## Quick validation checklist
 
 Run this checklist to verify your integration:
 
@@ -71,9 +71,9 @@ except Exception as e:
 print("\n🎉 All integration tests passed!")
 ```
 
-## Detailed Test Suite
+## Detailed test suite
 
-### 1. Test API Authentication
+### 1. Test API authentication
 
 **What to test:** Verify API key is valid and working.
 
@@ -102,7 +102,7 @@ except AuthenticationError:
 
 ---
 
-### 2. Test Math Verification
+### 2. Test math verification
 
 **What to test:** Math engine returns correct results.
 
@@ -128,7 +128,7 @@ print("✅ All math tests passed!")
 
 ---
 
-### 3. Test Code Security
+### 3. Test code security
 
 **What to test:** Security vulnerabilities are detected.
 
@@ -154,7 +154,7 @@ print("✅ All security tests passed!")
 
 ---
 
-### 4. Test SQL Injection Detection
+### 4. Test SQL injection detection
 
 **What to test:** SQL injection attempts are caught.
 
@@ -180,7 +180,7 @@ print("✅ All SQL injection tests passed!")
 
 ---
 
-### 5. Test Error Handling
+### 5. Test error handling
 
 **What to test:** QWED handles errors gracefully.
 
@@ -215,7 +215,7 @@ print("✅ Error handling tests passed!")
 
 ---
 
-## Integration Validation Script
+## Integration validation script
 
 Save this as `test_qwed_integration.py` and run it:
 
@@ -391,9 +391,9 @@ You can now use QWED in production with confidence.
 
 ---
 
-## Debugging Failed Tests
+## Debugging failed tests
 
-### Problem: Authentication Fails
+### Problem: authentication fails
 
 **Symptoms:**
 
@@ -410,7 +410,7 @@ You can now use QWED in production with confidence.
 
 ---
 
-### Problem: Math Verification Returns Wrong Results
+### Problem: math verification returns wrong results
 
 **Symptoms:**
 
@@ -435,7 +435,7 @@ assert result.verified == True  # Fails!
 
 ---
 
-### Problem: Security Detection Misses Vulnerabilities
+### Problem: security detection misses vulnerabilities
 
 **Symptoms:**
 
@@ -455,9 +455,9 @@ assert result.blocked == True  # Fails!
 
 ---
 
-## Performance Testing
+## Performance testing
 
-### Test Response Times
+### Test response times
 
 ```python
 import time
@@ -474,7 +474,7 @@ assert duration < 5.0, "Response too slow!"
 
 ---
 
-### Test Batch Processing
+### Test batch processing
 
 ```python
 from qwed import BatchItem
@@ -495,9 +495,9 @@ print(f"Average: {duration/len(items):.2f}s per item")
 
 ---
 
-## Continuous Integration (CI) Testing
+## Continuous integration (CI) testing
 
-### GitHub Actions Example
+### GitHub Actions example
 
 ```yaml
 # .github/workflows/test-qwed.yml
@@ -529,7 +529,7 @@ jobs:
 
 ---
 
-## Next Steps
+## Next steps
 
 Once all tests pass:
 
@@ -539,7 +539,7 @@ Once all tests pass:
 
 ---
 
-## Need Help?
+## Need help?
 
 Can't get tests to pass? We're here to help:
 

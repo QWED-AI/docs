@@ -7,7 +7,7 @@ Complete guide for integrating QWED verification into popular AI frameworks.
 
 ---
 
-## Quick Start: 5-Minute Integration
+## Quick start: 5-minute integration
 
 ```python
 # Install
@@ -23,7 +23,7 @@ print(result["is_correct"])  # True
 
 ---
 
-## Framework Integrations
+## Framework integrations
 
 ### 1. LangChain Integration
 
@@ -213,7 +213,7 @@ else:
 
 ---
 
-## Common Patterns
+## Common patterns
 
 ### Pattern 1: Pre-Execution Verification
 
@@ -274,7 +274,7 @@ print(f"Blocked: {results['summary']['blocked_count']}")
 
 ---
 
-## Production Deployment
+## Production deployment
 
 ### Docker Compose
 
@@ -310,7 +310,7 @@ QWED_ENABLE_ATTESTATION=true
 
 ---
 
-## Performance Tips
+## Performance tips
 
 1. **Cache Results:** Use Redis for repeated verifications
 2. **Async Verification:** Don't block LLM calls
@@ -371,7 +371,7 @@ if result["status"] == "UNSUPPORTED":
 
 ---
 
-## Examples Repository
+## Examples repository
 
 Full working examples: https://github.com/QWED-AI/qwed-verification/tree/main/examples
 

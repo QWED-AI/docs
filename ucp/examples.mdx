@@ -11,13 +11,13 @@ Real-world examples of using QWED-UCP for commerce verification.
 
 ---
 
-## Example 1: E-commerce Checkout
+## Example 1: e-commerce checkout
 
 ### Scenario
 
 An AI shopping assistant helps a user buy flowers online. The AI calculates discounts and taxes.
 
-### The Checkout Data
+### The checkout data
 
 ```python
 checkout = {
@@ -68,7 +68,7 @@ result = verifier.verify_checkout(checkout)
 
 ---
 
-## Example 2: International Currency (Japan)
+## Example 2: international currency (Japan)
 
 ### Scenario
 
@@ -109,13 +109,13 @@ result = verifier.verify_checkout(checkout_japan_bad)
 
 ---
 
-## Example 3: Discount Validation
+## Example 3: discount validation
 
 ### Scenario
 
 AI applies a "20% off" coupon. Need to verify the math.
 
-### Percentage Discount
+### Percentage discount
 
 ```python
 from qwed_ucp.guards import DiscountGuard
@@ -147,13 +147,13 @@ result = guard.verify_percentage_discount(
 
 ---
 
-## Example 4: State Machine Transitions
+## Example 4: state machine transitions
 
 ### Scenario
 
 Checkout progresses through states. Invalid transitions should be blocked.
 
-### Valid Flow
+### Valid flow
 
 ```python
 from qwed_ucp.guards import StateGuard
@@ -186,9 +186,9 @@ guard.verify_transition(
 
 ---
 
-## Example 5: FastAPI Production Setup
+## Example 5: FastAPI production setup
 
-### Full Implementation
+### Full implementation
 
 ```python
 from fastapi import FastAPI, HTTPException
@@ -255,9 +255,9 @@ async def verification_error_handler(request, exc):
 
 ---
 
-## Example 6: Express.js Production Setup
+## Example 6: Express.js production setup
 
-### Full Implementation
+### Full implementation
 
 ```javascript
 const express = require('express');
@@ -311,7 +311,7 @@ app.listen(3000, () => {
 
 ---
 
-## Example 7: Testing with pytest
+## Example 7: testing with pytest
 
 ### Unit Tests for Guards
 
@@ -369,7 +369,7 @@ class TestLineItemsGuard:
 
 ---
 
-## Best Practices
+## Best practices
 
 ### 1. Always Verify Before Payment
 

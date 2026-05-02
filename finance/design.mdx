@@ -6,7 +6,7 @@ description: "QWED-Finance system architecture with C4 diagrams showing integrat
 
 This page provides a deep dive into the internal design of QWED-Finance.
 
-## System Overview
+## System overview
 
 ```mermaid
 C4Context
@@ -28,9 +28,9 @@ C4Context
     Rel(qwed, regulator, "Audit receipts")
 ```
 
-## Guard Architecture
+## Guard architecture
 
-### Component Diagram
+### Component diagram
 
 ```mermaid
 graph TB
@@ -79,9 +79,9 @@ graph TB
     QG --> Receipt
 ```
 
-## Verification Flow
+## Verification flow
 
-### State Machine
+### State machine
 
 ```mermaid
 stateDiagram-v2
@@ -115,9 +115,9 @@ stateDiagram-v2
     PendingReview --> [*]
 ```
 
-## Data Flow
+## Data flow
 
-### Verification Receipt Lifecycle
+### Verification receipt lifecycle
 
 ```mermaid
 flowchart LR
@@ -144,7 +144,7 @@ flowchart LR
     Receipt --> Log
 ```
 
-### Cross-Guard Pipeline
+### Cross-guard pipeline
 
 ```mermaid
 flowchart TD
@@ -170,7 +170,7 @@ flowchart TD
     Step4 --> Output1
 ```
 
-## Engine Selection Matrix
+## Engine selection matrix
 
 ```mermaid
 quadrantChart
@@ -190,7 +190,7 @@ quadrantChart
     "Query (AST)": [0.7, 0.5]
 ```
 
-## Class Diagram
+## Class diagram
 
 ```mermaid
 classDiagram
@@ -248,7 +248,7 @@ classDiagram
     CrossGuard --> QueryGuard : uses
 ```
 
-## Deployment Architecture
+## Deployment architecture
 
 ```mermaid
 flowchart TB
@@ -286,27 +286,27 @@ flowchart TB
 
 ---
 
-## Design Principles
+## Design principles
 
-### 1. Determinism First
+### 1. Determinism first
 
 Every verification produces the **same result** for the same input. No randomness.
 
-### 2. Symbolic Over Statistical
+### 2. Symbolic over statistical
 
 Use mathematical proofs (Z3, SymPy) instead of probabilistic confidence scores.
 
-### 3. Audit by Default
+### 3. Audit by default
 
 Every verification generates a receipt. No silent failures.
 
-### 4. Defense in Depth
+### 4. Defense in depth
 
 Cross-Guard combines multiple guards for layered security.
 
 ---
 
-## Related Pages
+## Related pages
 
 - [Overview](/finance/overview) — Introduction and quick start
 - [The 10 Guards](/finance/guards) — Guard implementation details

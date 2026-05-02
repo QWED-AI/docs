@@ -56,7 +56,7 @@ You can add any OpenAI-compatible provider (Groq, Together, Fireworks, and other
 
 ---
 
-## Configuration Options
+## Configuration options
 
 ### Option 1: Use QWED's Built-in Translation (Recommended)
 
@@ -324,7 +324,7 @@ You can always override routing by passing an explicit `provider` parameter in y
 
 ---
 
-## Programmatic Configuration
+## Programmatic configuration
 
 ```python
 from qwed import QWEDClient, LLMConfig
@@ -361,12 +361,12 @@ Understanding the two phases:
 | **Translation** | Natural language → Structured form | LLM (any) | Optional |
 | **Verification** | Structured form → Proof | QWED Engines | Required |
 
-### When You Need an LLM
+### When you need an LLM
 
 - `client.verify("Is the derivative of x² equal to 2x?")` — Needs LLM to parse
 - `client.verify("Calculate compound interest on $1000 at 5%")` — Needs LLM
 
-### When You Don't Need an LLM
+### When you don't need an LLM
 
 - `client.verify_math("diff(x**2, x) == 2*x")` — Already structured
 - `client.verify_logic("(AND (GT x 5) (LT x 10))")` — Already in DSL

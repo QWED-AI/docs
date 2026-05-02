@@ -273,7 +273,7 @@ Use these QWED SDK imports in your `execute_python_code` scripts to replicate th
 | `verify_config_secrets` | `from qwed_sdk.guards.config_guard import ConfigGuard` |
 
 <Warning>
-  If you see a `BLOCKED` response with error code `QWED-MCP-RISK-001` in Claude Desktop, it means the LLM is trying to call a tool not in the governance policy table (likely a removed v0.1.x tool). Tell Claude: "The verify\_\* tools have been removed. Use execute\_python\_code to write and run a Python verification script."
+  If you see a `BLOCKED` response with error code `QWED-MCP-RISK-001` in Claude Desktop, it means the LLM is trying to call a tool not in the governance policy table (typically a removed v0.1.x tool). Tell Claude: "The verify\_\* tools have been removed. Use execute\_python\_code to write and run a Python verification script."
 </Warning>
 
 ---

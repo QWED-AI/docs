@@ -19,9 +19,9 @@ QWED supports **ANY** OpenAI-compatible API, including Ollama for running models
 
 ---
 
-## Quick Start (5 Minutes)
+## Quick start (5 minutes)
 
-### Step 1: Install Ollama
+### Step 1: install Ollama
 
 **macOS/Linux:**
 
@@ -31,7 +31,7 @@ curl -fsSL https://ollama.com/install.sh | sh
 
 **Windows:** Download from [https://ollama.com/download](https://ollama.com/download)
 
-### Step 2: Pull a Model
+### Step 2: pull a model
 
 ```bash
 # Recommended: Llama 3 (8B)
@@ -43,20 +43,20 @@ ollama pull phi3
 ollama pull codellama
 ```
 
-### Step 3: Start Ollama Server
+### Step 3: start the Ollama server
 
 ```bash
 ollama serve
 # Server runs on http://localhost:11434
 ```
 
-### Step 4: Install QWED
+### Step 4: install QWED
 
 ```bash
 pip install qwed
 ```
 
-### Step 5: Use QWED with Ollama!
+### Step 5: use QWED with Ollama
 
 **Option A: Backend Server** (Recommended)
 
@@ -106,7 +106,7 @@ print(result.value)  # 120
 
 ---
 
-## Supported Models
+## Supported models
 
 QWED works with any Ollama model! Tested with:
 
@@ -120,7 +120,7 @@ QWED works with any Ollama model! Tested with:
 
 ---
 
-## Complete Example
+## Complete example
 
 ```python
 from qwed import QWEDClient
@@ -156,7 +156,7 @@ print(f"⚠️ Vulnerabilities: {result.vulnerabilities}")
 
 ---
 
-## Cost Comparison
+## Cost comparison
 
 | Setup | Monthly Cost | Best For |
 | --- | --- | --- |
@@ -169,7 +169,7 @@ print(f"⚠️ Vulnerabilities: {result.vulnerabilities}")
 
 ---
 
-## Hardware Requirements
+## Hardware requirements
 
 **Minimum (Phi3, small models):**
 
@@ -224,7 +224,7 @@ ollama run llama3 --gpu
 
 ---
 
-## Alternative Local LLM Tools
+## Alternative local LLM tools
 
 QWED also works with:
 
@@ -237,7 +237,7 @@ All use OpenAI-compatible APIs → work with QWED!
 
 ---
 
-## Privacy Benefits
+## Privacy benefits
 
 **Data that NEVER leaves your machine:**
 
@@ -255,7 +255,7 @@ All use OpenAI-compatible APIs → work with QWED!
 
 ---
 
-## Next Steps
+## Next steps
 
 **Expand your setup:**
 

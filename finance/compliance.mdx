@@ -8,7 +8,7 @@ QWED-Finance generates **cryptographic proof** of every verification for regulat
 
 > "If an AI makes a mistake, the algorithm isn't sued—the bank is. Your `input_hash` and `signature` provide **Non-Repudiation**."
 
-## Verification Receipts
+## Verification receipts
 
 Every verification generates a tamper-proof receipt:
 
@@ -26,7 +26,7 @@ receipt = ReceiptGenerator.create_receipt(
 print(receipt.to_json())
 ```
 
-### Receipt Fields
+### Receipt fields
 
 | Field | Description | Example |
 | --- | --- | --- |
@@ -37,7 +37,7 @@ print(receipt.to_json())
 | `verified` | Pass/fail | `true/false` |
 | `proof_steps` | Symbolic derivation | `["amount=15000", "threshold=10000", "15000>=10000"]` |
 
-### Cryptographic Signature
+### Cryptographic signature
 
 ```python
 # Get tamper-proof signature
@@ -58,7 +58,7 @@ assert signature == expected  # Proof of integrity
 
 ---
 
-## Audit Log
+## Audit log
 
 Aggregate receipts for regulatory reporting:
 
@@ -85,7 +85,7 @@ summary = log.summary()
 json_export = log.export_json()
 ```
 
-### Query Failed Verifications
+### Query failed verifications
 
 ```python
 # Get all failures for investigation
@@ -99,7 +99,7 @@ for receipt in failures:
 
 ---
 
-## Regulatory Alignment
+## Regulatory alignment
 
 | Regulation | QWED Feature |
 | --- | --- |
@@ -111,7 +111,7 @@ for receipt in failures:
 
 ---
 
-## Adversarial Defense
+## Adversarial defense
 
 We test against "jailbroken" LLMs:
 
@@ -130,7 +130,7 @@ def test_mixed_case_drop():
     assert result.safe == False  # ✅ Caught
 ```
 
-### Test Suites
+### Test suites
 
 | Suite | Tests | Coverage |
 | --- | --- | --- |
@@ -139,7 +139,7 @@ def test_mixed_case_drop():
 
 ---
 
-## For Compliance Officers
+## For compliance officers
 
 When a regulator asks: _"How do you verify AI decisions?"_
 
@@ -172,7 +172,7 @@ Show them:
 
 ---
 
-## Related Pages
+## Related pages
 
 - **Previous:** [The 10 Guards](/finance/guards) — Deep dive into each verification guard
 - **Next:** [QWED UCP: transaction verification for AI commerce](/ucp/overview) — Connect finance verification to AI-driven commerce flows

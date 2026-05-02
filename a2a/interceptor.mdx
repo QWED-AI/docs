@@ -59,7 +59,7 @@ The `trace_id` parameter is **required** and must be provided by the caller. Thi
 
 ## Verification engines
 
-### Finance Guard
+### Finance guard
 
 Verifies financial claims using **deterministic Decimal arithmetic**. Recomputes totals from line items and compares against the `claimed_total`.
 
@@ -89,7 +89,7 @@ verdict = await interceptor.intercept(message, trace_id="fin_001")
 All financial comparisons use `decimal.Decimal` with `ROUND_HALF_UP` quantization to `0.01`. Floating-point arithmetic is **never** used in the verification path.
 </Warning>
 
-### Logic Guard
+### Logic guard
 
 Detects **logical contradictions** — claims where the same proposition is both asserted and negated.
 
@@ -116,7 +116,7 @@ verdict = await interceptor.intercept(message, trace_id="logic_001")
 Contradictions are **sorted** before output, ensuring deterministic results regardless of Python's hash randomization (`PYTHONHASHSEED`).
 </Tip>
 
-### Code Guard
+### Code guard
 
 Scans code payloads for **dangerous patterns** using case-insensitive compiled regex:
 

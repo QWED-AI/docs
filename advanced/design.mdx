@@ -8,7 +8,7 @@ description: "QWED's core design philosophy and the Untrusted Translator pattern
 
 ---
 
-## Core Philosophy
+## Core philosophy
 
 > **"Don't reduce hallucinations. Make them irrelevant."**
 
@@ -16,9 +16,9 @@ Large Language Models (LLMs) are probabilistic and will always hallucinate. Rath
 
 ---
 
-## Architecture: The Untrusted Translator Pattern
+## Architecture: the untrusted translator pattern
 
-### The Problem
+### The problem
 
 **Traditional approach:** Trust the LLM to compute correctly
 - Train it better (fine-tuning)
@@ -27,7 +27,7 @@ Large Language Models (LLMs) are probabilistic and will always hallucinate. Rath
 
 **Why this fails:** LLMs are fundamentally probabilistic. No amount of training guarantees correctness.
 
-### The QWED Solution
+### The QWED solution
 
 **Separation of concerns:**
 1. **LLM:** Translates natural language → formal specification
@@ -47,9 +47,9 @@ QWED: Returns verified result
 
 ---
 
-## Design Decision 1: Multiple Specialized Engines
+## Design decision 1: multiple specialized engines
 
-### The Trade-off
+### The trade-off
 
 **Option A: Single general-purpose verifier**
 - Pros: Simpler architecture, one dependency
@@ -59,7 +59,7 @@ QWED: Returns verified result
 - Pros: Each domain uses decades of specialized research
 - Cons: More complex architecture, multiple dependencies
 
-### The Decision
+### The decision
 
 **Chosen:** Multiple specialized engines
 
@@ -74,9 +74,9 @@ QWED: Returns verified result
 
 ---
 
-## Design Decision 2: TF-IDF for Fact Grounding
+## Design decision 2: TF-IDF for fact grounding
 
-### The Trade-off
+### The trade-off
 
 **Option A: Vector embeddings (semantic similarity)**
 - Pros: Captures semantic meaning; uses current embedding methods
@@ -86,7 +86,7 @@ QWED: Returns verified result
 - Pros: Deterministic, reproducible, searches for evidence
 - Cons: Doesn't capture semantic similarity
 
-### The Decision
+### The decision
 
 **Chosen:** TF-IDF for evidence retrieval
 
@@ -107,9 +107,9 @@ query2 = "The Sun orbits the Earth"
 
 ---
 
-## Design Decision 3: LLM-as-Translator vs LLM-as-Judge
+## Design decision 3: LLM-as-translator vs LLM-as-judge
 
-### The Trade-off
+### The trade-off
 
 **Option A: LLM-as-judge** (e.g., GPT-4 checks GPT-3.5)
 - Pros: Uses latest models, easy to implement
@@ -119,7 +119,7 @@ query2 = "The Sun orbits the Earth"
 - Pros: Deterministic, mathematical proof
 - Cons: Limited to verifiable domains
 
-### The Decision
+### The decision
 
 **Chosen:** Symbolic solver as judge
 
@@ -136,19 +136,19 @@ query2 = "The Sun orbits the Earth"
 
 ---
 
-## Design Decision 4: API Design Philosophy
+## Design decision 4: API design philosophy
 
-### The Trade-off
+### The trade-off
 
 **Option A: Low-level API** (expose all solver internals)
 - Pros: Maximum flexibility
-- Cons: Steep learning curve, users need solver expertise
+- Cons: Steep learning curve, you need solver expertise
 
 **Option B: High-level developer-friendly API** ← **CHOSEN**
 - Pros: Easy to use, hides complexity
 - Cons: Less control over solver behavior
 
-### The Decision
+### The decision
 
 **Chosen:** High-level, developer-friendly API
 
@@ -170,9 +170,9 @@ print(result.value)  # 4
 
 ---
 
-## Design Decision 5: Integration Patterns
+## Design decision 5: integration patterns
 
-### The Trade-off
+### The trade-off
 
 **Option A: Standalone verification service**
 - Pros: Clean separation
@@ -182,7 +182,7 @@ print(result.value)  # 4
 - Pros: Drops into LangChain, LlamaIndex, etc.
 - Cons: More maintenance, framework dependencies
 
-### The Decision
+### The decision
 
 **Chosen:** Native integrations with popular frameworks
 
@@ -195,9 +195,9 @@ print(result.value)  # 4
 
 ---
 
-## Design Decision 6: Error Handling Philosophy
+## Design decision 6: error handling philosophy
 
-### The Trade-off
+### The trade-off
 
 **Option A: Fail fast** (reject on any error)
 - Pros: Safe, conservative
@@ -207,7 +207,7 @@ print(result.value)  # 4
 - Pros: Better UX, transparent failures
 - Cons: Users might miss errors
 
-### The Decision
+### The decision
 
 **Chosen:** Graceful degradation with comprehensive logging
 
@@ -230,9 +230,9 @@ except VerificationError as e:
 
 ---
 
-## Design Decision 7: PII Masking Strategy
+## Design decision 7: PII masking strategy
 
-### The Trade-off
+### The trade-off
 
 **Option A: No PII handling** (user responsibility)
 - Pros: Simpler architecture
@@ -242,7 +242,7 @@ except VerificationError as e:
 - Pros: HIPAA/GDPR compliance, privacy by default
 - Cons: Performance overhead, false positives
 
-### The Decision
+### The decision
 
 **Chosen:** Optional built-in PII masking
 
@@ -256,9 +256,9 @@ except VerificationError as e:
 
 ---
 
-## Design Decision 8: Calculator vs Wikipedia Analogy
+## Design decision 8: calculator vs Wikipedia analogy
 
-### The Mental Model
+### The mental model
 
 **Why this matters:** Helps users understand QWED's scope
 
@@ -281,9 +281,9 @@ except VerificationError as e:
 
 ---
 
-## What QWED Is NOT
+## What QWED is not
 
-### Rejected Design Paths
+### Rejected design paths
 
 **1. Novel Research**
 - **Not claiming:** New verification algorithms
@@ -299,9 +299,9 @@ except VerificationError as e:
 
 ---
 
-## Development Transparency
+## Development transparency
 
-### AI Assistance
+### AI assistance
 
 This project was developed with assistance from generative AI tools:
 
@@ -320,16 +320,16 @@ This project was developed with assistance from generative AI tools:
 
 ---
 
-## Lessons Learned
+## Lessons learned
 
-### What Worked
+### What worked
 
 1. **Specialized engines:** Better than trying to build one general verifier
 2. **Developer-friendly API:** Easier adoption than low-level solver access
 3. **TF-IDF for grounding:** Deterministic evidence > semantic vibes
 4. **Open development:** Community contributions improved design
 
-### What We'd Change
+### What we'd change
 
 1. **Earlier framework integrations:** Should have built LangChain support sooner
 2. **More domain tutorials:** Users needed more examples per domain
@@ -356,7 +356,7 @@ This project was developed with assistance from generative AI tools:
 
 ---
 
-## Contributing to Design
+## Contributing to design
 
 Have suggestions on design improvements? Open an issue on GitHub to discuss!
 
