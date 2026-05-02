@@ -12,28 +12,31 @@ All notable changes to the QWED platform, listed by release.
 ## QWED-Verification — SecureCodeExecutor fail-closed when CodeVerifier is unavailable
 **Released: May 2, 2026**
 
-> Closes a fail-open gap in `SecureCodeExecutor._is_safe_code()`. When the primary `CodeVerifier` cannot be imported, execution is now blocked instead of falling back to a permissive keyword check that could authorize otherwise-unsafe code.
+> Closes a fail-open gap in `SecureCodeExecutor._is_safe_code()`. When the primary `CodeVerifier` cannot be imported **or raises at runtime**, execution is now blocked instead of falling back to a permissive keyword check that could authorize otherwise-unsafe code.
 
 ### What changed
 
 - **`SecureCodeExecutor._is_safe_code`** — An `ImportError` on `CodeVerifier` no longer routes authorization to `_basic_safety_check()`. The method returns `(False, "CodeVerifier unavailable; cannot validate code safety.")` and execution does not reach `containers.run()`.
+- **Runtime exceptions in `CodeVerifier.verify_code`** — Any unexpected exception raised by the verifier (for example, an internal engine failure) is now caught and routed to the same fail-closed denial. The exception message is sanitized before logging and is not returned to callers.
+- **Shared denial helper** — Both branches go through `_build_fail_closed_safety_denial(code)`, producing the same deterministic `(False, "CodeVerifier unavailable; …")` result regardless of whether the verifier was missing or crashed mid-call.
 - **Advisory-only heuristic** — The basic keyword scan is retained as advisory context. If it would have flagged the code, its reason is appended to the error message (`"Advisory-only fallback also flagged: <reason>"`), but it never authorizes execution on its own.
-- **`execute()` surface** — Calls into `SecureCodeExecutor.execute(code, context)` now return `(success=False, error="Code safety validation failed: CodeVerifier unavailable; cannot validate code safety.", result=None)` whenever `CodeVerifier` is missing, regardless of the input.
+- **`execute()` surface** — Calls into `SecureCodeExecutor.execute(code, context)` now return `(success=False, error="Code safety validation failed: CodeVerifier unavailable; cannot validate code safety.", result=None)` whenever `CodeVerifier` is missing or fails, regardless of the input.
 
 ### Behavior comparison
 
-| `CodeVerifier` available? | Code | Before | After |
+| `CodeVerifier` state | Code | Before | After |
 | --- | --- | --- | --- |
-| Yes | Any | Verified by `CodeVerifier` | Verified by `CodeVerifier` (unchanged) |
-| No | `print("hello")` | Allowed via basic keyword check | Blocked (`CodeVerifier unavailable`) |
-| No | `import os; os.system("ls")` | Blocked by basic keyword check | Blocked (`CodeVerifier unavailable; Advisory-only fallback also flagged: dangerous operation`) |
+| Available | Any | Verified by `CodeVerifier` | Verified by `CodeVerifier` (unchanged) |
+| `ImportError` | `print("hello")` | Allowed via basic keyword check | Blocked (`CodeVerifier unavailable`) |
+| `ImportError` | `import os; os.system("ls")` | Blocked by basic keyword check | Blocked (`CodeVerifier unavailable; Advisory-only fallback also flagged: dangerous operation`) |
+| Runtime exception in `verify_code` | Any | Propagated as an unhandled exception | Blocked (`CodeVerifier unavailable`); error sanitized in logs |
 
 ### Upgrade notes
 
 <Warning>
-Self-hosted deployments that relied on the implicit basic-keyword fallback when `qwed_new.core.code_verifier` failed to import must now ensure `CodeVerifier` is installed and importable. While the verifier is unavailable, both `/verify/stats` and `/verify/consensus` Python execution paths return a safety-check failure with no container run.
+Self-hosted deployments that relied on the implicit basic-keyword fallback when `qwed_new.core.code_verifier` failed to import — or that swallowed verifier exceptions upstream — must now ensure `CodeVerifier` is installed, importable, and operational. While the verifier is unavailable or failing, both `/verify/stats` and `/verify/consensus` Python execution paths return a safety-check failure with no container run.
 
-If you see `Code safety validation failed: CodeVerifier unavailable` in logs, fix the import error in `qwed_new.core.code_verifier` rather than disabling the safety gate.
+If you see `Code safety validation failed: CodeVerifier unavailable` in logs, fix the underlying import error or runtime failure in `qwed_new.core.code_verifier` rather than disabling the safety gate.
 </Warning>
 
 See [Security hardening — Fail-closed code execution](/advanced/security-hardening#fail-closed-code-execution) for the updated fallback behavior.
