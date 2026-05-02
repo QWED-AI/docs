@@ -15,9 +15,9 @@ description: "QWED Finance uses deterministic verification, SymPy, and Z3 to pre
 
 **Deterministic Verification for Financial AI**
 
-QWED Finance is a specialized guardrail library designed to prevent financial hallucinations in Large Language Models (LLMs). It uses **Neurosymbolic AI**—combining the flexibility of GenAI with the mathematical certainty of symbolic solvers (SymPy, Z3) and standard financial algorithms.
+QWED Finance is a specialized guardrail library designed to prevent financial hallucinations in Large Language Models (LLMs). It uses **Neurosymbolic AI**—combining the flexibility of GenAI with the mathematical certainty of symbolic solvers (SymPy, Z3, mpmath) and standard financial algorithms.
 
-> **New in v2.1.0:** Security audit hardening — fail-closed enforcement across `OpenResponsesIntegration`, full `Decimal`/`mpmath` migration in `BondGuard`, `DerivativesGuard`, and `RiskGuard`, and `verify_compound_interest` now raises on unknown frequencies. See the [v2.1.0 changelog entry](/changelog#qwed-finance--v2-1-0-security-audit-hardening) for migration notes.
+> **New in v2.1.0:** Security audit hardening — fail-closed enforcement across `OpenResponsesIntegration`, unified AML high-risk country list, `BondGuard._parse_rate()` returns `Decimal`, and full `Decimal`/`mpmath` migration for `BondGuard`, `DerivativesGuard`, and `RiskGuard`. Greeks are now Decimal-quantized strings.
 
 ## Why QWED Finance?
 
