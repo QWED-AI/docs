@@ -5,8 +5,6 @@ sidebarTitle: "Guards Reference"
 description: "Reference for QWED UCP guards including Money Guard, State Guard, Refund Guard, and Attestation Guard for AI commerce verification."
 ---
 
-# Guards Reference
-
 QWED-UCP includes **10 verification guards** that validate different aspects of UCP checkout data.
 
 ---
@@ -128,7 +126,7 @@ result = guard.verify({
 
 **Verifies percentage and fixed discount calculations.**
 
-### Usage - Percentage Discount
+### Usage - percentage discount
 
 ```python
 from qwed_ucp.guards import DiscountGuard
@@ -142,7 +140,7 @@ result = guard.verify_percentage_discount(
 )
 ```
 
-### Usage - Fixed Discount
+### Usage - fixed discount
 
 ```python
 result = guard.verify_fixed_discount(
@@ -178,7 +176,7 @@ result = guard.verify({"currency": "USD"})
 - Zero-decimal currencies (JPY, KRW) have no decimals
 - Currency conversion accuracy
 
-### Zero-Decimal Currencies
+### Zero-decimal currencies
 
 ```python
 # Valid - no decimals

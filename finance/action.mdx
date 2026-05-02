@@ -4,8 +4,6 @@ title: GitHub Action (CI/CD)
 description: "QWED Finance GitHub Action for CI/CD integration. Basic verification, SARIF scanning for security dashboards, and GitHub Advanced Security integration included."
 ---
 
-# QWED Finance GitHub Action
-
 QWED Finance v2.0 includes a production-ready GitHub Action to verify financial logic in your CI/CD pipeline.
 
 ## Usage
@@ -17,7 +15,7 @@ jobs:
   verify:
     runs-on: ubuntu-latest
     steps:
-      - name: Verify IRR Calculation
+      - name: Verify IRR calculation
         uses: QWED-AI/qwed-finance@v2
         with:
           action: verify
@@ -37,7 +35,7 @@ jobs:
     permissions:
       security-events: write
     steps:
-      - name: Scan Financial Models
+      - name: Scan financial models
         uses: QWED-AI/qwed-finance@v2
         with:
           action: scan
@@ -61,14 +59,14 @@ jobs:
 
 ## Supported verification types
 
-| Type | Params (Env Vars) | Description |
+| Type | Params (env vars) | Description |
 |------|-------------------|-------------|
-| `npv` | `INPUT_CASHFLOWS`, `INPUT_RATE` | Net Present Value |
-| `irr` | `INPUT_CASHFLOWS` | Internal Rate of Return |
-| `ytm` | `INPUT_FACE_VALUE`, `INPUT_COUPON_RATE`, `INPUT_PRICE`, `INPUT_YEARS` | Yield to Maturity |
-| `sharpe` | `INPUT_RETURN`, `INPUT_RISK_FREE`, `INPUT_VOLATILITY` | Sharpe Ratio |
+| `npv` | `INPUT_CASHFLOWS`, `INPUT_RATE` | Net present value |
+| `irr` | `INPUT_CASHFLOWS` | Internal rate of return |
+| `ytm` | `INPUT_FACE_VALUE`, `INPUT_COUPON_RATE`, `INPUT_PRICE`, `INPUT_YEARS` | Yield to maturity |
+| `sharpe` | `INPUT_RETURN`, `INPUT_RISK_FREE`, `INPUT_VOLATILITY` | Sharpe ratio |
 
-:::info Zero-Config SARIF
+:::info Zero-config SARIF
 When running in `scan` mode, the action automatically generates `qwed-results.sarif`. No extra configuration needed.
 :::
 ## Related extensions

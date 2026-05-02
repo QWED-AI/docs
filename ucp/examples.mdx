@@ -5,8 +5,6 @@ sidebarTitle: "Examples & Use Cases"
 description: "Real-world QWED UCP examples for AI commerce verification, checkout validation, and transaction safety."
 ---
 
-# Examples & Use Cases
-
 Real-world examples of using QWED-UCP for commerce verification.
 
 ---
@@ -74,7 +72,7 @@ result = verifier.verify_checkout(checkout)
 
 AI agent booking a hotel in Tokyo. JPY has no decimal places.
 
-### Correct (Verified)
+### Correct (verified)
 
 ```python
 checkout_japan = {
@@ -93,7 +91,7 @@ result = verifier.verify_checkout(checkout_japan)
 # ✅ VERIFIED - No decimals, math correct
 ```
 
-### Incorrect (Blocked)
+### Incorrect (blocked)
 
 ```python
 checkout_japan_bad = {
@@ -132,7 +130,7 @@ result = guard.verify_percentage_discount(
 # ✅ VERIFIED: 20% of 150 = 30
 ```
 
-### AI Makes Mistake
+### AI makes mistake
 
 ```python
 # AI claims: 20% of $150 = $35 (WRONG!)
@@ -173,7 +171,7 @@ guard.verify({"status": "completed", "order": {"id": "ORD-123"}})
 # ✅ Valid: completed has order object
 ```
 
-### Invalid Transition (Blocked)
+### Invalid transition (blocked)
 
 ```python
 # Trying to go backwards: completed → ready_for_complete
@@ -313,7 +311,7 @@ app.listen(3000, () => {
 
 ## Example 7: testing with pytest
 
-### Unit Tests for Guards
+### Unit tests for guards
 
 ```python
 import pytest
@@ -371,7 +369,7 @@ class TestLineItemsGuard:
 
 ## Best practices
 
-### 1. Always Verify Before Payment
+### 1. Always verify before payment
 
 ```python
 # Good: Verify first
@@ -384,7 +382,7 @@ else:
 process_payment(checkout)  # Could have wrong totals!
 ```
 
-### 2. Use Middleware in Production
+### 2. Use middleware in production
 
 Middleware catches errors automatically:
 ```python
@@ -392,7 +390,7 @@ Middleware catches errors automatically:
 app.add_middleware(QWEDUCPMiddleware)
 ```
 
-### 3. Log Verification Failures
+### 3. Log verification failures
 
 ```python
 result = verifier.verify_checkout(checkout)
@@ -402,7 +400,7 @@ if not result.verified:
     logger.error(f"Checkout data: {checkout}")
 ```
 
-### 4. Set Appropriate Tolerance
+### 4. Set appropriate tolerance
 
 ```python
 # For most currencies: $0.01 tolerance
