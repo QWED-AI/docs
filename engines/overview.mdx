@@ -1,10 +1,10 @@
 ---
 sidebar_position: 1
-title: "Verification Engines"
+title: "Verification engines"
 description: "QWED provides 11 specialized verification engines, each using deterministic methods first and LLM only as fallback."
 ---
 
-## Engine Overview
+## Engine overview
 
 | Engine | Technology | Key Features |
 | --- | --- | --- |
@@ -20,7 +20,7 @@ description: "QWED provides 11 specialized verification engines, each using dete
 | **Image** | Deterministic \+ VLM | Metadata extraction, Size verification, Multi-VLM |
 | **Schema** | Pydantic \+ Math | JSON structure \+ embedded calculation checks |
 
-## Deterministic-First Philosophy
+## Deterministic-first philosophy
 
 All engines now follow a **deterministic-first** approach:
 
@@ -40,7 +40,7 @@ result = client.verify_fact(
 
 > 📖 **See [Determinism Guarantee](/advanced/determinism-guarantee)** for the full engine classification and how to check if a response is `SYMBOLIC` or `HEURISTIC`.
 
-## Engine Selection
+## Engine selection
 
 QWED auto-detects the appropriate engine:
 
@@ -59,28 +59,28 @@ Or specify explicitly:
 result = client.verify(query, type="math")
 ```
 
-## Engine Documentation
+## Engine documentation
 
-### Deterministic Engines
+### Deterministic engines
 
 - [Math Engine](/engines/math) - Calculus, Matrix, Financial
 - [Logic Engine](/engines/logic) - Quantifiers, Theorem Proving
 - [Schema Engine](/engines/schema) - JSON Structure & Math
 
-### Security Engines
+### Security engines
 
 - [Code Engine](/engines/code) - Multi-language Security
 - [SQL Engine](/engines/sql) - Complexity Limits
 - [Taint Engine](/engines/taint) - Data Flow Analysis
 
-### Data Verification Engines
+### Data verification engines
 
 - [Stats Engine](/engines/stats) - Wasm Sandbox Execution
 - [Fact Engine](/engines/fact) - TF-IDF \+ Citations
 - [Graph Engine](/engines/graph) - Knowledge Graph Triples
 - [Image Engine](/engines/image) - Deterministic Verification
 
-### Orchestration Engines
+### Orchestration engines
 
 - [Reasoning Engine](/engines/reasoning) - Multi-LLM Validation
 - [Consensus Engine](/engines/consensus) - Parallel Execution

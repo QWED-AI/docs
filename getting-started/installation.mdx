@@ -18,7 +18,7 @@ After installing, run the onboarding wizard to set up verification engines, conf
 qwed init
 ```
 
-The wizard checks that core engines (SymPy, Z3, AST, SQLGlot) are installed, walks you through selecting a provider (NVIDIA NIM, OpenAI, Anthropic, Google Gemini, or any OpenAI-compatible endpoint), validates your credentials, and bootstraps a ready-to-use API key. For CI pipelines, use `--non-interactive`. See the [CLI reference](/advanced/cli) for all options.
+The wizard runs four checks. First, it confirms that core engines (SymPy, Z3, AST, SQLGlot) are installed. Next, it walks you through selecting a provider — NVIDIA NIM, OpenAI, Anthropic, Google Gemini, or any OpenAI-compatible endpoint. It then validates your credentials. Finally, it bootstraps a ready-to-use API key. For CI pipelines, use `--non-interactive`. See the [CLI reference](/advanced/cli) for all options.
 
 After init, verify your setup and run the built-in test suite:
 
@@ -59,7 +59,7 @@ qwed = "1.0"
 
 ---
 
-## Full Stack (Self-Hosted)
+## Full stack (self-hosted)
 
 For running the complete QWED stack locally:
 
@@ -91,8 +91,8 @@ python -m uvicorn qwed_new.api.main:app --reload
 
 ---
 
-## Next Steps
+## Next steps
 
-- [Quick Start Guide](/getting-started/quickstart)
-- [Core Concepts](/getting-started/concepts)
+- [Quick start guide](/getting-started/quickstart)
+- [Core concepts](/getting-started/concepts)
 

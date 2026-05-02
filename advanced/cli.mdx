@@ -171,7 +171,7 @@ The following patterns are rejected:
 - Template values: strings starting with `your-` or `replace-` that contain `key`
 - Short NVIDIA keys: `nvapi-` prefixed values shorter than 20 characters
 
-In non-interactive mode, if every key source (CLI argument, environment variable, and NVIDIA fallback) resolves to a placeholder, the command reports that the key is required and exits — so you get a clear error instead of a cryptic provider failure downstream.
+In non-interactive mode, the CLI checks three key sources: CLI argument, environment variable, and NVIDIA fallback. If all three resolve to a placeholder, the command reports that the key is required and exits. You get a clear error instead of a cryptic provider failure downstream.
 
 **Re-running `qwed init`:** Running the command again merges new values into your existing `.env` file. Existing variables that you don't reconfigure are preserved.
 

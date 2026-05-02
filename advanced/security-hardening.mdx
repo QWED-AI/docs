@@ -10,11 +10,11 @@ This guide provides instructions for hardening your QWED deployment for producti
 Only **QWED v5.x** is currently supported with security patches and updates. Versions 4.x and earlier are end-of-life. If you are running a prior version, upgrade before applying the guidance below.
 </Note>
 
-## 1. Secret Management
+## 1. Secret management
 
 QWED relies on environment variables for sensitive configuration. **Never commit `.env` files to version control.**
 
-### Environment Variable Injection
+### Environment variable injection
 
 For production deployments, we recommend injecting environment variables using your infrastructure's secret management solution.
 
@@ -36,7 +36,7 @@ env:
         key: jwt-secret
 ```
 
-#### HashiCorp Vault Integration
+#### HashiCorp Vault integration
 If you use Vault, you can use `envconsul` or the Vault Agent Injector to populate environment variables before the application starts.
 
 ```bash
@@ -72,9 +72,9 @@ python -c "import secrets; print(secrets.token_urlsafe(48))"
 
 ---
 
-## 2. Network Security
+## 2. Network security
 
-### Firewall Rules
+### Firewall rules
 Restrict network access to the QWED API server:
 
 - **Public Access**: Allow ports `80` / `443` only via a Load Balancer / WAF.
@@ -136,7 +136,7 @@ When `QWED_CORS_ORIGINS` is set to a wildcard (`*`), credentialed requests (`all
 
 ---
 
-## 3. Authentication Hardening
+## 3. Authentication hardening
 
 ### API key rotation
 Regularly rotate API keys to minimize the impact of a potential leak.
@@ -148,7 +148,7 @@ If you integrate QWED with a custom user database:
 - Require a mix of uppercase, lowercase, numbers, and special characters.
 - Use the built-in `bcrypt` hashing provided by QWED's authentication module.
 
-### Session Management
+### Session management
 Control the lifetime of access tokens to reduce the window of opportunity for session hijacking.
 
 | Environment Variable | Default | Description |
@@ -293,15 +293,15 @@ The `qwed init` wizard and YAML provider config system write `.env` files with s
 
 QWED implements technical defenses for the [OWASP LLM Top 10](https://owasp.org/www-project-top-10-for-large-language-model-applications/). However, security is a shared responsibility.
 
-### Your Responsibilities (User/Deployment)
+### Your responsibilities (user/deployment)
 
 While QWED handles internal verification, you must implement the following "Human in the Loop" and deployment safeguards:
 
-#### LLM01: Prompt Injection & LLM02: Insecure Output Handling
+#### LLM01: Prompt injection and LLM02: Insecure output handling
 - **Human in the Loop**: For critical actions (e.g., financial transactions, code deployment), do not rely solely on QWED's verification. Implement a manual approval step.
 - **Output Monitoring**: Log and randomly audit verified outputs to ensure the verification engine itself hasn't been bypassed.
 
-#### LLM05: Supply Chain Vulnerabilities
+#### LLM05: Supply-chain vulnerabilities
 - **Startup environment integrity**: QWED enforces environment integrity at startup by verifying all Python `.pth` startup hook files against a built-in allowlist. If any unrecognized `.pth` file is found, the server refuses to start. You can extend the allowlist for custom deployments using the `QWED_ALLOWED_STARTUP_PTH_FILES` environment variable (comma-separated list of filenames).
 
   ```bash
@@ -319,7 +319,7 @@ While QWED handles internal verification, you must implement the following "Huma
 - **Network Isolation**: Run the QWED backend in a VPC without direct outbound internet access, except to specific LLM provider APIs (allowlist).
 - **Dependency Scanning**: Regularly scan your deployment container for vulnerabilities in system packages.
 
-#### LLM06: Sensitive Information Disclosure
+#### LLM06: Sensitive information disclosure
 - **Data Minimization**: Do not send PII (Personally Identifiable Information) to QWED unless absolutely necessary. Mask or redact sensitive data *before* it reaches the API.
 
 For related deployment controls, see [Architecture Overview](/architecture), [SDK Guards](/sdks/guards), and [Troubleshooting Guide](/troubleshooting).

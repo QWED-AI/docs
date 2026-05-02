@@ -1,6 +1,6 @@
 ---
 sidebar_position: 1
-title: "LangChain Integration"
+title: "LangChain integration"
 description: "Use QWED with LangChain via QWEDTool for verified AI chains and agents. Includes verification callbacks for math, logic, and code validation in your workflows."
 ---
 
@@ -10,7 +10,7 @@ description: "Use QWED with LangChain via QWEDTool for verified AI chains and ag
 pip install qwed langchain
 ```
 
-## Quick Start
+## Quick start
 
 ```python
 from qwed_sdk.langchain import QWEDTool, QWEDVerificationCallback
@@ -29,7 +29,7 @@ result = agent.run("Verify: Is 2+2 equal to 5?")
 # Agent uses QWED tool to verify and corrects the answer
 ```
 
-## Available Components
+## Available components
 
 ### QWEDTool
 
@@ -43,7 +43,7 @@ print(tool.run("2+2=4"))
 # ✅ VERIFIED: The statement is correct
 ```
 
-### Specialized Tools
+### Specialized tools
 
 ```python
 from qwed_sdk.langchain import QWEDMathTool, QWEDLogicTool, QWEDCodeTool
@@ -94,7 +94,7 @@ print(result.output)    # "4"
 print(result.verified)  # True
 ```
 
-## LCEL Integration
+## LCEL integration
 
 Use with LangChain Expression Language:
 
@@ -110,7 +110,7 @@ def verify_output(text):
 chain = prompt | llm | RunnableLambda(verify_output)
 ```
 
-## Best Practices
+## Best practices
 
 1. **Use callbacks for monitoring** — Track verification rates
 2. **Use tools for agent autonomy** — Let agents verify themselves

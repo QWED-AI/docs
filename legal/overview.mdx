@@ -65,9 +65,9 @@ Not every guard provides full formal verification. Some operate on partial rules
 
 A valid result from a `PARTIAL / HEURISTIC` guard does **not** mean the underlying legal claim is correct. It means the claim matched a supported structural pattern.
 
-## Quick Example
+## Quick example
 
-### Verify a Deadline Calculation
+### Verify a deadline calculation
 
 ```python
 from qwed_legal import DeadlineGuard
@@ -84,7 +84,7 @@ print(result.computed_deadline)   # 2026-02-27
 print(result.message)
 ```
 
-### Verify a Legal Citation
+### Verify a legal citation
 
 ```python
 from qwed_legal import CitationGuard
@@ -101,7 +101,7 @@ A valid format result does **not** prove that the cited authority exists or is c
 
 ## Architecture
 
-### High-Level Flow
+### High-level flow
 
 ```mermaid
 flowchart TB
@@ -135,7 +135,7 @@ flowchart TB
     Receipt -->|"Rejected"| LLM
 ```
 
-### Guard Selection Flow
+### Guard selection flow
 
 ```mermaid
 flowchart LR
@@ -176,7 +176,7 @@ LLMs are **probabilistic** and can fail in legally significant ways:
 
 QWED-Legal treats LLM output as **untrusted input**. It does not assume correctness, and it requires proof for the properties it is able to verify. When proof is not possible, the correct outcome is to fail closed.
 
-## Jurisdiction Support
+## Jurisdiction support
 
 DeadlineGuard supports jurisdiction-specific holidays:
 
@@ -193,7 +193,7 @@ uk_guard = DeadlineGuard(country="GB")
 ca_guard = DeadlineGuard(country="US", state="CA")
 ```
 
-## Next Steps
+## Next steps
 
 - [The 10 Guards](/legal/guards) - Deep dive into each verification guard
 - [Examples](/legal/examples) - Real-world contract verification scenarios

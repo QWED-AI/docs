@@ -1,6 +1,6 @@
 ---
 sidebar_position: 10
-title: "Troubleshooting Guide"
+title: "Troubleshooting guide"
 description: "Resolve common QWED verification issues including authentication errors, API key problems, and rate limits. Step-by-step debugging solutions included."
 ---
 
@@ -8,9 +8,9 @@ Common issues and how to resolve them.
 
 ---
 
-## Authentication Errors
+## Authentication errors
 
-### API Key Invalid
+### API key invalid
 
 ```
 Error: 401 Unauthorized - Invalid API key
@@ -30,7 +30,7 @@ client = QWEDClient(api_key="qwed_live_abc123...")
 client = QWEDClient(api_key="qwed_live_abc123...\n")
 ```
 
-### Rate Limit Exceeded
+### Rate limit exceeded
 
 ```
 Error: 429 Too Many Requests
@@ -58,9 +58,9 @@ for attempt in range(3):
 
 ---
 
-## Verification Failures
+## Verification failures
 
-### Math: Floating Point Precision
+### Math: floating-point precision
 
 ```python
 # Fails due to floating point
@@ -75,7 +75,7 @@ result = client.verify_math("0.1 + 0.2 = 0.3", tolerance=1e-10)
 # True
 ```
 
-### Logic: Unsatisfiable Constraints
+### Logic: unsatisfiable constraints
 
 ```
 Error: No satisfying assignment found
@@ -105,7 +105,7 @@ This generic message is returned when the Stats Engine fails to generate or tran
 2. Check that the column names in your query match the columns in your data
 3. If the issue persists, check the server-side logs for the exception type
 
-### Code: Timeout
+### Code: timeout
 
 ```
 Error: Verification timeout after 30s
@@ -118,7 +118,7 @@ Error: Verification timeout after 30s
 
 ---
 
-## CLI Issues
+## CLI issues
 
 ### `qwed init` fails with "attempt to write a readonly database"
 
@@ -126,7 +126,7 @@ Error: Verification timeout after 30s
 sqlite3.OperationalError: attempt to write a readonly database
 ```
 
-This error occurs during Step 3 of `qwed init` when the local server tries to create a bootstrap SQLite database in a directory that is not writable (e.g., a read-only mount, a container filesystem, or a system-managed path).
+This error occurs during Step 3 of `qwed init`. The local server tries to create a bootstrap SQLite database in a directory that is not writable — for example, a read-only mount, a container filesystem, or a system-managed path.
 
 **Solution:** Upgrade to QWED v4.0.0 or later:
 
@@ -195,9 +195,9 @@ This can happen when Gemini returns malformed JSON for complex queries. QWED aut
 
 ---
 
-## SDK Issues
+## SDK issues
 
-### Import Error
+### Import error
 
 ```
 ModuleNotFoundError: No module named 'qwed_sdk'
@@ -210,7 +210,7 @@ pip install qwed
 pip install qwed-sdk
 ```
 
-### Async Not Working
+### Async not working
 
 ```python
 # Wrong - missing await
@@ -232,9 +232,9 @@ async with QWEDAsyncClient() as client:
 
 ---
 
-## DSL Syntax Errors
+## DSL syntax errors
 
-### Unknown Operator
+### Unknown operator
 
 ```
 SECURITY BLOCK: Unknown operator 'CHECK_IF_VALID'
@@ -257,7 +257,7 @@ SECURITY BLOCK: Unknown operator 'CHECK_IF_VALID'
 "(GT x 0)"
 ```
 
-### Missing Parentheses
+### Missing parentheses
 
 ```
 SyntaxError: Missing closing ')'
@@ -275,9 +275,9 @@ SyntaxError: Missing closing ')'
 
 ---
 
-## Performance Issues
+## Performance issues
 
-### Slow Verification
+### Slow verification
 
 **Possible causes:**
 1. Complex expressions with many variables
@@ -304,7 +304,7 @@ async def verify_many(queries):
         return await asyncio.gather(*tasks)
 ```
 
-### High Memory Usage
+### High memory usage
 
 **Solution:** Stream large results:
 
@@ -317,7 +317,7 @@ for result in client.verify_batch_stream(large_list):
 
 ---
 
-## Common Error Codes
+## Common error codes
 
 | Code | Meaning | Solution |
 |------|---------|----------|
@@ -331,7 +331,7 @@ for result in client.verify_batch_stream(large_list):
 
 ---
 
-## Getting Help
+## Getting help
 
 1. **Documentation:** [docs.qwedai.com](https://docs.qwedai.com)
 2. **GitHub Issues:** [github.com/QWED-AI/qwed-verification/issues](https://github.com/QWED-AI/qwed-verification/issues)
@@ -340,7 +340,7 @@ for result in client.verify_batch_stream(large_list):
 
 ---
 
-## Debug Mode
+## Debug mode
 
 Enable debug logging:
 

@@ -79,7 +79,7 @@ QWED: Returns verified result
 ### The Trade-off
 
 **Option A: Vector embeddings (semantic similarity)**
-- Pros: Captures semantic meaning, state-of-the-art
+- Pros: Captures semantic meaning; uses current embedding methods
 - Cons: Probabilistic, can match opposite meanings
 
 **Option B: TF-IDF (lexical matching)** ← **CHOSEN**
@@ -191,7 +191,7 @@ print(result.value)  # 4
 - **LlamaIndex:** Query engine wrapper
 - **Direct API:** For custom workflows
 
-**Rationale:** Developers already use LangChain/LlamaIndex. QWED should integrate seamlessly rather than forcing workflow changes.
+**Rationale:** Developers already use LangChain and LlamaIndex. QWED integrates with both rather than forcing workflow changes.
 
 ---
 
