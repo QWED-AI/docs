@@ -11,11 +11,11 @@ This guide provides instructions for System Administrators and Developers on how
 
 ---
 
-## 1. SOC 2 Preparation
+## 1. SOC 2 preparation
 
 QWED provides built-in tools to assist with SOC 2 Type II audits, specifically focusing on Security, Availability, and Processing Integrity.
 
-### SOC 2 Report Generator
+### SOC 2 report generator
 Generate a comprehensive JSON report containing security metrics, control statuses, and evidence summaries.
 
 **API Endpoint:**
@@ -46,8 +46,8 @@ Verify the cryptographic integrity of your audit logs. This ensures that no logs
 GET /admin/compliance/verify/{log_id}
 ```
 
-**Verify Entire Trail (Python SDK):**
-For a complete verification of all logs, use the Python SDK or a custom script interacting with the database directly, as the API verifies one entry at a time for performance reasons.
+**Verify entire trail (Python SDK):**
+The API verifies one entry at a time for performance. For complete log verification, use the Python SDK or a custom script that queries the database directly.
 
 ```python
 from qwed_new.core.audit_logger import AuditLogger
@@ -72,9 +72,9 @@ GET /admin/compliance/export/csv?organization_id={org_id}
 
 ---
 
-## 2. GDPR Compliance
+## 2. GDPR compliance
 
-### Data Export (Article 15 - Right of Access)
+### Data export (Article 15 - right of access)
 QWED supports the Right of Access by allowing you to export all data associated with an organization or user.
 
 **API Endpoint:**
@@ -83,7 +83,7 @@ Use the CSV export endpoint to retrieve all verification data.
 GET /admin/compliance/export/csv?organization_id={org_id}
 ```
 
-### Data Deletion (Article 17 - Right to Erasure)
+### Data deletion (Article 17 - right to erasure)
 **Note:** Currently, user deletion must be performed by an administrator directly in the database. A self-service deletion API is planned.
 
 To comply with a deletion request:
@@ -141,7 +141,7 @@ QWED uses the configured database (SQLite/PostgreSQL) for log storage. For high-
 
 ---
 
-## 4. Compliance Checklist
+## 4. Compliance checklist
 
 Use this checklist to prepare for an enterprise audit.
 

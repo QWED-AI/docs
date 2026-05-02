@@ -31,7 +31,7 @@ docker-compose ps
 
 ## Configuration
 
-### Environment Variables
+### Environment variables
 
 ```bash
 # .env file
@@ -57,7 +57,7 @@ QWED_CORS_ORIGINS=https://app.yourcompany.com
 `API_KEY_SECRET` and `QWED_CORS_ORIGINS` are mandatory as of v5.0.0. See the [deployment guide](/advanced/deployment#environment-variables-reference) for the full reference.
 </Warning>
 
-### API Configuration
+### API configuration
 
 ```python
 # config.py
@@ -72,7 +72,7 @@ SETTINGS = {
 
 ## Docker
 
-### API Only
+### API only
 
 ```dockerfile
 FROM python:3.13-slim-bookworm
@@ -83,7 +83,7 @@ EXPOSE 8000
 CMD ["uvicorn", "qwed_new.api.main:app", "--host", "0.0.0.0"]
 ```
 
-### Build & Run
+### Build and run
 
 ```bash
 docker build -t qwed-api .
@@ -128,13 +128,13 @@ spec:
 
 ## Scaling
 
-### Horizontal Scaling
+### Horizontal scaling
 
 - Stateless API servers behind load balancer
 - Redis for distributed rate limiting
 - PostgreSQL with read replicas
 
-### Performance Tuning
+### Performance tuning
 
 ```bash
 # Increase workers
@@ -146,13 +146,13 @@ export QWED_DB_POOL_SIZE=20
 
 ## Monitoring
 
-### Health Check
+### Health check
 
 ```bash
 curl http://localhost:8000/health
 ```
 
-### Prometheus Metrics
+### Prometheus metrics
 
 ```text
 qwed_verification_total{engine="math", status="verified"}

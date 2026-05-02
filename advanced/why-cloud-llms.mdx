@@ -8,7 +8,7 @@ sidebarTitle: "Why Cloud LLMs?"
 
 ---
 
-## 🎯 The Core Problem
+## 🎯 The core problem
 
 **Verification requires two things:**
 1. **LLM understands the query** (natural language → structured reasoning)
@@ -18,9 +18,9 @@ If the LLM gets step 1 wrong, verification fails even with perfect symbolic math
 
 ---
 
-## 📊 LLM Accuracy Comparison
+## 📊 LLM accuracy comparison
 
-### Math Verification Example
+### Math verification example
 
 **Query:** "What is the integral of 2x?"
 
@@ -31,7 +31,7 @@ If the LLM gets step 1 wrong, verification fails even with perfect symbolic math
 | **Llama 3 8B** | Local | ~75% | Sometimes "x² + C" ✅, sometimes "2x²/2" ❌ |
 | **Mistral 7B** | Local | ~70% | Inconsistent, may confuse derivative/integral |
 
-### Why This Matters
+### Why this matters
 
 **When QWED verifies:**
 ```
@@ -51,7 +51,7 @@ If the LLM gets step 1 wrong, verification fails even with perfect symbolic math
 
 ---
 
-## 🤔 When to Use Each
+## 🤔 When to use each
 
 | Use Case | Local LLM (Ollama) | Cloud LLM (OpenAI/Anthropic) |
 |----------|-------------------|------------------------------|
@@ -63,11 +63,11 @@ If the LLM gets step 1 wrong, verification fails even with perfect symbolic math
 
 ---
 
-## 💡 QWED's Hybrid Approach
+## 💡 QWED's hybrid approach
 
 **Best Practice: Use both strategically**
 
-### Development Setup (Free)
+### Development setup (free)
 ```python
 from qwed_sdk import QWEDLocal
 
@@ -85,7 +85,7 @@ result = client_dev.verify("What is 2+2?")
 **Cost:** $0/month  
 **Use for:** Prototyping, experimentation, learning
 
-### Production Setup (Reliable)
+### Production setup (reliable)
 ```python
 import os
 from qwed_sdk import QWEDLocal
@@ -108,7 +108,7 @@ result = client_prod.verify("Verify calculation: ...")
 
 ---
 
-## 💰 Cost Analysis
+## 💰 Cost analysis
 
 ### Local LLM (Ollama)
 - **Setup:** 10 minutes (download model)
@@ -124,7 +124,7 @@ result = client_prod.verify("Verify calculation: ...")
 - **Privacy:** Use PII masking
 - **Best for:** Production, critical tasks
 
-### With QWED Caching (Smart Cost Savings)
+### With QWED caching (cost savings)
 ```python
 # First query: Hits LLM (costs $$)
 result1 = client.verify("What is 2+2?")
@@ -137,14 +137,14 @@ result2 = client.verify("What is 2+2?")  # $0 cost!
 
 ---
 
-## 🔒 Privacy Considerations
+## 🔒 Privacy considerations
 
-### Local LLM Advantages
+### Local LLM advantages
 ✅ **100% private** - data never leaves your machine  
 ✅ **No API keys** - no third-party access  
 ✅ **Compliance** - easier GDPR/HIPAA compliance
 
-### Cloud LLM with PII Masking
+### Cloud LLM with PII masking
 ```python
 client = QWEDLocal(
     provider="openai",
@@ -161,7 +161,7 @@ result = client.verify("User email: john@example.com, calculate 2+2")
 
 ---
 
-## 🎯 Recommendation by Use Case
+## 🎯 Recommendation by use case
 
 ### Healthcare (HIPAA)
 ```python
@@ -192,7 +192,7 @@ client = QWEDLocal(
 
 **Recommendation:** Cloud + PII masking (accuracy matters for money!)
 
-### Enterprise (General)
+### Enterprise (general)
 ```python
 # Development
 dev_client = QWEDLocal(base_url="http://localhost:11434/v1", model="llama3")
@@ -205,11 +205,11 @@ prod_client = QWEDLocal(provider="openai", mask_pii=True, cache=True)
 
 ---
 
-## 🚀 The QWED Advantage
+## 🚀 The QWED advantage
 
 **Even with local LLMs, QWED catches errors!**
 
-### Scenario: Local LLM Makes Mistake
+### Scenario: local LLM makes mistake
 ```python
 client = QWEDLocal(base_url="http://localhost:11434/v1", model="llama3")
 
@@ -231,7 +231,7 @@ result = client.verify("What is the derivative of x²?")
 
 ---
 
-## 📈 Accuracy in Practice
+## 📈 Accuracy in practice
 
 **From QWED internal testing:**
 
@@ -246,9 +246,9 @@ result = client.verify("What is the derivative of x²?")
 
 ---
 
-## 🎓 Bottom Line
+## 🎓 Bottom line
 
-### Start with Local LLM
+### Start with local LLM
 ```bash
 # Install Ollama
 curl -fsSL https://ollama.com/install.sh | sh
@@ -264,7 +264,7 @@ python -c "from qwed_sdk import QWEDLocal; \
 
 **Perfect for:** Learning, prototyping, hobby projects
 
-### Scale to Cloud LLM
+### Scale to cloud LLM
 ```bash
 # Get API key from OpenAI
 export OPENAI_API_KEY="sk-..."
@@ -279,7 +279,7 @@ python -c "from qwed_sdk import QWEDLocal; \
 
 ---
 
-## 🔗 Related Documentation
+## 🔗 Related documentation
 
 - **[LLM Configuration Guide](/getting-started/llm-configuration)** - Complete LLM setup
 - **[PII Masking Guide](/advanced/pii-masking)** - Privacy protection

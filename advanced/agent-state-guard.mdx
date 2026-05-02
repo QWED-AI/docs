@@ -23,7 +23,7 @@ Use AgentStateGuard when your AI agents maintain structured state (such as task 
 AgentStateGuard uses a three-phase approach:
 
 1. **Structural verification (Phase 1)** — Validates that a proposed JSON state payload conforms to a strict schema. Rejects duplicate keys, non-standard JSON constants (`NaN`, `Infinity`), and unexpected fields. Numbers are parsed as `Decimal` to preserve deterministic numeric semantics.
-2. **Semantic transition verification (Phase 2)** — Given a current state and a proposed state, verifies that the transition satisfies configured rules: immutable paths cannot change, integer paths must increase monotonically, enum paths must advance forward, and keyed arrays must preserve order.
+2. **Semantic transition verification (Phase 2)** — Verifies that a proposed state transition satisfies configured rules. Immutable paths cannot change, integer paths must increase monotonically, enum paths must advance forward, and keyed arrays must preserve order.
 3. **Governed atomic commit (Phase 3)** — After verification passes, writes the normalized state to disk atomically using `tempfile` + `os.replace`. The write target must be within configured allowed roots and must end in `.json`.
 
 All three phases are fail-closed — if any check fails, no side effects occur.

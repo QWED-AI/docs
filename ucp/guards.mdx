@@ -9,7 +9,7 @@ QWED-UCP includes **10 verification guards** that validate different aspects of 
 
 ---
 
-## 1. Money Guard
+## 1. Money guard
 
 **Verifies the total formula is mathematically correct.**
 
@@ -36,7 +36,7 @@ Uses `Decimal` precision with 1 cent ($0.01) tolerance for floating-point errors
 
 ---
 
-## 2. State Guard
+## 2. State guard
 
 **Verifies valid checkout state machine transitions.**
 
@@ -73,7 +73,7 @@ result = guard.verify_transition(
 
 ---
 
-## 3. Schema Guard
+## 3. Schema guard
 
 **Validates UCP JSON schema compliance.**
 
@@ -94,7 +94,7 @@ result = guard.verify(checkout_data)
 
 ---
 
-## 4. Line Items Guard
+## 4. Line items guard
 
 **Verifies price × quantity = line total for each item.**
 
@@ -122,7 +122,7 @@ result = guard.verify({
 
 ---
 
-## 5. Discount Guard
+## 5. Discount guard
 
 **Verifies percentage and fixed discount calculations.**
 
@@ -157,7 +157,7 @@ result = guard.verify_fixed_discount(
 
 ---
 
-## 6. Currency Guard
+## 6. Currency guard
 
 **Validates ISO 4217 currency codes and format.**
 
@@ -188,7 +188,7 @@ result = guard.verify({"currency": "USD"})
 
 ---
 
-## 7. Refund Guard
+## 7. Refund guard
 
 **Verifies refund amounts match original transactions.**
 
@@ -243,7 +243,7 @@ result = guard.verify(checkout, refund)
 
 ---
 
-## 8. Tip Guard
+## 8. Tip guard
 
 **Verifies tip calculations (pre-tax and post-tax).**
 
@@ -291,7 +291,7 @@ result = guard.verify_tip_bounds(
 
 ---
 
-## 9. Fee Guard
+## 9. Fee guard
 
 **Verifies fee calculations (service, delivery, platform).**
 
@@ -342,7 +342,7 @@ result = guard.verify_platform_fee(
 
 ---
 
-## 10. Attestation Guard
+## 10. Attestation guard
 
 **Generates cryptographic proofs (JWTs) for verification results.**
 

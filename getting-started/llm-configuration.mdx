@@ -58,7 +58,7 @@ You can add any OpenAI-compatible provider (Groq, Together, Fireworks, and other
 
 ## Configuration options
 
-### Option 1: Use QWED's Built-in Translation (Recommended)
+### Option 1: use QWED's built-in translation (recommended)
 
 QWED can handle LLM translation internally:
 
@@ -72,7 +72,7 @@ result = client.verify("What is 15% of 200?")
 # QWED internally: "15% of 200" → 0.15 * 200 → verify with SymPy → 30
 ```
 
-### Option 2: Bring Your Own LLM
+### Option 2: bring your own LLM
 
 Use QWED purely as a verification layer:
 
@@ -194,7 +194,7 @@ export CUSTOM_API_KEY=your-api-key
 export CUSTOM_MODEL=gpt-4o-mini
 ```
 
-Only `CUSTOM_BASE_URL` is required. If your endpoint does not require authentication (for example, a local vLLM or LM Studio server), you can omit `CUSTOM_API_KEY` entirely — QWED automatically supplies a placeholder token so the underlying client initializes correctly.
+Only `CUSTOM_BASE_URL` is required. If your endpoint does not require authentication (for example, a local vLLM or LM Studio server), you can omit `CUSTOM_API_KEY` entirely. QWED supplies a placeholder token so the underlying client initializes correctly.
 
 ### Google Gemini
 
@@ -352,7 +352,7 @@ client = QWEDClient(
 
 ---
 
-## Translation vs Verification
+## Translation vs verification
 
 Understanding the two phases:
 

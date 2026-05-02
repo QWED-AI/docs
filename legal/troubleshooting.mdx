@@ -7,7 +7,7 @@ description: "Troubleshoot QWED Legal installation issues, Z3 solver errors, hol
 
 ## Installation issues
 
-### Z3 Solver Not Found
+### Z3 solver not found
 
 **Error:**
 
@@ -39,7 +39,7 @@ pip install --upgrade holidays>=0.40
 
 ---
 
-## DeadlineGuard Issues
+## DeadlineGuard issues
 
 ### Unexpected holiday calculation
 
@@ -56,7 +56,7 @@ guard = DeadlineGuard(country="GB")              # UK holidays
 guard = DeadlineGuard(country="IN")              # India holidays
 ```
 
-### "Failed to parse dates" Error
+### "Failed to parse dates" error
 
 **Problem:**
 
@@ -76,7 +76,7 @@ guard.verify("01/02/2026", ...)  # Is this Jan 2 or Feb 1?
 
 ---
 
-## LiabilityGuard Issues
+## LiabilityGuard issues
 
 ### Float precision errors
 
@@ -93,7 +93,7 @@ guard = LiabilityGuard(tolerance_percent=0.1)    # More lenient
 
 ---
 
-## ClauseGuard Issues
+## ClauseGuard issues
 
 ### No conflicts detected (false negative)
 
@@ -118,7 +118,7 @@ clauses = [
 
 ---
 
-## CitationGuard Issues
+## CitationGuard issues
 
 ### Valid citation marked invalid
 

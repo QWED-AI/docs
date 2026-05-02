@@ -4,7 +4,7 @@ title: "Common pitfalls"
 description: "Avoid common QWED integration mistakes like calling LLM directly instead of through QWED. Includes correct and incorrect code examples for reference."
 ---
 
-## Pitfall #1: Calling the LLM directly
+## ❌ Pitfall #1: calling the LLM directly
 
 ### The mistake
 
@@ -48,7 +48,7 @@ print(result.verified)  # True
 
 ---
 
-## Pitfall #2: Trusting LLM output without verification
+## ❌ Pitfall #2: trusting LLM output without verification
 
 ### The mistake
 
@@ -81,7 +81,7 @@ else:
 
 ---
 
-## Pitfall #3: Wrong verification method
+## ❌ Pitfall #3: wrong verification method
 
 ### The mistake
 
@@ -123,7 +123,7 @@ if result.blocked:
 
 ---
 
-## Pitfall #4: Ignoring verification results
+## ❌ Pitfall #4: ignoring verification results
 
 ### The mistake
 
@@ -160,7 +160,7 @@ else:
 
 ---
 
-## Pitfall #5: Not handling errors
+## ❌ Pitfall #5: not handling errors
 
 ### The mistake
 
@@ -214,7 +214,7 @@ except ValidationError as e:
 
 ---
 
-## Pitfall #6: Missing API key configuration
+## ❌ Pitfall #6: missing API key configuration
 
 ### The mistake
 
@@ -257,7 +257,7 @@ QWED_API_KEY = os.getenv("QWED_API_KEY")
 
 ---
 
-## Pitfall #7: Not using batch processing
+## ❌ Pitfall #7: not using batch processing
 
 ### The mistake
 
@@ -301,7 +301,7 @@ for item_result in result.items:
 
 ---
 
-## Pitfall #8: Wrong timeout settings
+## ❌ Pitfall #8: wrong timeout settings
 
 ### The mistake
 
@@ -342,7 +342,7 @@ result = client.verify(
 
 ---
 
-## Pitfall #9: Not running the backend server
+## ❌ Pitfall #9: not running the backend server
 
 ### The mistake
 
@@ -398,7 +398,7 @@ Your App → SDK → Backend Server (YOU run) → LLM (YOUR key) → Verifiers
 
 ---
 
-## Integration checklist
+## ✅ Integration checklist
 
 Before deploying to production, verify:
 

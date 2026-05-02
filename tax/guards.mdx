@@ -9,7 +9,7 @@ QWED-Tax verifies logic deterministically. No probabilities, just rules.
 
 ## United States (IRS)
 
-### ClassificationGuard (IRS Common Law)
+### ClassificationGuard (IRS common law)
 
 **Goal:** Prevent "Employee Misclassification" lawsuits. **Logic:** Uses the IRS Common Law test to determine if a worker is a W-2 Employee or 1099 Contractor.
 
@@ -68,7 +68,7 @@ result = guard.verify_classification(params, claimed_status_contractor=True)
 | `params` | `WorkerClassificationParams` | Yes | Worker facts for ABC Test |
 | `claimed_status_contractor` | `bool` | Yes | `True` if the AI claims 1099, `False` if W-2 |
 
-### NexusGuard (Economic Nexus)
+### NexusGuard (economic nexus)
 
 **Goal:** Prevent Sales Tax Evasion. **Logic:** Checks local state thresholds for 2025.
 
@@ -354,7 +354,7 @@ result = guard.verify_fd_rate(
 | Real estate | > 730 days | — | — |
 | Debt | > 1095 days | Slab rate | Slab rate |
 
-### Accounts payable guards (Indirect Tax)
+### Accounts payable guards (indirect tax)
 
 **Goal:** Automate GST/VAT and TDS compliance. **Logic:**
 
@@ -391,7 +391,7 @@ result = guard.verify_fd_rate(
 
 ## International
 
-### DTAAGuard (Foreign Tax Credit)
+### DTAAGuard (foreign tax credit)
 
 **Goal:** Verify Foreign Tax Credit (FTC) eligibility under Double Taxation Avoidance Agreements. **Logic:**
 
@@ -444,7 +444,7 @@ result = guard.verify_foreign_tax_credit(
   The guard **fails closed**: any non-numeric, non-finite (NaN / Infinity), boolean, or negative input returns `verified: False` with a descriptive `message` and zeroed credit fields rather than raising an exception.
 </Note>
 
-### TransferPricingGuard (Arm's Length Price)
+### TransferPricingGuard (arm's length price)
 
 **Goal:** Verify that related-party transactions are priced within an acceptable range of the Arm's Length Price (ALP). Ref: OECD Guidelines, US Sec 482, India Sec 92C.
 
@@ -477,7 +477,7 @@ result = guard.verify_arms_length_price(
   On any non-numeric, non-finite, or boolean input the guard **fails closed** and returns `{"verified": False, "risk": "INVALID_NUMERIC_INPUT", "message": "...", "safe_harbour_range": [], "potential_adjustment": "0"}`.
 </Note>
 
-### PoEMGuard (Place of Effective Management)
+### PoEMGuard (place of effective management)
 
 **Goal:** Determine tax residency of foreign companies under CBDT Circular 6 of 2017 and OECD models.
 
