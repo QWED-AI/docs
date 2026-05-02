@@ -1,6 +1,6 @@
 ---
 sidebar_position: 1
-title: "Getting Started"
+title: "Getting started"
 description: "Set up QWED in your development environment. Covers backend server architecture, cloning, installing, and configuring LLM providers for verification."
 ---
 
@@ -26,7 +26,7 @@ QWED Backend Server (you run this!)
 
 ---
 
-## Step 1: clone and install
+## Step 1: Clone and install
 
 ```bash
 # Clone the repository
@@ -39,18 +39,18 @@ pip install -r requirements.txt
 
 ---
 
-## Step 2: configure the LLM provider
+## Step 2: Configure LLM provider
 
 QWED is **model agnostic** - select any LLM based on your needs:
 
-### Create the environment file
+### Create environment file
 
 ```bash
 # Copy example configuration
 cp .env.example .env
 ```
 
-### Choose your LLM provider
+### Select your LLM provider
 
 Edit `.env` and add your API key for ONE provider:
 
@@ -100,7 +100,7 @@ Edit `.env` and add your API key for ONE provider:
 
 ---
 
-## Step 3: run the QWED backend server
+## Step 3: Run the QWED backend server
 
 ```bash
 # Start the backend server
@@ -114,7 +114,7 @@ python -m qwed_api
 
 ---
 
-## Step 4: install the SDK
+## Step 4: Install the SDK
 
 In a **new terminal**, install the QWED SDK in your project:
 

@@ -1,13 +1,13 @@
 ---
 sidebar_position: 2
 title: "QWED quick start for deterministic verification"
-sidebarTitle: "Quick Start"
+sidebarTitle: "Quick start"
 description: "Get started with QWED in 5 minutes. Learn deterministic verification for LLM outputs with math, logic, and code examples."
 ---
 
 Learn QWED basics in 5 minutes.
 
-## 1. Basic Verification
+## 1. Basic verification
 
 ```python
 from qwed_sdk import QWEDClient
@@ -20,7 +20,7 @@ print(result.verified)  # True
 print(result.status)    # "VERIFIED"
 ```
 
-## 2. Math Verification
+## 2. Math verification
 
 Verify mathematical expressions with 100% accuracy:
 
@@ -35,7 +35,7 @@ print(result.verified)  # False
 print(result.message)   # "Not equal: difference is 1"
 ```
 
-## 3. Logic Verification
+## 3. Logic verification
 
 Verify logical constraints using Z3 SAT solver:
 
@@ -50,7 +50,7 @@ result = client.verify_logic("(AND (GT x 10) (LT x 5))")
 print(result.status)  # "UNSAT"
 ```
 
-## 4. Code Security
+## 4. Code security
 
 Check code for vulnerabilities:
 
@@ -67,7 +67,7 @@ for vuln in result.vulnerabilities:
     print(f"- {vuln.severity}: {vuln.message}")
 ```
 
-## 5. SQL Validation
+## 5. SQL validation
 
 Validate SQL queries:
 
@@ -83,7 +83,7 @@ result = client.verify_sql("SELECT * FROM users; DROP TABLE users; --")
 print(result.status)  # "BLOCKED"
 ```
 
-## 6. Batch Verification
+## 6. Batch verification
 
 Verify multiple claims at once:
 
@@ -137,7 +137,7 @@ You only need to run `qwed init` once. After that, QWED reads from `.env`. Re-ru
 
 ## Next steps
 
-- [Core Concepts](/getting-started/concepts)
-- [Verification Engines](/engines/overview)
-- [SDK Reference](/sdks/overview)
+- [Core concepts](/getting-started/concepts)
+- [Verification engines](/engines/overview)
+- [SDK reference](/sdks/overview)
 

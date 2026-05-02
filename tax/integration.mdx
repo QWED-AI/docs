@@ -9,7 +9,7 @@ The primary usage patterns for QWED-Tax are the **TaxPreFlight** auditor for int
 
 ## TaxPreFlight
 
-The `TaxPreFlight` class routes a transaction intent to the guards required for its `action`. Every intent must declare a supported action and include a complete, verifiable claim for that action — `TaxPreFlight` **fails closed** and blocks execution whenever the payload is missing required fields, contains non-numeric or non-finite values, or references an unsupported action.
+The `TaxPreFlight` class routes a transaction intent to the guards required for its `action`. Every intent must declare a supported action and include a complete, verifiable claim for that action. `TaxPreFlight` **fails closed**: it blocks execution whenever the payload is missing required fields, contains non-numeric or non-finite values, or references an unsupported action.
 
 <Note>
   `TaxPreFlight` is **fail-closed**. An intent that is empty, not a `dict`, uses an unsupported `action`, or does not contain a complete verifiable claim is **blocked by default** — it never silently passes through.
@@ -139,7 +139,7 @@ The report always echoes the canonical action (after alias resolution) in the `a
 
 ### Redacting block reasons in untrusted contexts
 
-`report["blocks"]` contains human-readable diagnostics that may echo back fields from the original intent — including worker facts, nexus sales figures, remittance purposes, or vendor service types. Treat these strings as **internal-only**: log them to your audit trail, but do not render them verbatim in end-user surfaces, demo output, or any context where a downstream consumer could infer protected payroll or customer data.
+`report["blocks"]` contains human-readable diagnostics that may echo back fields from the original intent — including worker facts, nexus sales figures, remittance purposes, or vendor service types. Treat these strings as **internal-only**. Log them to your audit trail. Do not render them verbatim in end-user surfaces, demo output, or any context where a downstream consumer could infer protected payroll or customer data.
 
 In example and demo scripts bundled with `qwed-tax` (`examples/verify_tax_expansion.py`), outcomes are printed as high-level pass/fail only and verification details are intentionally redacted:
 
