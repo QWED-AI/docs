@@ -9,7 +9,7 @@ We believe in **Trust & Openness**. You have full access to the codebase because
 
 ---
 
-## 📚 Step 1: The Context (1 Hour)
+## 📚 Step 1: the context (1 hour)
 
 Don't read the code yet. Read these first to understand *why* we exist.
 
@@ -20,7 +20,7 @@ Don't read the code yet. Read these first to understand *why* we exist.
 
 ---
 
-## 🛠️ Step 2: The Setup (30 Mins)
+## 🛠️ Step 2: the setup (30 mins)
 
 1. **Clone the Repo**:
 ```bash
@@ -40,16 +40,16 @@ pip install -e .
 
 ---
 
-## 🎯 Step 3: The Task (Phase 0)
+## 🎯 Step 3: the task (Phase 0)
 
-### The Goal: Building a "SQL Firewall" for AI Agents
+### The goal: building a "SQL firewall" for AI agents
 
 Enterprises want to use "Text-to-SQL" agents (e.g., "Show me top 10 users").
 **The Risk:** LLMs hallucinate. If an LLM generates `DROP TABLE users` or `SELECT * FROM passwords`, the company is destroyed.
 
 **QWED's Role**: We parse the SQL (using AST analysis) and **Block** dangerous queries before they hit the database.
 
-### Real-World Scenarios (Your Task)
+### Real-world scenarios (your task)
 
 You are building the **Safety Test Suite** for our SQL Engine.
 **Your Workspace**: `tests/test_sql_safety.py` (Create this file).
@@ -68,7 +68,7 @@ Write the **Tests** first (TDD). Create scenarios for both **Safe Queries** (e.g
 
 ---
 
-## 🚀 Step 4: Submission
+## 🚀 Step 4: submission
 
 1.  Create a branch: `git checkout -b feature/sql-safety-tests`
 2.  Push your changes.

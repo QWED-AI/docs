@@ -35,7 +35,7 @@ Results posted as a GitHub Check Run
 
 ## What QWED Security catches
 
-### 🛡️ Code Security (AST Analysis)
+### 🛡️ Code security (AST analysis)
 
 Detects dangerous code patterns before they reach production:
 
@@ -47,15 +47,15 @@ Detects dangerous code patterns before they reach production:
 | Hardcoded secrets | `api_key = "sk-proj-..."` | Credential exposure |
 | Unsafe imports | `import subprocess` | Privilege escalation |
 
-### 🧮 Math Verification (SymPy)
+### 🧮 Math verification (SymPy)
 
 Validates mathematical formulas and constants — tax rate calculations, interest/NPV formulas, unit conversions, and financial compliance rules.
 
-### ⚖️ Logic Validation (Z3 Prover)
+### ⚖️ Logic validation (Z3 prover)
 
 Ensures boolean logic and business rules are satisfiable — contract clause contradictions, business rule conflicts, and constraint satisfaction.
 
-### 🔒 PII Detection
+### 🔒 PII detection
 
 Detects sensitive data before it enters your codebase — credit card numbers, Social Security Numbers, email addresses, and API keys.
 
@@ -81,7 +81,7 @@ Detects sensitive data before it enters your codebase — credit card numbers, S
 
 When QWED Security scans a PR, you'll see results directly in the **Checks tab**:
 
-### ✅ All Clear
+### ✅ All clear
 
 ```text
 QWED Verification Report
@@ -91,7 +91,7 @@ QWED Verification Report
 ✅ api_handler.py: Passed
 ```
 
-### ❌ Issues Found
+### ❌ Issues found
 
 ```text
 QWED Verification Report
@@ -104,7 +104,7 @@ QWED Verification Report
 ✅ math_logic.py: Passed
 ```
 
-## Privacy & Security
+## Privacy and security
 
 - **No code storage**: Files are analyzed in-memory and discarded
 - **Webhook verification**: HMAC-SHA256 signature validation

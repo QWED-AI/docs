@@ -13,7 +13,7 @@ description: "QWED latency benchmarks for Math, Logic, Code, SQL, and other veri
 
 ## Performance benchmarks (latency)
 
-### Verification Engine Latency
+### Verification engine latency
 
 | Engine | Operation | Typical Latency | P95 Latency | P99 Latency |
 |--------|-----------|-----------------|-------------|-------------|
@@ -33,7 +33,7 @@ description: "QWED latency benchmarks for Math, Logic, Code, SQL, and other veri
 | **Image** | Metadata check | 15ms | 30ms | 50ms |
 | **Consensus** | 3-model check | 4,500ms | 7,000ms | 12,000ms |
 
-### Key Observations:
+### Key observations
 
 - ✅ **Most verifications < 100ms** - Suitable for real-time applications
 - ⚠️ **Symbolic execution slow** - Use only for simple functions
@@ -43,7 +43,7 @@ description: "QWED latency benchmarks for Math, Logic, Code, SQL, and other veri
 
 ## Cost comparison
 
-### Scenario: Financial Calculator Application
+### Scenario: financial calculator application
 
 **Use Case:** Verify 1,000 compound interest calculations per day
 
@@ -59,7 +59,7 @@ description: "QWED latency benchmarks for Math, Logic, Code, SQL, and other veri
 
 ---
 
-### Scenario: SQL Query Generation (RAG Application)
+### Scenario: SQL query generation (RAG application)
 
 **Use Case:** Verify 5,000 SQL queries per day
 
@@ -73,7 +73,7 @@ description: "QWED latency benchmarks for Math, Logic, Code, SQL, and other veri
 
 ---
 
-### Scenario: Code Security Scanning
+### Scenario: code security scanning
 
 **Use Case:** Verify 500 code snippets per day
 
@@ -87,9 +87,9 @@ description: "QWED latency benchmarks for Math, Logic, Code, SQL, and other veri
 
 ---
 
-## API Pricing (QWED Cloud)
+## API pricing (QWED Cloud)
 
-### Free Tier
+### Free tier
 - 1,000 verifications/month
 - All 8 engines
 - No credit card required
@@ -100,21 +100,21 @@ description: "QWED latency benchmarks for Math, Logic, Code, SQL, and other veri
 - Priority support
 - SLA: 99.9% uptime
 
-### Enterprise (Custom)
+### Enterprise (custom)
 - Unlimited verifications
 - On-premise deployment
 - Custom SLA
 - Dedicated support
 
-### Pay-As-You-Go
+### Pay-as-you-go
 - $0.0005 per verification (beyond free tier)
 - Volume discounts available
 
 ---
 
-## ROI Calculator
+## ROI calculator
 
-### Example: Finance Application
+### Example: finance application
 
 **Assumptions:**
 - 10,000 calculations/day
@@ -138,7 +138,7 @@ description: "QWED latency benchmarks for Math, Logic, Code, SQL, and other veri
 
 ## Latency optimization tips
 
-### 1. Enable Redis Caching
+### 1. Enable Redis caching
 
 ```python
 from qwed_sdk import QWEDClient
@@ -151,7 +151,7 @@ client = QWEDClient(
 # Repeated verifications: 0.5ms (99% faster)
 ```
 
-### 2. Async Verification
+### 2. Async verification
 
 ```python
 import asyncio
@@ -163,14 +163,14 @@ async def verify_batch(items):
 # 10× throughput improvement
 ```
 
-### 3. Selective Engines
+### 3. Selective engines
 
 ```python
 # Only enable engines you need
 client = QWEDClient(engines=["math", "code"])  # Faster startup
 ```
 
-### 4. Timeout Tuning
+### 4. Timeout tuning
 
 ```python
 # Reduce timeout for simple operations
@@ -192,7 +192,7 @@ result = engine.verify_math(expr, timeout_ms=1000)  # 1s max
 
 ---
 
-## Comparison with Alternatives
+## Comparison with alternatives
 
 ### vs Guardrails AI
 
@@ -204,7 +204,7 @@ result = engine.verify_math(expr, timeout_ms=1000)  # 1s max
 | **Cost** | $0.50/1K | $0.80/1K |
 | **Security** | ✅ AST analysis | ⚠️ Pattern matching |
 
-### vs Self-Consistency
+### vs self-consistency
 
 | Metric | QWED | Self-Consistency (5×) |
 |--------|------|----------------------|
@@ -213,7 +213,7 @@ result = engine.verify_math(expr, timeout_ms=1000)  # 1s max
 | **Latency** | 50ms | 5,000ms (100× slower) |
 | **Deterministic** | ✅ Yes | ❌ No |
 
-### vs Manual Review
+### vs manual review
 
 | Metric | QWED | Human Review |
 |--------|------|--------------|
@@ -226,7 +226,7 @@ result = engine.verify_math(expr, timeout_ms=1000)  # 1s max
 
 ## Production scaling
 
-### Architecture for 1M Verifications/Day
+### Architecture for 1M verifications/day
 
 ```
 Load Balancer

@@ -386,7 +386,7 @@ qwed verify "2+2" --quiet  # Just outputs: ✅ VERIFIED: 4
 
 ---
 
-### `qwed interactive` - Interactive Mode
+### `qwed interactive` - interactive mode
 
 Start an interactive REPL session.
 
@@ -424,7 +424,7 @@ Hit Rate: 0.0%
 
 ---
 
-### `qwed cache` - Cache Management
+### `qwed cache` - cache management
 
 Manage verification result cache.
 
@@ -568,7 +568,7 @@ If you have run `qwed init`, the `ACTIVE_PROVIDER` value in your `.env` determin
 
 ## Output formats
 
-### Colorful Output (Default)
+### Colorful output (default)
 
 ```
 🔬 QWED Verification | Math Engine
@@ -582,7 +582,7 @@ If you have run `qwed init`, the `ACTIVE_PROVIDER` value in your `.env` determin
 ────────────────────────────────────────────────────────
 ```
 
-### Quiet Output (`--quiet`)
+### Quiet output (`--quiet`)
 
 ```
 ✅ VERIFIED: 4
@@ -628,7 +628,7 @@ Only `http` and `https` URLs are accepted. The imported YAML must contain `base_
 
 ## Use cases
 
-### 1. Quick Verification
+### 1. Quick verification
 
 ```bash
 qwed verify "Is 17 a prime number?"
@@ -647,7 +647,7 @@ if [[ $result == *"VERIFIED"* ]]; then
 fi
 ```
 
-### 3. Local Development
+### 3. Local development
 
 ```bash
 # Start Ollama
@@ -660,7 +660,7 @@ qwed interactive
 ✅ VERIFIED → 3*x**2
 ```
 
-### 4. Cache Performance Testing
+### 4. Cache performance testing
 
 ```bash
 # First run (cache miss)

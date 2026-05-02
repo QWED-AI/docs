@@ -7,7 +7,7 @@ description: "Learn the correct QWED integration pattern where QWED handles LLM 
 
 ---
 
-## ⚠️ Common Mistake
+## ⚠️ Common mistake
 
 **Most users think:**
 
@@ -35,7 +35,7 @@ qwed.verify(response.content)  # TOO LATE!
 
 ---
 
-## ✅ Correct Approach
+## ✅ Correct approach
 
 
 
@@ -61,11 +61,11 @@ print(result.verified)  # True ✅
 
 ---
 
-## 🔄 How QWED Really Works
+## 🔄 How QWED really works
 
 
 
-### Step-by-Step:
+### Step-by-step
 
 ```
 1️⃣ Your Code
@@ -91,9 +91,9 @@ print(result.verified)  # True ✅
 
 ---
 
-## 📖 Quick Start Examples
+## 📖 Quick start examples
 
-### 1️⃣ Math Verification
+### 1️⃣ Math verification
 
 ```python
 from qwed import QWEDClient
@@ -120,7 +120,7 @@ User Query → QWED → [LLM: "2+2=5"] → [SymPy: 4≠5] → ❌ Failed
 
 ---
 
-### 2️⃣ Code Security
+### 2️⃣ Code security
 
 ```python
 dangerous_code = """
@@ -149,9 +149,9 @@ Code → QWED → [LLM: Detects SQL] → [AST: f-string in query] → 🚫 BLOCK
 
 ---
 
-## 🎨 Visual Comparison
+## 🎨 Visual comparison
 
-### Traditional LLM Call:
+### Traditional LLM call
 
 ```
 ┌─────────────┐
@@ -169,7 +169,7 @@ Code → QWED → [LLM: Detects SQL] → [AST: f-string in query] → 🚫 BLOCK
 └─────────────┘
 ```
 
-### QWED Call:
+### QWED call
 
 ```
 ┌─────────────┐
@@ -227,7 +227,7 @@ Code → QWED → [LLM: Detects SQL] → [AST: f-string in query] → 🚫 BLOCK
 
 ---
 
-## 🎯 Do's and Don'ts
+## 🎯 Do's and don'ts
 
 ### ✅ DO:
 
@@ -267,9 +267,9 @@ use_value_directly(value)  # DANGEROUS!
 
 ---
 
-## 🎉 Quick Summary
+## 🎉 Quick summary
 
-### Remember These 3 Things:
+### Remember these 3 things
 
 1. **❌ Don't call LLM yourself**  
    Let QWED handle it internally
@@ -280,7 +280,7 @@ use_value_directly(value)  # DANGEROUS!
 3. **🔒 Trust the verification**  
    QWED uses formal methods, not guessing
 
-### One-Line Integration:
+### One-line integration
 
 ```python
 result = QWEDClient(api_key="...").verify("Your question here")

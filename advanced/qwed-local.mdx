@@ -6,25 +6,25 @@ sidebarTitle: "QWEDLocal"
 
 ## 🌟 Why QWEDLocal?
 
-### **No Backend Server Needed**
+### **No backend server needed**
 
 - Run verification directly in your application
 - No infrastructure to manage
 - Perfect for prototyping, scripts, and small projects
 
-### **100% Privacy**
+### **100% privacy**
 
 - Your API keys stay on your machine
 - Your data never touches QWED servers
 - Perfect for HIPAA, GDPR, sensitive data
 
-### **Model Agnostic**
+### **Model agnostic**
 
 - Works with **ANY LLM** - OpenAI, Anthropic, Gemini
 - Works with **local models** via Ollama (FREE!)
 - Works with **any OpenAI-compatible API**
 
-### **Smart Caching**
+### **Deterministic caching**
 
 - Automatic result caching saves API costs
 - 50-80% cost reduction on repeated queries
@@ -56,7 +56,7 @@ pip install colorama click
 
 ---
 
-## 🚀 Quick Start
+## 🚀 Quick start
 
 ### Option 1: Ollama (FREE! \$0/month)
 
@@ -116,9 +116,9 @@ result = client.verify("What is 5 factorial?")
 
 ---
 
-## 🔬 Verification Engines
+## 🔬 Verification engines
 
-### 1. Math Verification (SymPy)
+### 1. Math verification (SymPy)
 
 ```python
 result = client.verify_math("What is the integral of 2x?")
@@ -126,7 +126,7 @@ print(result.value)  # x**2
 print(result.evidence)  # {"method": "sympy_eval", ...}
 ```
 
-### 2. Logic Verification (Z3)
+### 2. Logic verification (Z3)
 
 ```python
 result = client.verify_logic("Is (p AND NOT p) satisfiable?")
@@ -134,7 +134,7 @@ print(result.value)  # FALSE (contradiction!)
 print(result.evidence)  # {"method": "z3_sat", ...}
 ```
 
-### 3. Code Security (AST)
+### 3. Code security (AST)
 
 ```python
 code = """
@@ -162,7 +162,7 @@ print(result.evidence["dangerous_patterns"])
 
 ---
 
-## ⚡ Smart Caching
+## ⚡ Deterministic caching
 
 **Automatic caching saves API costs!**
 
@@ -199,9 +199,9 @@ client = QWEDLocal(
 
 ---
 
-## 🎨 CLI Tool
+## 🎨 CLI tool
 
-### One-Shot Verification
+### One-shot verification
 
 ```bash
 # Basic usage
@@ -254,7 +254,7 @@ qwed interactive --help
 
 ---
 
-## 🎯 Cost Comparison
+## 🎯 Cost comparison
 
 | Tier | Monthly Cost | LLM Options | Best For |
 | --- | --- | --- | --- |
@@ -266,9 +266,9 @@ qwed interactive --help
 
 ---
 
-## 🔒 Privacy \\u0026 Security
+## 🔒 Privacy and security
 
-### **Your Data Never Leaves Your Machine**
+### **Your data never leaves your machine**
 
 **QWEDLocal architecture:**
 
@@ -314,14 +314,14 @@ client = QWEDLocal(
 )
 ```
 
-### Environment Variables
+### Environment variables
 
 ```bash
 export QWED_API_KEY="sk-..."
 export QWED_QUIET=1  # Disable colorful output
 ```
 
-### Quiet Mode (No Branding)
+### Quiet mode (no branding)
 
 ```python
 import os
@@ -336,7 +336,7 @@ result = client.verify("2+2")
 
 ## 📊 Examples
 
-### Example 1: Fact Checking Pipeline
+### Example 1: fact-checking pipeline
 
 ```python
 from qwed_sdk import QWEDLocal
@@ -354,7 +354,7 @@ for fact in facts_to_check:
     print(f"{fact}: {'✅' if result.verified else '❌'}")
 ```
 
-### Example 2: Code Review Automation
+### Example 2: code review automation
 
 ```python
 import os
@@ -376,7 +376,7 @@ for code in code_snippets:
         print(f"  Issues: {result.evidence['dangerous_patterns']}")
 ```
 
-### Example 3: Batch Processing with Cache
+### Example 3: batch processing with cache
 
 ```python
 from qwed_sdk import QWEDLocal
@@ -398,7 +398,7 @@ print(client.cache_stats)
 
 ## 🐛 Troubleshooting
 
-### LLM Not Available
+### LLM not available
 
 ```python
 # Check if Ollama is running
@@ -408,7 +408,7 @@ curl http://localhost:11434/v1/models
 ollama serve
 ```
 
-### Missing Dependencies
+### Missing dependencies
 
 ```bash
 # Install verification engines
@@ -418,7 +418,7 @@ pip install sympy z3-solver
 pip install openai anthropic google-generativeai
 ```
 
-### Cache Issues
+### Cache issues
 
 ```bash
 # Clear cache
@@ -430,7 +430,7 @@ client._cache.clear()
 
 ---
 
-## 🎓 Learn More
+## 🎓 Learn more
 
 - [**CLI Guide**](/advanced/cli) - Complete CLI reference
 - [**Ollama Integration**](/advanced/ollama) - FREE local LLMs

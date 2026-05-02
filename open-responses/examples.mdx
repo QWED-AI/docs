@@ -158,7 +158,7 @@ safety_guard = SafetyGuard(
 )
 ```
 
-### PII Blocked
+### PII blocked
 
 ```python
 # Agent generates summary with SSN
@@ -401,7 +401,7 @@ result = verifier.verify_tool_call(
 
 ## Best practices
 
-### 1. Layer Multiple Guards
+### 1. Layer multiple guards
 
 ```python
 # Defense in depth
@@ -414,7 +414,7 @@ verifier = ResponseVerifier(guards=[
 ])
 ```
 
-### 2. Fail Fast, Log Everything
+### 2. Fail fast, log everything
 
 ```python
 callback = QWEDCallbackHandler(
@@ -424,7 +424,7 @@ callback = QWEDCallbackHandler(
 )
 ```
 
-### 3. Environment-Specific Guards
+### 3. Environment-specific guards
 
 ```python
 if os.getenv("ENV") == "production":
@@ -433,7 +433,7 @@ else:
     guards = [ToolGuard(allow_unknown=True)]  # More lenient in dev
 ```
 
-### 4. Test Your Guards
+### 4. Test your guards
 
 ```python
 import pytest

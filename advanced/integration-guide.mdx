@@ -25,7 +25,7 @@ print(result["is_correct"])  # True
 
 ## Framework integrations
 
-### 1. LangChain Integration
+### 1. LangChain integration
 
 #### Basic Usage
 
@@ -81,7 +81,7 @@ result = verified_chain.run("What is 15% of $250?")
 
 ---
 
-### 2. CrewAI Integration
+### 2. CrewAI integration
 
 #### Agent-Level Verification
 
@@ -139,7 +139,7 @@ crew = Crew(agents=[quant, engineer, writer], tasks=[...])
 
 ---
 
-### 3. LlamaIndex Integration
+### 3. LlamaIndex integration
 
 ```python
 from llama_index.core import VectorStoreIndex, SimpleDirectoryReader
@@ -165,7 +165,7 @@ response = verified_engine.query(
 
 ---
 
-### 4. Standalone API Integration
+### 4. Standalone API integration
 
 #### REST API
 
@@ -215,7 +215,7 @@ else:
 
 ## Common patterns
 
-### Pattern 1: Pre-Execution Verification
+### Pattern 1: pre-execution verification
 
 ```python
 def safe_execute_llm_code(llm_code: str):
@@ -232,7 +232,7 @@ def safe_execute_llm_code(llm_code: str):
     exec(llm_code)
 ```
 
-### Pattern 2: Fallback on Verification Failure
+### Pattern 2: fallback on verification failure
 
 ```python
 def verified_llm_call(prompt: str, max_retries=3):
@@ -254,7 +254,7 @@ def verified_llm_call(prompt: str, max_retries=3):
     raise ValueError("LLM failed verification after retries")
 ```
 
-### Pattern 3: Batch Verification
+### Pattern 3: batch verification
 
 ```python
 from qwed_new.core.code_verifier import CodeVerifier
@@ -298,7 +298,7 @@ services:
       - "6379:6379"
 ```
 
-### Environment Variables
+### Environment variables
 
 ```bash
 # .env
@@ -333,7 +333,7 @@ client = QWEDClient(
 
 ## Troubleshooting
 
-### Issue: Verification Timeouts
+### Issue: verification timeouts
 
 **Solution:** Reduce complexity or increase timeout
 
@@ -345,7 +345,7 @@ result = verifier.verify_code(
 )
 ```
 
-### Issue: False Rejections
+### Issue: false rejections
 
 **Solution:** Use tolerance for floating-point math
 
@@ -357,7 +357,7 @@ result = engine.verify_math(
 )
 ```
 
-### Issue: Unsupported Domain
+### Issue: unsupported domain
 
 **Solution:** Check domain coverage
 

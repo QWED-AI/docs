@@ -171,13 +171,13 @@ sudo systemctl enable docker
 sudo usermod -aG docker $USER
 ```
 
-### 2. Python Dependencies
+### 2. Python dependencies
 ```bash
 # Install dependencies
 pip install -e .
 ```
 
-### 3. Database Setup
+### 3. Database setup
 Ensure PostgreSQL and Redis are running. Set the `DATABASE_URL` and `REDIS_URL` environment variables.
 
 Initialize the database:
@@ -211,7 +211,7 @@ gunicorn qwed_new.api.main:app -w 4 -k uvicorn.workers.UvicornWorker --bind 0.0.
 `API_KEY_SECRET` no longer has a default value. The server will refuse to start if it is not set. This prevents accidental deployment with a weak default secret.
 </Warning>
 
-### Security Configuration
+### Security configuration
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `MAX_INPUT_LENGTH` | Max query length (chars) | 2000 |
@@ -220,7 +220,7 @@ gunicorn qwed_new.api.main:app -w 4 -k uvicorn.workers.UvicornWorker --bind 0.0.
 | `DOCKER_MEMORY_LIMIT` | Container memory limit | 512m |
 | `QWED_SKIP_ENV_INTEGRITY_CHECK` | Skip `.pth` file verification on startup | `false` |
 
-### AI Providers
+### AI providers
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `ACTIVE_PROVIDER` | Selected LLM provider | `azure_openai` |
@@ -241,12 +241,12 @@ gunicorn qwed_new.api.main:app -w 4 -k uvicorn.workers.UvicornWorker --bind 0.0.
 
 Before going to production, ensure the following:
 
-### 1. Database Setup
+### 1. Database setup
 - [ ] Use a managed PostgreSQL instance (e.g., AWS RDS, Azure Database for PostgreSQL).
 - [ ] Enable automated backups.
 - [ ] Run database migrations.
 
-### 2. Redis Configuration
+### 2. Redis configuration
 - [ ] Use a managed Redis instance (e.g., AWS ElastiCache).
 - [ ] Configure eviction policy (LRU).
 - [ ] Enable persistence (RDB/AOF).

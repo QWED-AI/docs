@@ -41,7 +41,7 @@ Our results demonstrate that deterministic verification—not probabilistic impr
 
 ## 1. Introduction
 
-### 1.1 The AI Hallucination Crisis
+### 1.1 The AI hallucination crisis
 
 The deployment of Large Language Models in enterprise applications has exposed a critical vulnerability: LLMs produce confident, plausible-sounding outputs that are factually incorrect. These "hallucinations" are not bugs to be fixed but inherent properties of probabilistic token prediction systems.
 
@@ -55,7 +55,7 @@ Consider a financial application where GPT-4 is asked to calculate compound inte
 
 The LLM applied simple interest (`100000 * 0.05 * 10 = 50000`) instead of the compound formula (`100000 * (1.05)^10`). This represents a **$12,889 error per transaction**—unacceptable in production financial systems.
 
-### 1.2 Why Current Approaches Are Insufficient
+### 1.2 Why current approaches are insufficient
 
 The industry has attempted several approaches to address hallucinations:
 
@@ -69,9 +69,9 @@ The industry has attempted several approaches to address hallucinations:
 
 All these approaches share a fundamental flaw: they attempt to make probabilistic systems more accurate rather than verifying their outputs deterministically.
 
-### 1.3 The Untrusted Translator Paradigm
+### 1.3 The untrusted translator paradigm
 
-QWED introduces a paradigm shift: treat the LLM as an **untrusted translator** rather than a trusted oracle. 
+QWED inverts the trust model: treat the LLM as an **untrusted translator** rather than a trusted oracle.
 
 In this model:
 - The LLM translates natural language queries into structured outputs (code, equations, SQL)
@@ -96,9 +96,9 @@ This paper makes the following contributions:
 
 ---
 
-## 2. Background and Related Work
+## 2. Background and related work
 
-### 2.1 Formal Verification
+### 2.1 Formal verification
 
 Formal verification uses mathematical methods to prove or disprove the correctness of systems. QWED builds on decades of research in this field.
 
@@ -108,7 +108,7 @@ Formal verification uses mathematical methods to prove or disprove the correctne
 
 **Computer Algebra Systems:** SymPy [3] provides symbolic mathematics capabilities including differentiation, integration, and equation solving—enabling verification of mathematical claims without numerical approximation.
 
-### 2.2 LLM Limitations
+### 2.2 LLM limitations
 
 Recent research has documented systematic LLM failures:
 
@@ -118,13 +118,13 @@ Recent research has documented systematic LLM failures:
 
 These failures are not addressable through scale alone; they require external verification.
 
-### 2.3 Existing Verification Approaches
+### 2.3 Existing verification approaches
 
 **Guardrails AI** and **NeMo Guardrails** provide output filtering but operate on pattern matching rather than formal verification. **LangChain's Tool Calling** enables LLMs to invoke external functions but does not verify the correctness of the calls themselves.
 
 QWED differs by applying formal methods—mathematical proof rather than heuristic checking.
 
-### 2.4 Regulatory Context
+### 2.4 Regulatory context
 
 The **EU AI Act** (2024) classifies AI systems by risk level, with "high-risk" applications in finance and healthcare requiring documented accuracy and reliability guarantees. The **NIST AI Risk Management Framework** (2023) emphasizes the need for AI systems that are "valid and reliable."
 
@@ -132,9 +132,9 @@ QWED's deterministic verification provides the formal guarantees these regulatio
 
 ---
 
-## 3. The QWED Protocol Architecture
+## 3. The QWED protocol architecture
 
-### 3.1 System Overview
+### 3.1 System overview
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -205,7 +205,7 @@ QWED's deterministic verification provides the formal guarantees these regulatio
           └──────────────────┘        └──────────────────┘
 ```
 
-### 3.2 Core Principles
+### 3.2 Core principles
 
 **Principle 1: Zero Trust**
 Every LLM output is treated as potentially incorrect until proven otherwise.
@@ -219,7 +219,7 @@ If verification cannot be completed (timeout, unsupported domain), the output is
 **Principle 4: Transparency**
 Every verification produces an auditable proof trace.
 
-### 3.3 Verification Flow
+### 3.3 Verification flow
 
 1. **Domain Detection:** QWED analyzes the query and LLM output to determine which verification engine(s) apply
 2. **Structured Extraction:** The LLM output is parsed into a formal structure (AST, equation, SQL query)
@@ -229,11 +229,11 @@ Every verification produces an auditable proof trace.
 
 ---
 
-## 4. The Eight Verification Engines
+## 4. The eight verification engines
 
 QWED implements eight specialized verification engines, each targeting a specific domain of LLM failure.
 
-### 4.1 Math Verification Engine
+### 4.1 Math verification engine
 
 **Technology Stack:** SymPy, NumPy
 
@@ -269,7 +269,7 @@ def verify_derivative(expression: str, claimed_derivative: str) -> bool:
 - Linear algebra (matrix operations, eigenvalues)
 - Financial calculations (compound interest, NPV, IRR)
 
-### 4.2 Logic Verification Engine
+### 4.2 Logic verification engine
 
 **Technology Stack:** Z3 Prover (SMT Solver)
 
@@ -302,7 +302,7 @@ def verify_logical_consistency(premises: List[str], conclusion: str) -> bool:
 - Integer and real arithmetic constraints
 - Satisfiability checking
 
-### 4.3 Code Security Engine
+### 4.3 Code security engine
 
 **Technology Stack:** Python AST, Semgrep patterns
 
@@ -346,7 +346,7 @@ def verify_code_safety(code: str) -> Dict[str, Any]:
 - Hardcoded secrets and API keys
 - Insecure cryptographic usage
 
-### 4.4 SQL Verification Engine
+### 4.4 SQL verification engine
 
 **Technology Stack:** SQLGlot
 
@@ -380,7 +380,7 @@ def verify_sql_safety(query: str, schema: Dict) -> Dict[str, Any]:
         return {'is_safe': False, 'reason': f'Parse error: {e}'}
 ```
 
-### 4.5 Statistics Engine
+### 4.5 Statistics engine
 
 **Technology Stack:** Pandas, WebAssembly sandboxing
 
@@ -392,7 +392,7 @@ def verify_sql_safety(query: str, schema: Dict) -> Dict[str, Any]:
 - Regression coefficient checking
 - Dataset integrity verification
 
-### 4.6 Fact Checking Engine
+### 4.6 Fact-checking engine
 
 **Technology Stack:** TF-IDF, Natural Language Inference (NLI)
 
@@ -406,7 +406,7 @@ def verify_sql_safety(query: str, schema: Dict) -> Dict[str, Any]:
 
 > **Important:** The Fact Engine does not attempt semantic understanding or deep meaning resolution. It verifies grounding and entailment consistency against provided sources, not truth of language.
 
-### 4.7 Image Verification Engine
+### 4.7 Image verification engine
 
 **Technology Stack:** OpenCV, Pillow, Metadata extraction
 
@@ -417,7 +417,7 @@ def verify_sql_safety(query: str, schema: Dict) -> Dict[str, Any]:
 - Metadata consistency checking
 - Basic content validation (faces detected, colors present)
 
-### 4.8 Consensus Engine (Consistency Checker)
+### 4.8 Consensus engine (consistency checker)
 
 **Technology Stack:** Multi-provider API calls
 
@@ -433,7 +433,7 @@ def verify_sql_safety(query: str, schema: Dict) -> Dict[str, Any]:
 
 ---
 
-## 5. Symbolic Execution and Bounded Model Checking
+## 5. Symbolic execution and bounded model checking
 
 ### 5.1 Integration with CrossHair
 
@@ -453,7 +453,7 @@ result = verifier.verify_code(code)
 # Returns counterexample: y=0 causes ZeroDivisionError
 ```
 
-### 5.2 Bounded Model Checking
+### 5.2 Bounded model checking
 
 To prevent path explosion in programs with loops and recursion, QWED implements bounded model checking:
 
@@ -487,7 +487,7 @@ Symbolic execution is computationally expensive for complex programs. QWED provi
 
 ---
 
-## 6. Benchmark Results
+## 6. Benchmark results
 
 ### 6.1 Methodology
 
@@ -533,7 +533,7 @@ We evaluated QWED against **Claude Opus 4.5** across 215 test cases in four cate
         Legend: ███ Claude Opus 4.5 (73-85%)    ███ QWED (100%)
 ```
 
-### 6.2.1 Per-Engine Ablation Study
+### 6.2.1 Per-engine ablation study
 
 To address transparency requirements, we provide a detailed breakdown of which verification engine caught which types of errors. This demonstrates that QWED's error detection is attributable to specific formal methods rather than heuristic filtering.
 
@@ -569,7 +569,7 @@ To address transparency requirements, we provide a detailed breakdown of which v
 
 > **Economic Insight:** In high-stakes systems, expected loss is dominated by rare but severe errors. A 73% accuracy rate is acceptable in conversational AI but catastrophic in financial systems where a single error costs thousands.
 
-### 6.3 Comparison with Existing Approaches
+### 6.3 Comparison with existing approaches
 
 | Approach | Deterministic | Provable | Latency | Coverage |
 |----------|---------------|----------|---------|----------|
@@ -579,7 +579,7 @@ To address transparency requirements, we provide a detailed breakdown of which v
 | RAG | No | No | ~200ms | Knowledge only |
 | Prompt Engineering | No | No | 0ms | None |
 
-### 6.4 Case Study: The $12,889 Bug
+### 6.4 Case study: the $12,889 bug
 
 **Scenario:** Financial application calculating compound interest
 
@@ -602,7 +602,7 @@ assert FV_claimed != FV_actual
 
 **Business Impact:** $12,889 error per transaction. At 1,000 transactions/day = **$4.7M annual loss**.
 
-### 6.5 Benchmark Dataset Availability
+### 6.5 Benchmark dataset availability
 
 The complete benchmark suite (215 test cases) is available at:
 
@@ -616,9 +616,9 @@ Includes:
 
 ---
 
-## 7. Integration Guide
+## 7. Integration guide
 
-### 7.1 LangChain Integration
+### 7.1 LangChain integration
 
 ```python
 from qwed_sdk.langchain import QWEDTool
@@ -634,7 +634,7 @@ agent = create_agent(
 )
 ```
 
-### 7.2 CrewAI Integration
+### 7.2 CrewAI integration
 
 ```python
 from qwed_sdk.crewai import QWEDVerifiedAgent
@@ -647,7 +647,7 @@ analyst = QWEDVerifiedAgent(
 )
 ```
 
-### 7.3 API Architecture
+### 7.3 API architecture
 
 ```
 POST /api/v1/verify
@@ -680,11 +680,11 @@ X-API-Key: qwed_...
 
 ---
 
-## 8. Limitations and Transparency
+## 8. Limitations and transparency
 
 > **Explicit Limitation:** QWED does not verify free-form natural language reasoning, subjective analysis, or creative text. Any claim that cannot be reduced to a formal artifact is intentionally rejected.
 
-### 8.1 Threat Model
+### 8.1 Threat model
 
 **QWED defends against:**
 - ✓ Mathematical computation errors
@@ -698,7 +698,7 @@ X-API-Key: qwed_...
 - ✗ Model extraction or membership inference attacks
 - ✗ Semantic deception within valid formal structures
 
-### 8.2 Structured Output Requirement
+### 8.2 Structured output requirement
 
 QWED requires LLM outputs to be in parseable formats (JSON, code blocks, mathematical notation). This means:
 
@@ -706,7 +706,7 @@ QWED requires LLM outputs to be in parseable formats (JSON, code blocks, mathema
 - Freeform text responses cannot be directly verified
 - Integration requires output formatting configuration
 
-### 8.3 Latency Considerations
+### 8.3 Latency considerations
 
 Verification introduces latency overhead:
 
@@ -719,11 +719,11 @@ Verification introduces latency overhead:
 
 QWED provides a `get_verification_budget()` API to estimate feasibility before execution.
 
-### 8.4 Domain Coverage
+### 8.4 Domain coverage
 
 QWED currently supports eight verification domains. Outputs outside these domains (creative writing, subjective opinions, open-ended analysis) cannot be verified deterministically.
 
-### 8.5 Code and Data Availability
+### 8.5 Code and data availability
 
 - **License:** Apache 2.0
 - **Benchmarks:** https://github.com/QWED-AI/qwed-verification/tree/main/benchmarks
@@ -744,17 +744,17 @@ pip install -r requirements.txt
 
 ---
 
-## 9. Future Work
+## 9. Future work
 
-### Phase 3: LLM-Assisted Specification Generation
+### Phase 3: LLM-assisted specification generation
 
 Use LLMs to generate verification specifications from docstrings and comments, which QWED then validates deterministically.
 
-### Phase 4: Algorithm Equivalence Proofs
+### Phase 4: algorithm equivalence proofs
 
 Verify that two code implementations produce identical outputs for all inputs—useful for validating refactoring.
 
-### Phase 5: Natural Language Contract Verification
+### Phase 5: natural language contract verification
 
 Extend QWED to legal contracts and regulatory compliance documents, verifying that AI-generated analyses align with regulatory requirements.
 
