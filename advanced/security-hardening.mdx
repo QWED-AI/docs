@@ -195,6 +195,28 @@ If the Docker daemon is unreachable, the affected endpoints return HTTP 503 rath
 
 This design ensures that a Docker outage is surfaced as a visible service disruption rather than silently downgrading security.
 
+#### Fail-closed when `CodeVerifier` cannot be imported
+
+<Info>Updated May 2, 2026</Info>
+
+`SecureCodeExecutor` delegates code-safety verification to `qwed_new.core.code_verifier.CodeVerifier`. If that import fails — for example, after a partial install or a version mismatch — the executor now blocks execution instead of falling back to a permissive keyword scan.
+
+When `CodeVerifier` is unavailable, `SecureCodeExecutor.execute()` returns:
+
+```python
+success = False
+error   = "Code safety validation failed: CodeVerifier unavailable; cannot validate code safety."
+result  = None
+```
+
+If the basic keyword scan would have flagged the input as dangerous, its reason is appended to the error message as advisory context only — it does not authorize execution:
+
+```text
+Code safety validation failed: CodeVerifier unavailable; cannot validate code safety. Advisory-only fallback also flagged: dangerous operation
+```
+
+The container is never started in either case. To restore execution, fix the underlying import error so `from qwed_new.core.code_verifier import CodeVerifier` succeeds. Do not rely on the heuristic keyword scan as a substitute for the structured verifier.
+
 #### Legacy `CodeExecutor` hard-blocked
 
 The legacy `CodeExecutor` class — which previously used raw `exec()` to run model-generated Python — is now permanently hard-blocked. Any call to `CodeExecutor.execute()` raises a `RuntimeError` directing you to use `SecureCodeExecutor` instead.

@@ -5,7 +5,38 @@ description: "All notable changes to QWED Protocol — releases, features, secur
 
 All notable changes to the QWED platform, listed by release.
 
-**Jump to:** [QWED-Finance security audit — OpenResponses fail-closed](#qwed-finance--openresponses-fail-closed-and-computed-status) · [QWED-Finance security audit — rate parsing](#qwed-finance--rate-parsing-heuristic-removed) · [QWED-Verification symbolic verifier fail-closed](#qwed-verification--symbolic-verifier-fail-closed-without-proof) · [QWED-Verification strict additionalProperties](#qwed-verification--strict-additionalproperties-fail-closed) · [QWED-Tax example redaction](#qwed-tax-—-redacted-preflight-block-details-in-examples) · [QWED-Tax decimal hardening](#qwed-tax-—-decimal-hardening-in-financial-guards) · [v5.1.0](#v5-1-0-—-agent-state-governance-and-fail-closed-hardening) · [v5.0.0](#v5-0-0-—-enforcement-boundary-hardening) · [v4.0.5](#v4-0-5-—-stats-exception-masking) · [v4.0.4](#v4-0-4-—-fail-closed-execution-enforcement) · [v4.0.3](#v4-0-3-—-server-enforced-agent-security) · [v4.0.2](#v4-0-2-—-security-cleanup) · [v4.0.1](#v4-0-1-—-sentinel-guard-sync) · [v4.0.0](#v4-0-0-—-sentinel-edition) · [v3.0.1](#v3-0-1-—-ironclad-update) · [v2.4.1](#v2-4-1-—-the-reasoning-engine)
+**Jump to:** [QWED-Verification SecureCodeExecutor fail-closed fallback](#qwed-verification--securecodeexecutor-fail-closed-when-codeverifier-is-unavailable) · [QWED-Finance security audit — OpenResponses fail-closed](#qwed-finance--openresponses-fail-closed-and-computed-status) · [QWED-Finance security audit — rate parsing](#qwed-finance--rate-parsing-heuristic-removed) · [QWED-Verification symbolic verifier fail-closed](#qwed-verification--symbolic-verifier-fail-closed-without-proof) · [QWED-Verification strict additionalProperties](#qwed-verification--strict-additionalproperties-fail-closed) · [QWED-Tax example redaction](#qwed-tax-—-redacted-preflight-block-details-in-examples) · [QWED-Tax decimal hardening](#qwed-tax-—-decimal-hardening-in-financial-guards) · [v5.1.0](#v5-1-0-—-agent-state-governance-and-fail-closed-hardening) · [v5.0.0](#v5-0-0-—-enforcement-boundary-hardening) · [v4.0.5](#v4-0-5-—-stats-exception-masking) · [v4.0.4](#v4-0-4-—-fail-closed-execution-enforcement) · [v4.0.3](#v4-0-3-—-server-enforced-agent-security) · [v4.0.2](#v4-0-2-—-security-cleanup) · [v4.0.1](#v4-0-1-—-sentinel-guard-sync) · [v4.0.0](#v4-0-0-—-sentinel-edition) · [v3.0.1](#v3-0-1-—-ironclad-update) · [v2.4.1](#v2-4-1-—-the-reasoning-engine)
+
+---
+
+## QWED-Verification — SecureCodeExecutor fail-closed when CodeVerifier is unavailable
+**Released: May 2, 2026**
+
+> Closes a fail-open gap in `SecureCodeExecutor._is_safe_code()`. When the primary `CodeVerifier` cannot be imported, execution is now blocked instead of falling back to a permissive keyword check that could authorize otherwise-unsafe code.
+
+### What changed
+
+- **`SecureCodeExecutor._is_safe_code`** — An `ImportError` on `CodeVerifier` no longer routes authorization to `_basic_safety_check()`. The method returns `(False, "CodeVerifier unavailable; cannot validate code safety.")` and execution does not reach `containers.run()`.
+- **Advisory-only heuristic** — The basic keyword scan is retained as advisory context. If it would have flagged the code, its reason is appended to the error message (`"Advisory-only fallback also flagged: <reason>"`), but it never authorizes execution on its own.
+- **`execute()` surface** — Calls into `SecureCodeExecutor.execute(code, context)` now return `(success=False, error="Code safety validation failed: CodeVerifier unavailable; cannot validate code safety.", result=None)` whenever `CodeVerifier` is missing, regardless of the input.
+
+### Behavior comparison
+
+| `CodeVerifier` available? | Code | Before | After |
+| --- | --- | --- | --- |
+| Yes | Any | Verified by `CodeVerifier` | Verified by `CodeVerifier` (unchanged) |
+| No | `print("hello")` | Allowed via basic keyword check | Blocked (`CodeVerifier unavailable`) |
+| No | `import os; os.system("ls")` | Blocked by basic keyword check | Blocked (`CodeVerifier unavailable; Advisory-only fallback also flagged: dangerous operation`) |
+
+### Upgrade notes
+
+<Warning>
+Self-hosted deployments that relied on the implicit basic-keyword fallback when `qwed_new.core.code_verifier` failed to import must now ensure `CodeVerifier` is installed and importable. While the verifier is unavailable, both `/verify/stats` and `/verify/consensus` Python execution paths return a safety-check failure with no container run.
+
+If you see `Code safety validation failed: CodeVerifier unavailable` in logs, fix the import error in `qwed_new.core.code_verifier` rather than disabling the safety gate.
+</Warning>
+
+See [Security hardening — Fail-closed code execution](/advanced/security-hardening#fail-closed-code-execution) for the updated fallback behavior.
 
 ---
 
