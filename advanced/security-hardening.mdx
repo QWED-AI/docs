@@ -195,6 +195,31 @@ If the Docker daemon is unreachable, the affected endpoints return HTTP 503 rath
 
 This design ensures that a Docker outage is surfaced as a visible service disruption rather than silently downgrading security.
 
+#### Fail-closed when `CodeVerifier` is unavailable or failing
+
+<Info>Updated May 2, 2026</Info>
+
+`SecureCodeExecutor` delegates code-safety verification to `qwed_new.core.code_verifier.CodeVerifier`. The executor now blocks execution in two scenarios that previously could downgrade safety:
+
+- **Import failure** — `from qwed_new.core.code_verifier import CodeVerifier` raises `ImportError` (for example, after a partial install or version mismatch).
+- **Runtime failure** — `CodeVerifier.verify_code()` raises any unexpected exception (for example, an internal engine error). The exception is caught, sanitized, and logged; it is not surfaced to API callers.
+
+Both cases route through the same `_build_fail_closed_safety_denial()` helper, so the response is deterministic. `SecureCodeExecutor.execute()` returns:
+
+```python
+success = False
+error   = "Code safety validation failed: CodeVerifier unavailable; cannot validate code safety."
+result  = None
+```
+
+If the basic keyword scan would have flagged the input as dangerous, its reason is appended to the error message as advisory context only — it does not authorize execution:
+
+```text
+Code safety validation failed: CodeVerifier unavailable; cannot validate code safety. Advisory-only fallback also flagged: dangerous operation
+```
+
+The container is never started in any of these cases. To restore execution, fix the underlying import error or runtime failure in `qwed_new.core.code_verifier`. Do not rely on the heuristic keyword scan as a substitute for the structured verifier.
+
 #### Legacy `CodeExecutor` hard-blocked
 
 The legacy `CodeExecutor` class — which previously used raw `exec()` to run model-generated Python — is now permanently hard-blocked. Any call to `CodeExecutor.execute()` raises a `RuntimeError` directing you to use `SecureCodeExecutor` instead.
