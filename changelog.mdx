@@ -19,6 +19,8 @@ All notable changes to the QWED platform, listed by release.
 - **`RiskGuard` (C-03)** — `verify_var()`, `verify_beta()`, `verify_sharpe_ratio()`, `verify_sortino_ratio()`, `verify_max_drawdown()`, and `verify_information_ratio()` use `Decimal` accumulation and `Decimal.sqrt()`. `Z_SCORES` lookup constants are `Decimal`.
 - **Greeks output type** — `_calculate_greeks()` returns `Decimal.quantize()` strings instead of rounded floats.
 - **Catastrophic cancellation fix** — Beta accumulation in `RiskGuard` no longer suffers from float cancellation errors on small return series.
+- **`BondGuard._parse_rate()` return type** — Now returns `Decimal` instead of `float`, removing the `Decimal(str(float(...)))` round-trip at every call site.
+- **Money formatting** — Bond accrued-interest and dirty-price outputs use `Decimal.quantize()` instead of `f"{x:.2f}"`, eliminating the last `float`-style format specifiers.
 
 ### Breaking changes
 
