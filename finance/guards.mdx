@@ -7,7 +7,7 @@ description: "QWED Finance guards for financial AI verification including Compli
 
 QWED-Finance uses **Neurosymbolic AI** - combining neural (LLM) outputs with symbolic (math/logic) verification.
 
-## 1. Compliance Guard (Z3)
+## 1. Compliance guard (Z3)
 
 **Purpose:** Verify KYC/AML regulatory decisions using formal boolean logic.
 
@@ -48,7 +48,7 @@ solver.add(Implies(amount >= 10000, flag == True))
 
 ---
 
-## 2. Calendar Guard (SymPy)
+## 2. Calendar guard (SymPy)
 
 **Purpose:** Deterministic day count conventions for interest calculations.
 
@@ -80,7 +80,7 @@ result = guard.verify_day_count(
 
 ---
 
-## 3. Derivatives Guard (Black-Scholes)
+## 3. Derivatives guard (Black-Scholes)
 
 **Purpose:** Options pricing and margin verification using pure calculus.
 
@@ -134,7 +134,7 @@ Decimal(greeks["delta"]) * Decimal(notional)  # "0.4502" → exact
 
 ---
 
-## 4. Message Guard (XML Schema)
+## 4. Message guard (XML schema)
 
 **Purpose:** Validate ISO 20022 and SWIFT messages before transmission.
 
@@ -175,7 +175,7 @@ result = guard.verify_swift_mt(
 
 ---
 
-## 5. ISOGuard (JSON Schema)
+## 5. ISOGuard (JSON schema)
 
 **Purpose:** Enforce ISO 20022 compliance for JSON-based Agentic Banking.
 
@@ -203,7 +203,7 @@ While `MessageGuard` handles traditional XML SWIFT messages, `ISOGuard` enables 
 
 ---
 
-## 6. Query Guard (SQLGlot)
+## 6. Query guard (SQLGlot)
 
 **Purpose:** Prevent SQL injection and unauthorized data access.
 
@@ -240,9 +240,9 @@ SELECT * FROM (DELETE FROM users RETURNING *) AS x
 
 ---
 
-## 7. Cross-Guard (Multi-Layer)
+## 7. Cross-guard (multi-layer)
 
-**Purpose:** Combine multiple guards for comprehensive verification.
+**Purpose:** Combine multiple guards to verify every component.
 
 ```python
 from qwed_finance import CrossGuard
@@ -259,7 +259,7 @@ result = guard.verify_swift_with_sanctions(
 
 ---
 
-## 8. Bond Guard (Yield Analytics)
+## 8. Bond guard (yield analytics)
 
 **Purpose:** Verify fixed income calculations like Yield to Maturity (YTM) and duration using Newton-Raphson.
 
@@ -323,7 +323,7 @@ guard = BondGuard(tolerance_pct="0.5")
 `verify_ytm`, `verify_duration`, and `verify_convexity` return their `details` fields as quantized strings (e.g. `"5.6601%"`) instead of raw floats.
 </Info>
 
-## 9. FX Guard (Currency Arbitration)
+## 9. FX guard (currency arbitration)
 
 **Purpose:** Validate cross-currency conversions and detect arbitrage opportunities.
 
@@ -345,7 +345,7 @@ result = guard.verify_conversion(
 
 ---
 
-## 10. Risk Guard (Portfolio Metrics)
+## 10. Risk guard (portfolio metrics)
 
 **Purpose:** Ensure risk metrics like Sharpe Ratio and VaR (Value at Risk) are mathematically consistent.
 
