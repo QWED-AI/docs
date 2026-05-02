@@ -17,7 +17,7 @@ All notable changes to the QWED platform, listed by release.
 - **`OpenResponsesIntegration._verify_option_price`** — Removed the duplicate IEEE-754 `math.log/exp/sqrt/erf` Black-Scholes routine. The `price_option` tool now delegates to `DerivativesGuard.verify_black_scholes()`, so OpenResponses-mediated pricing and direct guard pricing are bit-identical.
 - **Tool result fields** — `price` and `delta` are now sourced from the guard's `mpmath`-backed, `Decimal`-quantized output instead of the integration's own float computation.
 - **`FinanceVerifier.verify_compound_interest`** — Unknown values for `compounding` now raise `ValueError` listing the accepted frequencies (`annual`, `semi-annual`, `quarterly`, `monthly`, `daily`). Previously, unknown values silently fell back to annual compounding.
-- **Test suite** — 149 tests pass; zero regressions.
+- **Test suite** — 150 tests pass (including a regression test that asserts unknown compounding frequencies raise `ValueError`); zero regressions.
 
 ### Breaking changes
 
