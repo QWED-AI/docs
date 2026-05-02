@@ -6,7 +6,7 @@ description: "QWED API rate limiting by plan tier. Learn about Free, Pro, and En
 
 API rate limiting and quotas.
 
-## Default Limits
+## Default limits
 
 | Plan | Requests/min | Requests/day | Batch size |
 |------|--------------|--------------|------------|
@@ -14,7 +14,7 @@ API rate limiting and quotas.
 | **Pro** | 600 | 50,000 | 50 |
 | **Enterprise** | Unlimited | Unlimited | 100 |
 
-## Rate Limit Headers
+## Rate limit headers
 
 Every response includes rate limit headers:
 
@@ -30,7 +30,7 @@ X-RateLimit-Reset: 1703073600
 | `X-RateLimit-Remaining` | Requests remaining |
 | `X-RateLimit-Reset` | Unix timestamp of reset |
 
-## Rate Limit Response
+## Rate limit response
 
 When rate limited, you'll receive:
 
@@ -50,7 +50,7 @@ When rate limited, you'll receive:
 
 HTTP Status: `429 Too Many Requests`
 
-## Best Practices
+## Best practices
 
 ### 1. Implement Exponential Backoff
 
@@ -95,7 +95,7 @@ def cached_verify(client, query):
     return result
 ```
 
-## Per-Endpoint Limits
+## Per-endpoint limits
 
 Some endpoints have specific limits:
 

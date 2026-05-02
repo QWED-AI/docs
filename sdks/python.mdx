@@ -12,7 +12,7 @@ The official Python SDK for QWED.
 pip install qwed
 ```
 
-## Quick Start
+## Quick start
 
 ```python
 from qwed_sdk import QWEDClient
@@ -29,7 +29,7 @@ print(result.status)    # "VERIFIED"
 As of v5.0.0, the `status` field may return `INCONCLUSIVE`, `BLOCKED`, or `UNKNOWN` in addition to `VERIFIED` and `ERROR`. Natural-language math queries return `INCONCLUSIVE` when the inner engine succeeds, because the LLM translation step is non-deterministic. See the [trust boundary documentation](/api/endpoints#post-verifynatural_language) for details.
 </Note>
 
-## Async Client
+## Async client
 
 ```python
 from qwed_sdk import QWEDAsyncClient
@@ -226,7 +226,7 @@ result = cfg_guard.verify_config_safety(config_data)
 
 See the [SDK Guards reference](/sdks/guards) for complete documentation.
 
-## Environment Variables
+## Environment variables
 
 | Variable        | Description  |
 | --------------- | ------------ |

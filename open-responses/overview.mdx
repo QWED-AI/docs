@@ -26,7 +26,7 @@ QWED Open Responses provides **deterministic verification guards** for AI agent 
 
 Use it when you need runtime tool call verification, AI safety guardrails, and policy enforcement before an agent executes an action.
 
-### The Problem
+### The problem
 
 When AI agents execute tools or generate structured outputs, they can:
 - 🔧 **Call dangerous functions** - `rm -rf /`, `DROP TABLE`
@@ -35,7 +35,7 @@ When AI agents execute tools or generate structured outputs, they can:
 - 🔐 **Leak sensitive data** - PII, API keys in responses
 - 💰 **Exceed budgets** - Unlimited API calls
 
-### The Solution
+### The solution
 
 QWED Open Responses intercepts and verifies every agent output before execution:
 
@@ -48,7 +48,7 @@ AI Agent Output → Guards → Verified? → Execute
 
 ---
 
-## How It Works
+## How it works
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -86,7 +86,7 @@ AI Agent Output → Guards → Verified? → Execute
 
 ---
 
-## The 6 Guards
+## The 6 guards
 
 | Guard | What It Verifies | Example Catch |
 |-------|------------------|---------------|
@@ -107,7 +107,7 @@ AI Agent Output → Guards → Verified? → Execute
 pip install qwed-open-responses
 ```
 
-### With Framework Integrations
+### With framework integrations
 
 ```bash
 # OpenAI
@@ -122,9 +122,9 @@ pip install qwed-open-responses[all]
 
 ---
 
-## Quick Start
+## Quick start
 
-### Basic Verification
+### Basic verification
 
 ```python
 from qwed_open_responses import ResponseVerifier
@@ -152,7 +152,7 @@ else:
     print(f"   Failed guard: {result.failed_guard}")
 ```
 
-### Verify Structured Output
+### Verify structured output
 
 ```python
 from qwed_open_responses.guards import SchemaGuard
@@ -180,7 +180,7 @@ result = verifier.verify_structured_output(
 
 ---
 
-## Framework Integration
+## Framework integration
 
 ### LangChain
 
@@ -302,7 +302,7 @@ print(middleware.get_stats())
 
 ## Why QWED Open Responses?
 
-### Security Comparison
+### Security comparison
 
 | Threat | Without Verification | With QWED |
 |--------|---------------------|-----------|
@@ -312,7 +312,7 @@ print(middleware.get_stats())
 | PII in API response | 📋 Compliance violation | ✅ **DETECTED** |
 | Infinite tool loop | 💰 $10,000 API bill | ✅ **BUDGET GUARD** |
 
-### Real-World Impact
+### Real-world impact
 
 - **Finance:** Prevent wrong calculations in trading bots
 - **Healthcare:** Block PII leaks in patient summaries
@@ -323,7 +323,7 @@ print(middleware.get_stats())
 
 ## Configuration
 
-### Environment Variables
+### Environment variables
 
 | Variable | Description | Default |
 |----------|-------------|---------|
@@ -331,7 +331,7 @@ print(middleware.get_stats())
 | `QWED_OR_STRICT` | Fail on any guard failure | `true` |
 | `QWED_OR_MAX_BUDGET` | Maximum API cost allowed | `100.0` |
 
-### Custom Guard Configuration
+### Custom guard configuration
 
 ```python
 from qwed_open_responses.guards import ToolGuard, SafetyGuard
@@ -355,7 +355,7 @@ verifier = ResponseVerifier(guards=[tool_guard, safety_guard])
 
 ---
 
-## Next Steps
+## Next steps
 
 - [Guards Reference](./guards) - Deep dive into each guard
 - [Examples](./examples) - Real-world use cases

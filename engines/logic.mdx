@@ -24,7 +24,7 @@ The legacy `VerificationEngine.verify_logic_rule()` method has been removed as o
 
 ---
 
-## Quick Start
+## Quick start
 
 ```python
 from qwed_sdk import QWEDClient
@@ -75,9 +75,9 @@ Comparison and arithmetic operators accept multiple aliases for convenience. For
 
 ---
 
-## Satisfiability Checking
+## Satisfiability checking
 
-### Basic Check
+### Basic check
 
 ```python
 # Satisfiable - has solution
@@ -90,7 +90,7 @@ result = client.verify_logic("(AND (GT x 10) (LT x 5))")
 print(result.satisfiable)  # False (x can't be > 10 AND < 5)
 ```
 
-### Finding All Solutions
+### Finding all solutions
 
 ```python
 result = client.find_all_models(
@@ -102,9 +102,9 @@ result = client.find_all_models(
 
 ---
 
-## Business Rules
+## Business rules
 
-### Age Verification
+### Age verification
 
 ```python
 rule = """
@@ -116,7 +116,7 @@ rule = """
 result = client.verify_logic(rule)
 ```
 
-### Discount Eligibility
+### Discount eligibility
 
 ```python
 rule = """
@@ -128,7 +128,7 @@ rule = """
 result = client.verify_logic(rule)
 ```
 
-### Approval Workflow
+### Approval workflow
 
 ```python
 rule = """
@@ -202,7 +202,7 @@ This field also appears in error responses, which helps you debug provider-relat
 
 ---
 
-## Error Handling
+## Error handling
 
 ```python
 result = client.verify_logic("(AND (GT x 5) (LT x 0))")
@@ -225,7 +225,7 @@ if not result.satisfiable:
 
 ---
 
-## Next Steps
+## Next steps
 
 - [DSL Reference](/api/dsl-reference) - Complete operator documentation
 - [Code Engine](./code) - Verify code correctness

@@ -5,16 +5,16 @@ sidebarTitle: "Production Deployment"
 description: "Production deployment checklist for QWED covering integration testing, API key management, monitoring, and performance optimization."
 ---
 
-## Pre-Deployment Checklist
+## Pre-deployment checklist
 
-### ✅ 1. Integration Testing Complete
+### ✅ 1. Integration testing complete
 
 - All integration tests pass (`test_qwed_integration.py`)
 - Performance tests meet requirements
 - Error handling tested
 - Batch processing tested (if applicable)
 
-### ✅ 2. API Key Management
+### ✅ 2. API key management
 
 - API keys stored in environment variables
 - Different keys for dev/staging/production
@@ -34,7 +34,7 @@ QWED_API_KEY=qwed_prod_...
 # QWED_API_KEY=qwed_dev_...
 ```
 
-### ✅ 3. Error Handling
+### ✅ 3. Error handling
 
 - All QWED calls wrapped in try/except
 - Fallback mechanisms in place
@@ -62,14 +62,14 @@ except QWEDError as e:
     return safe_default()
 ```
 
-### ✅ 4. Rate Limiting
+### ✅ 4. Rate limiting
 
 - Understood quota limits for your plan
 - Rate limiting logic implemented
 - Backoff/retry logic in place
 - Monitoring quota usage
 
-### ✅ 5. Logging & Monitoring
+### ✅ 5. Logging and monitoring
 
 - All QWED calls logged
 - Verification results tracked
@@ -78,9 +78,9 @@ except QWEDError as e:
 
 ---
 
-## Deployment Strategy
+## Deployment strategy
 
-### Option 1: Gradual Rollout (Recommended)
+### Option 1: gradual rollout (recommended)
 
 **Week 1: Canary (5% traffic)**
 
@@ -98,7 +98,7 @@ else:
 
 **Week 2-3: Increase to 25%, then 50%** **Week 4: Full rollout (100%)**
 
-### Option 2: Shadow Mode
+### Option 2: shadow mode
 
 Run QWED in parallel without affecting production:
 
@@ -116,7 +116,7 @@ except Exception as e:
 return prod_result  # Always return existing result
 ```
 
-### Option 3: Feature Flag
+### Option 3: feature flag
 
 Use feature flags (LaunchDarkly, Split.io):
 
@@ -129,9 +129,9 @@ else:
 
 ---
 
-## Production Configuration
+## Production configuration
 
-### Recommended Settings
+### Recommended settings
 
 ```python
 from qwed import QWEDClient
@@ -145,7 +145,7 @@ client = QWEDClient(
 )
 ```
 
-### Environment-Specific Config
+### Environment-specific config
 
 ```python
 # config.py
@@ -178,9 +178,9 @@ def get_qwed_client():
 
 ---
 
-## Security Considerations
+## Security considerations
 
-### 1. API Key Security
+### 1. API key security
 
 ✅ **DO:**
 
@@ -196,7 +196,7 @@ def get_qwed_client():
 - Use same key across environments
 - Log API keys
 
-### 2. Input Validation
+### 2. Input validation
 
 ```python
 def safe_verify(user_input):
@@ -212,7 +212,7 @@ def safe_verify(user_input):
     return result
 ```
 
-### 3. Output Sanitization
+### 3. Output sanitization
 
 ```python
 def use_verified_output(result):
@@ -227,9 +227,9 @@ def use_verified_output(result):
 
 ---
 
-## Performance Optimization
+## Performance optimization
 
-### 1. Use Batch Processing
+### 1. Use batch processing
 
 ```python
 # ❌ Slow (N API calls)
@@ -254,7 +254,7 @@ def cached_verify(query):
     return result
 ```
 
-### 3. Async Processing
+### 3. Async processing
 
 ```python
 import asyncio
@@ -271,9 +271,9 @@ async def verify_async(queries):
 
 ---
 
-## Database Integration
+## Database integration
 
-### Storing Verification Results
+### Storing verification results
 
 ```sql
 CREATE TABLE verification_logs (
@@ -308,7 +308,7 @@ def verify_and_log(query, user_id):
 
 ---
 
-## Compliance & Audit Trails
+## Compliance and audit trails
 
 ### Requirements
 
@@ -317,7 +317,7 @@ def verify_and_log(query, user_id):
 - Audit trail accessible
 - Failed verifications flagged
 
-### Audit Log Format
+### Audit log format
 
 ```json
 {
@@ -336,9 +336,9 @@ def verify_and_log(query, user_id):
 
 ---
 
-## Deployment Checklist
+## Deployment checklist
 
-### Before Deploy:
+### Before deploy
 
 - All tests pass
 - API keys configured
@@ -348,7 +348,7 @@ def verify_and_log(query, user_id):
 - Rollback plan documented
 - Team notified
 
-### During Deploy:
+### During deploy
 
 - Deploy to staging first
 - Run smoke tests
@@ -356,7 +356,7 @@ def verify_and_log(query, user_id):
 - Monitor metrics
 - Gradual traffic ramp-up
 
-### After Deploy:
+### After deploy
 
 - Verify no error rate increase
 - Check performance metrics
@@ -366,7 +366,7 @@ def verify_and_log(query, user_id):
 
 ---
 
-## Rollback Plan
+## Rollback plan
 
 If issues occur:
 
@@ -395,7 +395,7 @@ git push
 
 ---
 
-## Go-Live Checklist
+## Go-live checklist
 
 **Final checks before 100% rollout:**
 
@@ -409,7 +409,7 @@ git push
 
 ---
 
-## Next Steps
+## Next steps
 
 Once deployed:
 

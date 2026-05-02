@@ -21,7 +21,7 @@ curl -O https://raw.githubusercontent.com/QWED-AI/qwed-ucp/main/middleware/expre
 
 ---
 
-## Basic Usage
+## Basic usage
 
 ```javascript
 const express = require('express');
@@ -43,7 +43,7 @@ app.listen(8182);
 
 ---
 
-## Configuration Options
+## Configuration options
 
 ```javascript
 const middleware = createQWEDUCPMiddleware({
@@ -63,7 +63,7 @@ app.use(middleware);
 
 ---
 
-## Response Headers
+## Response headers
 
 | Header | Value | Description |
 |--------|-------|-------------|
@@ -73,7 +73,7 @@ app.use(middleware);
 
 ---
 
-## Error Response
+## Error response
 
 When verification fails:
 
@@ -91,7 +91,7 @@ When verification fails:
 
 ---
 
-## Available Guards (JavaScript)
+## Available guards (JavaScript)
 
 The Express.js middleware includes local JavaScript implementations:
 
@@ -110,7 +110,7 @@ console.log(result.verified); // true
 
 ---
 
-## Complete Example
+## Complete example
 
 ```javascript
 const express = require('express');

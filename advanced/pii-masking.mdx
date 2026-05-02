@@ -11,7 +11,7 @@ sidebarTitle: "PII Masking"
 
 ---
 
-## 📋 Table of Contents
+## 📋 Table of contents
 
 - [What is PII Masking?](#what-is-pii-masking)
 - [Why It Matters](#why-it-matters)
@@ -27,7 +27,7 @@ sidebarTitle: "PII Masking"
 
 ---
 
-## What is PII Masking?
+## What is PII masking?
 
 PII (Personally Identifiable Information) masking automatically detects and replaces sensitive data with placeholders before sending queries to LLM providers.
 
@@ -41,9 +41,9 @@ The LLM **never sees** your sensitive data!
 
 ---
 
-## Why It Matters
+## Why it matters
 
-### The Problem
+### The problem
 
 When you send queries to cloud LLM providers (OpenAI, Anthropic, etc.), your data passes through their servers:
 
@@ -58,7 +58,7 @@ You → OpenAI API → OpenAI Servers → Training Data (potentially)
 - 📞 **Phone numbers** stored
 - 🏥 **Medical data** (HIPAA violation)
 
-### The Solution
+### The solution
 
 QWED masks PII **before** sending to LLMs:
 
@@ -76,7 +76,7 @@ You → QWED (masks PII) → OpenAI API (sees <EMAIL>) → Safe!
 
 ## Installation
 
-### Step 1: Install PII Extra
+### Step 1: install the PII extra
 
 PII masking requires Microsoft Presidio (optional dependency):
 
@@ -84,7 +84,7 @@ PII masking requires Microsoft Presidio (optional dependency):
 pip install 'qwed[pii]'
 ```
 
-### Step 2: Download spaCy Model
+### Step 2: download the spaCy model
 
 Presidio uses spaCy for NLP:
 
@@ -94,7 +94,7 @@ python -m spacy download en_core_web_lg
 
 **Total install size:** ~150MB (why it's optional!)
 
-### Verify Installation
+### Verify installation
 
 ```bash
 qwed pii "test@example.com"
@@ -110,7 +110,7 @@ Detected: 1 entities
 
 ---
 
-## Quick Start
+## Quick start
 
 ### Python API
 
@@ -148,7 +148,7 @@ qwed pii "My SSN is 123-45-6789"
 
 ---
 
-## Supported PII Types
+## Supported PII types
 
 QWED detects **9 types** of PII using Microsoft Presidio:
 
@@ -164,7 +164,7 @@ QWED detects **9 types** of PII using Microsoft Presidio:
 | `LOCATION` | New York, 123 Main St | Addresses |
 | `MEDICAL_LICENSE` | DEA-1234567 | Healthcare (HIPAA) |
 
-### Detection Examples
+### Detection examples
 
 ```bash
 # Email
@@ -182,9 +182,9 @@ qwed pii "John Doe (john@example.com) lives at 123 Main St"
 
 ---
 
-## Usage Examples
+## Usage examples
 
-### Example 1: Healthcare (HIPAA)
+### Example 1: healthcare (HIPAA)
 
 **Scenario:** AI-powered medical assistant
 
@@ -220,7 +220,7 @@ result = client.verify(query)
 - ✅ HIPAA compliance maintained
 - ✅ Transparent audit trail in evidence
 
-### Example 2: Finance (PCI-DSS)
+### Example 2: finance (PCI-DSS)
 
 **Scenario:** Fraud detection system
 
@@ -246,7 +246,7 @@ print(result.evidence['pii_masked'])
 - ✅ Card numbers never in LLM logs
 - ✅ Works with local LLMs (zero cloud exposure)
 
-### Example 3: Legal (Attorney-Client Privilege)
+### Example 3: legal (attorney-client privilege)
 
 **Scenario:** Contract analysis
 
@@ -271,7 +271,7 @@ result = client.verify(f"Analyze contract: {contract}")
 
 ---
 
-## How It Works
+## How it works
 
 ### Architecture
 
@@ -309,7 +309,7 @@ result = client.verify(f"Analyze contract: {contract}")
 └────────────────────┘
 ```
 
-### Detection Process
+### Detection process
 
 1. **Analyze:** Presidio scans text for PII patterns
 2. **Detect:** Identifies entity types and positions
@@ -317,7 +317,7 @@ result = client.verify(f"Analyze contract: {contract}")
 4. **Send:** Masked text goes to LLM
 5. **Evidence:** PII metadata saved for audit
 
-### One-Way Masking
+### One-way masking
 
 QWED uses **non-reversible** masking:
 - ✅ Simple and secure
@@ -330,7 +330,7 @@ QWED uses **non-reversible** masking:
 
 ## Configuration
 
-### Custom Entity Types
+### Custom entity types
 
 Only detect specific PII types:
 
@@ -343,7 +343,7 @@ client = QWEDLocal(
 )
 ```
 
-### Disable for Specific Queries
+### Disable for specific queries
 
 ```python
 # Client with masking enabled
@@ -353,7 +353,7 @@ client = QWEDLocal(mask_pii=True, ...)
 result = client.verify("What is 2+2?")  # No PII to mask anyway
 ```
 
-### Environment-Based
+### Environment-based
 
 ```python
 import os
@@ -371,7 +371,7 @@ client = QWEDLocal(
 
 ## Limitations
 
-### 1. Detection Accuracy
+### 1. Detection accuracy
 
 - **False Positives:** May mask non-PII (e.g., "john" as name)
 - **False Negatives:** May miss obfuscated PII
@@ -382,7 +382,7 @@ client = QWEDLocal(
 - **Latency:** Adds ~100-200ms per query
 - **Memory:** Requires ~150MB for spaCy model
 
-### 3. Context Loss
+### 3. Context loss
 
 Masked data loses semantic meaning:
 
@@ -463,9 +463,9 @@ print(result.evidence['pii_masked'])
 
 ---
 
-## Enterprise Use Cases
+## Enterprise use cases
 
-### Healthcare: HIPAA Compliance
+### Healthcare: HIPAA compliance
 
 ```python
 # Protected Health Information (PHI) masking
@@ -483,7 +483,7 @@ client = QWEDLocal(
 )
 ```
 
-### Finance: PCI-DSS Compliance
+### Finance: PCI-DSS compliance
 
 ```python
 # Payment Card Industry compliance
@@ -499,7 +499,7 @@ client = QWEDLocal(
 )
 ```
 
-### Legal: Data Privacy Laws
+### Legal: data privacy laws
 
 ```python
 # GDPR / CCPA compliance
@@ -517,7 +517,7 @@ client = QWEDLocal(
 
 ---
 
-## Next Steps
+## Next steps
 
 1. **Install:** `pip install 'qwed[pii]'`
 2. **Test:** `qwed pii "your sensitive text"`

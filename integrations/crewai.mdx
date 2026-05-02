@@ -10,7 +10,7 @@ description: "Use QWEDVerifiedAgent and QWEDVerificationTool with CrewAI for ver
 pip install qwed crewai
 ```
 
-## Quick Start
+## Quick start
 
 ```python
 from crewai import Task, Crew
@@ -48,7 +48,7 @@ agent = Agent(
 )
 ```
 
-## Specialized Tools
+## Specialized tools
 
 ```python
 from qwed_sdk.crewai import QWEDMathTool, QWEDCodeTool, QWEDSQLTool
@@ -107,7 +107,7 @@ print(result.verified)  # True/False
 print(result.overall_verification_rate)  # 0.95
 ```
 
-## Task Decorator
+## Task decorator
 
 ```python
 from qwed_sdk.crewai import verified_task

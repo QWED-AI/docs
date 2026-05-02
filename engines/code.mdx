@@ -22,7 +22,7 @@ The Code Engine uses [CrossHair](https://github.com/pschanely/crosshair), a symb
 
 ---
 
-## Quick Start
+## Quick start
 
 ```python
 from qwed_sdk import QWEDClient
@@ -41,9 +41,9 @@ print(result.issues[0])     # "Division by zero possible when b=0"
 
 ---
 
-## Safety Verification
+## Safety verification
 
-### Division by Zero
+### Division by zero
 
 ```python
 # UNSAFE - can crash
@@ -65,7 +65,7 @@ result = client.verify_code(safe_code)
 # Verified: True, Issues: []
 ```
 
-### Null Pointer / None Access
+### Null pointer / None access
 
 ```python
 # UNSAFE
@@ -79,7 +79,7 @@ def get_name_safe(user: Optional[User]) -> str:
     return user.name
 ```
 
-### Index Out of Bounds
+### Index out of bounds
 
 ```python
 # UNSAFE
@@ -95,7 +95,7 @@ def first_element_safe(items: List[int]) -> int:
 
 ---
 
-## Contract Verification
+## Contract verification
 
 ### Preconditions
 
@@ -127,7 +127,7 @@ result = client.verify_code(code)
 # Verifies result is always >= 0
 ```
 
-### Full Contract
+### Full contract
 
 ```python
 code = '''
@@ -144,9 +144,9 @@ result = client.verify_code(code)
 
 ---
 
-## Security Scanning
+## Security scanning
 
-### SQL Injection
+### SQL injection
 
 ```python
 code = '''
@@ -159,7 +159,7 @@ result = client.verify_code(code, check_security=True)
 # Issues: ["SQL Injection vulnerability: unsanitized input in query"]
 ```
 
-### Command Injection
+### Command injection
 
 ```python
 code = '''
@@ -213,7 +213,7 @@ This check covers `subprocess.run`, `subprocess.call`, `subprocess.Popen`, and `
 
 ---
 
-## Complexity Analysis
+## Complexity analysis
 
 ```python
 code = '''
@@ -234,7 +234,7 @@ print(result.recursive)       # False
 
 ---
 
-## Language Support
+## Language support
 
 | Language   | Support Level  |
 | ---------- | -------------- |
@@ -269,7 +269,7 @@ result = client.verify_code(
 
 ---
 
-## Next Steps
+## Next steps
 
 - [SQL Engine](./sql) - Verify SQL queries
 - [Logic Engine](./logic) - Verify logical constraints

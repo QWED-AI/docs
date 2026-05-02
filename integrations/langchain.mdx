@@ -10,7 +10,7 @@ description: "Use QWED with LangChain via QWEDTool for verified AI chains and ag
 pip install qwed langchain
 ```
 
-## Quick Start
+## Quick start
 
 ```python
 from qwed_sdk.langchain import QWEDTool, QWEDVerificationCallback
@@ -29,7 +29,7 @@ result = agent.run("Verify: Is 2+2 equal to 5?")
 # Agent uses QWED tool to verify and corrects the answer
 ```
 
-## Available Components
+## Available components
 
 ### QWEDTool
 
@@ -110,7 +110,7 @@ def verify_output(text):
 chain = prompt | llm | RunnableLambda(verify_output)
 ```
 
-## Best Practices
+## Best practices
 
 1. **Use callbacks for monitoring** — Track verification rates
 2. **Use tools for agent autonomy** — Let agents verify themselves

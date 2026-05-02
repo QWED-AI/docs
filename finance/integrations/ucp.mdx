@@ -4,7 +4,7 @@ title: "UCP Integration"
 description: "Connect QWED-Finance to the Universal Commerce Protocol for e-commerce payment verification and capability discovery."
 ---
 
-## Quick Start
+## Quick start
 
 ```python
 from qwed_finance import UCPIntegration
@@ -29,7 +29,7 @@ print(result.status)       # PaymentStatus.APPROVED
 
 ---
 
-## Capability Discovery
+## Capability discovery
 
 For UCP's **Dynamic Discovery**, declare your capability:
 
@@ -61,7 +61,7 @@ capability = UCPIntegration.get_capability_definition()
 
 ---
 
-## Middleware Pattern
+## Middleware pattern
 
 Drop into your UCP flow:
 
@@ -87,7 +87,7 @@ def checkout(request: UCPRequest):
 
 ---
 
-## ISO 20022 Payments
+## ISO 20022 payments
 
 For bank transfers using ISO 20022:
 
@@ -105,7 +105,7 @@ else:
 
 ---
 
-## Verification Flow
+## Verification flow
 
 ```text
 ┌─────────────┐     ┌─────────────┐     ┌─────────────┐
