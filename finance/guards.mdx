@@ -99,7 +99,7 @@ result = guard.verify_black_scholes(
     option_type=OptionType.CALL,
     llm_price="$3.50"
 )
-# result.greeks = {"delta": 0.4502, "gamma": 0.0389, ...}
+# result.greeks = {"delta": "0.4502", "gamma": "0.0389", ...}
 ```
 
 ### Methods
@@ -110,6 +110,27 @@ result = guard.verify_black_scholes(
 | `verify_delta()` | Delta calculation |
 | `verify_margin_call()` | Margin call decision |
 | `verify_put_call_parity()` | Arbitrage detection |
+
+### Arbitrary-precision arithmetic
+
+<Info>
+**Since the Decimal/mpmath migration:** `DerivativesGuard` uses `mpmath` (30 decimal places) for all transcendental functions — `log`, `exp`, `sqrt`, and `erf` — replacing IEEE-754 `math.*` calls. The standard normal CDF and PDF (`_norm_cdf`, `_norm_pdf`) are now exact to 30 dp, and `verify_margin_call` and `verify_put_call_parity` compare values in `Decimal` space.
+</Info>
+
+<Warning>
+**Breaking change — Greeks are now `str`, not `float`.** Each Greek is `Decimal.quantize()`'d and returned as a string to preserve precision across serialization boundaries. Cast explicitly if you need a numeric type:
+
+```python
+# Before
+greeks["delta"] * notional  # 0.4502 * notional
+
+# After
+from decimal import Decimal
+Decimal(greeks["delta"]) * Decimal(notional)  # "0.4502" → exact
+```
+</Warning>
+
+`mpmath` is now a runtime dependency. It was already pulled in transitively by `sympy`, so no extra install step is required.
 
 ---
 
@@ -286,6 +307,22 @@ guard.verify_ytm(..., llm_output="0.0525")
 This same parsing logic is used consistently across `BondGuard._parse_rate()` and `FinanceVerifier.verify_irr()`, eliminating cross-guard inconsistencies.
 </Note>
 
+### Exact arithmetic with Decimal
+
+<Info>
+**Since the Decimal/mpmath migration:** `BondGuard` runs Newton-Raphson YTM solving and all duration, convexity, and accrued-interest math in `Decimal` with 50-digit precision (`getcontext().prec = 50`). Inputs are converted to `Decimal` at the boundary, eliminating IEEE-754 cancellation in long-dated bond cashflow sums.
+
+`tolerance_pct` is now stored as `Decimal`. Pass a `float` or `int` — the guard converts it via `Decimal(str(value))` to avoid float contamination:
+
+```python
+# Both are safe
+guard = BondGuard(tolerance_pct=0.5)
+guard = BondGuard(tolerance_pct="0.5")
+```
+
+`verify_ytm`, `verify_duration`, and `verify_convexity` return their `details` fields as quantized strings (e.g. `"5.6601%"`) instead of raw floats.
+</Info>
+
 ## 9. FX Guard (Currency Arbitration)
 
 **Purpose:** Validate cross-currency conversions and detect arbitrage opportunities.
@@ -328,6 +365,23 @@ result = guard.verify_sharpe_ratio(
 # result.verified = True ✅
 # result.computed_sharpe = 0.60
 ```
+
+### Exact arithmetic with Decimal
+
+<Info>
+**Since the Decimal/mpmath migration:** every `RiskGuard` method computes in `Decimal`. `verify_var` and `verify_sortino_ratio` use `Decimal.sqrt()` instead of `math.sqrt()`, and `verify_beta` accumulates covariance and variance in `Decimal` to prevent catastrophic cancellation on large return histories.
+
+The `Z_SCORES` lookup table is `Decimal`-typed:
+
+| Method | Backing math |
+| --- | --- |
+| `verify_var()` | `Decimal.sqrt()` for time scaling |
+| `verify_beta()` | `Decimal` covariance accumulation |
+| `verify_sharpe_ratio()` | `Decimal` division |
+| `verify_sortino_ratio()` | `Decimal.sqrt()` on downside deviation |
+| `verify_max_drawdown()` | `Decimal` running peak/trough |
+| `verify_information_ratio()` | `Decimal` division |
+</Info>
 
 ---
 

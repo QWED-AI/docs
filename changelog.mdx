@@ -5,7 +5,50 @@ description: "All notable changes to QWED Protocol — releases, features, secur
 
 All notable changes to the QWED platform, listed by release.
 
-**Jump to:** [QWED-Verification SecureCodeExecutor fail-closed fallback](#qwed-verification--securecodeexecutor-fail-closed-when-codeverifier-is-unavailable) · [QWED-Finance security audit — OpenResponses fail-closed](#qwed-finance--openresponses-fail-closed-and-computed-status) · [QWED-Finance security audit — rate parsing](#qwed-finance--rate-parsing-heuristic-removed) · [QWED-Verification symbolic verifier fail-closed](#qwed-verification--symbolic-verifier-fail-closed-without-proof) · [QWED-Verification strict additionalProperties](#qwed-verification--strict-additionalproperties-fail-closed) · [QWED-Tax example redaction](#qwed-tax-—-redacted-preflight-block-details-in-examples) · [QWED-Tax decimal hardening](#qwed-tax-—-decimal-hardening-in-financial-guards) · [v5.1.0](#v5-1-0-—-agent-state-governance-and-fail-closed-hardening) · [v5.0.0](#v5-0-0-—-enforcement-boundary-hardening) · [v4.0.5](#v4-0-5-—-stats-exception-masking) · [v4.0.4](#v4-0-4-—-fail-closed-execution-enforcement) · [v4.0.3](#v4-0-3-—-server-enforced-agent-security) · [v4.0.2](#v4-0-2-—-security-cleanup) · [v4.0.1](#v4-0-1-—-sentinel-guard-sync) · [v4.0.0](#v4-0-0-—-sentinel-edition) · [v3.0.1](#v3-0-1-—-ironclad-update) · [v2.4.1](#v2-4-1-—-the-reasoning-engine)
+---
+
+## QWED-Finance — Decimal/mpmath migration for BondGuard, DerivativesGuard, and RiskGuard
+**Released: May 2, 2026** · [GitHub PR #23](https://github.com/QWED-AI/qwed-finance/pull/23)
+
+> Eliminates IEEE-754 `float` from every financial guard. `BondGuard`, `DerivativesGuard`, and `RiskGuard` now match the precision standard already used by `TradingGuard` and `FinanceVerifier`: exact arithmetic with `Decimal` and arbitrary-precision transcendentals with `mpmath`.
+
+### What changed
+
+- **BondGuard** — Newton-Raphson YTM solving, duration, and convexity now run in `Decimal` with `getcontext().prec = 50`. `tolerance_pct` is stored as `Decimal`; `verify_ytm` returns quantized percentage strings.
+- **DerivativesGuard** — `mpmath` (30 dp) replaces `math.log/exp/sqrt/erf` in `verify_black_scholes`, `_norm_cdf`, `_norm_pdf`, and `verify_put_call_parity`. `verify_margin_call` compares `Decimal` values.
+- **RiskGuard** — `Decimal.sqrt()` replaces `math.sqrt()` in `verify_var` and `verify_sortino_ratio`. `verify_beta` accumulates covariance in `Decimal` to eliminate catastrophic cancellation. `Z_SCORES` is now `Decimal`-typed.
+- **Test coverage** — 23 new tests in `TestBondGuardDecimal`, `TestDerivativesGuardMpmath`, `TestRiskGuardDecimal`, and a cross-guard `TestNoFloatInOutput` IEEE-754 artifact scan.
+
+### Breaking changes
+
+<Warning>
+**Greeks are now `str` (Decimal-quantized), not `float`.** `verify_black_scholes` returns `result.greeks` with each Greek as a quantized string. Cast explicitly when arithmetic is needed:
+
+```python
+# Before
+delta = greeks["delta"]            # 0.4502 (float)
+exposure = delta * notional
+
+# After
+from decimal import Decimal
+delta = Decimal(greeks["delta"])   # "0.4502" → Decimal
+exposure = delta * Decimal(str(notional))
+```
+
+`mpmath` is now a runtime dependency. It was already available transitively via `sympy`, so existing installs require no extra step.
+</Warning>
+
+### Audit references
+
+| Finding | Description | Fix |
+| --- | --- | --- |
+| C-01 | `BondGuard` float Newton-Raphson and accumulation | Full `Decimal` arithmetic |
+| C-02 | `DerivativesGuard` `math.*` transcendentals | `mpmath` at 30 dp |
+| C-03 | `RiskGuard` `math.sqrt` and float covariance cancellation | `Decimal.sqrt()` and `Decimal` accumulation |
+
+See [Bond Guard](/finance/guards#8-bond-guard-yield-analytics), [Derivatives Guard](/finance/guards#3-derivatives-guard-black-scholes), and [Risk Guard](/finance/guards#10-risk-guard-portfolio-metrics) for the updated guard documentation.
+
+**Jump to:** [QWED-Finance Decimal/mpmath migration](#qwed-finance--decimalmpmath-migration-for-bondguard-derivativesguard-and-riskguard) · [QWED-Verification SecureCodeExecutor fail-closed fallback](#qwed-verification--securecodeexecutor-fail-closed-when-codeverifier-is-unavailable) · [QWED-Finance security audit — OpenResponses fail-closed](#qwed-finance--openresponses-fail-closed-and-computed-status) · [QWED-Finance security audit — rate parsing](#qwed-finance--rate-parsing-heuristic-removed) · [QWED-Verification symbolic verifier fail-closed](#qwed-verification--symbolic-verifier-fail-closed-without-proof) · [QWED-Verification strict additionalProperties](#qwed-verification--strict-additionalproperties-fail-closed) · [QWED-Tax example redaction](#qwed-tax-—-redacted-preflight-block-details-in-examples) · [QWED-Tax decimal hardening](#qwed-tax-—-decimal-hardening-in-financial-guards) · [v5.1.0](#v5-1-0-—-agent-state-governance-and-fail-closed-hardening) · [v5.0.0](#v5-0-0-—-enforcement-boundary-hardening) · [v4.0.5](#v4-0-5-—-stats-exception-masking) · [v4.0.4](#v4-0-4-—-fail-closed-execution-enforcement) · [v4.0.3](#v4-0-3-—-server-enforced-agent-security) · [v4.0.2](#v4-0-2-—-security-cleanup) · [v4.0.1](#v4-0-1-—-sentinel-guard-sync) · [v4.0.0](#v4-0-0-—-sentinel-edition) · [v3.0.1](#v3-0-1-—-ironclad-update) · [v2.4.1](#v2-4-1-—-the-reasoning-engine)
 
 ---
 
