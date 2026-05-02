@@ -30,7 +30,7 @@ client = QWEDClient(api_key="qwed_live_abc123...")
 client = QWEDClient(api_key="qwed_live_abc123...\n")
 ```
 
-### Rate Limit Exceeded
+### Rate limit exceeded
 
 ```
 Error: 429 Too Many Requests
@@ -197,7 +197,7 @@ This can happen when Gemini returns malformed JSON for complex queries. QWED aut
 
 ## SDK issues
 
-### Import Error
+### Import error
 
 ```
 ModuleNotFoundError: No module named 'qwed_sdk'
@@ -210,7 +210,7 @@ pip install qwed
 pip install qwed-sdk
 ```
 
-### Async Not Working
+### Async not working
 
 ```python
 # Wrong - missing await
@@ -234,7 +234,7 @@ async with QWEDAsyncClient() as client:
 
 ## DSL syntax errors
 
-### Unknown Operator
+### Unknown operator
 
 ```
 SECURITY BLOCK: Unknown operator 'CHECK_IF_VALID'
@@ -257,7 +257,7 @@ SECURITY BLOCK: Unknown operator 'CHECK_IF_VALID'
 "(GT x 0)"
 ```
 
-### Missing Parentheses
+### Missing parentheses
 
 ```
 SyntaxError: Missing closing ')'
@@ -277,7 +277,7 @@ SyntaxError: Missing closing ')'
 
 ## Performance issues
 
-### Slow Verification
+### Slow verification
 
 **Possible causes:**
 1. Complex expressions with many variables
@@ -304,7 +304,7 @@ async def verify_many(queries):
         return await asyncio.gather(*tasks)
 ```
 
-### High Memory Usage
+### High memory usage
 
 **Solution:** Stream large results:
 

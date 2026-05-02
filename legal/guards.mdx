@@ -18,7 +18,7 @@ When a claim falls outside a guard's supported boundary, the guard should be tre
 
 **Purpose:** Verify date calculations in contracts for structured, unambiguous inputs.
 
-### The Problem
+### The problem
 
 LLMs frequently miscalculate deadlines:
 
@@ -26,7 +26,7 @@ LLMs frequently miscalculate deadlines:
 - Ignore **leap years**
 - Forget **jurisdiction-specific holidays**
 
-### The Solution
+### The solution
 
 ```python
 from qwed_legal import DeadlineGuard
@@ -105,7 +105,7 @@ print(business_days)  # Number of business days excluding weekends and holidays
 
 **Purpose:** Verify liability cap and indemnity calculations for supported numeric inputs.
 
-### The Problem
+### The problem
 
 LLMs get percentage math wrong:
 
@@ -119,7 +119,7 @@ LLMs get percentage math wrong:
   Tolerance for floating-point comparison as a percentage. For example, `0.01` means 0.01% tolerance. Adjust for stricter or more lenient verification.
 </ParamField>
 
-### The Solution
+### The solution
 
 ```python
 from qwed_legal import LiabilityGuard
@@ -275,11 +275,11 @@ print(result.message)     # "CONTRADICTION: Provided Z3 constraints are unsatisf
 
 **Purpose:** Validate that legal citations match a supported format. CitationGuard does **not** prove that a cited authority exists or is controlling — it only checks structural shape against supported reporters.
 
-### The Problem
+### The problem
 
 The **Mata v. Avianca** scandal: Lawyers used ChatGPT, which cited **6 fake court cases**. They were fined \$5,000 and sanctioned.
 
-### The Solution
+### The solution
 
 ```python
 from qwed_legal import CitationGuard
@@ -307,7 +307,7 @@ print(result.issues)  # ["Unknown reporter"]
 | **UK Neutral** | `[year] court number` | `[2023] UKSC 10` |
 | **India AIR** | `AIR year court page` | `AIR 2020 SC 100` |
 
-### Batch Verification
+### Batch verification
 
 ```python
 result = guard.verify_batch([
@@ -320,7 +320,7 @@ print(result.valid)    # 1
 print(result.invalid)  # 1
 ```
 
-### Statute Citations
+### Statute citations
 
 ```python
 result = guard.check_statute_citation("42 U.S.C. § 1983")
@@ -337,7 +337,7 @@ print(result.parsed_components)
 
 **Purpose:** Apply structured checks around governing law and forum selection clauses for modeled combinations. Results should not be treated as authoritative legal opinions on choice-of-law conflicts.
 
-### The Problem
+### The problem
 
 LLMs miss jurisdiction conflicts:
 
@@ -345,7 +345,7 @@ LLMs miss jurisdiction conflicts:
 - Missing CISG applicability warnings
 - Cross-border legal system mismatches
 
-### The Solution
+### The solution
 
 ```python
 from qwed_legal import JurisdictionGuard
@@ -405,7 +405,7 @@ print(result.verified)   # True
 print(result.warnings)   # ["Contract value $50,000 may not meet diversity jurisdiction threshold..."]
 ```
 
-### Convention Check
+### Convention check
 
 ```python
 result = guard.check_convention_applicability(
@@ -423,7 +423,7 @@ print(result.verified)  # True - both are CISG members
 
 **Purpose:** Compute claim limitation periods for supported jurisdictions and claim types using rule tables. Coverage is limited to the modeled jurisdictions and claim types listed below.
 
-### The Problem
+### The problem
 
 LLMs don't track jurisdiction-specific limitation periods:
 
@@ -431,7 +431,7 @@ LLMs don't track jurisdiction-specific limitation periods:
 - New York breach of contract: 6 years
 - Different periods for negligence, fraud, etc.
 
-### The Solution
+### The solution
 
 ```python
 from qwed_legal import StatuteOfLimitationsGuard
@@ -522,7 +522,7 @@ comparison = guard.compare_jurisdictions(
 
 **Purpose:** Check that legal reasoning follows the IRAC framework (Issue, Rule, Application, Conclusion). IRACGuard verifies structure and surface-level consistency only — it is **not** a proof of correct legal reasoning.
 
-### The Problem
+### The problem
 
 LLMs produce legal advice that lacks structured reasoning:
 
@@ -530,7 +530,7 @@ LLMs produce legal advice that lacks structured reasoning:
 - No citation of applicable rules or statutes
 - Conclusions without proper application of law to facts
 
-### The Solution
+### The solution
 
 ```python
 from qwed_legal import IRACGuard
@@ -551,7 +551,7 @@ print(result["verified"])    # True
 print(result["components"])  # {'issue': '...', 'rule': '...', 'application': '...', 'conclusion': '...'}
 ```
 
-### Detection Types
+### Detection types
 
 | Check | Description |
 | --- | --- |
@@ -559,7 +559,7 @@ print(result["components"])  # {'issue': '...', 'rule': '...', 'application': '.
 | **Logical Disconnect** | Detects when Application doesn't reference the Rule |
 | **Missing Steps** | Identifies which IRAC components are missing |
 
-### Error Response
+### Error response
 
 ```python
 result = guard.verify_structure("The defendant should pay damages.")
@@ -577,7 +577,7 @@ print(result["missing"])   # ['issue', 'rule', 'application', 'conclusion']
 
 **Purpose:** Apply counterfactual consistency checks to detect output that changes when protected attributes are swapped. This is a structural fairness check, not a complete fairness proof. Requires an external LLM client.
 
-### The Problem
+### The problem
 
 AI legal systems can exhibit bias based on protected attributes:
 
@@ -585,7 +585,7 @@ AI legal systems can exhibit bias based on protected attributes:
 - Inconsistent contract assessments based on party names
 - Discriminatory loan approval reasoning
 
-### The Solution
+### The solution
 
 ```python
 from qwed_legal import FairnessGuard
@@ -603,7 +603,7 @@ print(result["verified"])  # True if decision is consistent
 print(result["status"])    # "FAIRNESS_VERIFIED" or "JUDICIAL_BIAS_DETECTED"
 ```
 
-### How It Works
+### How it works
 
 1. **Early exit** - If `protected_attribute_swap` is empty (`{}`), returns immediately with `NO_SWAP_REQUIRED` without calling the LLM
 2. **Counterfactual Generation** - Swaps protected attributes (names, pronouns) while preserving case
@@ -641,7 +641,7 @@ print(result["status"])    # "FAIRNESS_VERIFIED" or "JUDICIAL_BIAS_DETECTED"
 
 **Purpose:** Detect logical contradictions between modeled clauses using a constraint solver. Coverage is limited to the supported clause categories below — a "consistent" result is **not** a proof of full contract consistency.
 
-### The Problem
+### The problem
 
 Contracts can contain mathematically impossible combinations:
 
@@ -650,7 +650,7 @@ Contracts can contain mathematically impossible combinations:
 
 Text-based heuristics (ClauseGuard) miss these formal logic conflicts.
 
-### The Solution
+### The solution
 
 ```python
 from qwed_legal import ContradictionGuard, Clause
@@ -668,7 +668,7 @@ print(result["verified"])  # False
 print(result["message"])   # "❌ LOGIC CONTRADICTION: Clauses are mutually exclusive..."
 ```
 
-### Clause Structure
+### Clause structure
 
 The `Clause` dataclass requires:
 
@@ -679,7 +679,7 @@ The `Clause` dataclass requires:
 | `category` | `str` | `DURATION`, `LIABILITY`, or `TERMINATION` |
 | `value` | `int` | Normalized numeric value (days, dollars, etc.) |
 
-### Supported Categories
+### Supported categories
 
 | Category | Detects |
 | --- | --- |
@@ -820,7 +820,7 @@ When verification fails, the `risk` field indicates the type of failure:
 
 **Purpose:** Prevent Document-Level Retrieval Mismatch (DRM) in legal RAG systems.
 
-### The Problem
+### The problem
 
 Standard RAG chunking causes \>95% retrieval mismatch in legal databases because:
 
@@ -828,7 +828,7 @@ Standard RAG chunking causes \>95% retrieval mismatch in legal databases because
 - Chunk-level embeddings lose document context
 - NDAs, contracts, and agreements look alike at the chunk level
 
-### The Solution
+### The solution
 
 ```python
 from qwed_legal import SACProcessor
@@ -907,7 +907,7 @@ guard.verify_provenance(content, provenance) # NEW in v0.4.0
 
 ---
 
-## Next Steps
+## Next steps
 
 - [Examples](/legal/examples) - Real-world scenarios
 - [Troubleshooting](/legal/troubleshooting) - Common issues

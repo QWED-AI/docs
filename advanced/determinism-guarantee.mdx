@@ -18,7 +18,7 @@ Every QWED verification engine falls into one of three categories:
 | **Hybrid** | Fact, Stats | TF-IDF / Sandbox → LLM fallback | ⚠️ Conditional |
 | **Heuristic** | Image, Consensus, Reasoning | VLM / Multi-LLM voting | ❌ No |
 
-### Detailed Breakdown
+### Detailed breakdown
 
 | Engine | Mode | Primary Technology | LLM Fallback? |
 |--------|------|-------------------|---------------|
@@ -61,14 +61,14 @@ Every API response includes a `verification_mode` field:
 
 ## Why this matters
 
-### For Regulated Industries
+### For regulated industries
 
 Banks, healthcare, and legal systems require **audit trails** and **reproducibility**:
 
 - ✅ `SYMBOLIC` results can be independently verified
 - ⚠️ `HEURISTIC` results should be flagged for human review
 
-### For Production Systems
+### For production systems
 
 ```python
 result = client.verify_math("2+2=4")
