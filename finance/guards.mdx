@@ -84,6 +84,10 @@ result = guard.verify_day_count(
 
 **Purpose:** Options pricing and margin verification using pure calculus.
 
+<Note>
+**Since v2.2.0:** Black-Scholes uses `mpmath` (30 decimal places) for transcendental functions (`log`, `exp`, `sqrt`, `erf`) and `Decimal` for monetary outputs. Greeks are returned as Decimal-quantized **strings**, not `float`.
+</Note>
+
 ```python
 from qwed_finance import DerivativesGuard, OptionType
 
@@ -99,7 +103,9 @@ result = guard.verify_black_scholes(
     option_type=OptionType.CALL,
     llm_price="$3.50"
 )
-# result.greeks = {"delta": 0.4502, "gamma": 0.0389, ...}
+# result.greeks = {"delta": "0.4502", "gamma": "0.038900", ...}
+# Note: Greeks are returned as Decimal-quantized strings (since v2.2.0)
+# to preserve precision and avoid IEEE-754 float artifacts.
 ```
 
 ### Methods
@@ -242,6 +248,10 @@ result = guard.verify_swift_with_sanctions(
 
 **Purpose:** Verify fixed income calculations like Yield to Maturity (YTM) and duration using Newton-Raphson.
 
+<Note>
+**Since v2.2.0:** All YTM, duration, and convexity calculations use `Decimal` arithmetic end-to-end (50-digit precision). The Newton-Raphson solver, accumulators, and `tolerance_pct` are all `Decimal`, eliminating IEEE-754 contamination.
+</Note>
+
 ```python
 from qwed_finance import BondGuard
 
@@ -311,6 +321,10 @@ result = guard.verify_conversion(
 ## 10. Risk Guard (Portfolio Metrics)
 
 **Purpose:** Ensure risk metrics like Sharpe Ratio and VaR (Value at Risk) are mathematically consistent.
+
+<Note>
+**Since v2.2.0:** All metrics — VaR, beta, Sharpe, Sortino, max drawdown, information ratio — use `Decimal` arithmetic with `Decimal.sqrt()`. The `Z_SCORES` lookup table uses `Decimal` constants. Beta accumulation no longer suffers from catastrophic cancellation.
+</Note>
 
 ```python
 from qwed_finance import RiskGuard
