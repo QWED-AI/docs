@@ -16,7 +16,7 @@ description: "QWED Infra uses formal verification for infrastructure as code. Ve
 
 It prevents AI agents (like Devin or Copilot Workspace) from deploying insecure or expensive infrastructure by verifying configuration *before* deployment.
 
-## 🎯 Architecture
+## Architecture
 
 ```mermaid
 graph TD
@@ -29,18 +29,18 @@ graph TD
     E --> F
 ```
 
-## 🚀 Key Features
+## Key features
 
-### 🛡️ IamGuard
+### IamGuard
 Verifies AWS IAM Policies using the **Z3 Theorem Prover**. Instead of regex matching, it converts policies into logical formulas to prove reachability and specific permissions.
 
-### 🌐 NetworkGuard
+### NetworkGuard
 Verifies Network Reachability using **Graph Theory** (NetworkX). Validates paths like `Internet -> IGW -> Route -> Security Group -> Instance`.
 
-### 💰 CostGuard
+### CostGuard
 Deterministic Cloud Cost estimation before deployment. Enforce budgets and prevent expensive instance provisioning errors.
 
-## 📦 Installation
+## Installation
 
 ```bash
 pip install qwed-infra

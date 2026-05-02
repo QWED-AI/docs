@@ -1,6 +1,6 @@
 ---
 sidebar_position: 10
-title: "Troubleshooting Guide"
+title: "Troubleshooting guide"
 description: "Resolve common QWED verification issues including authentication errors, API key problems, and rate limits. Step-by-step debugging solutions included."
 ---
 
@@ -10,7 +10,7 @@ Common issues and how to resolve them.
 
 ## Authentication errors
 
-### API Key Invalid
+### API key invalid
 
 ```
 Error: 401 Unauthorized - Invalid API key
@@ -60,7 +60,7 @@ for attempt in range(3):
 
 ## Verification failures
 
-### Math: Floating Point Precision
+### Math: floating-point precision
 
 ```python
 # Fails due to floating point
@@ -75,7 +75,7 @@ result = client.verify_math("0.1 + 0.2 = 0.3", tolerance=1e-10)
 # True
 ```
 
-### Logic: Unsatisfiable Constraints
+### Logic: unsatisfiable constraints
 
 ```
 Error: No satisfying assignment found
@@ -105,7 +105,7 @@ This generic message is returned when the Stats Engine fails to generate or tran
 2. Check that the column names in your query match the columns in your data
 3. If the issue persists, check the server-side logs for the exception type
 
-### Code: Timeout
+### Code: timeout
 
 ```
 Error: Verification timeout after 30s
@@ -126,7 +126,7 @@ Error: Verification timeout after 30s
 sqlite3.OperationalError: attempt to write a readonly database
 ```
 
-This error occurs during Step 3 of `qwed init` when the local server tries to create a bootstrap SQLite database in a directory that is not writable (e.g., a read-only mount, a container filesystem, or a system-managed path).
+This error occurs during Step 3 of `qwed init`. The local server tries to create a bootstrap SQLite database in a directory that is not writable — for example, a read-only mount, a container filesystem, or a system-managed path.
 
 **Solution:** Upgrade to QWED v4.0.0 or later:
 

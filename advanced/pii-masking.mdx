@@ -186,7 +186,7 @@ qwed pii "John Doe (john@example.com) lives at 123 Main St"
 
 ### Example 1: healthcare (HIPAA)
 
-**Scenario:** LLM-backed medical assistant
+**Scenario:** Medical assistant built on an LLM
 
 ```python
 from qwed_sdk import QWEDLocal
@@ -457,7 +457,7 @@ print(result.evidence['pii_masked'])
 
 **A:** Yes:
 - ✅ Runs **locally** (not a cloud service)
-- ✅ Microsoft Presidio (enterprise-grade)
+- ✅ Microsoft Presidio (production-tested at Microsoft)
 - ✅ No data sent to QWED servers
 - ✅ One-way masking (no reverse mapping)
 

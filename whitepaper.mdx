@@ -27,7 +27,7 @@ slug: /whitepaper
 
 Large Language Models (LLMs) exhibit fundamental unreliability in deterministic tasks due to their probabilistic architecture. Hallucinations, arithmetic errors, logical inconsistencies, and unsafe code generation persist despite fine-tuning, prompting strategies, or retrieval augmentation.
 
-We introduce QWED (Query with Evidence & Determinism), a deterministic verification protocol that treats LLMs as untrusted translators rather than reliable oracles. QWED validates model outputs using established formal methods—symbolic mathematics (SymPy), SMT solving (Z3), static analysis, and bounded model checking—across eight specialized engines: mathematics, logic, code security, SQL safety, statistics, fact checking, image validation, and multi-model consensus.
+We introduce QWED (Query with Evidence & Determinism), a deterministic verification protocol that treats LLMs as untrusted translators rather than reliable oracles. QWED validates model outputs using established formal methods: symbolic mathematics (SymPy), SMT solving (Z3), static analysis, and bounded model checking. It applies these methods across eight specialized engines — mathematics, logic, code security, SQL safety, statistics, fact checking, image validation, and multi-model consensus.
 
 In benchmarks against Claude Opus 4.5 across 215 adversarial and domain-specific test cases, QWED achieved 100% error detection in verifiable domains where the model exhibited 73–85% accuracy. Critical failures included a compound interest miscalculation representing $12,889 per transaction—a systematic error pattern undetectable through prompting or confidence scoring.
 
