@@ -35,7 +35,7 @@ result = guard.verify_aml_flag(
 | `verify_transaction_limit()` | Enforce daily limits |
 | `verify_sanctions_check()` | OFAC sanctions screening |
 
-### How Z3 Works
+### How Z3 works
 
 ```python
 # Z3 proves: IF amount >= 10000 THEN flag_required
@@ -162,7 +162,7 @@ result = guard.verify_iso20022_xml(
 | `MT103` | SWIFT Single Transfer |
 | `MT202` | SWIFT Bank Transfer |
 
-### SWIFT MT Validation
+### SWIFT MT validation
 
 ```python
 # Validate MT103 fields
@@ -197,7 +197,7 @@ result = guard.verify_payment_message(
 # result.verified = True ✅
 ```
 
-### Why JSON vs XML?
+### Why JSON vs. XML?
 
 While `MessageGuard` handles traditional XML SWIFT messages, `ISOGuard` enables **Modern Banking Agents** to speak the same standard using lightweight JSON.
 
@@ -229,7 +229,7 @@ result = guard.verify_readonly_safety(
 | `verify_column_access()` | Block PII columns |
 | `verify_no_injection()` | Detect injection patterns |
 
-### Why AST, Not Regex?
+### Why AST, not regex?
 
 ```sql
 -- Regex might miss this:
