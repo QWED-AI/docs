@@ -19,7 +19,7 @@ pip install qwed-open-responses[langchain]
 
 ---
 
-## Quick Start
+## Quick start
 
 ```python
 from langchain.agents import create_react_agent
@@ -58,7 +58,7 @@ result = agent.invoke({"input": "Search for weather"})
 
 ---
 
-## Example: Blocking Dangerous Tools
+## Example: blocking dangerous tools
 
 ```python
 from qwed_open_responses import ToolGuard
@@ -79,7 +79,7 @@ callback = QWEDCallbackHandler(
 
 ---
 
-## Example: Safety Checks
+## Example: safety checks
 
 ```python
 from qwed_open_responses import SafetyGuard
@@ -97,7 +97,7 @@ callback = QWEDCallbackHandler(
 
 ---
 
-## Handling Blocked Actions
+## Handling blocked actions
 
 ```python
 from qwed_open_responses.middleware.langchain import ToolCallBlocked
@@ -112,7 +112,7 @@ except ToolCallBlocked as e:
 
 ---
 
-## Verification Summary
+## Verification summary
 
 ```python
 # After running agent
@@ -125,7 +125,7 @@ print(f"Success rate: {summary['success_rate']:.1%}")
 
 ---
 
-## Full Example
+## Full example
 
 ```python
 from langchain_openai import ChatOpenAI

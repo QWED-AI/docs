@@ -19,7 +19,7 @@ pip install qwed-open-responses[openai]
 
 ---
 
-## Quick Start
+## Quick start
 
 ```python
 from qwed_open_responses.middleware.openai_sdk import VerifiedOpenAI
@@ -43,7 +43,7 @@ print(response._qwed_verification.verified)
 
 ---
 
-## Structured Outputs
+## Structured outputs
 
 ```python
 from qwed_open_responses import SchemaGuard
@@ -74,7 +74,7 @@ response = client.chat.completions.create(
 
 ---
 
-## Tool Calling Verification
+## Tool calling verification
 
 ```python
 from qwed_open_responses import ToolGuard
@@ -99,7 +99,7 @@ response = client.chat.completions.create(
 
 ---
 
-## Handling Blocked Responses
+## Handling blocked responses
 
 ```python
 from qwed_open_responses.middleware.openai_sdk import ResponseBlocked
@@ -120,7 +120,7 @@ except ResponseBlocked as e:
 
 ---
 
-## Non-Blocking Mode
+## Non-blocking mode
 
 ```python
 # Don't raise exceptions, just mark results
@@ -157,7 +157,7 @@ response = client.responses.create(
 
 ---
 
-## Full Example
+## Full example
 
 ```python
 from qwed_open_responses.middleware.openai_sdk import VerifiedOpenAI, ResponseBlocked

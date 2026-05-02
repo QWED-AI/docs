@@ -4,7 +4,7 @@ title: "Cryptographic Attestations"
 description: "Generate and verify cryptographically signed JWT proofs of verification using ES256 signatures. Store attestations on-chain or verify independently."
 ---
 
-## What are Attestations?
+## What are attestations?
 
 An **attestation** is a cryptographically signed proof that a verification occurred. It:
 
@@ -13,7 +13,7 @@ An **attestation** is a cryptographically signed proof that a verification occur
 - Can be verified independently
 - Can be stored on-chain
 
-## Requesting Attestations
+## Requesting attestations
 
 ```python
 result = client.verify(
@@ -25,7 +25,7 @@ print(result.attestation)
 # eyJhbGciOiJFUzI1NiIsInR5cCI6InF3ZWQtYXR0ZXN...
 ```
 
-## Attestation Structure
+## Attestation structure
 
 ### Header
 
@@ -60,7 +60,7 @@ print(result.attestation)
 }
 ```
 
-## Verifying Attestations
+## Verifying attestations
 
 ### Using the API
 
@@ -81,7 +81,7 @@ is_valid = verify_attestation(
 )
 ```
 
-## Trust Anchors
+## Trust anchors
 
 QWED maintains a registry of trusted attestation issuers:
 
@@ -90,7 +90,7 @@ QWED maintains a registry of trusted attestation issuers:
 | `did:qwed:node:production` | QWED Production | ✅ Active |
 | `did:qwed:node:staging` | QWED Staging | ✅ Active |
 
-## Attestation Chains
+## Attestation chains
 
 Link multiple attestations together:
 
@@ -105,14 +105,14 @@ attestation2 = client.verify(
 )
 ```
 
-## Use Cases
+## Use cases
 
 1. **Audit Trails** - Prove AI outputs were verified
 2. **Compliance** - Regulatory verification records
 3. **Blockchain** - Anchor proofs on-chain
 4. **Badges** - Show verification status in UIs
 
-## Badge Integration
+## Badge integration
 
 Embed attestation badges:
 

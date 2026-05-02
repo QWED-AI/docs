@@ -25,7 +25,7 @@ result = client.verify_sql(
 print(result.verified)  # True
 ```
 
-## Injection Detection
+## Injection detection
 
 ```python
 # SQL injection pattern
@@ -35,7 +35,7 @@ print(result.vulnerabilities)
 # [{"type": "injection", "message": "Chained DROP statement"}]
 ```
 
-## Detected Patterns
+## Detected patterns
 
 | Pattern           | Risk     | Example        |
 | ----------------- | -------- | -------------- |
@@ -44,7 +44,7 @@ print(result.vulnerabilities)
 | UNION injection   | Critical | `UNION SELECT` |
 | Chained DROP      | Critical | `; DROP TABLE` |
 
-## Destructive Operations
+## Destructive operations
 
 ```python
 # Destructive query
@@ -76,7 +76,7 @@ The SQL engine also blocks administrative SQL commands by default:
 | SET         | Medium   |
 | TRANSACTION | Medium   |
 
-## Supported Dialects
+## Supported dialects
 
 - PostgreSQL
 - MySQL

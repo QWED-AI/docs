@@ -4,7 +4,7 @@ title: "Error Codes"
 description: "QWED API error code reference. Covers general errors (QWED-001 to QWED-007), verification errors (QWED-100+), and security errors with response format details."
 ---
 
-## Error Response Format
+## Error response format
 
 ```json
 {
@@ -19,7 +19,7 @@ description: "QWED API error code reference. Covers general errors (QWED-001 to 
 }
 ```
 
-## General Errors
+## General errors
 
 | Code | HTTP | Message |
 | --- | --- | --- |
@@ -31,7 +31,7 @@ description: "QWED API error code reference. Covers general errors (QWED-001 to 
 | `QWED-006` | 500 | Internal server error |
 | `QWED-007` | 503 | Service temporarily unavailable |
 
-## Verification Errors
+## Verification errors
 
 | Code | Message |
 | --- | --- |
@@ -42,7 +42,7 @@ description: "QWED API error code reference. Covers general errors (QWED-001 to 
 | `QWED-104` | Engine timeout |
 | `QWED-105` | Unsupported language |
 
-## Execution Errors
+## Execution errors
 
 | Code | HTTP | Message |
 | --- | --- | --- |
@@ -51,7 +51,7 @@ description: "QWED API error code reference. Covers general errors (QWED-001 to 
 
 These errors apply to the `/verify/stats` and `/verify/consensus` endpoints. Statistical and consensus Python verification requires the secure Docker sandbox. When Docker is unavailable, the API returns `503` instead of falling back to in-process execution.
 
-## Security Errors
+## Security errors
 
 | Code | Message |
 | --- | --- |
@@ -104,7 +104,7 @@ These errors relate to the progress-aware doom loop guard ([LOOP-004](/specs/age
 | `QWED-AGENT-STATE-003` | `state_source` must be one of: `file_tree`, `db_snapshot`, `conversation_digest`, `git_tree`, `custom` |
 | `QWED-AGENT-STATE-004` | Action parameters contain non-deterministic JSON-incompatible values |
 
-## Attestation Errors
+## Attestation errors
 
 | Code | Message |
 | --- | --- |

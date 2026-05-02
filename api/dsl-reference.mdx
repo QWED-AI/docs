@@ -18,7 +18,7 @@ QWED-Logic is an S-expression based DSL for expressing logical constraints. It's
 
 ---
 
-## Basic Syntax
+## Basic syntax
 
 ```
 (OPERATOR arg1 arg2 ...)
@@ -28,7 +28,7 @@ All expressions are enclosed in parentheses. The operator comes first, followed 
 
 ---
 
-## Logical Operators
+## Logical operators
 
 | Operator | Meaning | Example |
 |----------|---------|---------|
@@ -54,7 +54,7 @@ All expressions are enclosed in parentheses. The operator comes first, followed 
 
 ---
 
-## Comparison Operators
+## Comparison operators
 
 | Operator | Meaning | Example |
 |----------|---------|---------|
@@ -80,7 +80,7 @@ All expressions are enclosed in parentheses. The operator comes first, followed 
 
 ---
 
-## Arithmetic Operators
+## Arithmetic operators
 
 | Operator | Meaning | Example |
 |----------|---------|---------|
@@ -126,16 +126,16 @@ All expressions are enclosed in parentheses. The operator comes first, followed 
 
 ---
 
-## Special Types
+## Special types
 
-### Boolean Literals
+### Boolean literals
 
 ```lisp
 TRUE
 FALSE
 ```
 
-### Integer Constraints
+### Integer constraints
 
 ```lisp
 (INT x)          # x is an integer
@@ -143,7 +143,7 @@ FALSE
 (POS x)          ; x is positive
 ```
 
-### Array/List Operations
+### Array/list operations
 
 ```lisp
 (LEN arr)              # Length of array
@@ -154,9 +154,9 @@ FALSE
 
 ---
 
-## Complete Examples
+## Complete examples
 
-### Example 1: Age Validation
+### Example 1: age validation
 
 ```lisp
 # User must be 18-65 years old
@@ -172,7 +172,7 @@ result = client.verify_logic("(AND (GE age 18) (LE age 65))")
 # SAT with model: {age: 30}
 ```
 
-### Example 2: Budget Constraint
+### Example 2: budget constraint
 
 ```lisp
 # Total spending must not exceed budget
@@ -182,7 +182,7 @@ result = client.verify_logic("(AND (GE age 18) (LE age 65))")
 )
 ```
 
-### Example 3: Password Rules
+### Example 3: password rules
 
 ```lisp
 # Password must be 8-20 chars with at least 1 uppercase
@@ -193,7 +193,7 @@ result = client.verify_logic("(AND (GE age 18) (LE age 65))")
 )
 ```
 
-### Example 4: Scheduling Constraint
+### Example 4: scheduling constraint
 
 ```lisp
 # Meetings can't overlap
@@ -203,7 +203,7 @@ result = client.verify_logic("(AND (GE age 18) (LE age 65))")
 )
 ```
 
-### Example 5: Quadratic Equation
+### Example 5: quadratic equation
 
 ```lisp
 # x² - 5x + 6 = 0 has solutions
@@ -214,7 +214,7 @@ result = client.verify_logic("(AND (GE age 18) (LE age 65))")
 
 ---
 
-## Verification Results
+## Verification results
 
 | Status | Meaning | Model |
 |--------|---------|-------|
@@ -222,7 +222,7 @@ result = client.verify_logic("(AND (GE age 18) (LE age 65))")
 | `UNSAT` | Unsatisfiable — no solution | `null` |
 | `UNKNOWN` | Solver timeout or undecidable | `null` |
 
-### Reading Results
+### Reading results
 
 ```python
 result = client.verify_logic("(AND (GT x 5) (LT x 10))")
@@ -234,7 +234,7 @@ print(result.verified) # True
 
 ---
 
-## API Usage
+## API usage
 
 ### Python
 
@@ -284,36 +284,36 @@ curl -X POST https://api.qwedai.com/v1/verify/logic \
 
 ---
 
-## Common Patterns
+## Common patterns
 
-### Range Check
+### Range check
 ```lisp
 (AND (GE x min) (LE x max))
 ```
 
-### Non-Empty String
+### Non-empty string
 ```lisp
 (GT (LEN str) 0)
 ```
 
-### Mutual Exclusion
+### Mutual exclusion
 ```lisp
 (NOT (AND a b))     # a and b can't both be true
 ```
 
-### At Most One
+### At most one
 ```lisp
 (LE (PLUS (IF a 1 0) (IF b 1 0) (IF c 1 0)) 1)
 ```
 
-### Exactly One
+### Exactly one
 ```lisp
 (EQ (PLUS (IF a 1 0) (IF b 1 0) (IF c 1 0)) 1)
 ```
 
 ---
 
-## Error Handling
+## Error handling
 
 | Error | Cause | Fix |
 |-------|-------|-----|
@@ -342,6 +342,6 @@ string         = "\"" [^\"]* "\""
 
 ---
 
-## Full Specification
+## Full specification
 
 See [QWED-Logic DSL Specification](/specs/qwed-spec#7-qwed-logic-dsl) for the complete formal grammar.
