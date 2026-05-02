@@ -1,12 +1,12 @@
 ---
 sidebar_position: 2
-title: "Common Pitfalls"
+title: "Common pitfalls"
 description: "Avoid common QWED integration mistakes like calling LLM directly instead of through QWED. Includes correct and incorrect code examples for reference."
 ---
 
-## ❌ Pitfall #1: Calling LLM Directly
+## Pitfall #1: Calling the LLM directly
 
-### The Mistake:
+### The mistake
 
 ```python
 # ❌ WRONG!
@@ -24,14 +24,14 @@ qwed = QWEDClient(api_key="...")
 result = qwed.verify(response.content)  # TOO LATE!
 ```
 
-### Why It's Wrong:
+### Why it's wrong
 
 - 🚫 QWED can't control LLM prompting
 - 🚫 No DSL enforcement
 - 🚫 Vulnerable to prompt injection
 - 🚫 Can't guarantee structured output
 
-### The Fix:
+### The fix
 
 ```python
 # ✅ CORRECT!
@@ -48,9 +48,9 @@ print(result.verified)  # True
 
 ---
 
-## ❌ Pitfall #2: Trusting LLM Output Without Verification
+## Pitfall #2: Trusting LLM output without verification
 
-### The Mistake:
+### The mistake
 
 ```python
 # ❌ DANGEROUS!
@@ -60,13 +60,13 @@ llm_calculation = llm.generate("Calculate loan payment for $50k at 5%")
 charge_customer(llm_calculation)  # LAWSUIT WAITING TO HAPPEN!
 ```
 
-### Why It's Wrong:
+### Why it's wrong
 
 - LLMs make mistakes (12% error rate in benchmarks)
 - Financial errors = legal liability
 - No audit trail
 
-### The Fix:
+### The fix
 
 ```python
 # ✅ SAFE!
@@ -81,9 +81,9 @@ else:
 
 ---
 
-## ❌ Pitfall #3: Wrong Verification Method
+## Pitfall #3: Wrong verification method
 
-### The Mistake:
+### The mistake
 
 ```python
 # ❌ WRONG METHOD!
@@ -96,13 +96,13 @@ def login(username, password):
 result = qwed.verify(code_to_verify)  # Won't detect SQL injection!
 ```
 
-### Why It's Wrong:
+### Why it's wrong
 
 - Different engines for different domains
 - `verify()` won't analyze code security
 - Misses vulnerabilities
 
-### The Fix:
+### The fix
 
 ```python
 # ✅ USE CORRECT METHOD!
@@ -123,9 +123,9 @@ if result.blocked:
 
 ---
 
-## ❌ Pitfall #4: Ignoring Verification Results
+## Pitfall #4: Ignoring verification results
 
-### The Mistake:
+### The mistake
 
 ```python
 # ❌ IGNORING ERRORS!
@@ -136,13 +136,13 @@ value = result.value  # Might be wrong!
 process_payment(value)
 ```
 
-### Why It's Wrong:
+### Why it's wrong
 
 - Verification might have failed
 - Using unverified data
 - No error handling
 
-### The Fix:
+### The fix
 
 ```python
 # ✅ ALWAYS CHECK VERIFICATION STATUS!
@@ -160,9 +160,9 @@ else:
 
 ---
 
-## ❌ Pitfall #5: Not Handling Errors
+## Pitfall #5: Not handling errors
 
-### The Mistake:
+### The mistake
 
 ```python
 # ❌ NO ERROR HANDLING!
@@ -170,13 +170,13 @@ result = qwed.verify("malformed input!!!@#$")
 # Might crash or return unexpected result
 ```
 
-### Why It's Wrong:
+### Why it's wrong
 
 - Network failures happen
 - API quotas exist
 - Invalid input exists
 
-### The Fix:
+### The fix
 
 ```python
 # ✅ PROPER ERROR HANDLING!
@@ -214,22 +214,22 @@ except ValidationError as e:
 
 ---
 
-## ❌ Pitfall #6: Missing API Key Configuration
+## Pitfall #6: Missing API key configuration
 
-### The Mistake:
+### The mistake
 
 ```python
 # ❌ HARDCODED API KEY!
 client = QWEDClient(api_key="qwed_1234567890abcdef")  # Committed to Git!
 ```
 
-### Why It's Wrong:
+### Why it's wrong
 
 - Security risk (API key exposed)
 - Can't change keys without code changes
 - Different keys for dev/prod
 
-### The Fix:
+### The fix
 
 ```python
 # ✅ ENVIRONMENT VARIABLE!
@@ -257,9 +257,9 @@ QWED_API_KEY = os.getenv("QWED_API_KEY")
 
 ---
 
-## ❌ Pitfall #7: Not Using Batch Processing
+## Pitfall #7: Not using batch processing
 
-### The Mistake:
+### The mistake
 
 ```python
 # ❌ SLOW! (N individual API calls)
@@ -269,13 +269,13 @@ for query in queries:  # 100 queries
     results.append(result)
 ```
 
-### Why It's Wrong:
+### Why it's wrong
 
 - Slow (sequential API calls)
 - Expensive (more API credits)
 - Poor user experience
 
-### The Fix:
+### The fix
 
 ```python
 # ✅ FAST! (1 batch API call)
@@ -301,9 +301,9 @@ for item_result in result.items:
 
 ---
 
-## ❌ Pitfall #8: Wrong Timeout Settings
+## Pitfall #8: Wrong timeout settings
 
-### The Mistake:
+### The mistake
 
 ```python
 # ❌ TOO SHORT!
@@ -312,13 +312,13 @@ client = QWEDClient(api_key="...", timeout=1)  # 1 second!
 result = client.verify("complex calculation")  # Likely to timeout
 ```
 
-### Why It's Wrong:
+### Why it's wrong
 
 - Complex queries need time
 - Causes unnecessary failures
 - Poor user experience
 
-### The Fix:
+### The fix
 
 ```python
 # ✅ REASONABLE TIMEOUT!
@@ -342,9 +342,9 @@ result = client.verify(
 
 ---
 
-## ❌ Pitfall #9: Not Running Backend Server
+## Pitfall #9: Not running the backend server
 
-### The Mistake:
+### The mistake
 
 ```python
 # ❌ WRONG - SDK without backend!
@@ -355,13 +355,13 @@ client = QWEDClient(api_key="qwed_123")
 result = client.verify("2+2=4")  # Connection refused!
 ```
 
-### Why It's Wrong:
+### Why it's wrong
 
 - QWED requires a backend server
 - SDK is just a client that connects to backend
 - Backend needs YOUR LLM API keys
 
-### The Fix:
+### The fix
 
 ```bash
 # ✅ Terminal 1: Run backend first
@@ -398,7 +398,7 @@ Your App → SDK → Backend Server (YOU run) → LLM (YOUR key) → Verifiers
 
 ---
 
-## ✅ Integration Checklist
+## Integration checklist
 
 Before deploying to production, verify:
 
