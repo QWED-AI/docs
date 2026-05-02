@@ -1,6 +1,6 @@
 ---
 title: "QWEDLocal - Client-Side Verification"
-description: "Run QWED verification directly in your code without a backend server. 100% privacy, model-agnostic support, and smart caching for cost reduction."
+description: "Run QWED verification directly in your code without a backend server. 100% privacy, model-agnostic support, and deterministic result caching for cost reduction."
 sidebarTitle: "QWEDLocal"
 ---
 
@@ -217,7 +217,7 @@ qwed verify "5!" --base-url http://localhost:11434/v1 --model llama3
 qwed verify "2+2" --quiet
 ```
 
-### Interactive Mode
+### Interactive mode
 
 ```bash
 qwed interactive
@@ -234,7 +234,7 @@ Type 'exit' or 'quit' to quit
 > exit
 ```
 
-### Cache Management
+### Cache management
 
 ```bash
 # View cache stats
@@ -301,9 +301,9 @@ qwed interactive --help
 
 ---
 
-## 🔧 Advanced Configuration
+## 🔧 Advanced configuration
 
-### Custom Cache Settings
+### Custom cache settings
 
 ```python
 client = QWEDLocal(

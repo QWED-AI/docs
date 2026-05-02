@@ -23,7 +23,7 @@ pip install z3-solver
 
 Note: The package is `z3-solver`, not `z3`.
 
-### Holidays Package Version
+### Holidays package version
 
 **Error:**
 
@@ -41,7 +41,7 @@ pip install --upgrade holidays>=0.40
 
 ## DeadlineGuard Issues
 
-### Unexpected Holiday Calculation
+### Unexpected holiday calculation
 
 **Problem:** Deadline seems off by a few days.
 
@@ -78,7 +78,7 @@ guard.verify("01/02/2026", ...)  # Is this Jan 2 or Feb 1?
 
 ## LiabilityGuard Issues
 
-### Float Precision Errors
+### Float precision errors
 
 **Problem:** Small differences in large calculations.
 
@@ -95,7 +95,7 @@ guard = LiabilityGuard(tolerance_percent=0.1)    # More lenient
 
 ## ClauseGuard Issues
 
-### No Conflicts Detected (False Negative)
+### No conflicts detected (false negative)
 
 **Problem:** You expect a conflict but ClauseGuard doesn't find it.
 
@@ -120,7 +120,7 @@ clauses = [
 
 ## CitationGuard Issues
 
-### Valid Citation Marked Invalid
+### Valid citation marked invalid
 
 **Problem:** A real citation is flagged as invalid.
 
@@ -128,7 +128,7 @@ clauses = [
 
 **Solution:** Check if the reporter is a valid Bluebook abbreviation. If it's a less common reporter, it may not be in our list. File an issue to add it: [https://github.com/QWED-AI/qwed-legal/issues](https://github.com/QWED-AI/qwed-legal/issues)
 
-### Statute Citation Format
+### Statute citation format
 
 **Problem:** `42 USC 1983` doesn't validate.
 
@@ -146,7 +146,7 @@ guard.check_statute_citation("42 USC 1983")
 
 ## General issues
 
-### Import Errors
+### Import errors
 
 **Problem:**
 
@@ -160,7 +160,7 @@ ImportError: cannot import name 'LegalGuard' from 'qwed_legal'
 pip install --upgrade qwed-legal
 ```
 
-### Version Mismatch with MCP
+### Version mismatch with MCP
 
 **Problem:** MCP tools don't show legal verification options.
 

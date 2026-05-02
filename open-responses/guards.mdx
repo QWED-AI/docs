@@ -60,13 +60,13 @@ result = guard.check({
 # ❌ BLOCKED: Dangerous pattern detected
 ```
 
-### Default Blocked Tools
+### Default blocked tools
 
 - `execute_shell`, `bash`, `cmd`
 - `delete_file`, `remove_file`
 - `send_email`, `transfer_money`
 
-### Default Dangerous Patterns
+### Default dangerous patterns
 
 - `DROP TABLE`, `DELETE FROM`
 - `rm -rf`, `rmdir /s`
@@ -94,7 +94,7 @@ result = guard.check({
 # ✅ Passed
 ```
 
-### What It Checks
+### What it checks
 
 - Totals: `total = subtotal + tax + shipping`
 - Percentages: `tax_amount = subtotal * tax_rate`
@@ -150,7 +150,7 @@ result = guard.check({
 # ✅ All arguments valid
 ```
 
-### Supported Types
+### Supported types
 
 | Type | Validation |
 |------|------------|
@@ -197,7 +197,7 @@ result = guard.check({
 
 ---
 
-## Combining Guards
+## Combining guards
 
 ```python
 from qwed_open_responses import (

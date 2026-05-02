@@ -96,7 +96,7 @@ For production environments, we provide Kubernetes manifests in `deploy/kubernet
 - `kubectl` configured.
 - A PostgreSQL database and Redis instance (managed services recommended for production).
 
-### Deployment Steps
+### Deployment steps
 
 1. **Create Namespace**
    ```bash
@@ -125,7 +125,7 @@ For production environments, we provide Kubernetes manifests in `deploy/kubernet
    kubectl get pods -n qwed
    ```
 
-### Horizontal Pod Autoscaling (HPA)
+### Horizontal pod autoscaling (HPA)
 
 For high-traffic environments, we recommend enabling HPA (requires Metrics Server):
 
@@ -267,7 +267,7 @@ Before going to production, ensure the following:
 
 ## Troubleshooting
 
-### 1. Docker Permission Denied
+### 1. Docker permission denied
 **Error:** `docker: Got permission denied while trying to connect to the Docker daemon socket`
 **Solution:** Ensure the user running the app is in the `docker` group, or (for Docker Compose) ensure the socket is mounted correctly and the container user has permissions.
 
@@ -283,7 +283,7 @@ Before going to production, ensure the following:
 
 ## Operations and monitoring
 
-### View Recent Security Events
+### View recent security events
 
 ```bash
 # Python script
@@ -304,7 +304,7 @@ with get_session() as session:
 "
 ```
 
-### Security Metrics Dashboard
+### Security metrics dashboard
 
 ```bash
 # Block rate by hour

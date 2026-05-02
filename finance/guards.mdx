@@ -68,7 +68,7 @@ result = guard.verify_day_count(
 # result.verified = True ✅
 ```
 
-### Supported Conventions
+### Supported conventions
 
 | Convention | Use Case |
 | --- | --- |
@@ -152,7 +152,7 @@ result = guard.verify_iso20022_xml(
 # result.errors = ["Missing required element: GrpHdr"]
 ```
 
-### Supported Formats
+### Supported formats
 
 | Format | Description |
 | --- | --- |
@@ -280,7 +280,7 @@ result = guard.verify_ytm(
 # result.computed_ytm = 0.0566...
 ```
 
-### Rate Format Rules
+### Rate format rules
 
 <Warning>
 **Since v2.1.0:** `_parse_rate()` no longer silently guesses whether an input is a percentage or decimal. The old heuristic (`val < 1 → decimal, else percentage`) has been removed.

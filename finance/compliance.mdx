@@ -26,7 +26,7 @@ receipt = ReceiptGenerator.create_receipt(
 print(receipt.to_json())
 ```
 
-### Receipt Fields
+### Receipt fields
 
 | Field | Description | Example |
 | --- | --- | --- |
@@ -37,7 +37,7 @@ print(receipt.to_json())
 | `verified` | Pass/fail | `true/false` |
 | `proof_steps` | Symbolic derivation | `["amount=15000", "threshold=10000", "15000>=10000"]` |
 
-### Cryptographic Signature
+### Cryptographic signature
 
 ```python
 # Get tamper-proof signature
@@ -85,7 +85,7 @@ summary = log.summary()
 json_export = log.export_json()
 ```
 
-### Query Failed Verifications
+### Query failed verifications
 
 ```python
 # Get all failures for investigation
@@ -130,7 +130,7 @@ def test_mixed_case_drop():
     assert result.safe == False  # ✅ Caught
 ```
 
-### Test Suites
+### Test suites
 
 | Suite | Tests | Coverage |
 | --- | --- | --- |

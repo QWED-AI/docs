@@ -38,7 +38,7 @@ GET /admin/compliance/report/soc2/{org_id}
 }
 ```
 
-### Audit Trail Verification
+### Audit trail verification
 Verify the cryptographic integrity of your audit logs. This ensures that no logs have been tampered with since creation.
 
 **Verify a Single Log Entry:**
@@ -62,7 +62,7 @@ with get_session() as session:
         print(f"Integrity check failed: {result['errors']}")
 ```
 
-### Evidence Collection
+### Evidence collection
 Export all verification logs and security events as a CSV file to provide to your auditor.
 
 **API Endpoint:**
@@ -99,7 +99,7 @@ DELETE FROM user WHERE id = {user_id};
 DELETE FROM verificationlog WHERE user_id = {user_id};
 ```
 
-### Consent Management
+### Consent management
 QWED does not have a built-in "Consent Management Platform" (CMP), but you can use the immutable audit log to track consent events.
 
 **Implementing Consent Tracking:**
@@ -117,9 +117,9 @@ requests.post("/verify/fact", json={
 
 ---
 
-## 3. Audit Trail Setup
+## 3. Audit trail setup
 
-### Enable Cryptographic Logging
+### Enable cryptographic logging
 Cryptographic logging is enabled by default, but you **must** configure the security key for production.
 
 1.  **Set Environment Variable:**
@@ -132,10 +132,10 @@ Cryptographic logging is enabled by default, but you **must** configure the secu
 2.  **Secure Storage:**
     Ensure this key is stored in a secrets manager (e.g., AWS Secrets Manager, HashiCorp Vault) and injected into the application environment.
 
-### Verify Log Integrity
+### Verify log integrity
 Regularly run the verification process (see "Audit Trail Verification" above) to detect any database tampering.
 
-### Long-term Storage
+### Long-term storage
 QWED uses the configured database (SQLite/PostgreSQL) for log storage. For high-volume compliance requirements:
 - Configure database backups to a WORM (Write Once, Read Many) compatible storage (e.g., AWS S3 Object Lock) for archival.
 

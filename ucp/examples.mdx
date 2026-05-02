@@ -17,7 +17,7 @@ Real-world examples of using QWED-UCP for commerce verification.
 
 An AI shopping assistant helps a user buy flowers online. The AI calculates discounts and taxes.
 
-### The Checkout Data
+### The checkout data
 
 ```python
 checkout = {
@@ -115,7 +115,7 @@ result = verifier.verify_checkout(checkout_japan_bad)
 
 AI applies a "20% off" coupon. Need to verify the math.
 
-### Percentage Discount
+### Percentage discount
 
 ```python
 from qwed_ucp.guards import DiscountGuard
@@ -153,7 +153,7 @@ result = guard.verify_percentage_discount(
 
 Checkout progresses through states. Invalid transitions should be blocked.
 
-### Valid Flow
+### Valid flow
 
 ```python
 from qwed_ucp.guards import StateGuard
@@ -188,7 +188,7 @@ guard.verify_transition(
 
 ## Example 5: FastAPI production setup
 
-### Full Implementation
+### Full implementation
 
 ```python
 from fastapi import FastAPI, HTTPException
@@ -257,7 +257,7 @@ async def verification_error_handler(request, exc):
 
 ## Example 6: Express.js production setup
 
-### Full Implementation
+### Full implementation
 
 ```javascript
 const express = require('express');
