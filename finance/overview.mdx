@@ -26,14 +26,14 @@ LLMs struggle with basic math and strict logic. In finance, close enough is not 
 *   **Problem:** LLM says "IRR is 12%" (when it's actually 11.8%)
 *   **Solution:** QWED calculates the *exact* IRR symbolically and either validates or corrects the LLM.
 
-## Key Features
+## Key features
 
 *   ✅ **10 Specialized Guards:** Compliance, Calendar, Derivatives, Messages, Query, Cross, Bond, FX, Risk, ISO.
 *   ✅ **GitHub Action v2.0:** Integrated CI/CD verifier with SARIF support for security dashboards.
 *   ✅ **Audit Trails:** Cryptographic attestation of verification results.
 *   ✅ **Zero Hallucination:** Fallback to deterministic engines ensures 100% mathematical accuracy.
 
-## The 4 Pillars of Banking Verification
+## The 4 pillars of banking verification
 
 | Pillar | Guard | Engine | Use Case |
 |--------|-------|--------|----------|
@@ -42,7 +42,7 @@ LLMs struggle with basic math and strict logic. In finance, close enough is not 
 | **Interoperability** | Message | XML Schema | ISO 20022, SWIFT MT |
 | **Data Safety** | Query | SQLGlot | SQL injection prevention |
 
-## Quick Example
+## Quick example
 
 ```python
 from qwed_finance import ComplianceGuard
@@ -186,7 +186,7 @@ sequenceDiagram
     end
 ```
 
-## Why Not Just Trust the LLM?
+## Why not just trust the LLM?
 
 LLMs are **probabilistic**. They can:
 
@@ -204,7 +204,7 @@ QWED-Finance uses **deterministic** verification:
 | "Payment XML is valid" | Schema validation | Structure |
 | "SELECT * FROM users" | AST analysis | SQL |
 
-## Regulatory Alignment
+## Regulatory alignment
 
 QWED-Finance aligns with:
 
@@ -215,7 +215,7 @@ QWED-Finance aligns with:
 
 > "Accuracy alone is not sufficient - transparency, auditability, and defensible decision logic are required." — India AI Governance Guidelines
 
-## Next Steps
+## Next steps
 
 - [The 10 Guards](/finance/guards) - Deep dive into each verification guard
 - [Compliance & Auditing](/finance/compliance) - Receipts and regulatory proof

@@ -19,7 +19,7 @@ description: "QWED UCP verifies AI-driven commerce transactions, totals, discoun
 
 QWED-UCP provides **deterministic verification guards** for the [Universal Commerce Protocol (UCP)](https://developers.google.com/commerce/ucp) - Google's open standard for AI-driven commerce.
 
-### The Problem
+### The problem
 
 When AI agents shop on behalf of users, they can make calculation errors that result in:
 - 💸 **Wrong totals** - Customers overcharged or undercharged
@@ -27,7 +27,7 @@ When AI agents shop on behalf of users, they can make calculation errors that re
 - 🧾 **Incorrect tax** - Legal compliance issues
 - 💱 **Currency errors** - International payment failures
 
-### The Solution
+### The solution
 
 QWED-UCP intercepts checkout requests and **mathematically verifies** every calculation before payment:
 
@@ -40,7 +40,7 @@ AI Agent → UCP Checkout → QWED-UCP Guard → Payment Gateway
 
 ---
 
-## How It Works
+## How it works
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -88,7 +88,7 @@ AI Agent → UCP Checkout → QWED-UCP Guard → Payment Gateway
 
 ---
 
-## The 10 Guards
+## The 10 guards
 
 | Guard | What It Verifies | Error When Wrong |
 |-------|------------------|------------------|
@@ -121,9 +121,9 @@ npm install qwed-ucp-middleware
 
 ---
 
-## Quick Start
+## Quick start
 
-### Basic Verification
+### Basic verification
 
 ```python
 from qwed_ucp import UCPVerifier
@@ -153,7 +153,7 @@ else:
     print(f"   Guard: {result.failed_guard}")
 ```
 
-### Middleware Integration (FastAPI)
+### Middleware integration (FastAPI)
 
 ```python
 from fastapi import FastAPI
@@ -170,7 +170,7 @@ async def checkout(request: CheckoutRequest):
     return {"status": "completed", "order_id": "ORD-123"}
 ```
 
-### Middleware Integration (Express.js)
+### Middleware integration (Express.js)
 
 ```javascript
 const express = require('express');
@@ -226,7 +226,7 @@ jobs:
 | `strict_mode` | Fail on any violation | `true` |
 | `tolerance` | Rounding tolerance (cents) | `0.01` |
 
-### What Gets Audited
+### What gets audited
 
 The Action scans all `.json` files in the specified path and verifies:
 - ✅ Line item math: `price × quantity = total`
@@ -235,7 +235,7 @@ The Action scans all `.json` files in the specified path and verifies:
 - ✅ Currency format (ISO 4217)
 - ✅ No "Penny Slicing" (rounding theft)
 
-### Example Output
+### Example output
 
 ```
 🛡️ QWED-UCP Audit: 3 vulnerabilities blocked
@@ -251,7 +251,7 @@ Action: BLOCKED (Exit Code 1)
 
 ## Why QWED-UCP?
 
-### Business Impact
+### Business impact
 
 | Scenario | Without QWED-UCP | With QWED-UCP |
 |----------|------------------|---------------|
@@ -260,7 +260,7 @@ Action: BLOCKED (Exit Code 1)
 | Currency format invalid | Payment gateway rejects | ✅ Caught at middleware |
 | State transition invalid | Order stuck in limbo | ✅ Proper error message |
 
-### ROI Calculation
+### ROI calculation
 
 For a platform processing **100M transactions/year**:
 - **Error rate** without verification: ~0.1%
@@ -274,7 +274,7 @@ QWED-UCP catches these errors **before they become expensive problems**.
 
 ## Configuration
 
-### Environment Variables
+### Environment variables
 
 | Variable | Description | Default |
 |----------|-------------|---------|
@@ -282,7 +282,7 @@ QWED-UCP catches these errors **before they become expensive problems**.
 | `QWED_UCP_LOG_LEVEL` | Logging level | `INFO` |
 | `QWED_UCP_TOLERANCE` | Tolerance for rounding (cents) | `0.01` |
 
-### Custom Guard Configuration
+### Custom guard configuration
 
 ```python
 from qwed_ucp import UCPVerifier, MoneyGuard
@@ -296,7 +296,7 @@ verifier = UCPVerifier(
 
 ---
 
-## Next Steps
+## Next steps
 
 - [Guards Reference](./guards) - Deep dive into each guard
 - [Examples](./examples) - Real-world use cases
