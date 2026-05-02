@@ -7,6 +7,49 @@ All notable changes to the QWED platform, listed by release.
 
 ---
 
+## QWED-Finance — Release blockers N-01 and N-04 fixed (NO-GO → GO)
+**Released: May 2, 2026** · [GitHub PR #24](https://github.com/QWED-AI/qwed-finance/pull/24)
+
+> Resolves the two release-blocking findings from the post-fix deterministic audit. Eliminates the last fail-open execution path in `FinanceVerifier` and the last precision divergence between the integration layer and `DerivativesGuard`.
+
+### What changed
+
+- **N-01 (HIGH) — Integration layer precision parity.** `OpenResponsesIntegration._verify_option_price()` previously carried its own Black-Scholes implementation using `math.log/exp/sqrt/erf` (IEEE-754 float), while `DerivativesGuard.verify_black_scholes()` uses `mpmath` (arbitrary precision). Same formula, two precision paths — same input could produce different output depending on the call route. The duplicate implementation has been removed; `_verify_option_price` now delegates to `DerivativesGuard.verify_black_scholes()`. The tool result's `price` and `delta` are now sourced from `bs_result.computed_price` and `bs_result.greeks["delta"]`.
+- **N-04 (MEDIUM) — Compound interest fail-closed.** `FinanceVerifier.verify_compound_interest()` previously used `n_map.get(compounding, 1)`, silently defaulting unknown frequencies (`"weekly"`, `"continuous"`, typos) to annual compounding — a classic fail-open that produced a wrong result with no error signal. The method now raises `ValueError` listing the accepted values: `annual`, `semi-annual`, `quarterly`, `monthly`, `daily`.
+
+### Behavior comparison
+
+| Path | Input | Before | After |
+| --- | --- | --- | --- |
+| `OpenResponses.price_option` | `S=100, K=105, T=0.25, r=0.05, σ=0.20, type=CALL` | float Black-Scholes (IEEE-754 path) | `DerivativesGuard.verify_black_scholes()` (mpmath, 30 dp) |
+| `OpenResponses.price_option` result | — | `{"price": "$3.50", "delta": 0.4502}` (float) | `{"price": "$3.50", "delta": "0.4502"}` (Decimal-quantized strings from the guard) |
+| `FinanceVerifier.verify_compound_interest(..., compounding="weekly")` | unknown frequency | Silently used `n=1` (annual) | Raises `ValueError: Unknown compounding frequency: 'weekly'. Accepted values: annual, daily, monthly, quarterly, semi-annual` |
+| `FinanceVerifier.verify_compound_interest(..., compounding="annual")` | known frequency | `n=1` | `n=1` (unchanged) |
+
+### Breaking changes
+
+<Warning>
+**`verify_compound_interest` raises on unknown compounding values.** Callers that previously relied on the silent annual fallback must either pass one of the accepted values or wrap the call in a `try/except ValueError`. Accepted values: `annual`, `semi-annual`, `quarterly`, `monthly`, `daily`.
+
+**`price_option` `delta` is now a Decimal-quantized string** (sourced from `DerivativesGuard.greeks["delta"]`) instead of a `float`. This matches the rest of the post-mpmath migration. Cast with `Decimal(result["delta"])` if you need numeric arithmetic.
+</Warning>
+
+### Release blocking checklist (post-fix)
+
+- No fail-open execution paths
+- No heuristic → verified transitions
+- All financial math deterministic
+- All parsing fail-closed
+- Integration layer enforces verification
+- Output status consistent and truthful
+- No silent fallback logic
+
+149 tests passed with zero regressions. Release status: **NO-GO → GO**.
+
+See [Open Responses — Black-Scholes single source of truth](/finance/integrations/open-responses#black-scholes-single-source-of-truth) for the integration-layer change and [Derivatives Guard](/finance/guards#3-derivatives-guard-black-scholes) for the underlying mpmath implementation.
+
+---
+
 ## QWED-Finance — Decimal/mpmath migration for BondGuard, DerivativesGuard, and RiskGuard
 **Released: May 2, 2026** · [GitHub PR #23](https://github.com/QWED-AI/qwed-finance/pull/23)
 
@@ -48,7 +91,7 @@ exposure = delta * Decimal(str(notional))
 
 See [Bond Guard](/finance/guards#8-bond-guard-yield-analytics), [Derivatives Guard](/finance/guards#3-derivatives-guard-black-scholes), and [Risk Guard](/finance/guards#10-risk-guard-portfolio-metrics) for the updated guard documentation.
 
-**Jump to:** [QWED-Finance Decimal/mpmath migration](#qwed-finance--decimalmpmath-migration-for-bondguard-derivativesguard-and-riskguard) · [QWED-Verification SecureCodeExecutor fail-closed fallback](#qwed-verification--securecodeexecutor-fail-closed-when-codeverifier-is-unavailable) · [QWED-Finance security audit — OpenResponses fail-closed](#qwed-finance--openresponses-fail-closed-and-computed-status) · [QWED-Finance security audit — rate parsing](#qwed-finance--rate-parsing-heuristic-removed) · [QWED-Verification symbolic verifier fail-closed](#qwed-verification--symbolic-verifier-fail-closed-without-proof) · [QWED-Verification strict additionalProperties](#qwed-verification--strict-additionalproperties-fail-closed) · [QWED-Tax example redaction](#qwed-tax-—-redacted-preflight-block-details-in-examples) · [QWED-Tax decimal hardening](#qwed-tax-—-decimal-hardening-in-financial-guards) · [v5.1.0](#v5-1-0-—-agent-state-governance-and-fail-closed-hardening) · [v5.0.0](#v5-0-0-—-enforcement-boundary-hardening) · [v4.0.5](#v4-0-5-—-stats-exception-masking) · [v4.0.4](#v4-0-4-—-fail-closed-execution-enforcement) · [v4.0.3](#v4-0-3-—-server-enforced-agent-security) · [v4.0.2](#v4-0-2-—-security-cleanup) · [v4.0.1](#v4-0-1-—-sentinel-guard-sync) · [v4.0.0](#v4-0-0-—-sentinel-edition) · [v3.0.1](#v3-0-1-—-ironclad-update) · [v2.4.1](#v2-4-1-—-the-reasoning-engine)
+**Jump to:** [QWED-Finance N-01 / N-04 release blockers](#qwed-finance--release-blockers-n-01-and-n-04-fixed-no-go--go) · [QWED-Finance Decimal/mpmath migration](#qwed-finance--decimalmpmath-migration-for-bondguard-derivativesguard-and-riskguard) · [QWED-Verification SecureCodeExecutor fail-closed fallback](#qwed-verification--securecodeexecutor-fail-closed-when-codeverifier-is-unavailable) · [QWED-Finance security audit — OpenResponses fail-closed](#qwed-finance--openresponses-fail-closed-and-computed-status) · [QWED-Finance security audit — rate parsing](#qwed-finance--rate-parsing-heuristic-removed) · [QWED-Verification symbolic verifier fail-closed](#qwed-verification--symbolic-verifier-fail-closed-without-proof) · [QWED-Verification strict additionalProperties](#qwed-verification--strict-additionalproperties-fail-closed) · [QWED-Tax example redaction](#qwed-tax-—-redacted-preflight-block-details-in-examples) · [QWED-Tax decimal hardening](#qwed-tax-—-decimal-hardening-in-financial-guards) · [v5.1.0](#v5-1-0-—-agent-state-governance-and-fail-closed-hardening) · [v5.0.0](#v5-0-0-—-enforcement-boundary-hardening) · [v4.0.5](#v4-0-5-—-stats-exception-masking) · [v4.0.4](#v4-0-4-—-fail-closed-execution-enforcement) · [v4.0.3](#v4-0-3-—-server-enforced-agent-security) · [v4.0.2](#v4-0-2-—-security-cleanup) · [v4.0.1](#v4-0-1-—-sentinel-guard-sync) · [v4.0.0](#v4-0-0-—-sentinel-edition) · [v3.0.1](#v3-0-1-—-ironclad-update) · [v2.4.1](#v2-4-1-—-the-reasoning-engine)
 
 ---
 

@@ -113,6 +113,22 @@ The `check_aml_compliance` tool delegates to `ComplianceGuard.high_risk_countrie
 
 The `price_option` tool rejects non-positive inputs for `spot_price`, `strike_price`, `time_to_expiry`, and `volatility` before computing, preventing `ZeroDivisionError` at the math boundary.
 
+### Black-Scholes single source of truth
+
+<Info>
+**Since the N-01 release-blocker fix:** `price_option` no longer carries its own Black-Scholes implementation. It delegates to `DerivativesGuard.verify_black_scholes()`, which uses `mpmath` at 30 decimal places for `log`, `exp`, `sqrt`, and `erf`.
+
+This guarantees deterministic consistency across calling paths — the same inputs produce the same output whether the agent calls `price_option` via Open Responses or invokes `DerivativesGuard` directly. The previous duplicate implementation used IEEE-754 `math.*` calls and could diverge from the guard for edge inputs.
+</Info>
+
+The tool result now mirrors the guard's output:
+
+| Field | Source |
+| --- | --- |
+| `price` | `bs_result.computed_price` (Decimal-quantized string, e.g. `"$3.50"`) |
+| `delta` | `bs_result.greeks["delta"]` (quantized string, or `null` if unavailable) |
+| `verified` | `false` (status remains `COMPUTED` — no LLM claim is being checked) |
+
 ---
 
 ## Item Wrapper (Streaming)
