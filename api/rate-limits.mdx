@@ -52,7 +52,7 @@ HTTP Status: `429 Too Many Requests`
 
 ## Best practices
 
-### 1. Implement Exponential Backoff
+### 1. Implement exponential backoff
 
 ```python
 import time
@@ -67,7 +67,7 @@ def verify_with_retry(client, query, max_retries=3):
     raise Exception("Max retries exceeded")
 ```
 
-### 2. Use Batch Endpoints
+### 2. Use batch endpoints
 
 Instead of individual requests:
 ```python
@@ -79,7 +79,7 @@ for item in items:
 client.verify_batch(items)
 ```
 
-### 3. Cache Results
+### 3. Cache results
 
 ```python
 import hashlib

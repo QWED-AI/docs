@@ -6,7 +6,7 @@ sidebarTitle: "Specification Guide"
 
 > **TL;DR:** QWED verifies LLM outputs against **developer-written code specifications**, not natural language. If you let the LLM generate both the answer AND the spec, you've just verified a hallucination.
 
-## How QWED Actually Works
+## How QWED actually works
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -41,9 +41,9 @@ sidebarTitle: "Specification Guide"
 
 ---
 
-## Examples by Engine
+## Examples by engine
 
-### Math Engine
+### Math engine
 ```python
 from qwed_new.core.verifier import VerificationEngine
 
@@ -63,7 +63,7 @@ result = engine.verify_compound_interest(
 # If LLM says "use rate=0.03" and you trust it, QWED can't help
 ```
 
-### SQL Engine
+### SQL engine
 ```python
 from qwed_new.core.sql_verifier import SQLVerifier
 
@@ -79,7 +79,7 @@ result = verifier.verify_query(
 # ❌ WRONG: Letting LLM define what tables are allowed
 ```
 
-### Code Engine
+### Code engine
 ```python
 from qwed_new.core.code_verifier import CodeSecurityVerifier
 
@@ -95,7 +95,7 @@ result = verifier.analyze_code(
 # The patterns (eval, exec, __import__) are defined by QWED, not LLM
 ```
 
-### Logic Engine
+### Logic engine
 ```python
 from qwed_new.core.logic_verifier import LogicVerifier
 
@@ -113,7 +113,7 @@ result = verifier.verify_conclusion(
 
 ---
 
-## When QWED Does NOT Work
+## When QWED does not work
 
 | Use Case | Why It Fails |
 |----------|--------------|
@@ -124,7 +124,7 @@ result = verifier.verify_conclusion(
 
 ---
 
-## When QWED Works Best
+## When QWED works best
 
 | Use Case | Why It Works |
 |----------|--------------|

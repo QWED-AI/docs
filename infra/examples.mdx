@@ -4,7 +4,7 @@ title: "Usage Examples"
 description: "QWED-Infra code examples for parsing Terraform, verifying IAM policies with context-aware checks, and cloud cost budget verification with Python samples."
 ---
 
-## 1. Parsing & Verifying IAM
+## 1. Parsing and verifying IAM
 
 ```python
 from qwed_infra import TerraformParser, IamGuard 
@@ -27,7 +27,7 @@ for policy in resources.get("policies", []):
     print(f"Policy {policy['id']} allows VPN access? {result.allowed}")
 ```
 
-## 2. Verifying Cloud Costs
+## 2. Verifying cloud costs
 
 ```python
 from qwed_infra import CostGuard
@@ -50,7 +50,7 @@ print(f"Total: ${result.total_monthly_cost:.2f}") # -> ~$23,900
 print(f"Reason: {result.reason}")
 ```
 
-## 3. Verifying Network Reachability
+## 3. Verifying network reachability
 
 ```python
 from qwed_infra import NetworkGuard
