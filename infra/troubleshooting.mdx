@@ -5,17 +5,17 @@ sidebarTitle: "Troubleshooting"
 description: "Troubleshoot QWED Infra issues including Z3 solver errors, Terraform parsing failures, IAM checks, and missing cloud pricing data."
 ---
 
-## Common Issues
+## Common issues
 
-### 1. Z3 Solver Errors
+### 1. Z3 solver errors
 
 **Error:** `Z3Exception: ...` **Cause:** Typical z3 installation issues or complex logical contradictions. **Fix:** Ensure `z3-solver` is correctly installed. Check for contradictory policy statements (e.g., Allow and Deny on the same resource/action without conditions).
 
-### 2. Terraform Parsing Failures
+### 2. Terraform parsing failures
 
 **Error:** `HCLParserError` **Cause:** Syntax error in `.tf` files or unsupported HCL features (e.g., complex modules or dynamic blocks not yet supported). **Fix:** Validate your terraform code with `terraform validate`.
 
-### 3. Missing Pricing Data
+### 3. Missing pricing data
 
 **Error:** `PriceNotFound` **Cause:** Instance type not in the embedded static catalog. **Fix:** Update `qwed-infra` or check `CostGuard.pricing_catalog` to verify coverage.
 

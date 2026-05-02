@@ -113,7 +113,7 @@ The `check_aml_compliance` tool delegates to `ComplianceGuard.high_risk_countrie
 
 The `price_option` tool rejects non-positive inputs for `spot_price`, `strike_price`, `time_to_expiry`, and `volatility` before computing, preventing `ZeroDivisionError` at the math boundary.
 
-### Black-Scholes Single Source of Truth
+### Black-Scholes single source of truth
 
 <Note>
 **Since N-01 fix:** `price_option` delegates to `DerivativesGuard.verify_black_scholes()` — the same `mpmath` (30 dp) implementation used by direct guard calls. This guarantees that pricing through the OpenResponses integration and pricing through `DerivativesGuard` produce **identical** outputs for identical inputs.

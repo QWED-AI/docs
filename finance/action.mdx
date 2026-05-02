@@ -10,7 +10,7 @@ QWED Finance v2.0 includes a production-ready GitHub Action to verify financial 
 
 ## Usage
 
-### Basic Verification
+### Basic verification
 
 ```yaml
 jobs:
@@ -26,7 +26,7 @@ jobs:
           llm_output: "24.89%"
 ```
 
-### SARIF Scanning (Security Dashboard)
+### SARIF scanning (security dashboard)
 
 QWED automatically outputs SARIF reports that integrate with GitHub Advanced Security.
 
@@ -59,7 +59,7 @@ jobs:
 | `llm_output` | The value claimed by the LLM (e.g., "15.4%") | Yes (for verify) | - |
 | `scan_target` | Directory to scan for logic files | Yes (for scan) | - |
 
-## Supported Verification Types
+## Supported verification types
 
 | Type | Params (Env Vars) | Description |
 |------|-------------------|-------------|
