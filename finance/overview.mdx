@@ -11,13 +11,13 @@ description: "QWED Finance uses deterministic verification, SymPy, and Z3 to pre
 
 > When an LLM told a customer his Chase card had "$12,889" in rewards, QWED-Finance would have caught the hallucination before it caused a lawsuit.
 
-# QWED Finance (v2.0.1)
+# QWED Finance (v2.1.0)
 
 **Deterministic Verification for Financial AI**
 
-QWED Finance is a specialized guardrail library designed to prevent financial hallucinations in Large Language Models (LLMs). It uses **Neurosymbolic AI**—combining the flexibility of GenAI with the mathematical certainty of symbolic solvers (SymPy, Z3) and standard financial algorithms.
+QWED Finance is a specialized guardrail library designed to prevent financial hallucinations in Large Language Models (LLMs). It uses **Neurosymbolic AI**—combining the flexibility of GenAI with the mathematical certainty of symbolic solvers (SymPy, Z3, mpmath) and standard financial algorithms.
 
-> **New in v2.0.1:** Added **BondGuard**, **FXGuard**, and **RiskGuard** for institutional-grade analytics.
+> **New in v2.1.0:** Security audit hardening — fail-closed enforcement across `OpenResponsesIntegration`, unified AML high-risk country list, `BondGuard._parse_rate()` returns `Decimal`, and full `Decimal`/`mpmath` migration for `BondGuard`, `DerivativesGuard`, and `RiskGuard`. Greeks are now Decimal-quantized strings.
 
 ## Why QWED Finance?
 
@@ -70,7 +70,7 @@ flowchart TB
         LLM["LLM (GPT-4, Claude)"]
     end
     
-    subgraph QWED["🛡️ QWED-Finance v2.0.1"]
+    subgraph QWED["🛡️ QWED-Finance v2.1.0"]
         direction TB
         subgraph Guards["Verification Guards"]
             CG["Compliance Guard<br/>(Z3 Logic)"]
