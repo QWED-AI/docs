@@ -334,6 +334,28 @@ client.verify_action(agent_id, action={"type": "calculate", "query": "2+2"},
 # -> {"decision": "DENIED", "error": {"code": "QWED-AGENT-LOOP-002"}}
 ```
 
+### Unknown action types denied
+
+<Info>New in v5.1.1</Info>
+
+QWED fails closed when an `action_type` does not have explicit registered semantics. An action type is recognized when it appears in either the action-engine map (e.g. `execute_sql`, `execute_code`, `verify_logic`) or the tool risk map (e.g. `calculate`, `read_file`, `database_read`).
+
+If an unregistered action is submitted, risk assessment and verification checks are skipped entirely and the call is denied with `QWED-AGENT-ACTION-001`:
+
+```json
+{
+  "decision": "DENIED",
+  "error": {
+    "code": "QWED-AGENT-ACTION-001",
+    "message": "Unknown action_type 'transfer_funds_internal_v2' cannot be verified without explicit registered semantics"
+  }
+}
+```
+
+The denial response intentionally omits the `verification` block because no engine is bound to the action. The in-flight step reservation is released, so the agent can retry the same `step_number` with a registered action.
+
+The `verification.engine` field in approved responses now always reflects the explicitly registered engine. The previous generic `"security"` fallback is no longer emitted.
+
 ### In-flight reservation system
 
 When a `verify_action` call is being processed, QWED reserves the step number to prevent concurrent requests from claiming the same step. The reservation is released if the action is denied, allowing the agent to retry with a different action at the same step.
