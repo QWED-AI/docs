@@ -58,6 +58,40 @@ result2 = client.verify_reasoning(query, enable_caching=True)
 print(result2.cached)  # True (instant!)
 ```
 
+## Fail-closed prerequisites
+
+The engine fails closed when required reasoning evidence is missing. A verification result is only marked valid when both prerequisites below are satisfied.
+
+<ParamField path="reasoning trace" type="required">
+  A substantive reasoning trace must be produced by the primary provider. The verifier rejects empty traces and traces that begin with placeholder or failure markers, including:
+
+  - `No LLM provider available for reasoning trace`
+  - `Could not generate reasoning trace`
+  - `No structured reasoning trace generated`
+  - `Failed to generate reasoning trace:`
+
+  When any of these markers appear, the result includes the issue `Reasoning trace unavailable or non-substantive` and `is_valid` is `False`.
+</ParamField>
+
+<ParamField path="distinct secondary provider" type="required when enable_cross_validation=True">
+  Cross-validation requires a secondary provider that is different from the primary. The primary provider is no longer reused as a fallback.
+
+  If `enable_cross_validation=True` and no distinct secondary provider is configured, the result includes the issue `Cross-validation requested but no distinct secondary provider is available` and `is_valid` is `False`.
+</ParamField>
+
+```python
+# Fails closed: only one provider configured but cross-validation requested
+result = client.verify_reasoning(
+    query="Complex reasoning task...",
+    providers=["anthropic"],
+    enable_cross_validation=True,
+)
+
+print(result.is_valid)  # False
+print(result.issues)
+# ["Cross-validation requested but no distinct secondary provider is available"]
+```
+
 ## Formula equivalence
 
 When verifying whether two arithmetic formulas produce the same result, the engine uses a safe AST-based evaluator instead of Python's `eval()`. The evaluator only allows basic arithmetic operators (`+`, `-`, `*`, `/`, `**`) and numeric literals — any other expression is rejected. This prevents code-injection risks while still supporting numeric fallback checks during reasoning validation.
