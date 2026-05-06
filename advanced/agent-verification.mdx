@@ -334,6 +334,21 @@ client.verify_action(agent_id, action={"type": "calculate", "query": "2+2"},
 # -> {"decision": "DENIED", "error": {"code": "QWED-AGENT-LOOP-002"}}
 ```
 
+### Fail-closed for unknown action types
+
+QWED denies any `verify_action` call whose `action_type` has no registered engine binding or tool risk level. Action verification is deterministic — actions without explicit semantics cannot be risk-assessed or routed to a verification engine, so the kernel returns a denial instead of falling back to a permissive default.
+
+```python
+result = client.verify_action(
+    agent_id,
+    action={"type": "transfer_funds_internal_v2", "query": "Move funds between ledgers"},
+    context={"conversation_id": "conv_42", "step_number": 1},
+)
+# -> {"decision": "DENIED", "error": {"code": "QWED-AGENT-ACTION-001", "message": "..."}}
+```
+
+A denial under `QWED-AGENT-ACTION-001` releases the in-flight step reservation, so the agent may retry the same step number with a registered action type. Registered action types include the entries in `ACTION_ENGINES` (such as `calculate`, `verify`, `prove`) and tools listed in `TOOL_RISK_LEVELS`.
+
 ### In-flight reservation system
 
 When a `verify_action` call is being processed, QWED reserves the step number to prevent concurrent requests from claiming the same step. The reservation is released if the action is denied, allowing the agent to retry with a different action at the same step.
