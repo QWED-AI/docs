@@ -58,7 +58,9 @@ result2 = client.verify_reasoning(query, enable_caching=True)
 print(result2.cached)  # True (instant!)
 ```
 
-Each `ReasoningVerifier` instance owns its own cache, so verifiers configured with different providers or modes do not share entries. Cache keys incorporate the query, formula, the sorted provider list, and the cross-validation flag, and cached results are returned as defensive copies so callers cannot mutate stored entries.
+Each `ReasoningVerifier` instance owns its own cache, so verifiers configured with different providers or modes do not share entries. Cache keys incorporate the query, formula, the configured provider list (in the order it was supplied, so provider precedence is preserved), and the cross-validation flag. Cached results are returned as defensive copies so callers cannot mutate stored entries.
+
+Each cache entry is bound to its creation time. On every lookup the verifier checks the entry's age against `cache_ttl_seconds` and discards entries that have expired before returning a result, so stale reasoning is never served past its TTL.
 
 ## Fail-closed prerequisites
 
