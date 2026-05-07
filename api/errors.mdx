@@ -68,7 +68,7 @@ These errors apply to the `/verify/stats` and `/verify/consensus` endpoints. Sta
 | `QWED-AGENT-002` | Invalid agent token |
 | `QWED-AGENT-003` | Agent suspended |
 | `QWED-AGENT-004` | Action not permitted |
-| `QWED-AGENT-ACTION-001` | Unknown `action_type` — denied because no registered engine or tool semantics exist for the action |
+| `QWED-AGENT-ACTION-001` | Unknown `action_type` — no registered semantics for the requested action |
 | `QWED-AGENT-BUDGET-001` | Daily cost limit exceeded |
 | `QWED-AGENT-BUDGET-002` | Hourly rate limit exceeded |
 
@@ -80,6 +80,14 @@ These errors apply to the `/verify/stats` and `/verify/consensus` endpoints. Sta
 | --- | --- |
 | `QWED-AGENT-CTX-001` | Action context with `conversation_id` and `step_number` is required |
 | `QWED-AGENT-CTX-002` | `step_number` must be >= 1 |
+
+## Agent action registration errors
+
+<Info>New in v5.1.1</Info>
+
+| Code | Message |
+| --- | --- |
+| `QWED-AGENT-ACTION-001` | Unknown `action_type` cannot be verified without explicit registered semantics |
 
 ## Agent loop detection errors
 

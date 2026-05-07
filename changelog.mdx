@@ -7,6 +7,30 @@ All notable changes to the QWED platform, listed by release.
 
 ---
 
+## QWED-Verification — Fail-closed unknown agent actions
+**Released: May 6, 2026** · [GitHub PR #176](https://github.com/QWED-AI/qwed-verification/pull/176)
+
+> Hardens `AgentService.verify_action` so action types with no registered engine or tool risk binding are denied instead of routed through a permissive default.
+
+### What changed
+
+- **`verify_action` denies unregistered action types** — Calls whose `action_type` is not in `ACTION_ENGINES` or `TOOL_RISK_LEVELS` now return `decision: "DENIED"` with error code `QWED-AGENT-ACTION-001`. The verification kernel no longer falls back to a `"security"` engine label for unknown actions.
+- **Risk assessment is now deterministic** — `_assess_risk` raises `ValueError` if it is invoked for an unregistered `action_type`. Risk levels must come from explicit registration.
+- **Step reservation released on action denial** — A `QWED-AGENT-ACTION-001` denial releases the in-flight step reservation, so the agent can retry the same `(conversation_id, step_number)` pair with a registered action type.
+
+### Breaking changes
+
+<Warning>
+**Unknown agent `action_type` values are rejected.** Agents that previously relied on the implicit `"security"` engine fallback for ad-hoc action types must now register them in `ACTION_ENGINES` (engine binding) or `TOOL_RISK_LEVELS` (tool-control binding). Unregistered actions return `QWED-AGENT-ACTION-001`.
+</Warning>
+
+### References
+
+- [Fail-closed for unknown action types](/advanced/agent-verification#fail-closed-for-unknown-action-types)
+- [Agent action registration errors](/api/errors#agent-action-registration-errors)
+
+---
+
 ## QWED-Finance v2.1.0 — Security Audit Hardening
 **Released: May 2, 2026** · [GitHub PR #25](https://github.com/QWED-AI/qwed-finance/pull/25)
 

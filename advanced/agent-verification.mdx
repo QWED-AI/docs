@@ -363,6 +363,21 @@ client.verify_action(agent_id, action={"type": "calculate", "query": "2+2"},
 # -> {"decision": "DENIED", "error": {"code": "QWED-AGENT-LOOP-002"}}
 ```
 
+### Fail-closed for unknown action types
+
+QWED denies any `verify_action` call whose `action_type` has no registered engine binding or tool risk level. Action verification is deterministic — actions without explicit semantics cannot be risk-assessed or routed to a verification engine, so the kernel returns a denial instead of falling back to a permissive default.
+
+```python
+result = client.verify_action(
+    agent_id,
+    action={"type": "transfer_funds_internal_v2", "query": "Move funds between ledgers"},
+    context={"conversation_id": "conv_42", "step_number": 1},
+)
+# -> {"decision": "DENIED", "error": {"code": "QWED-AGENT-ACTION-001", "message": "..."}}
+```
+
+A denial under `QWED-AGENT-ACTION-001` releases the in-flight step reservation, so the agent may retry the same step number with a registered action type. Registered action types include the entries in `ACTION_ENGINES` (such as `calculate`, `verify`, `prove`) and tools listed in `TOOL_RISK_LEVELS`.
+
 ### In-flight reservation system
 
 When a `verify_action` call is being processed, QWED reserves the step number to prevent concurrent requests from claiming the same step. The reservation is released if the action is denied, allowing the agent to retry with a different action at the same step.
@@ -382,6 +397,41 @@ On API server startup, QWED runs an environment integrity check (via `StartupHoo
 ### Timing-safe token verification
 
 Agent token verification uses `hmac.compare_digest` for constant-time comparison, preventing timing side-channel attacks against agent authentication.
+
+### Fail-closed on unknown actions
+
+QWED only verifies actions whose `action_type` has explicit, registered semantics. If you submit an `action_type` that is not bound to a verification engine or a known tool, the request is denied with `QWED-AGENT-ACTION-001` before risk assessment runs.
+
+Registered actions fall into two categories:
+
+| Category | Examples | Engine |
+|----------|----------|--------|
+| Verification engines | `execute_sql`, `execute_code`, `calculate`, `verify_logic`, `verify_fact` | `sql`, `code`, `math`, `logic`, `fact` |
+| Tool calls | `database_read`, `database_write`, `send_email`, `file_read`, `file_write`, `file_delete`, `api_call` | `tool_control` |
+
+Anything else — including custom action names, typos, and forward-compatible names that the runtime does not yet recognize — is denied:
+
+```python
+result = client.verify_action(
+    agent_id="agent_abc123",
+    action={"type": "transfer_funds_internal_v2", "query": "Move funds between ledgers"},
+    context={"conversation_id": "conv_1", "step_number": 1},
+)
+
+# {
+#   "decision": "DENIED",
+#   "error": {
+#     "code": "QWED-AGENT-ACTION-001",
+#     "message": "Unknown action_type 'transfer_funds_internal_v2' cannot be verified without explicit registered semantics"
+#   }
+# }
+```
+
+Key behaviors to plan for:
+
+- **No `verification` block is returned.** Unknown actions never receive an engine label or a `VERIFIED` status — there is no generic `"security"` fallback.
+- **The step reservation is released.** Because the action was denied, the same `step_number` can be retried with a registered action (no `QWED-AGENT-LOOP-002` replay error).
+- **Map custom intents to registered actions.** If your agent needs to perform a domain-specific operation, route it through one of the registered verification engines or tool calls rather than inventing a new `action_type` string.
 
 ## Framework integration
 
