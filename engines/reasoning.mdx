@@ -102,6 +102,63 @@ print(result.issues)
 
 When verifying whether two arithmetic formulas produce the same result, the engine uses a safe AST-based evaluator instead of Python's `eval()`. The evaluator only allows basic arithmetic operators (`+`, `-`, `*`, `/`, `**`) and numeric literals — any other expression is rejected. This prevents code-injection risks while still supporting numeric fallback checks during reasoning validation.
 
+## Fail-closed prerequisites
+
+The Reasoning Engine refuses to mark a result as valid when the evidence required to verify it is missing. Absence of issues is not proof — if the engine cannot produce a substantive reasoning trace, or cannot actually run cross-validation when requested, the result is reported as invalid with an explanatory issue.
+
+### Required reasoning trace
+
+Verification fails closed when no usable reasoning trace can be produced. This occurs when:
+
+- No LLM provider is available to generate the trace.
+- The provider returns an empty or placeholder response.
+- Trace generation raises an error or hits a provider rate limit.
+- The trace contains only non-substantive markers such as `N/A`, `unavailable`, `no reasoning`, `rate limit exceeded`, or messages indicating the trace could not be generated.
+
+The parser accepts both flush-left and indented trace lines — any line whose stripped content begins with a digit (for example, `1. ...`) or `-` is treated as a reasoning step. Lines that match a non-substantive marker are not counted as substantive reasoning, even if they are formatted as a numbered list.
+
+In any of these cases, `result.is_valid` is `False` and `result.issues` contains either `Reasoning trace missing` or `Reasoning trace unavailable or non-substantive`.
+
+```python
+result = client.verify_reasoning(
+    query="Alice has 10 apples and gets 5 more. How many apples does she have?",
+    providers=["anthropic"],
+)
+
+if not result.is_valid:
+    print(result.issues)
+    # ["Reasoning trace unavailable or non-substantive"]
+```
+
+To resolve this, configure at least one reachable provider with valid credentials before calling `verify_reasoning`.
+
+### Distinct secondary provider for cross-validation
+
+When `enable_cross_validation=True`, the engine requires a secondary provider that is distinct from the primary. The primary provider is no longer reused as a fallback secondary path, because verifying a model against itself does not constitute cross-validation.
+
+If only one provider is configured, cross-validation fails closed with the issue `Cross-validation requested but no distinct secondary provider is available`.
+
+```python
+# Fails closed - only one provider configured
+result = client.verify_reasoning(
+    query="Complex reasoning task...",
+    providers=["anthropic"],
+    enable_cross_validation=True,
+)
+print(result.is_valid)  # False
+print(result.issues)
+# ["Cross-validation requested but no distinct secondary provider is available"]
+
+# Passes prerequisite - two distinct providers
+result = client.verify_reasoning(
+    query="Complex reasoning task...",
+    providers=["anthropic", "openai"],
+    enable_cross_validation=True,
+)
+```
+
+To run cross-validation, configure at least two distinct providers, or set `enable_cross_validation=False` to skip the secondary check.
+
 ## Chain-of-thought validation
 
 ```python

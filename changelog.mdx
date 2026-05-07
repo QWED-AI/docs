@@ -7,21 +7,27 @@ All notable changes to the QWED platform, listed by release.
 
 ---
 
-## QWED-Verification — Fail-closed on unknown agent actions
-**Released: May 6, 2026**
+## QWED-Verification — Fail-closed unknown agent actions
+**Released: May 6, 2026** · [GitHub PR #176](https://github.com/QWED-AI/qwed-verification/pull/176)
 
-> The agent service now rejects verification requests whose `action_type` has no explicit registered semantics. Previously, an unrecognized action could pass through risk assessment and receive an `APPROVED` decision with a generic `"security"` engine fallback.
+> Hardens `AgentService.verify_action` so action types with no registered engine or tool risk binding are denied instead of routed through a permissive default.
 
-### Security
+### What changed
 
-- **Unknown `action_type` values are denied** with the new error code `QWED-AGENT-ACTION-001`. The denial happens before risk assessment, so unknown actions can never be marked `VERIFIED`.
-- **Generic `"security"` engine fallback removed** from the verification response. The `engine` field now only reflects an explicitly registered engine (e.g. `sql`, `code`, `math`, `tool_control`).
-- **In-flight step reservation released on denial.** Agents can retry the same `step_number` with a registered action without triggering replay detection (`QWED-AGENT-LOOP-002`).
-- **Explicitly registered tool actions remain on their existing deterministic risk path** — no behavior change for known engines or tools.
+- **`verify_action` denies unregistered action types** — Calls whose `action_type` is not in `ACTION_ENGINES` or `TOOL_RISK_LEVELS` now return `decision: "DENIED"` with error code `QWED-AGENT-ACTION-001`. The verification kernel no longer falls back to a `"security"` engine label for unknown actions.
+- **Risk assessment is now deterministic** — `_assess_risk` raises `ValueError` if it is invoked for an unregistered `action_type`. Risk levels must come from explicit registration.
+- **Step reservation released on action denial** — A `QWED-AGENT-ACTION-001` denial releases the in-flight step reservation, so the agent can retry the same `(conversation_id, step_number)` pair with a registered action type.
 
-### Migration
+### Breaking changes
 
-If you call `verify_action` with custom `action_type` strings, route them through one of the registered verification engines or tool calls. See [agent verification — fail-closed on unknown actions](/advanced/agent-verification#fail-closed-on-unknown-actions) for the full registered list.
+<Warning>
+**Unknown agent `action_type` values are rejected.** Agents that previously relied on the implicit `"security"` engine fallback for ad-hoc action types must now register them in `ACTION_ENGINES` (engine binding) or `TOOL_RISK_LEVELS` (tool-control binding). Unregistered actions return `QWED-AGENT-ACTION-001`.
+</Warning>
+
+### References
+
+- [Fail-closed for unknown action types](/advanced/agent-verification#fail-closed-for-unknown-action-types)
+- [Agent action registration errors](/api/errors#agent-action-registration-errors)
 
 ---
 
@@ -202,7 +208,37 @@ exposure = delta * Decimal(str(notional))
 
 See [Bond Guard](/finance/guards#8-bond-guard-yield-analytics), [Derivatives Guard](/finance/guards#3-derivatives-guard-black-scholes), and [Risk Guard](/finance/guards#10-risk-guard-portfolio-metrics) for the updated guard documentation.
 
-**Jump to:** [QWED-Finance v2.1.0 — Security Audit Hardening](#qwed-finance-v210--security-audit-hardening) · [QWED-Finance N-01/N-04 release blockers](#qwed-finance--release-blockers-n-01-and-n-04-resolved-no-go--go) · [QWED-Finance Decimal/mpmath migration](#qwed-finance--decimalmpmath-migration-for-bondguard-derivativesguard-and-riskguard) · [QWED-Verification SecureCodeExecutor fail-closed fallback](#qwed-verification--securecodeexecutor-fail-closed-when-codeverifier-is-unavailable) · [QWED-Finance security audit — OpenResponses fail-closed](#qwed-finance--openresponses-fail-closed-and-computed-status) · [QWED-Finance security audit — rate parsing](#qwed-finance--rate-parsing-heuristic-removed) · [QWED-Verification symbolic verifier fail-closed](#qwed-verification--symbolic-verifier-fail-closed-without-proof) · [QWED-Verification strict additionalProperties](#qwed-verification--strict-additionalproperties-fail-closed) · [QWED-Tax example redaction](#qwed-tax-—-redacted-preflight-block-details-in-examples) · [QWED-Tax decimal hardening](#qwed-tax-—-decimal-hardening-in-financial-guards) · [v5.1.0](#v5-1-0-—-agent-state-governance-and-fail-closed-hardening) · [v5.0.0](#v5-0-0-—-enforcement-boundary-hardening) · [v4.0.5](#v4-0-5-—-stats-exception-masking) · [v4.0.4](#v4-0-4-—-fail-closed-execution-enforcement) · [v4.0.3](#v4-0-3-—-server-enforced-agent-security) · [v4.0.2](#v4-0-2-—-security-cleanup) · [v4.0.1](#v4-0-1-—-sentinel-guard-sync) · [v4.0.0](#v4-0-0-—-sentinel-edition) · [v3.0.1](#v3-0-1-—-ironclad-update) · [v2.4.1](#v2-4-1-—-the-reasoning-engine)
+**Jump to:** [QWED-Verification fail-closed unknown agent actions](#qwed-verification--fail-closed-unknown-agent-actions) · [QWED-Finance v2.1.0 — Security Audit Hardening](#qwed-finance-v210--security-audit-hardening) · [QWED-Finance N-01/N-04 release blockers](#qwed-finance--release-blockers-n-01-and-n-04-resolved-no-go--go) · [QWED-Finance Decimal/mpmath migration](#qwed-finance--decimalmpmath-migration-for-bondguard-derivativesguard-and-riskguard) · [QWED-Verification SecureCodeExecutor fail-closed fallback](#qwed-verification--securecodeexecutor-fail-closed-when-codeverifier-is-unavailable) · [QWED-Finance security audit — OpenResponses fail-closed](#qwed-finance--openresponses-fail-closed-and-computed-status) · [QWED-Finance security audit — rate parsing](#qwed-finance--rate-parsing-heuristic-removed) · [QWED-Verification symbolic verifier fail-closed](#qwed-verification--symbolic-verifier-fail-closed-without-proof) · [QWED-Verification strict additionalProperties](#qwed-verification--strict-additionalproperties-fail-closed) · [QWED-Tax example redaction](#qwed-tax-—-redacted-preflight-block-details-in-examples) · [QWED-Tax decimal hardening](#qwed-tax-—-decimal-hardening-in-financial-guards) · [v5.1.0](#v5-1-0-—-agent-state-governance-and-fail-closed-hardening) · [v5.0.0](#v5-0-0-—-enforcement-boundary-hardening) · [v4.0.5](#v4-0-5-—-stats-exception-masking) · [v4.0.4](#v4-0-4-—-fail-closed-execution-enforcement) · [v4.0.3](#v4-0-3-—-server-enforced-agent-security) · [v4.0.2](#v4-0-2-—-security-cleanup) · [v4.0.1](#v4-0-1-—-sentinel-guard-sync) · [v4.0.0](#v4-0-0-—-sentinel-edition) · [v3.0.1](#v3-0-1-—-ironclad-update) · [v2.4.1](#v2-4-1-—-the-reasoning-engine)
+
+---
+
+## QWED-Verification — Fail-closed unknown agent actions
+**Released: May 6, 2026** · [GitHub PR #176](https://github.com/QWED-AI/qwed-verification/pull/176)
+
+> Closes a fail-open gap in `AgentService.verify_action()`. Action types that are not bound to a verification engine or a governed tool are now denied with a dedicated error code instead of silently routing through a permissive default engine.
+
+### What changed
+
+- **`AgentService.verify_action`** — Action types not present in `ACTION_ENGINES` or `TOOL_RISK_LEVELS` now return `decision: "DENIED"` with `error.code: "QWED-AGENT-ACTION-001"`. The reserved conversation step is released so the agent can retry with a registered action type.
+- **`AgentService._assess_risk`** — Raises `ValueError` for unregistered action types instead of falling back to `RiskLevel.MEDIUM`. This prevents the deterministic risk path from inferring a default for actions QWED cannot verify.
+- **Engine resolution** — New `_resolve_action_engine` helper distinguishes engine-backed actions (`math`, `logic`, `sql`, etc.) from tool-controlled actions, which now report `engine: "tool_control"` in the verification response. The previous `"security"` default for unknown actions has been removed.
+- **`_run_verification_checks`** — When an action has no registered engine, an `action_registered` check is recorded as failed before any other check runs, making the denial reason visible in the `checks_failed` array.
+
+### Behavior comparison
+
+| Action type | Before | After |
+| --- | --- | --- |
+| Registered engine action (e.g. `verify_math`) | `engine: "math"`, normal risk path | Unchanged |
+| Governed tool (e.g. `read_database`) | `engine: "security"` (default) | `engine: "tool_control"` |
+| Unregistered action (e.g. `do_arbitrary_thing`) | `engine: "security"`, MEDIUM risk, may APPROVE/PENDING by trust level | `DENIED` with `QWED-AGENT-ACTION-001` |
+
+### Upgrade notes
+
+<Warning>
+If your agents emit `action_type` values that are not in QWED's engine map or tool registry, they will now be denied. Audit production traffic for non-standard action types and either bind them to an engine or register them as governed tools with an explicit risk level before upgrading.
+</Warning>
+
+See [Agent Verification — Registered action enforcement](/advanced/agent-verification#registered-action-enforcement) for the full denial flow and migration guidance, and [API errors](/api/errors#agent-errors) for the new error code.
 
 ---
 

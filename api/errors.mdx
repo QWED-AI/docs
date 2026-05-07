@@ -81,6 +81,14 @@ These errors apply to the `/verify/stats` and `/verify/consensus` endpoints. Sta
 | `QWED-AGENT-CTX-001` | Action context with `conversation_id` and `step_number` is required |
 | `QWED-AGENT-CTX-002` | `step_number` must be >= 1 |
 
+## Agent action registration errors
+
+<Info>New in v5.1.1</Info>
+
+| Code | Message |
+| --- | --- |
+| `QWED-AGENT-ACTION-001` | Unknown `action_type` cannot be verified without explicit registered semantics |
+
 ## Agent loop detection errors
 
 <Info>New in v5.0.0</Info>
