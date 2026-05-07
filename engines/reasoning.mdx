@@ -58,6 +58,26 @@ result2 = client.verify_reasoning(query, enable_caching=True)
 print(result2.cached)  # True (instant!)
 ```
 
+### Cache scope and isolation
+
+Cache entries are scoped to the full verification mode, not just the query and formula. The cache key incorporates:
+
+- The query and primary formula.
+- The configured provider list.
+- Whether `enable_cross_validation` was requested.
+
+This means a result returned with `enable_cross_validation=False` is never reused for a later call with `enable_cross_validation=True`, and a result computed with one provider configuration will not satisfy a call made with a different one. Each `ReasoningVerifier` instance also keeps its own cache, so results from one verifier never leak into another.
+
+Cached results are returned as defensive copies. Mutating fields on a returned `ReasoningValidation` (for example, appending to `issues` or `reasoning_trace`) will not affect the stored cache entry or any subsequent call.
+
+```python
+result1 = client.verify_reasoning(query, enable_cross_validation=False)
+result1.issues.append("local note")  # safe - does not modify cache
+
+result2 = client.verify_reasoning(query, enable_cross_validation=False)
+print(result2.issues)  # unchanged from the original cached value
+```
+
 ## Formula equivalence
 
 When verifying whether two arithmetic formulas produce the same result, the engine uses a safe AST-based evaluator instead of Python's `eval()`. The evaluator only allows basic arithmetic operators (`+`, `-`, `*`, `/`, `**`) and numeric literals — any other expression is rejected. This prevents code-injection risks while still supporting numeric fallback checks during reasoning validation.
@@ -72,7 +92,10 @@ Verification fails closed when no usable reasoning trace can be produced. This o
 
 - No LLM provider is available to generate the trace.
 - The provider returns an empty or placeholder response.
-- Trace generation raises an error.
+- Trace generation raises an error or hits a provider rate limit.
+- The trace contains only non-substantive markers such as `N/A`, `unavailable`, `no reasoning`, `rate limit exceeded`, or messages indicating the trace could not be generated.
+
+The parser accepts both flush-left and indented trace lines — any line whose stripped content begins with a digit (for example, `1. ...`) or `-` is treated as a reasoning step. Lines that match a non-substantive marker are not counted as substantive reasoning, even if they are formatted as a numbered list.
 
 In any of these cases, `result.is_valid` is `False` and `result.issues` contains either `Reasoning trace missing` or `Reasoning trace unavailable or non-substantive`.
 
