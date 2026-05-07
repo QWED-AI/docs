@@ -7,6 +7,40 @@ All notable changes to the QWED platform, listed by release.
 
 ---
 
+## QWED-Verification — Fail-closed denial of unknown agent action types
+**Released: May 6, 2026** · [GitHub PR #176](https://github.com/QWED-AI/qwed-verification/pull/176)
+
+> Closes a fail-open gap in `AgentService.verify_action`. Previously, an `action_type` with no explicit registered semantics could pass risk assessment and verification, then receive an `APPROVED` decision with a generic `"security"` engine fallback. The runtime now denies unknown action types before any risk or verification checks run.
+
+### What changed
+
+- **Unknown `action_type` is denied with `QWED-AGENT-ACTION-001`.** Action types that are not registered in either the action-engine map or the tool risk map are now rejected before risk assessment, with no `verification` block in the response.
+- **Generic `"security"` engine fallback removed.** `verification.engine` now always reflects the explicitly registered engine (or `"tool_control"` for registered tool actions). There is no implicit catch-all engine label.
+- **In-flight step reservation released on denial.** The denied step number is freed so the agent can retry with a registered action on the same step.
+- **Explicit tool actions keep their deterministic risk path.** Registered actions continue to resolve through `ACTION_ENGINES` or `TOOL_RISK_LEVELS` unchanged.
+
+### Example
+
+```python
+result = client.verify_action(
+    agent_id="agent_abc123",
+    action={"type": "transfer_funds_internal_v2", "query": "Move funds between ledgers"},
+    context={"conversation_id": "conv_xyz", "step_number": 1},
+)
+# {
+#   "decision": "DENIED",
+#   "error": {
+#     "code": "QWED-AGENT-ACTION-001",
+#     "message": "Unknown action_type 'transfer_funds_internal_v2' cannot be verified without explicit registered semantics"
+#   }
+# }
+```
+
+### Why
+
+Unknown actions are not verifiable actions. If QWED has no explicit semantics for an action type, it must not approve it or mark it as verified.
+
+See [Agent verification — Unknown action types denied](/advanced/agent-verification#unknown-action-types-denied) and the [Agent spec error code table](/specs/agent#appendix-a-error-codes).
 ## QWED-Verification — Fail-closed on unknown agent actions
 **Released: May 6, 2026**
 
