@@ -564,21 +564,58 @@ To prevent race conditions in concurrent environments, the runtime uses a reserv
 3. If the action is denied, the reservation is **released** — the step can be retried
 4. If the action is approved or pending, the reservation is **committed** — the step is permanently consumed
 
-### 9.6 Budget Denial Semantics
+### 9.6 Unknown Action Type Denial
+
+The runtime fails closed for any `action_type` that does not have explicit registered semantics. An action type is considered registered when it appears in either the action-engine map (e.g. `execute_sql`, `execute_code`, `verify_logic`) or the tool risk map (e.g. `calculate`, `read_file`, `database_read`).
+
+When an unregistered `action_type` is submitted:
+
+1. Risk assessment is **not** performed — there is no deterministic risk binding for the action.
+2. Verification checks are **not** run.
+3. The in-flight step reservation is released so the agent can retry the same step number with a registered action.
+4. The response is `DENIED` with error code `QWED-AGENT-ACTION-001`.
+
+The denial response contains only `decision` and `error` — no `verification` block is emitted, because no engine is bound to the action:
+
+```json
+{
+  "decision": "DENIED",
+  "error": {
+    "code": "QWED-AGENT-ACTION-001",
+    "message": "Unknown action_type 'transfer_funds_internal_v2' cannot be verified without explicit registered semantics"
+  }
+}
+```
+
+Previously, unregistered action types would receive a generic `"security"` engine label and could pass through verification. The runtime no longer emits this fallback engine; the `engine` field in a verification response always reflects the explicitly registered engine for the action.
+
+### 9.7 Budget Denial Semantics
 
 Budget check failures (`QWED-AGENT-BUDGET-001`, `QWED-AGENT-BUDGET-002`) do not consume the conversation step. The in-flight reservation is released so the agent can retry the same step number after the budget resets.
 
-### 9.7 Fail-Closed Rate Limiting
+### 9.8 Fail-Closed Rate Limiting
 
 When the Redis backend is unavailable, the sliding window rate limiter fails closed (denies all requests) rather than failing open. This prevents uncontrolled access during infrastructure failures. When Redis is entirely absent at process startup, a local in-memory fallback limiter is used.
 
-### 9.8 Environment Integrity
+### 9.9 Environment Integrity
 
 On server startup, the runtime MUST verify environment integrity (via `StartupHookGuard`) before initializing the database. A compromised environment causes the server to abort startup with a `RuntimeError`.
 
-### 9.9 Timing-Safe Authentication
+### 9.10 Timing-Safe Authentication
 
 Agent token verification MUST use constant-time comparison (`hmac.compare_digest`) to prevent timing side-channel attacks.
+
+### 9.10 Fail-Closed on Unknown Actions
+
+The runtime MUST reject any verification request whose `action_type` is not explicitly registered in the agent service. An action is considered registered only when it appears in either the engine map (e.g. `execute_sql`, `execute_code`, `calculate`, `verify_logic`, `verify_fact`) or the tool risk table (e.g. `database_read`, `database_write`, `send_email`, `file_read`, `file_write`, `file_delete`, `api_call`).
+
+When an `action_type` has no registered semantics:
+
+- The request is denied with `QWED-AGENT-ACTION-001` before risk assessment runs.
+- No `verification` block is returned — the runtime never emits a generic `"security"` engine fallback for unknown actions.
+- The in-flight step reservation is released so the agent can retry the same `step_number` with a registered action.
+
+This guarantees that verification outcomes are always tied to explicit, deterministic semantics. An unrecognized action cannot be silently treated as approved or marked as `VERIFIED`.
 
 ---
 
@@ -667,6 +704,7 @@ verified_agent = QWEDVerifiedAgent(
 | `QWED-AGENT-003`        | Agent suspended          |
 | `QWED-AGENT-004`        | Tool not allowed         |
 | `QWED-AGENT-005`        | Verification failed      |
+| `QWED-AGENT-ACTION-001` | Unknown `action_type` — no explicit registered semantics for the requested action |
 | `QWED-AGENT-CTX-001`    | Missing required action context (`conversation_id` and `step_number`) |
 | `QWED-AGENT-CTX-002`    | Invalid `step_number` (must be >= 1) |
 | `QWED-AGENT-ACTION-001` | Unknown `action_type` cannot be verified — the action has no registered engine or tool risk binding |
