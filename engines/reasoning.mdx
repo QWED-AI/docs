@@ -58,7 +58,19 @@ result2 = client.verify_reasoning(query, enable_caching=True)
 print(result2.cached)  # True (instant!)
 ```
 
-Each `ReasoningVerifier` instance owns its own cache, so verifiers configured with different providers or modes do not share entries. Cache keys incorporate the query, formula, the sorted provider list, and the cross-validation flag, and cached results are returned as defensive copies so callers cannot mutate stored entries.
+Each `ReasoningVerifier` instance owns its own cache, so verifiers configured with different providers or modes do not share entries. Cache keys incorporate the query, formula, the provider list in the order it was configured, and the cross-validation flag, and cached results are returned as defensive copies so callers cannot mutate stored entries. Because provider order is part of the cache identity, changing primary/secondary precedence — for example, switching from `["anthropic", "openai"]` to `["openai", "anthropic"]` — produces a different cache key and forces recomputation.
+
+Cached entries are also bound to `cache_ttl_seconds`. On every cache lookup, entries older than the configured TTL are discarded and the verification is recomputed, so stale results cannot replay after the freshness window has elapsed.
+
+```python
+from qwed_sdk import ReasoningVerifier
+
+verifier = ReasoningVerifier(
+    providers=["anthropic", "openai"],
+    enable_cache=True,
+    cache_ttl_seconds=3600,  # results expire after 1 hour
+)
+```
 
 ## Fail-closed prerequisites
 
