@@ -58,7 +58,7 @@ result2 = client.verify_reasoning(query, enable_caching=True)
 print(result2.cached)  # True (instant!)
 ```
 
-Each `ReasoningVerifier` instance owns its own cache, so verifiers configured with different providers or modes do not share entries. Cache keys incorporate the query, primary formula, the sorted provider list, and the cross-validation flag, and cached results are returned as defensive copies so callers cannot mutate stored entries.
+Each `ReasoningVerifier` instance owns its own cache, so verifiers configured with different providers or modes do not share entries. Cache keys incorporate the query, primary formula, the provider list (in configured order), and the cross-validation flag, and cached results are returned as defensive copies so callers cannot mutate stored entries.
 
 ### Cache key composition
 
@@ -73,7 +73,7 @@ A cache entry is only reused when every component below matches the current veri
 </ParamField>
 
 <ParamField path="providers" type="list[string]">
-  The configured provider list, sorted lexicographically. Reordering providers does not invalidate the cache, but adding, removing, or swapping providers does.
+  The configured provider list, in the order it was supplied. Provider precedence is part of cache identity: reordering providers (for example, swapping the primary) invalidates the cache, as do additions or removals.
 </ParamField>
 
 <ParamField path="enable_cross_validation" type="bool">
