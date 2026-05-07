@@ -4,7 +4,7 @@ title: QWED Protocol Specification
 description: "QWED-SPEC v1.0 defines the standard interface for deterministic verification of AI-generated content. Covers request/response formats and supported engines."
 ---
 
-# QWED Protocol Specification v1.0
+# QWED protocol specification v1.0
 
 > **Status:** Draft  
 > **Version:** 1.0.0  
@@ -13,18 +13,18 @@ description: "QWED-SPEC v1.0 defines the standard interface for deterministic ve
 
 ---
 
-## Table of Contents
+## Table of contents
 
 1. [Introduction](#1-introduction)
-2. [Protocol Philosophy](#2-protocol-philosophy)
-3. [Architecture Overview](#3-architecture-overview)
-4. [Verification Types](#4-verification-types)
-5. [Request Format](#5-request-format)
-6. [Response Format](#6-response-format)
+2. [Protocol philosophy](#2-protocol-philosophy)
+3. [Architecture overview](#3-architecture-overview)
+4. [Verification types](#4-verification-types)
+5. [Request format](#5-request-format)
+6. [Response format](#6-response-format)
 7. [QWED-Logic DSL](#7-qwed-logic-dsl)
-8. [Error Codes](#8-error-codes)
+8. [Error codes](#8-error-codes)
 9. [Versioning](#9-versioning)
-10. [Security Considerations](#10-security-considerations)
+10. [Security considerations](#10-security-considerations)
 11. [Conformance](#11-conformance)
 
 ---
@@ -54,15 +54,15 @@ This specification covers:
 | **DSL** | Domain Specific Language for expressing logic |
 | **Attestation** | Cryptographic proof of verification result |
 
-### 1.4 Notational Conventions
+### 1.4 Notational conventions
 
 The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT", "SHOULD", "SHOULD NOT", "RECOMMENDED", "MAY", and "OPTIONAL" in this document are to be interpreted as described in [RFC 2119](https://www.ietf.org/rfc/rfc2119.txt).
 
 ---
 
-## 2. Protocol Philosophy
+## 2. Protocol philosophy
 
-### 2.1 Core Principle: LLM as Untrusted Translator
+### 2.1 Core principle: LLM as untrusted translator
 
 ```mermaid
 flowchart LR
@@ -76,7 +76,7 @@ flowchart LR
 
 QWED treats LLMs as **untrusted translators**. The LLM's role is to convert natural language into a symbolic representation that can be verified by deterministic engines. The verification step provides the guarantee.
 
-### 2.2 Design Goals
+### 2.2 Design goals
 
 | Goal | Description |
 |------|-------------|
@@ -86,7 +86,7 @@ QWED treats LLMs as **untrusted translators**. The LLM's role is to convert natu
 | **Extensible** | New verification types can be added |
 | **Interoperable** | Standard format for all implementations |
 
-### 2.3 Trust Model
+### 2.3 Trust model
 
 ```
 Trust Level 0: User Input           (untrusted)
@@ -97,9 +97,9 @@ Trust Level 3: Symbolic Engine      (trusted, deterministic)
 
 ---
 
-## 3. Architecture Overview
+## 3. Architecture overview
 
-### 3.1 Protocol Layers
+### 3.1 Protocol layers
 
 ```mermaid
 flowchart TB
@@ -112,7 +112,7 @@ flowchart TB
     L4 --> L3 --> L2 --> L1 --> L0
 ```
 
-### 3.2 Request Flow
+### 3.2 Request flow
 
 ```
 1. Client sends VerificationRequest
@@ -132,9 +132,9 @@ flowchart TB
 
 ---
 
-## 4. Verification Types
+## 4. Verification types
 
-### 4.1 Engine Registry
+### 4.1 Engine registry
 
 | Engine ID | Name | Description | Technology |
 |-----------|------|-------------|------------|
@@ -147,7 +147,7 @@ flowchart TB
 | `image` | Image Verifier | Visual claim verification | Vision API |
 | `reasoning` | Reasoning Verifier | Chain-of-thought verification | Multi-step |
 
-### 4.2 Engine Capabilities
+### 4.2 Engine capabilities
 
 Each engine MUST declare its capabilities:
 
@@ -171,9 +171,9 @@ Each engine MUST declare its capabilities:
 
 ---
 
-## 5. Request Format
+## 5. Request format
 
-### 5.1 Base Request Schema
+### 5.1 Base request schema
 
 All verification requests MUST conform to this base schema:
 
@@ -231,9 +231,9 @@ All verification requests MUST conform to this base schema:
 }
 ```
 
-### 5.2 Engine-Specific Request Schemas
+### 5.2 Engine-specific request schemas
 
-#### 5.2.1 Math Verification
+#### 5.2.1 Math verification
 
 ```json
 {
@@ -246,7 +246,7 @@ All verification requests MUST conform to this base schema:
 }
 ```
 
-#### 5.2.2 Logic Verification
+#### 5.2.2 Logic verification
 
 ```json
 {
@@ -258,7 +258,7 @@ All verification requests MUST conform to this base schema:
 }
 ```
 
-#### 5.2.3 Code Verification
+#### 5.2.3 Code verification
 
 ```json
 {
@@ -271,7 +271,7 @@ All verification requests MUST conform to this base schema:
 }
 ```
 
-#### 5.2.4 Fact Verification
+#### 5.2.4 Fact verification
 
 ```json
 {
@@ -283,7 +283,7 @@ All verification requests MUST conform to this base schema:
 }
 ```
 
-#### 5.2.5 SQL Verification
+#### 5.2.5 SQL verification
 
 ```json
 {
@@ -296,7 +296,7 @@ All verification requests MUST conform to this base schema:
 }
 ```
 
-### 5.3 Batch Request
+### 5.3 Batch request
 
 ```json
 {
@@ -315,9 +315,9 @@ All verification requests MUST conform to this base schema:
 
 ---
 
-## 6. Response Format
+## 6. Response format
 
-### 6.1 Base Response Schema
+### 6.1 Base response schema
 
 ```json
 {
@@ -371,7 +371,7 @@ All verification requests MUST conform to this base schema:
 }
 ```
 
-### 6.2 Status Codes
+### 6.2 Status codes
 
 | Status | Meaning | HTTP Code |
 |--------|---------|-----------|
@@ -383,9 +383,9 @@ All verification requests MUST conform to this base schema:
 | `TIMEOUT` | Verification timed out | 504 |
 | `UNSUPPORTED` | Query type not supported | 400 |
 
-### 6.3 Example Responses
+### 6.3 Example responses
 
-#### 6.3.1 Successful Math Verification
+#### 6.3.1 Successful math verification
 
 ```json
 {
@@ -408,7 +408,7 @@ All verification requests MUST conform to this base schema:
 }
 ```
 
-#### 6.3.2 Failed Verification
+#### 6.3.2 Failed verification
 
 ```json
 {
@@ -427,7 +427,7 @@ All verification requests MUST conform to this base schema:
 }
 ```
 
-#### 6.3.3 Logic Verification with Model
+#### 6.3.3 Logic verification with model
 
 ```json
 {
@@ -445,7 +445,7 @@ All verification requests MUST conform to this base schema:
 }
 ```
 
-#### 6.3.4 Security Block
+#### 6.3.4 Security block
 
 ```json
 {
@@ -463,7 +463,7 @@ All verification requests MUST conform to this base schema:
 }
 ```
 
-### 6.4 Batch Response
+### 6.4 Batch response
 
 ```json
 {
@@ -531,9 +531,9 @@ digit       = "0" | ... | "9" ;
 character   = ? any printable character except '"' ? ;
 ```
 
-### 7.3 Operator Reference
+### 7.3 Operator reference
 
-#### 7.3.1 Logic Operators
+#### 7.3.1 Logic operators
 
 | Operator | Arity | Description | Example |
 |----------|-------|-------------|---------|
@@ -544,7 +544,7 @@ character   = ? any printable character except '"' ? ;
 | `IFF` | 2 | If and only if | `(IFF p q)` |
 | `XOR` | 2 | Exclusive or | `(XOR p q)` |
 
-#### 7.3.2 Comparison Operators
+#### 7.3.2 Comparison operators
 
 | Operator | Arity | Description | Example |
 |----------|-------|-------------|---------|
@@ -555,7 +555,7 @@ character   = ? any printable character except '"' ? ;
 | `LT` | 2 | Less than | `(LT x 10)` |
 | `LE` | 2 | Less or equal | `(LE x 10)` |
 
-#### 7.3.3 Arithmetic Operators
+#### 7.3.3 Arithmetic operators
 
 | Operator | Arity | Description | Example |
 |----------|-------|-------------|---------|
@@ -599,7 +599,7 @@ character   = ? any printable character except '"' ? ;
 ; IF category = "electronics" THEN tax_rate >= 18%
 ```
 
-### 7.5 Variable Declaration
+### 7.5 Variable declaration
 
 Variables are automatically inferred from usage. The default type is `Real`. Explicit type declarations:
 
@@ -618,15 +618,15 @@ QWED-Logic DSL is designed to be **safe by construction**:
 
 ---
 
-## 8. Error Codes
+## 8. Error codes
 
-### 8.1 Error Code Format
+### 8.1 Error code format
 
 ```
 QWED-<CATEGORY>-<NUMBER>
 ```
 
-### 8.2 Error Categories
+### 8.2 Error categories
 
 | Category | Description |
 |----------|-------------|
@@ -636,7 +636,7 @@ QWED-<CATEGORY>-<NUMBER>
 | `SEC` | Security violations |
 | `SYS` | System errors |
 
-### 8.3 Error Code Registry
+### 8.3 Error code registry
 
 | Code | HTTP | Description |
 |------|------|-------------|
@@ -659,7 +659,7 @@ QWED-<CATEGORY>-<NUMBER>
 | `QWED-SYS-001` | 500 | Internal server error |
 | `QWED-SYS-002` | 503 | Service unavailable |
 
-### 8.4 Error Response Format
+### 8.4 Error response format
 
 ```json
 {
@@ -682,7 +682,7 @@ QWED-<CATEGORY>-<NUMBER>
 
 ## 9. Versioning
 
-### 9.1 Semantic Versioning
+### 9.1 Semantic versioning
 
 The QWED Protocol follows [Semantic Versioning 2.0.0](https://semver.org/):
 
@@ -694,7 +694,7 @@ MINOR: New features, backward compatible
 PATCH: Bug fixes, backward compatible
 ```
 
-### 9.2 Version Negotiation
+### 9.2 Version negotiation
 
 Clients SHOULD include the protocol version in requests:
 
@@ -725,37 +725,37 @@ Servers MUST include the protocol version in responses:
 
 ---
 
-## 10. Security Considerations
+## 10. Security considerations
 
-### 10.1 Input Validation
+### 10.1 Input validation
 
 Implementations MUST:
 - Validate all input against JSON Schema
 - Enforce maximum query length (RECOMMENDED: 100KB)
 - Sanitize inputs before engine processing
 
-### 10.2 Prompt Injection Defense
+### 10.2 Prompt injection defense
 
 Implementations SHOULD:
 - Scan for known injection patterns
 - Block requests containing manipulation attempts
 - Log security events
 
-### 10.3 Rate Limiting
+### 10.3 Rate limiting
 
 Implementations SHOULD implement:
 - Per-client rate limiting
 - Global rate limiting
 - Burst allowance
 
-### 10.4 Audit Logging
+### 10.4 Audit logging
 
 Implementations SHOULD log:
 - All verification requests (with timestamps)
 - Security violations
 - Errors
 
-### 10.5 Transport Security
+### 10.5 Transport security
 
 - HTTPS MUST be used in production
 - TLS 1.2+ REQUIRED
@@ -764,7 +764,7 @@ Implementations SHOULD log:
 
 ## 11. Conformance
 
-### 11.1 Conformance Levels
+### 11.1 Conformance levels
 
 | Level | Requirements |
 |-------|--------------|
@@ -772,14 +772,14 @@ Implementations SHOULD log:
 | **Standard** | Basic + All 8 engines + Error codes |
 | **Full** | Standard + DSL + Attestation + Batch |
 
-### 11.2 Conformance Testing
+### 11.2 Conformance testing
 
 A conformance test suite is available at:
 ```
 https://github.com/QWED-AI/qwed-conformance
 ```
 
-### 11.3 Implementation Registry
+### 11.3 Implementation registry
 
 Compliant implementations MAY be registered at:
 ```
@@ -788,19 +788,19 @@ https://qwedai.com/implementations
 
 ---
 
-## Appendix A: JSON Schemas
+## Appendix A: JSON schemas
 
 Full JSON Schema files are available at:
 - Request: `https://qwedai.com/schemas/request/v1.json`
 - Response: `https://qwedai.com/schemas/response/v1.json`
 
-## Appendix B: Reference Implementation
+## Appendix B: Reference implementation
 
 The reference implementation is available at:
 - GitHub: `https://github.com/QWED-AI/qwed-verification`
 - Docker: `docker pull qwed/qwed-node:latest`
 
-## Appendix C: Change Log
+## Appendix C: Change log
 
 ### v1.0.0 (2025-12-20)
 - Initial specification release
