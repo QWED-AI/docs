@@ -58,19 +58,54 @@ result2 = client.verify_reasoning(query, enable_caching=True)
 print(result2.cached)  # True (instant!)
 ```
 
-Each `ReasoningVerifier` instance owns its own cache, so verifiers configured with different providers or modes do not share entries. Cache keys incorporate the query, formula, the provider list in the order it was configured, and the cross-validation flag, and cached results are returned as defensive copies so callers cannot mutate stored entries. Because provider order is part of the cache identity, changing primary/secondary precedence — for example, switching from `["anthropic", "openai"]` to `["openai", "anthropic"]` — produces a different cache key and forces recomputation.
+Each `ReasoningVerifier` instance owns its own cache, so verifiers configured with different providers or modes do not share entries. Cache keys incorporate the query, primary formula, the provider list (in configured order), and the cross-validation flag, and cached results are returned as defensive copies so callers cannot mutate stored entries.
 
-Cached entries are also bound to `cache_ttl_seconds`. On every cache lookup, entries older than the configured TTL are discarded and the verification is recomputed, so stale results cannot replay after the freshness window has elapsed.
+### Cache key composition
+
+A cache entry is only reused when every component below matches the current verification call. Changing any of these forces a fresh computation:
+
+<ParamField path="query" type="string">
+  The verification query text, byte-for-byte.
+</ParamField>
+
+<ParamField path="primary formula" type="string">
+  The expression of the primary task derived from the query.
+</ParamField>
+
+<ParamField path="providers" type="list[string]">
+  The configured provider list, in the order it was supplied. Provider precedence is part of cache identity: reordering providers (for example, swapping the primary) invalidates the cache, as do additions or removals.
+</ParamField>
+
+<ParamField path="enable_cross_validation" type="bool">
+  Whether cross-validation is requested. Toggling this flag invalidates cache reuse, because cross-validated and single-provider results are not interchangeable.
+</ParamField>
+
+### TTL enforcement
+
+Cached entries are bound to their creation time and are evaluated against `cache_ttl_seconds` on every lookup. When an entry's age exceeds the TTL, it is evicted and the verifier recomputes the result. Stale entries are never returned, even if they remain within the LRU window.
 
 ```python
-from qwed_sdk import ReasoningVerifier
+from qwed_sdk import QWEDClient
 
-verifier = ReasoningVerifier(
-    providers=["anthropic", "openai"],
-    enable_cache=True,
-    cache_ttl_seconds=3600,  # results expire after 1 hour
-)
+# 5-second TTL for demonstration
+client = QWEDClient(api_key="qwed_...", cache_ttl_seconds=5)
+
+result1 = client.verify_reasoning(query="...", enable_caching=True)
+print(result1.cached)  # False
+
+# Within TTL - cached
+result2 = client.verify_reasoning(query="...", enable_caching=True)
+print(result2.cached)  # True
+
+# After TTL expiry - recomputed
+import time; time.sleep(6)
+result3 = client.verify_reasoning(query="...", enable_caching=True)
+print(result3.cached)  # False
 ```
+
+### Instance isolation
+
+The cache is per-instance state, not shared across `ReasoningVerifier` objects. Two verifiers — even with identical configuration — start with independent caches and never read or write each other's entries. This prevents stale results from one verification context replaying under a different one.
 
 ## Fail-closed prerequisites
 
