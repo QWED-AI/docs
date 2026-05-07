@@ -27,7 +27,7 @@ print(result["is_correct"])  # True
 
 ### 1. LangChain integration
 
-#### Basic Usage
+#### Basic usage
 
 ```python
 from langchain.agents import create_openai_functions_agent, AgentExecutor
@@ -59,7 +59,7 @@ response = agent_executor.invoke({
 })
 ```
 
-#### Advanced: Auto-Verification Chain
+#### Advanced: auto-verification chain
 
 ```python
 from langchain.chains import LLMChain
@@ -83,7 +83,7 @@ result = verified_chain.run("What is 15% of $250?")
 
 ### 2. CrewAI integration
 
-#### Agent-Level Verification
+#### Agent-level verification
 
 ```python
 from crewai import Agent, Task, Crew

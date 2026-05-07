@@ -11,16 +11,16 @@ description: "QWED-Attestation v1.0 defines the standard format for cryptographi
 
 ---
 
-## Table of Contents
+## Table of contents
 
 1. [Introduction](#1-introduction)
-2. [Attestation Model](#2-attestation-model)
-3. [Attestation Format](#3-attestation-format)
-4. [Cryptographic Operations](#4-cryptographic-operations)
-5. [Verification Chain](#5-verification-chain)
-6. [Trust Anchors](#6-trust-anchors)
-7. [Transport & Storage](#7-transport--storage)
-8. [Implementation Guidelines](#8-implementation-guidelines)
+2. [Attestation model](#2-attestation-model)
+3. [Attestation format](#3-attestation-format)
+4. [Cryptographic operations](#4-cryptographic-operations)
+5. [Verification chain](#5-verification-chain)
+6. [Trust anchors](#6-trust-anchors)
+7. [Transport & storage](#7-transport--storage)
+8. [Implementation guidelines](#8-implementation-guidelines)
 
 ---
 
@@ -30,7 +30,7 @@ description: "QWED-Attestation v1.0 defines the standard format for cryptographi
 
 QWED-Attestation defines a standard format for **cryptographic proofs of verification**. An attestation is a signed statement that a specific verification was performed by a trusted verifier at a specific time.
 
-### 1.2 Use Cases
+### 1.2 Use cases
 
 | Use Case                 | Description                                     |
 | ------------------------ | ----------------------------------------------- |
@@ -53,9 +53,9 @@ QWED-Attestation defines a standard format for **cryptographic proofs of verific
 
 ---
 
-## 2. Attestation Model
+## 2. Attestation model
 
-### 2.1 Conceptual Model
+### 2.1 Conceptual model
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -81,7 +81,7 @@ QWED-Attestation defines a standard format for **cryptographic proofs of verific
 └─────────────────────────────────────────────────────────────┘
 ```
 
-### 2.2 Trust Flow
+### 2.2 Trust flow
 
 ```
 1. Client submits verification request
@@ -93,7 +93,7 @@ QWED-Attestation defines a standard format for **cryptographic proofs of verific
 7. Third parties verify signature against issuer's public key
 ```
 
-### 2.3 Attestation Lifecycle
+### 2.3 Attestation lifecycle
 
 | State     | Description                             |
 | --------- | --------------------------------------- |
@@ -104,7 +104,7 @@ QWED-Attestation defines a standard format for **cryptographic proofs of verific
 
 ---
 
-## 3. Attestation Format
+## 3. Attestation format
 
 ### 3.1 Structure (JWT)
 
@@ -114,7 +114,7 @@ QWED Attestations use JSON Web Token (JWT) format per [RFC 7519](https://www.rfc
 <header>.<payload>.<signature>
 ```
 
-### 3.2 Header Schema
+### 3.2 Header schema
 
 ```json
 {
@@ -130,7 +130,7 @@ QWED Attestations use JSON Web Token (JWT) format per [RFC 7519](https://www.rfc
 | `typ` | REQUIRED | Token type (MUST be `qwed-attestation+jwt`) |
 | `kid` | REQUIRED | Key identifier (DID-based)                  |
 
-### 3.3 Payload Schema
+### 3.3 Payload schema
 
 ```json
 {
@@ -211,7 +211,7 @@ QWED Attestations use JSON Web Token (JWT) format per [RFC 7519](https://www.rfc
 }
 ```
 
-### 3.4 Example Attestation (Decoded)
+### 3.4 Example attestation (decoded)
 
 **Header:**
 
@@ -261,7 +261,7 @@ MEUCIQDKZnw...signature...
 
 ---
 
-## 4. Cryptographic Operations
+## 4. Cryptographic operations
 
 ### 4.1 Algorithms
 
@@ -272,7 +272,7 @@ MEUCIQDKZnw...signature...
 | **SHA-256** | Content hashing     | REQUIRED    |
 | **SHA-384** | Content hashing     | OPTIONAL    |
 
-### 4.2 Key Types
+### 4.2 Key types
 
 **Issuer Keys:**
 
@@ -286,7 +286,7 @@ MEUCIQDKZnw...signature...
 }
 ```
 
-### 4.3 Signing Process
+### 4.3 Signing process
 
 The signing process accepts an optional `timestamp` parameter. When provided, it overrides the default `iat` value (which is `current_timestamp()`). This is useful for deterministic testing and replaying attestations.
 
@@ -328,7 +328,7 @@ def create_attestation(verification_result, issuer_key, timestamp=None):
     return base64url(header) + "." + base64url(payload) + "." + base64url(signature)
 ```
 
-### 4.4 Verification Process
+### 4.4 Verification process
 
 ```python
 def verify_attestation(attestation_jwt, trusted_issuers):
@@ -366,9 +366,9 @@ def verify_attestation(attestation_jwt, trusted_issuers):
 
 ---
 
-## 5. Verification Chain
+## 5. Verification chain
 
-### 5.1 Chained Attestations
+### 5.1 Chained attestations
 
 For complex verifications, multiple attestations can be chained:
 
@@ -379,7 +379,7 @@ For complex verifications, multiple attestations can be chained:
 └─────────────────┘     └─────────────────┘     └─────────────────┘
 ```
 
-### 5.2 Chain Reference
+### 5.2 Chain reference
 
 ```json
 {
@@ -392,7 +392,7 @@ For complex verifications, multiple attestations can be chained:
 }
 ```
 
-### 5.3 Multi-Engine Attestation
+### 5.3 Multi-engine attestation
 
 When multiple engines verify the same query:
 
@@ -414,9 +414,9 @@ When multiple engines verify the same query:
 
 ---
 
-## 6. Trust Anchors
+## 6. Trust anchors
 
-### 6.1 Issuer Registry
+### 6.1 Issuer registry
 
 QWED maintains a registry of trusted issuers:
 
@@ -446,7 +446,7 @@ https://qwedai.com/registry/issuers.json
 }
 ```
 
-### 6.2 Decentralized Identifiers (DIDs)
+### 6.2 Decentralized identifiers (DIDs)
 
 QWED uses DIDs for issuer identification:
 
@@ -456,15 +456,15 @@ did:qwed:provider:<provider-id>
 did:qwed:user:<user-id>
 ```
 
-### 6.3 Key Rotation
+### 6.3 Key rotation
 
 Issuers SHOULD rotate keys annually. Old keys remain valid for attestation verification until their designated expiry.
 
 ---
 
-## 7. Transport & Storage
+## 7. Transport & storage
 
-### 7.1 HTTP Header
+### 7.1 HTTP header
 
 Attestations can be returned in HTTP headers:
 
@@ -474,7 +474,7 @@ Content-Type: application/json
 QWED-Attestation: eyJhbGciOiJFUzI1NiIsInR5cCI6...
 ```
 
-### 7.2 Response Body
+### 7.2 Response body
 
 Attestations can be included in the response:
 
@@ -486,7 +486,7 @@ Attestations can be included in the response:
 }
 ```
 
-### 7.3 Standalone Document
+### 7.3 Standalone document
 
 Attestations can be stored as standalone files:
 
@@ -494,7 +494,7 @@ Attestations can be stored as standalone files:
 verification_result.qwed-attestation
 ```
 
-### 7.4 Blockchain Anchoring (Optional)
+### 7.4 Blockchain anchoring (optional)
 
 Attestation hashes can be anchored to public blockchains:
 
@@ -512,9 +512,9 @@ Attestation hashes can be anchored to public blockchains:
 
 ---
 
-## 8. Implementation Guidelines
+## 8. Implementation guidelines
 
-### 8.1 Request Attestation
+### 8.1 Request attestation
 
 Request attestation in verification request:
 
@@ -529,7 +529,7 @@ Request attestation in verification request:
 }
 ```
 
-### 8.2 SDK Example (Python)
+### 8.2 SDK example (Python)
 
 ```python
 from qwed_sdk import QWEDClient
@@ -560,7 +560,7 @@ if is_valid:
     print(f"Verified by {claims['iss']} at {claims['iat']}")
 ```
 
-### 8.3 Storage Recommendations
+### 8.3 Storage recommendations
 
 | Use Case             | Recommended Storage    |
 | -------------------- | ---------------------- |
@@ -569,7 +569,7 @@ if is_valid:
 | Immutable record     | Blockchain anchor      |
 | Offline verification | File system            |
 
-### 8.4 Security Recommendations
+### 8.4 Security recommendations
 
 1. **Protect Private Keys** - Use HSM or secure key management
 2. **Provide a Valid Secret** - The core `AttestationGuard` requires a `secret_key` or the `QWED_ATTESTATION_SECRET` environment variable. Insecure fallback secrets are no longer supported; initialization raises a `ValueError` if no secret is provided
@@ -580,7 +580,7 @@ if is_valid:
 
 ---
 
-## Appendix A: Error Codes
+## Appendix A: Error codes
 
 | Code      | Description                |
 | --------- | -------------------------- |
@@ -593,14 +593,14 @@ if is_valid:
 | `ATT-007` | Missing required claim     |
 | `ATT-008` | Chain validation failed    |
 
-## Appendix B: MIME Types
+## Appendix B: MIME types
 
 | Type                                | Usage               |
 | ----------------------------------- | ------------------- |
 | `application/qwed-attestation+jwt`  | Attestation JWT     |
 | `application/qwed-attestation+json` | Decoded attestation |
 
-## Appendix C: DID Method
+## Appendix C: DID method
 
 The `did:qwed` method specification will be published separately.
 

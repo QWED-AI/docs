@@ -31,7 +31,7 @@ All notable changes to the QWED platform, listed by release.
 
 ---
 
-## QWED-Finance v2.1.0 — Security Audit Hardening
+## QWED-Finance v2.1.0 — Security audit hardening
 **Released: May 2, 2026** · [GitHub PR #25](https://github.com/QWED-AI/qwed-finance/pull/25)
 
 > Roll-up release that consolidates all P0/P1 findings from the deterministic security audit (Issue #16). Combines the four hardening PRs (#21–#24) into a single tagged release, bumps `pyproject.toml` from `2.0.1` to `2.1.0`, and promotes `mpmath` to an explicit runtime dependency.
@@ -709,7 +709,7 @@ If you use agent verification, all requests must now include `conversation_id` a
 
 ---
 
-## v4.0.1 — Sentinel Guard Sync
+## v4.0.1 — Sentinel guard sync
 **Released: March 23, 2026** · [GitHub Release](https://github.com/QWED-AI/qwed-verification/releases/tag/v4.0.1) · [PyPI](https://pypi.org/project/qwed/4.0.1/)
 
 > Patch release aligning the TypeScript SDK, backend API schemas, and security guard integrations introduced in v4.0.0.
@@ -744,7 +744,7 @@ npm install @qwed-ai/sdk@4.0.1
 
 ---
 
-## v4.0.0 — Sentinel Edition
+## v4.0.0 — Sentinel edition
 **Released: March 12, 2026** · [GitHub Release](https://github.com/QWED-AI/qwed-verification/releases/tag/v4.0.0) · [PyPI](https://pypi.org/project/qwed/4.0.0/)
 
 > **147 commits** since v3.0.1 — the largest update in QWED history.
@@ -815,13 +815,13 @@ docker pull qwedai/qwed-verification:4.0.0
 
 ---
 
-## v3.0.1 — Ironclad Update
+## v3.0.1 — Ironclad update
 **Released: February 4, 2026** · [GitHub Release](https://github.com/QWED-AI/qwed-verification/releases/tag/v3.0.1)
 
 ### Critical security hardening
 - **CodeQL Remediation**: Resolved 50+ alerts including ReDoS, Clear-text Logging, and Exception Exposure.
 - **Workflow Permissions**: Enforced `permissions: contents: read` across all GitHub Actions to adhere to Least Privilege.
-- **PII Protection**: Implemented robust `redact_pii` logic in all API endpoints and exception handlers.
+- **PII Protection**: Implemented `redact_pii` logic across all API endpoints and exception handlers.
 
 ### Compliance
 - **Snyk Attribution**: Added Snyk attribution to README and Documentation footer for Partner Program compliance.
@@ -831,7 +831,7 @@ docker pull qwedai/qwed-verification:4.0.0
 
 ---
 
-## v2.4.1 — The Reasoning Engine
+## v2.4.1 — The reasoning engine
 **Released: January 20, 2026** · [GitHub Release](https://github.com/QWED-AI/qwed-verification/releases/tag/v2.4.1)
 
 ### New features
@@ -843,4 +843,4 @@ docker pull qwedai/qwed-verification:4.0.0
 
 ### Fixes and improvements
 - Updated `logic_verifier.py` with additive, non-breaking methods.
-- Replaced shell-based `action_entrypoint.sh` with robust Python handler `action_entrypoint.py`.
+- Replaced shell-based `action_entrypoint.sh` with Python handler `action_entrypoint.py`.
