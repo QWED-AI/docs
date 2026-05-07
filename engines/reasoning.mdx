@@ -58,19 +58,25 @@ result2 = client.verify_reasoning(query, enable_caching=True)
 print(result2.cached)  # True (instant!)
 ```
 
+Each `ReasoningVerifier` instance owns its own cache, so verifiers configured with different providers or modes do not share entries. Cache keys incorporate the query, formula, the sorted provider list, and the cross-validation flag, and cached results are returned as defensive copies so callers cannot mutate stored entries.
+
 ## Fail-closed prerequisites
 
 The engine fails closed when required reasoning evidence is missing. A verification result is only marked valid when both prerequisites below are satisfied.
 
 <ParamField path="reasoning trace" type="required">
-  A substantive reasoning trace must be produced by the primary provider. The verifier rejects empty traces and traces that begin with placeholder or failure markers, including:
+  A substantive reasoning trace must be produced by the primary provider. The verifier scans each numbered or bulleted trace entry and rejects entries that contain any of the following non-substantive markers (case-insensitive):
 
-  - `No LLM provider available for reasoning trace`
-  - `Could not generate reasoning trace`
-  - `No structured reasoning trace generated`
-  - `Failed to generate reasoning trace:`
+  - `no llm provider`
+  - `could not generate reasoning trace`
+  - `no structured reasoning trace generated`
+  - `failed to generate reasoning trace`
+  - `n/a`
+  - `unavailable`
+  - `no reasoning`
+  - `rate limit exceeded`
 
-  When any of these markers appear, the result includes the issue `Reasoning trace unavailable or non-substantive` and `is_valid` is `False`.
+  Indented trace entries are still accepted as long as they begin with a digit or `-` after stripping leading whitespace. If no substantive entries remain, the result includes the issue `Reasoning trace unavailable or non-substantive` and `is_valid` is `False`.
 </ParamField>
 
 <ParamField path="distinct secondary provider" type="required when enable_cross_validation=True">
