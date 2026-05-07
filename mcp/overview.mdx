@@ -35,9 +35,9 @@ QWED-MCP gives AI assistants access to **deterministic verification** through a 
 | Without QWED-MCP | With QWED-MCP |
 | --- | --- |
 | Claude calculates → 95% correct | Executes Python script calling `qwed_new` math engine → **100% correct** |
-| Claude writes SQL → might inject | Script uses `qwed_new` SQL analyzer → **injection detected** |
-| Claude reasons → might be wrong | Z3 solver executed via SDK → **formally proven** |
-| Claude codes → might be unsafe | AST check script executed → **security checked** |
+| Claude writes SQL → unverified for injection | Script uses `qwed_new` SQL analyzer → **injection detected** |
+| Claude reasons → unverified | Z3 solver executed via SDK → **formally proven** |
+| Claude codes → unverified for safety | AST check script executed → **security checked** |
 
 ---
 

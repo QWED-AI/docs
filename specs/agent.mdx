@@ -11,18 +11,18 @@ description: "QWED-Agent v1.1 protocol for AI agents to verify actions before ex
 
 ---
 
-## Table of Contents
+## Table of contents
 
 1. [Introduction](#1-introduction)
-2. [Agent Verification Model](#2-agent-verification-model)
-3. [Agent Registration](#3-agent-registration)
-4. [Verification Requests](#4-verification-requests)
-5. [Tool Verification](#5-tool-verification)
-6. [Budget & Limits](#6-budget--limits)
-7. [Audit Trail](#7-audit-trail)
-8. [Trust Levels](#8-trust-levels)
-9. [Runtime Hardening](#9-runtime-hardening)
-10. [Implementation Guidelines](#10-implementation-guidelines)
+2. [Agent verification model](#2-agent-verification-model)
+3. [Agent registration](#3-agent-registration)
+4. [Verification requests](#4-verification-requests)
+5. [Tool verification](#5-tool-verification)
+6. [Budget & limits](#6-budget--limits)
+7. [Audit trail](#7-audit-trail)
+8. [Trust levels](#8-trust-levels)
+9. [Runtime hardening](#9-runtime-hardening)
+10. [Implementation guidelines](#10-implementation-guidelines)
 
 ---
 
@@ -32,7 +32,7 @@ description: "QWED-Agent v1.1 protocol for AI agents to verify actions before ex
 
 QWED-Agent defines a protocol for **AI agents to verify their actions** before execution. As agentic AI systems become more autonomous, QWED-Agent provides guardrails ensuring agents operate within defined boundaries.
 
-### 1.2 Problem Statement
+### 1.2 Problem statement
 
 | Problem                             | Risk                     |
 | ----------------------------------- | ------------------------ |
@@ -65,9 +65,9 @@ QWED-Agent establishes:
 
 ---
 
-## 2. Agent Verification Model
+## 2. Agent verification model
 
-### 2.1 Verification Flow
+### 2.1 Verification flow
 
 ```mermaid
 flowchart LR
@@ -84,7 +84,7 @@ flowchart LR
     class E result;
 ```
 
-### 2.2 Verification Types for Agents
+### 2.2 Verification types for agents
 
 | Action Type       | Verification Engine | Risk Level |
 | ----------------- | ------------------- | ---------- |
@@ -95,7 +95,7 @@ flowchart LR
 | File operations   | Security Check      | High       |
 | Network requests  | Policy Check        | Medium     |
 
-### 2.3 Decision Matrix
+### 2.3 Decision matrix
 
 | Verification | Risk level | Action |
 |---|---|---|
@@ -109,9 +109,9 @@ flowchart LR
 
 ---
 
-## 3. Agent Registration
+## 3. Agent registration
 
-### 3.1 Registration Request
+### 3.1 Registration request
 
 Agents MUST register with QWED before use:
 
@@ -139,7 +139,7 @@ Agents MUST register with QWED before use:
 }
 ```
 
-### 3.2 Registration Response
+### 3.2 Registration response
 
 ```json
 {
@@ -152,7 +152,7 @@ Agents MUST register with QWED before use:
 }
 ```
 
-### 3.3 Agent Types
+### 3.3 Agent types
 
 | Type         | Description                          | Trust Level |
 | ------------ | ------------------------------------ | ----------- |
@@ -160,7 +160,7 @@ Agents MUST register with QWED before use:
 | `autonomous` | Self-executing within limits         | Medium      |
 | `trusted`    | Full autonomy (enterprise only)      | High        |
 
-### 3.4 Agent Identity
+### 3.4 Agent identity
 
 Agents receive a DID-based identity:
 
@@ -170,9 +170,9 @@ did:qwed:agent:<agent_id>
 
 ---
 
-## 4. Verification Requests
+## 4. Verification requests
 
-### 4.1 Agent Verification Request
+### 4.1 Agent verification request
 
 The `context` object with `conversation_id` and `step_number` is **required**. The `step_number` must be a positive integer that increases monotonically within a conversation. QWED uses these fields to enforce replay protection, loop detection, and conversation length limits. See [conversation controls](/advanced/agent-verification#conversation-controls) for details.
 
@@ -199,7 +199,7 @@ The `context` object with `conversation_id` and `step_number` is **required**. T
 }
 ```
 
-### 4.2 Verification Response
+### 4.2 Verification response
 
 ```json
 {
@@ -222,7 +222,7 @@ The `context` object with `conversation_id` and `step_number` is **required**. T
 }
 ```
 
-### 4.3 Decision Types
+### 4.3 Decision types
 
 | Decision          | Meaning                 | Agent Action  |
 | ----------------- | ----------------------- | ------------- |
@@ -234,9 +234,9 @@ The `context` object with `conversation_id` and `step_number` is **required**. T
 
 ---
 
-## 5. Tool Verification
+## 5. Tool verification
 
-### 5.1 Tool Call Request
+### 5.1 Tool call request
 
 Before an agent calls an external tool:
 
@@ -255,7 +255,7 @@ Before an agent calls an external tool:
 }
 ```
 
-### 5.2 Tool Risk Assessment
+### 5.2 Tool risk assessment
 
 ```json
 {
@@ -276,7 +276,7 @@ Before an agent calls an external tool:
 }
 ```
 
-### 5.3 Tool Registry
+### 5.3 Tool registry
 
 ```json
 {
@@ -307,9 +307,9 @@ Before an agent calls an external tool:
 
 ---
 
-## 6. Budget & Limits
+## 6. Budget & limits
 
-### 6.1 Budget Schema
+### 6.1 Budget schema
 
 ```json
 {
@@ -338,7 +338,7 @@ Before an agent calls an external tool:
 }
 ```
 
-### 6.2 Budget Enforcement
+### 6.2 Budget enforcement
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -358,7 +358,7 @@ Before an agent calls an external tool:
 └─────────────────────────────────────────────────────────────┘
 ```
 
-### 6.3 Budget Response
+### 6.3 Budget response
 
 ```json
 {
@@ -377,9 +377,9 @@ Before an agent calls an external tool:
 
 ---
 
-## 7. Audit Trail
+## 7. Audit trail
 
-### 7.1 Activity Log Schema
+### 7.1 Activity log schema
 
 Every agent action is logged:
 
@@ -411,7 +411,7 @@ Every agent action is logged:
 }
 ```
 
-### 7.2 Audit Query API
+### 7.2 Audit query API
 
 ```http
 GET /agents/:agent_id/activity?from=2025-12-01&to=2025-12-20
@@ -437,7 +437,7 @@ Response:
 }
 ```
 
-### 7.3 Compliance Export
+### 7.3 Compliance export
 
 ```http
 GET /agents/:agent_id/compliance-report?format=pdf
@@ -445,9 +445,9 @@ GET /agents/:agent_id/compliance-report?format=pdf
 
 ---
 
-## 8. Trust Levels
+## 8. Trust levels
 
-### 8.1 Trust Level Definitions
+### 8.1 Trust level definitions
 
 | Level             | Description             | Verification  | Approval      |
 | ----------------- | ----------------------- | ------------- | ------------- |
@@ -456,7 +456,7 @@ GET /agents/:agent_id/compliance-report?format=pdf
 | **2: Autonomous** | Most actions autonomous | Critical only | Critical only |
 | **3: Trusted**    | Full autonomy           | None          | None          |
 
-### 8.2 Trust Elevation
+### 8.2 Trust elevation
 
 Agents can request trust elevation:
 
@@ -477,7 +477,7 @@ Agents can request trust elevation:
 }
 ```
 
-### 8.3 Trust Degradation
+### 8.3 Trust degradation
 
 Automatic trust reduction on violations:
 
@@ -490,11 +490,11 @@ Automatic trust reduction on violations:
 
 ---
 
-## 9. Runtime Hardening
+## 9. Runtime hardening
 
 <Info>New in v1.1.0</Info>
 
-### 9.1 Action Context Requirements
+### 9.1 Action context requirements
 
 All verification requests MUST include a context with:
 
@@ -508,13 +508,13 @@ All verification requests MUST include a context with:
 
 The maximum number of steps per conversation is **50**. Exceeding this limit triggers `QWED-AGENT-LOOP-001`.
 
-### 9.2 Replay Detection
+### 9.2 Replay detection
 
 The runtime tracks the highest committed step number per `(agent_id, conversation_id)` pair. A verification request with a `step_number` less than or equal to the last committed step is rejected as a replay (`QWED-AGENT-LOOP-002`).
 
 Step numbers are only committed when the action decision is `APPROVED` or `PENDING`. Denied actions do not advance the conversation state, allowing the agent to retry the same step number with a different action.
 
-### 9.3 Repetitive Loop Detection
+### 9.3 Repetitive loop detection
 
 Actions are fingerprinted using a deterministic JSON serialization of:
 - `action_type`
@@ -555,7 +555,7 @@ The combined fingerprint is tracked in a per-conversation sliding window of the 
 
 Both fields must be provided together. Supplying only one triggers `QWED-AGENT-STATE-001`.
 
-### 9.5 In-Flight Reservations
+### 9.5 In-flight reservations
 
 To prevent race conditions in concurrent environments, the runtime uses a reservation system:
 
@@ -564,7 +564,7 @@ To prevent race conditions in concurrent environments, the runtime uses a reserv
 3. If the action is denied, the reservation is **released** — the step can be retried
 4. If the action is approved or pending, the reservation is **committed** — the step is permanently consumed
 
-### 9.6 Unknown Action Type Denial
+### 9.6 Unknown action type denial
 
 The runtime fails closed for any `action_type` that does not have explicit registered semantics. An action type is considered registered when it appears in either the action-engine map (e.g. `execute_sql`, `execute_code`, `verify_logic`) or the tool risk map (e.g. `calculate`, `read_file`, `database_read`).
 
@@ -589,23 +589,23 @@ The denial response contains only `decision` and `error` — no `verification` b
 
 Previously, unregistered action types would receive a generic `"security"` engine label and could pass through verification. The runtime no longer emits this fallback engine; the `engine` field in a verification response always reflects the explicitly registered engine for the action.
 
-### 9.7 Budget Denial Semantics
+### 9.7 Budget denial semantics
 
 Budget check failures (`QWED-AGENT-BUDGET-001`, `QWED-AGENT-BUDGET-002`) do not consume the conversation step. The in-flight reservation is released so the agent can retry the same step number after the budget resets.
 
-### 9.8 Fail-Closed Rate Limiting
+### 9.8 Fail-closed rate limiting
 
 When the Redis backend is unavailable, the sliding window rate limiter fails closed (denies all requests) rather than failing open. This prevents uncontrolled access during infrastructure failures. When Redis is entirely absent at process startup, a local in-memory fallback limiter is used.
 
-### 9.9 Environment Integrity
+### 9.9 Environment integrity
 
 On server startup, the runtime MUST verify environment integrity (via `StartupHookGuard`) before initializing the database. A compromised environment causes the server to abort startup with a `RuntimeError`.
 
-### 9.10 Timing-Safe Authentication
+### 9.10 Timing-safe authentication
 
 Agent token verification MUST use constant-time comparison (`hmac.compare_digest`) to prevent timing side-channel attacks.
 
-### 9.10 Fail-Closed on Unknown Actions
+### 9.10 Fail-closed on unknown actions
 
 The runtime MUST reject any verification request whose `action_type` is not explicitly registered in the agent service. An action is considered registered only when it appears in either the engine map (e.g. `execute_sql`, `execute_code`, `calculate`, `verify_logic`, `verify_fact`) or the tool risk table (e.g. `database_read`, `database_write`, `send_email`, `file_read`, `file_write`, `file_delete`, `api_call`).
 
@@ -619,9 +619,9 @@ This guarantees that verification outcomes are always tied to explicit, determin
 
 ---
 
-## 10. Implementation Guidelines
+## 10. Implementation guidelines
 
-### 9.1 SDK Integration
+### 9.1 SDK integration
 
 ```python
 from qwed_sdk import QWEDAgentClient
@@ -657,7 +657,7 @@ if result.decision == "APPROVED":
     )
 ```
 
-### 9.2 LangChain Integration
+### 9.2 LangChain integration
 
 ```python
 from langchain.agents import AgentExecutor
@@ -677,7 +677,7 @@ agent_executor = AgentExecutor(
 result = agent_executor.run("Get customer data")
 ```
 
-### 9.3 CrewAI Integration
+### 9.3 CrewAI integration
 
 ```python
 from crewai import Agent, Task, Crew
@@ -695,7 +695,7 @@ verified_agent = QWEDVerifiedAgent(
 
 ---
 
-## Appendix A: Error Codes
+## Appendix A: Error codes
 
 | Code                    | Description              |
 | ----------------------- | ------------------------ |
@@ -722,7 +722,7 @@ verified_agent = QWEDVerifiedAgent(
 | `QWED-AGENT-TRUST-001`  | Insufficient trust level |
 | `QWED-AGENT-TRUST-002`  | Action requires approval |
 
-## Appendix B: HTTP Endpoints
+## Appendix B: HTTP endpoints
 
 | Endpoint                  | Method | Description          |
 | ------------------------- | ------ | -------------------- |
