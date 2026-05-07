@@ -334,27 +334,20 @@ client.verify_action(agent_id, action={"type": "calculate", "query": "2+2"},
 # -> {"decision": "DENIED", "error": {"code": "QWED-AGENT-LOOP-002"}}
 ```
 
-### Unknown action types denied
+### Fail-closed for unknown action types
 
-<Info>New in v5.1.1</Info>
+QWED denies any `verify_action` call whose `action_type` has no registered engine binding or tool risk level. Action verification is deterministic — actions without explicit semantics cannot be risk-assessed or routed to a verification engine, so the kernel returns a denial instead of falling back to a permissive default.
 
-QWED fails closed when an `action_type` does not have explicit registered semantics. An action type is recognized when it appears in either the action-engine map (e.g. `execute_sql`, `execute_code`, `verify_logic`) or the tool risk map (e.g. `calculate`, `read_file`, `database_read`).
-
-If an unregistered action is submitted, risk assessment and verification checks are skipped entirely and the call is denied with `QWED-AGENT-ACTION-001`:
-
-```json
-{
-  "decision": "DENIED",
-  "error": {
-    "code": "QWED-AGENT-ACTION-001",
-    "message": "Unknown action_type 'transfer_funds_internal_v2' cannot be verified without explicit registered semantics"
-  }
-}
+```python
+result = client.verify_action(
+    agent_id,
+    action={"type": "transfer_funds_internal_v2", "query": "Move funds between ledgers"},
+    context={"conversation_id": "conv_42", "step_number": 1},
+)
+# -> {"decision": "DENIED", "error": {"code": "QWED-AGENT-ACTION-001", "message": "..."}}
 ```
 
-The denial response intentionally omits the `verification` block because no engine is bound to the action. The in-flight step reservation is released, so the agent can retry the same `step_number` with a registered action.
-
-The `verification.engine` field in approved responses now always reflects the explicitly registered engine. The previous generic `"security"` fallback is no longer emitted.
+A denial under `QWED-AGENT-ACTION-001` releases the in-flight step reservation, so the agent may retry the same step number with a registered action type. Registered action types include the entries in `ACTION_ENGINES` (such as `calculate`, `verify`, `prove`) and tools listed in `TOOL_RISK_LEVELS`.
 
 ### In-flight reservation system
 
