@@ -192,7 +192,7 @@ result = guard.verify({"currency": "USD"})
 
 **Verifies refund amounts match original transactions.**
 
-### Usage - Full refund
+### Usage - full refund
 
 ```python
 from qwed_ucp.guards.refund import RefundGuard
@@ -206,7 +206,7 @@ result = guard.verify_full_refund(
 # Returns: RefundGuardResult(verified=True, details={"refund_type": "full"})
 ```
 
-### Usage - Partial refund
+### Usage - partial refund
 
 ```python
 result = guard.verify_partial_refund(
@@ -216,7 +216,7 @@ result = guard.verify_partial_refund(
 )
 ```
 
-### Usage - Tax reversal
+### Usage - tax reversal
 
 ```python
 result = guard.verify_tax_reversal(
@@ -226,7 +226,7 @@ result = guard.verify_tax_reversal(
 )
 ```
 
-### Usage - Checkout refund
+### Usage - checkout refund
 
 ```python
 checkout = {"totals": [{"type": "total", "amount": 100.00}]}
@@ -247,7 +247,7 @@ result = guard.verify(checkout, refund)
 
 **Verifies tip calculations (pre-tax and post-tax).**
 
-### Usage - Pre-tax tip
+### Usage - pre-tax tip
 
 ```python
 from qwed_ucp.guards.tip import TipGuard
@@ -262,7 +262,7 @@ result = guard.verify_percentage_tip(
 # Returns: TipGuardResult(verified=True, details={"tip_type": "pre-tax"})
 ```
 
-### Usage - Post-tax tip
+### Usage - post-tax tip
 
 ```python
 result = guard.verify_post_tax_tip(
@@ -273,7 +273,7 @@ result = guard.verify_post_tax_tip(
 # Returns: TipGuardResult(verified=True, details={"tip_type": "post-tax"})
 ```
 
-### Usage - Bounds check
+### Usage - bounds check
 
 ```python
 result = guard.verify_tip_bounds(
@@ -295,7 +295,7 @@ result = guard.verify_tip_bounds(
 
 **Verifies fee calculations (service, delivery, platform).**
 
-### Usage - Service fee
+### Usage - service fee
 
 ```python
 from qwed_ucp.guards.fee import FeeGuard
@@ -310,7 +310,7 @@ result = guard.verify_service_fee(
 # Returns: FeeGuardResult(verified=True, details={"fee_type": "service"})
 ```
 
-### Usage - Delivery fee
+### Usage - delivery fee
 
 ```python
 # Formula: base_fee + (distance × rate_per_km)
@@ -323,7 +323,7 @@ result = guard.verify_delivery_fee(
 # Returns: FeeGuardResult(verified=True, details={"fee_type": "delivery"})
 ```
 
-### Usage - Platform fee
+### Usage - platform fee
 
 ```python
 result = guard.verify_platform_fee(
@@ -346,7 +346,7 @@ result = guard.verify_platform_fee(
 
 **Generates cryptographic proofs (JWTs) for verification results.**
 
-### Usage - Sign a checkout
+### Usage - sign a checkout
 
 ```python
 from qwed_ucp.guards.attestation import AttestationGuard
@@ -368,7 +368,7 @@ print(result.verified) # True
 print(result.details)  # {"checkout_hash": "...", "issued_at": ..., "expires_at": ...}
 ```
 
-### Usage - Verify an attestation
+### Usage - verify an attestation
 
 ```python
 result = guard.verify_attestation(token="eyJ...")
@@ -377,7 +377,7 @@ print(result.verified)  # True if valid and not expired
 print(result.details)   # Decoded JWT payload
 ```
 
-### Usage - Create a receipt
+### Usage - create a receipt
 
 ```python
 receipt = guard.create_receipt(

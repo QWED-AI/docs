@@ -17,7 +17,7 @@ The `qwed` CLI is automatically available after installation.
 
 ## Commands
 
-### `qwed init` - Onboarding and bootstrap
+### `qwed init` - onboarding and bootstrap
 
 Production-grade onboarding wizard that sets up verification engines, configures your LLM provider, and bootstraps a local API key — all in a single command. Run this once after installing QWED.
 
@@ -177,7 +177,7 @@ In non-interactive mode, the CLI checks three key sources: CLI argument, environ
 
 ---
 
-### `qwed doctor` - System health check
+### `qwed doctor` - system health check
 
 Run a local health check that reports the status of verification engines, LLM provider connectivity, the QWED server, and the database. Use this after installation or when verification calls fail unexpectedly.
 
@@ -274,7 +274,7 @@ Run `qwed doctor --json` in CI to gate deployments on system health. A non-zero 
 
 ---
 
-### `qwed test` - Deterministic verification tests
+### `qwed test` - deterministic verification tests
 
 Run the built-in deterministic test suite across the Math, Logic, SQL, and Code engines. Every test case has a known expected result and does not depend on an LLM, so outcomes are fully reproducible.
 
@@ -349,7 +349,7 @@ Math:
 
 ---
 
-### `qwed verify` - One-shot verification
+### `qwed verify` - one-shot verification
 
 Verify a query and exit.
 
@@ -598,7 +598,7 @@ If you have run `qwed init`, the `ACTIVE_PROVIDER` value in your `.env` determin
 
 ---
 
-### `qwed provider` - Custom provider management
+### `qwed provider` - custom provider management
 
 Manage custom LLM providers defined in `~/.qwed/providers.yaml`. See [Custom providers](/getting-started/custom-providers) for the full guide.
 
