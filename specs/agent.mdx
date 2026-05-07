@@ -707,6 +707,7 @@ verified_agent = QWEDVerifiedAgent(
 | `QWED-AGENT-ACTION-001` | Unknown `action_type` — no explicit registered semantics for the requested action |
 | `QWED-AGENT-CTX-001`    | Missing required action context (`conversation_id` and `step_number`) |
 | `QWED-AGENT-CTX-002`    | Invalid `step_number` (must be >= 1) |
+| `QWED-AGENT-ACTION-001` | Unknown `action_type` cannot be verified — the action has no registered engine or tool risk binding |
 | `QWED-AGENT-LOOP-001`   | Conversation step limit exceeded (max 50 steps) |
 | `QWED-AGENT-LOOP-002`   | Replay or out-of-order action step detected |
 | `QWED-AGENT-LOOP-003`   | Repetitive action loop detected (max 2 consecutive identical actions) |
