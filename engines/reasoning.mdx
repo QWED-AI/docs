@@ -60,6 +60,18 @@ print(result2.cached)  # True (instant!)
 
 Each `ReasoningVerifier` instance owns its own cache, so verifiers configured with different providers or modes do not share entries. Cache keys incorporate the query, formula, the sorted provider list, and the cross-validation flag, and cached results are returned as defensive copies so callers cannot mutate stored entries.
 
+Cached entries are also bound to `cache_ttl_seconds`. On every cache lookup, entries older than the configured TTL are discarded and the verification is recomputed, so stale results cannot replay after the freshness window has elapsed.
+
+```python
+from qwed_sdk import ReasoningVerifier
+
+verifier = ReasoningVerifier(
+    providers=["anthropic", "openai"],
+    enable_cache=True,
+    cache_ttl_seconds=3600,  # results expire after 1 hour
+)
+```
+
 ## Fail-closed prerequisites
 
 The engine fails closed when required reasoning evidence is missing. A verification result is only marked valid when both prerequisites below are satisfied.
