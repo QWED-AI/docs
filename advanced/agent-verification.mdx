@@ -310,6 +310,35 @@ Every `verify_action` call requires an `ActionContext` with:
 
 The step number must increase with each action in a conversation. Attempts to reuse or decrement step numbers are rejected.
 
+### Registered action enforcement
+
+<Info>New in v5.1.1</Info>
+
+Every `verify_action` call must reference an `action_type` that QWED knows how to verify. Action types are either bound to a verification engine (for example `verify_math` → `math`, `execute_sql` → `sql`) or registered as a governed tool with a known risk level (for example `read_database`, `send_email`). Action types outside those two registries are denied with `QWED-AGENT-ACTION-001` before any risk assessment runs.
+
+```python
+result = client.verify_action(
+    agent_id="agent_abc123",
+    action={"type": "do_arbitrary_thing", "query": "..."},
+    context={"conversation_id": "conv_1", "step_number": 1},
+)
+# {
+#   "decision": "DENIED",
+#   "error": {
+#     "code": "QWED-AGENT-ACTION-001",
+#     "message": "Unknown action_type 'do_arbitrary_thing' cannot be verified without explicit registered semantics"
+#   }
+# }
+```
+
+The denial fires before risk assessment, so unknown actions can never be auto-approved through a permissive default. The reserved conversation step is released, allowing the agent to retry the same step with a registered action type.
+
+To allow a custom action, either bind it to an engine in `ACTION_ENGINES` or add it to your tool registry with an explicit risk level. Tools registered this way are reported with `engine: "tool_control"` in the verification response.
+
+<Warning>
+Before v5.1.1, unknown action types defaulted to `engine: "security"` and proceeded through risk assessment as `MEDIUM` risk, which could result in `APPROVED` or `PENDING` decisions depending on the agent's trust level. Audit any production agents that emit non-standard `action_type` values and register them explicitly before upgrading.
+</Warning>
+
 ### Replay and loop detection
 
 The agent service detects and blocks four types of problematic patterns:
