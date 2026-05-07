@@ -41,6 +41,21 @@ result = client.verify_action(
 Unknown actions are not verifiable actions. If QWED has no explicit semantics for an action type, it must not approve it or mark it as verified.
 
 See [Agent verification — Unknown action types denied](/advanced/agent-verification#unknown-action-types-denied) and the [Agent spec error code table](/specs/agent#appendix-a-error-codes).
+## QWED-Verification — Fail-closed on unknown agent actions
+**Released: May 6, 2026**
+
+> The agent service now rejects verification requests whose `action_type` has no explicit registered semantics. Previously, an unrecognized action could pass through risk assessment and receive an `APPROVED` decision with a generic `"security"` engine fallback.
+
+### Security
+
+- **Unknown `action_type` values are denied** with the new error code `QWED-AGENT-ACTION-001`. The denial happens before risk assessment, so unknown actions can never be marked `VERIFIED`.
+- **Generic `"security"` engine fallback removed** from the verification response. The `engine` field now only reflects an explicitly registered engine (e.g. `sql`, `code`, `math`, `tool_control`).
+- **In-flight step reservation released on denial.** Agents can retry the same `step_number` with a registered action without triggering replay detection (`QWED-AGENT-LOOP-002`).
+- **Explicitly registered tool actions remain on their existing deterministic risk path** — no behavior change for known engines or tools.
+
+### Migration
+
+If you call `verify_action` with custom `action_type` strings, route them through one of the registered verification engines or tool calls. See [agent verification — fail-closed on unknown actions](/advanced/agent-verification#fail-closed-on-unknown-actions) for the full registered list.
 
 ---
 

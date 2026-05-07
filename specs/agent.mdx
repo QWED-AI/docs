@@ -605,6 +605,18 @@ On server startup, the runtime MUST verify environment integrity (via `StartupHo
 
 Agent token verification MUST use constant-time comparison (`hmac.compare_digest`) to prevent timing side-channel attacks.
 
+### 9.10 Fail-Closed on Unknown Actions
+
+The runtime MUST reject any verification request whose `action_type` is not explicitly registered in the agent service. An action is considered registered only when it appears in either the engine map (e.g. `execute_sql`, `execute_code`, `calculate`, `verify_logic`, `verify_fact`) or the tool risk table (e.g. `database_read`, `database_write`, `send_email`, `file_read`, `file_write`, `file_delete`, `api_call`).
+
+When an `action_type` has no registered semantics:
+
+- The request is denied with `QWED-AGENT-ACTION-001` before risk assessment runs.
+- No `verification` block is returned — the runtime never emits a generic `"security"` engine fallback for unknown actions.
+- The in-flight step reservation is released so the agent can retry the same `step_number` with a registered action.
+
+This guarantees that verification outcomes are always tied to explicit, deterministic semantics. An unrecognized action cannot be silently treated as approved or marked as `VERIFIED`.
+
 ---
 
 ## 10. Implementation Guidelines
@@ -692,7 +704,7 @@ verified_agent = QWEDVerifiedAgent(
 | `QWED-AGENT-003`        | Agent suspended          |
 | `QWED-AGENT-004`        | Tool not allowed         |
 | `QWED-AGENT-005`        | Verification failed      |
-| `QWED-AGENT-ACTION-001` | Unknown `action_type` — no explicit registered semantics for this action |
+| `QWED-AGENT-ACTION-001` | Unknown `action_type` — no explicit registered semantics for the requested action |
 | `QWED-AGENT-CTX-001`    | Missing required action context (`conversation_id` and `step_number`) |
 | `QWED-AGENT-CTX-002`    | Invalid `step_number` (must be >= 1) |
 | `QWED-AGENT-LOOP-001`   | Conversation step limit exceeded (max 50 steps) |
