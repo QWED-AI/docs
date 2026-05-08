@@ -7,6 +7,30 @@ All notable changes to the QWED platform, listed by release.
 
 ---
 
+## QWED-Verification — audit logger integrity hardening
+**Released: May 8, 2026**
+
+> `AuditLogger` now fails closed when audit integrity prerequisites are missing or when chain continuity cannot be trusted. The insecure built-in fallback signing key has been removed, and persisted chain heads are restored on startup.
+
+### What changed
+
+- **`QWED_AUDIT_SECRET_KEY` is required** — The audit logger no longer falls back to a hardcoded development key. Initialization raises `SecurityError` if the variable is unset and no explicit `secret_key` is passed to the constructor.
+- **Chain continuity restored on startup** — On initialization, `AuditLogger` loads the latest persisted entry hash from the database and uses it as the chain head. Restarts no longer begin a fresh in-memory root.
+- **Continuity check on every write** — Each `log_verification` call rereads the persisted chain head and refuses to write if it disagrees with the in-memory head.
+- **Stricter chain verification** — `verify_log_entry` rejects genesis entries that reference a previous hash, entries pointing at a missing predecessor hash, and broken `previous_hash` links. HMAC comparisons now use `hmac.compare_digest`.
+
+### Action required
+
+Before upgrading, set `QWED_AUDIT_SECRET_KEY` in every environment that runs `AuditLogger`. Store the key in a secrets manager. There is no default — the application will fail to start without it.
+
+```bash
+export QWED_AUDIT_SECRET_KEY="your-secure-production-key-here"
+```
+
+See [Compliance guide — Audit trail setup](/advanced/compliance#3-audit-trail-setup).
+
+---
+
 ## QWED-Verification — fail-closed denial of unknown agent action types
 **Released: May 6, 2026** · [GitHub PR #176](https://github.com/QWED-AI/qwed-verification/pull/176)
 
