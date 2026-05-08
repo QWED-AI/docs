@@ -7,6 +7,31 @@ All notable changes to the QWED platform, listed by release.
 
 ---
 
+## QWED-Verification — audit logger fail-closed and per-organization chains
+**Released: May 8, 2026** · [GitHub PR #179](https://github.com/QWED-AI/qwed-verification/pull/179)
+
+> Hardens the cryptographic audit logger so signing-key, payload, and chain-continuity failures fail closed instead of silently writing or "verifying" a broken audit trail.
+
+### What changed
+
+- **Signing key required at startup** — `AuditLogger()` now raises `SecurityError` when `QWED_AUDIT_SECRET_KEY` is unset or empty. The previous insecure `dev_only_change_in_production` fallback was removed.
+- **Per-organization hash chains** — Each organization now has its own isolated audit chain. Tampering or gaps in one tenant's chain cannot affect another tenant's verification.
+- **Hash coverage extended to `raw_llm_output`** — New entries hash and verify the raw LLM output. Legacy entries created before this change are still accepted by the verifier via a backward-compatible canonical payload.
+- **Stronger pre-append checks** — Before writing a new entry, the logger verifies the current persisted chain head, refuses to append on top of malformed payloads, missing hashes, or in-memory/persisted divergence, and serializes appends with `BEGIN IMMEDIATE` on SQLite (or `SELECT … FOR UPDATE` on other backends).
+- **Constant-time HMAC comparison** — Signature checks use `hmac.compare_digest` to prevent timing side channels.
+
+### Action required
+
+Set `QWED_AUDIT_SECRET_KEY` in every environment that runs the verification service (including CI and local development). The service will not start without it.
+
+```bash
+export QWED_AUDIT_SECRET_KEY="your-secure-production-key-here"
+```
+
+See [Compliance — Audit trail setup](/advanced/compliance#3-audit-trail-setup) for the updated configuration steps and failure modes.
+
+---
+
 ## QWED-Verification — fail-closed denial of unknown agent action types
 **Released: May 6, 2026** · [GitHub PR #176](https://github.com/QWED-AI/qwed-verification/pull/176)
 
