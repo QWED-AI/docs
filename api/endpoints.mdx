@@ -973,7 +973,9 @@ Export the full audit trail as a CSV file.
 
 Cryptographically verify a specific audit log entry using HMAC-SHA256 and hash-chain validation.
 
-The response reports three independent checks: payload hash, HMAC signature (compared in constant time), and chain linkage to the prior entry. Genesis entries must have a `null` `previous_hash`; non-genesis entries must link to a non-empty prior entry hash.
+The response reports three independent checks: payload hash, HMAC signature (compared in constant time), and chain linkage to the prior entry within the same organization. Genesis entries must have a `null` `previous_hash`; non-genesis entries must link to a non-empty prior entry hash. Entries with malformed stored result payloads cause verification to fail closed with `SecurityError` instead of returning `"valid": true`.
+
+Hash matching accepts either the current canonical payload (which includes `raw_llm_output`) or the legacy canonical payload, so entries written before that field was covered remain verifiable after the upgrade.
 
 **Response:**
 

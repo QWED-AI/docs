@@ -43,9 +43,15 @@ Verify the cryptographic integrity of your audit logs. This ensures that no logs
 
 Per-entry verification covers three checks:
 
-- **`hash_valid`**: the entry's SHA-256 hash matches a recomputation of its canonical payload.
+- **`hash_valid`**: the entry's SHA-256 hash matches a recomputation of its canonical payload. For backwards compatibility, entries hashed before `raw_llm_output` was covered are also accepted against the legacy canonical form.
 - **`signature_valid`**: the entry's HMAC-SHA256 signature is constant-time-equal to the expected signature.
-- **`chain_valid`**: the entry's `previous_hash` correctly references the prior entry's hash. Genesis entries must have a `null` `previous_hash`; non-genesis entries must reference a non-empty prior hash.
+- **`chain_valid`**: the entry's `previous_hash` correctly references the prior entry's hash **within the same organization**. Genesis entries (the first entry for an organization) must have a `null` `previous_hash`; non-genesis entries must reference a non-empty prior hash.
+
+<Note>
+Audit chains are isolated per organization. Hash linkage is verified only against prior entries belonging to the same `organization_id`, so cross-tenant activity cannot affect another organization's chain validity.
+</Note>
+
+If an entry's stored `result` payload cannot be decoded as JSON, `verify_log_entry` fails closed with a `SecurityError` rather than reporting the entry as valid.
 
 **Verify a Single Log Entry:**
 ```http
@@ -142,7 +148,9 @@ Cryptographic logging is enforced. `AuditLogger` **fails closed** at initializat
     Store this key in a secrets manager (for example, AWS Secrets Manager or HashiCorp Vault) and inject it into the application environment.
 
 3.  **Persisted chain continuity:**
-    On startup, `AuditLogger` restores the latest persisted entry hash from the database and binds new entries to it. If the in-memory chain head diverges from the persisted head at write time, the logger raises `SecurityError` and rejects the write rather than starting a fresh chain.
+    On each append, `AuditLogger` looks up the latest persisted entry hash for the writing organization and binds the new entry to it. Each organization has its own chain head, tracked independently. If the in-memory chain head diverges from the persisted head at write time, the logger raises `SecurityError` and rejects the write rather than starting a fresh chain.
+
+    Before appending, the logger re-verifies the persisted chain head and refuses to extend a chain whose latest entry fails integrity checks. On databases that support it, the chain-head read is taken with a `SELECT ... FOR UPDATE`; on SQLite, the append session opens an `IMMEDIATE` transaction so chain-head validation and the append remain serialized.
 
 ### Verify log integrity
 Regularly run the verification process (see "Audit Trail Verification" above) to detect any database tampering.
