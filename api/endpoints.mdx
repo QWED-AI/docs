@@ -971,7 +971,29 @@ Export the full audit trail as a CSV file.
 
 ### GET /admin/compliance/verify/{log_id}
 
-Cryptographically verify a specific audit log entry using HMAC and hash chain validation.
+Cryptographically verify a specific audit log entry using HMAC-SHA256 and hash-chain validation.
+
+The response reports three independent checks: payload hash, HMAC signature (compared in constant time), and chain linkage to the prior entry. Genesis entries must have a `null` `previous_hash`; non-genesis entries must link to a non-empty prior entry hash.
+
+**Response:**
+
+```json
+{
+  "valid": true,
+  "checks": {
+    "hash_valid": true,
+    "signature_valid": true,
+    "chain_valid": true
+  },
+  "errors": [],
+  "log_id": 42,
+  "timestamp": "2026-03-20T12:00:00Z"
+}
+```
+
+<Note>
+`AuditLogger` requires `QWED_AUDIT_SECRET_KEY` to be set. If the key is missing or persisted chain continuity cannot be loaded, initialization raises `SecurityError` and verification endpoints fail closed.
+</Note>
 
 ### GET /admin/compliance/report/soc2/{org_id}
 
