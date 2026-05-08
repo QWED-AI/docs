@@ -41,7 +41,9 @@ GET /admin/compliance/report/soc2/{org_id}
 ### Audit trail verification
 Verify the cryptographic integrity of your audit logs. This ensures that no logs have been tampered with since creation.
 
-**Verify a Single Log Entry:**
+Each verification log is hashed with SHA-256, signed with HMAC-SHA256, and chained to the previous entry for the same organization. Audit chains are isolated **per organization**, so tampering in one tenant cannot invalidate another.
+
+**Verify a single log entry:**
 ```http
 GET /admin/compliance/verify/{log_id}
 ```
@@ -53,7 +55,7 @@ The API verifies one entry at a time for performance. For complete log verificat
 from qwed_new.core.audit_logger import AuditLogger
 from qwed_new.core.database import get_session
 
-verifier = AuditLogger()
+verifier = AuditLogger()  # Requires QWED_AUDIT_SECRET_KEY to be set
 with get_session() as session:
     result = verifier.verify_audit_trail(organization_id=1)
     if result["valid"]:
@@ -61,6 +63,19 @@ with get_session() as session:
     else:
         print(f"Integrity check failed: {result['errors']}")
 ```
+
+<Note>
+  Verification accepts both the current canonical payload (which covers `raw_llm_output`) and the legacy payload format used before that field was hashed. Logs created on prior versions remain verifiable after upgrade.
+</Note>
+
+**Failure modes (fail closed):**
+
+The verifier raises `SecurityError` instead of silently returning a "valid" result when:
+
+- The latest persisted chain head fails integrity verification (refusing to append new entries on top of a broken chain).
+- An entry's `result` payload is malformed JSON.
+- The persisted trail is missing the latest entry hash.
+- The in-memory chain head diverges from the persisted chain head for an organization.
 
 ### Evidence collection
 Export all verification logs and security events as a CSV file to provide to your auditor.
@@ -120,17 +135,27 @@ requests.post("/verify/fact", json={
 ## 3. Audit trail setup
 
 ### Enable cryptographic logging
-Cryptographic logging is enabled by default, but you **must** configure the security key for production.
+Cryptographic logging is enabled by default. The audit logger now **fails closed** at startup if no signing key is configured — there is no insecure fallback.
 
-1.  **Set Environment Variable:**
-    Set `AUDIT_SECRET_KEY` to a secure, random string (at least 32 characters).
+1.  **Set environment variable:**
+    Set `QWED_AUDIT_SECRET_KEY` to a secure, random string (at least 32 characters) before starting the application.
     ```bash
-    export AUDIT_SECRET_KEY="your-secure-production-key-here"
+    export QWED_AUDIT_SECRET_KEY="your-secure-production-key-here"
     ```
-    *Warning: Never use the default hardcoded key in production.*
+    <Warning>
+      If `QWED_AUDIT_SECRET_KEY` is unset or empty, `AuditLogger()` raises `SecurityError` and refuses to initialize. No verification logs will be written until the key is configured.
+    </Warning>
 
-2.  **Secure Storage:**
+2.  **Secure storage:**
     Ensure this key is stored in a secrets manager (e.g., AWS Secrets Manager, HashiCorp Vault) and injected into the application environment.
+
+3.  **Programmatic override (testing only):**
+    You may pass a key directly when constructing the logger, but production deployments should always rely on the environment variable.
+    ```python
+    from qwed_new.core.audit_logger import AuditLogger
+
+    logger = AuditLogger(secret_key="explicit-test-key")
+    ```
 
 ### Verify log integrity
 Regularly run the verification process (see "Audit Trail Verification" above) to detect any database tampering.
@@ -148,7 +173,7 @@ Use this checklist to prepare for an enterprise audit.
 - [ ] **Audit Logs Verified:** Run `verify_audit_trail` on all historical logs.
 - [ ] **API Keys Rotated:** Rotate any API keys older than 90 days.
 - [ ] **SOC 2 Report Generated:** Generate and review the latest SOC 2 report via API.
-- [ ] **Secret Key Secured:** Confirm `AUDIT_SECRET_KEY` is set to a production-grade value.
+- [ ] **Secret Key Secured:** Confirm `QWED_AUDIT_SECRET_KEY` is set to a production-grade value.
 - [ ] **GDPR Export Tested:** Verify that data export works for a sample organization.
 - [ ] **Security Events Reviewed:** Check the "Security Events" section of the SOC 2 report for any anomalies.
 - [ ] **Rate Limiting Active:** Confirm rate limits are enforced to prevent abuse (DoS protection).
