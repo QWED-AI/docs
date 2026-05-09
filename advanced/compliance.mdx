@@ -65,7 +65,7 @@ The API verifies one entry at a time for performance. For complete log verificat
 from qwed_new.core.audit_logger import AuditLogger
 from qwed_new.core.database import get_session
 
-verifier = AuditLogger()
+verifier = AuditLogger()  # Requires QWED_AUDIT_SECRET_KEY to be set
 with get_session() as session:
     result = verifier.verify_audit_trail(organization_id=1)
     if result["valid"]:
@@ -73,6 +73,19 @@ with get_session() as session:
     else:
         print(f"Integrity check failed: {result['errors']}")
 ```
+
+<Note>
+  Verification accepts both the current canonical payload (which covers `raw_llm_output`) and the legacy payload format used before that field was hashed. Logs created on prior versions remain verifiable after upgrade.
+</Note>
+
+**Failure modes (fail closed):**
+
+The verifier raises `SecurityError` instead of silently returning a "valid" result when:
+
+- The latest persisted chain head fails integrity verification (refusing to append new entries on top of a broken chain).
+- An entry's `result` payload is malformed JSON.
+- The persisted trail is missing the latest entry hash.
+- The in-memory chain head diverges from the persisted chain head for an organization.
 
 ### Evidence collection
 Export all verification logs and security events as a CSV file to provide to your auditor.
@@ -151,6 +164,14 @@ Cryptographic logging is enforced. `AuditLogger` **fails closed** at initializat
     On each append, `AuditLogger` looks up the latest persisted entry hash for the writing organization and binds the new entry to it. Each organization has its own chain head, tracked independently. If the in-memory chain head diverges from the persisted head at write time, the logger raises `SecurityError` and rejects the write rather than starting a fresh chain.
 
     Before appending, the logger re-verifies the persisted chain head and refuses to extend a chain whose latest entry fails integrity checks. On databases that support it, the chain-head read is taken with a `SELECT ... FOR UPDATE`; on SQLite, the append session opens an `IMMEDIATE` transaction so chain-head validation and the append remain serialized.
+
+3.  **Programmatic override (testing only):**
+    You may pass a key directly when constructing the logger, but production deployments should always rely on the environment variable.
+    ```python
+    from qwed_new.core.audit_logger import AuditLogger
+
+    logger = AuditLogger(secret_key="explicit-test-key")
+    ```
 
 ### Verify log integrity
 Regularly run the verification process (see "Audit Trail Verification" above) to detect any database tampering.
