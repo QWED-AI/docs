@@ -655,6 +655,24 @@ Verify multiple items in a single request. Processes all items concurrently and 
 }
 ```
 
+**Math item results:** Math items in a batch are split between proof results and simplification-only results:
+
+- **Equality claims** (e.g., `x**2 + 2*x + 1 = (x+1)**2`) follow the proof path. Verified identities return `is_valid: true` with `message: "Identity verified"`. Non-identities return `is_valid: false` with `message: "Not equal"`.
+- **Non-equality expressions** (e.g., `x + x`) are symbolically simplified but **not** treated as proven claims. They return `is_valid: false` with `status: "SIMPLIFIED"`, the simplified form in `simplified`, and a `message` explaining that no equality or proof claim was provided.
+
+```json
+{
+  "id": "math-simplified",
+  "type": "math",
+  "is_valid": false,
+  "status": "SIMPLIFIED",
+  "simplified": "2*x",
+  "message": "Expression simplified, but no equality or proof claim was provided"
+}
+```
+
+<Info>Changed: parseable non-equality math expressions previously returned `is_valid: true` from the batch endpoint. They now return `is_valid: false` with `status: "SIMPLIFIED"` so that symbolic transformation is never reported as deterministic verification. Use `POST /verify/math` with an explicit equation to obtain a proof result.</Info>
+
 ### GET /verify/batch/{job_id}
 
 Get the status and results of a batch verification job. Use this to poll results when processing large batches.
