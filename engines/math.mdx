@@ -378,6 +378,7 @@ result = client.verify_math("1/(2*(3+1))")
 | Invalid tolerance     | Returns "BLOCKED" with error message  |
 | Sampling-only identity match | Returns "BLOCKED" — no formal proof established |
 | Ambiguous implicit multiplication | Returns "BLOCKED" — rewrite with explicit operators |
+| Non-equality expression in batch verification | Returns `is_valid: false` with `status: "SIMPLIFIED"` — simplification is not a proof |
 
 ---
 
