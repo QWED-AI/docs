@@ -655,6 +655,39 @@ Verify multiple items in a single request. Processes all items concurrently and 
 }
 ```
 
+#### Math items: proof vs. simplification
+
+Math items are split into two distinct outcomes so that symbolic transformation is never mistaken for a verified claim:
+
+- **Equality or proof claims** (e.g., `x**2 + 2*x + 1 = (x+1)**2`) take the proof path. Verified identities return `is_valid: true` with `message: "Identity verified"`. Non-identities return `is_valid: false` with `message: "Not equal"`.
+- **Non-equality expressions** (e.g., `x + x`) are simplified only. They are returned as explicit simplification results, not as valid proofs.
+
+Simplification-only results include:
+
+| Field | Value |
+|-------|-------|
+| `is_valid` | `false` |
+| `status` | `"SIMPLIFIED"` |
+| `simplified` | The simplified expression as a string |
+| `type` | `"math"` |
+| `message` | `"Expression simplified, but no equality or proof claim was provided"` |
+
+**Example response for `"x + x"`:**
+
+```json
+{
+  "is_valid": false,
+  "status": "SIMPLIFIED",
+  "simplified": "2*x",
+  "type": "math",
+  "message": "Expression simplified, but no equality or proof claim was provided"
+}
+```
+
+<Warning>
+A successfully simplified expression is not a verified claim. Treat `status: "SIMPLIFIED"` results as transformed input, not as proof. To get a `VERIFIED` outcome from a math item, submit an equality (e.g., `x + x = 2*x`).
+</Warning>
+
 ### GET /verify/batch/{job_id}
 
 Get the status and results of a batch verification job. Use this to poll results when processing large batches.
