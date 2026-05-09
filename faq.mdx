@@ -15,11 +15,11 @@ QWED is a deterministic verification protocol for Large Language Models (LLMs). 
 | Feature | QWED | RAG | Fine-tuning | Guardrails |
 |---------|------|-----|-------------|------------|
 | **Deterministic** | ✅ Yes | ❌ No | ❌ No | ❌ No |
-| **Mathematically Proven** | ✅ Yes | ❌ No | ❌ No | ⚠️ Limited |
-| **No Training Required** | ✅ Yes | ⚠️ Needs docs | ❌ No | ✅ Yes |
-| **Works Offline** | ❌ API-based | ✅ Yes | ✅ Yes | ✅ Yes |
+| **Mathematically proven** | ✅ Yes | ❌ No | ❌ No | ⚠️ Limited |
+| **No training required** | ✅ Yes | ⚠️ Needs docs | ❌ No | ✅ Yes |
+| **Works offline** | ❌ API-based | ✅ Yes | ✅ Yes | ✅ Yes |
 
-**QWED complements these tools** - use RAG for knowledge, QWED for verification.
+**QWED complements these tools** — use RAG for knowledge, QWED for verification.
 
 ### Do I need to run `qwed init` every time?
 
@@ -31,11 +31,11 @@ No. Once initialized, QWED reads your provider credentials and configuration fro
 
 ### Do I need to run a backend server?
 
-**Yes!** QWED requires a backend server with YOUR LLM API keys configured.
+**Yes.** QWED requires a backend server with your LLM API keys configured.
 
 **Architecture:**
 ```
-Your App → SDK → Backend Server (YOU run) → LLM (YOUR key) → Verifiers
+Your app → SDK → Backend server (you run) → LLM (your key) → Verifiers
 ```
 
 **Setup:**
@@ -51,16 +51,16 @@ python -m qwed_api
 python your_app.py
 ```
 
-See [Getting Started](./integration/getting-started) for full setup.
+See [Getting started](./integration/getting-started) for full setup.
 
 ### Do I need to call my LLM first?
 
-**No!** This is the most common mistake.
+**No.** This is a common mistake.
 
 ❌ **Wrong:**
 ```python
 llm_result = openai.chat(...)  # Don't do this
-qwed.verify(llm_result)  # Too late!
+qwed.verify(llm_result)  # Too late
 ```
 
 ✅ **Correct:**
@@ -69,11 +69,11 @@ qwed.verify(llm_result)  # Too late!
 result = qwed.verify("your question")
 ```
 
-The backend server (that YOU run) calls the LLM using YOUR API key.
+The backend server (that you run) calls the LLM using your API key.
 
 ### What LLM providers does QWED support?
 
-You configure YOUR LLM provider in the backend's `.env` file:
+You configure your LLM provider in the backend's `.env` file:
 
 **Supported providers:**
 - OpenAI (direct API)
@@ -88,11 +88,11 @@ ACTIVE_PROVIDER=anthropic
 ANTHROPIC_API_KEY=sk-ant-...
 ```
 
-See [LLM Configuration](https://github.com/QWED-AI/qwed-verification/blob/main/docs/LLM_CONFIGURATION.md) for all providers.
+See [LLM configuration](https://github.com/QWED-AI/qwed-verification/blob/main/docs/LLM_CONFIGURATION.md) for all providers.
 
 ### Can I use my own LLM API key?
 
-**Yes!** You MUST use your own LLM API key. QWED is open source - you run the backend server with YOUR credentials.
+**Yes.** You must use your own LLM API key. QWED is open source — you run the backend server with your credentials.
 
 **You provide:**
 - Your own LLM API key (in `.env`)
@@ -108,8 +108,8 @@ See [LLM Configuration](https://github.com/QWED-AI/qwed-verification/blob/main/d
 
 ### How much does QWED cost?
 
-**Open Source:** FREE! ✅
-- You just pay for your own LLM API usage
+**Open source:** free.
+- You pay only for your own LLM API usage
 - No QWED subscription needed
 - Run backend server yourself
 
@@ -125,7 +125,7 @@ If using Anthropic Claude:
 
 ### What are my rate limits?
 
-**QWED itself:** No limits! It's open source.
+**QWED itself:** no rate limits. It's open source.
 
 **Your LLM provider:** Check their limits:
 - OpenAI: Tier-based (see dashboard)
@@ -296,7 +296,7 @@ print(result.trace)
 
 ### How do I deploy QWED to production?
 
-See [Production Deployment Guide](/integration/production) for full checklist.
+See [Production deployment guide](/integration/production) for full checklist.
 
 **Quick steps:**
 1. Test thoroughly in staging
@@ -345,7 +345,7 @@ except QWEDError:
 
 ### Can I request new features?
 
-**Yes!** Submit feature requests:
+**Yes.** Submit feature requests:
 - GitHub: https://github.com/QWED-AI/qwed-verification/issues
 - Email: support@qwedai.com
 
