@@ -41,9 +41,19 @@ GET /admin/compliance/report/soc2/{org_id}
 ### Audit trail verification
 Verify the cryptographic integrity of your audit logs. This ensures that no logs have been tampered with since creation.
 
-Each verification log is hashed with SHA-256, signed with HMAC-SHA256, and chained to the previous entry for the same organization. Audit chains are isolated **per organization**, so tampering in one tenant cannot invalidate another.
+Per-entry verification covers three checks:
 
-**Verify a single log entry:**
+- **`hash_valid`**: the entry's SHA-256 hash matches a recomputation of its canonical payload. For backwards compatibility, entries hashed before `raw_llm_output` was covered are also accepted against the legacy canonical form.
+- **`signature_valid`**: the entry's HMAC-SHA256 signature is constant-time-equal to the expected signature.
+- **`chain_valid`**: the entry's `previous_hash` correctly references the prior entry's hash **within the same organization**. Genesis entries (the first entry for an organization) must have a `null` `previous_hash`; non-genesis entries must reference a non-empty prior hash.
+
+<Note>
+Audit chains are isolated per organization. Hash linkage is verified only against prior entries belonging to the same `organization_id`, so cross-tenant activity cannot affect another organization's chain validity.
+</Note>
+
+If an entry's stored `result` payload cannot be decoded as JSON, `verify_log_entry` fails closed with a `SecurityError` rather than reporting the entry as valid.
+
+**Verify a Single Log Entry:**
 ```http
 GET /admin/compliance/verify/{log_id}
 ```
@@ -135,19 +145,25 @@ requests.post("/verify/fact", json={
 ## 3. Audit trail setup
 
 ### Enable cryptographic logging
-Cryptographic logging is enabled by default. The audit logger now **fails closed** at startup if no signing key is configured — there is no insecure fallback.
+Cryptographic logging is enforced. `AuditLogger` **fails closed** at initialization if the signing key is not configured—there is no insecure default fallback.
 
 1.  **Set environment variable:**
     Set `QWED_AUDIT_SECRET_KEY` to a secure, random string (at least 32 characters) before starting the application.
     ```bash
     export QWED_AUDIT_SECRET_KEY="your-secure-production-key-here"
     ```
+
     <Warning>
-      If `QWED_AUDIT_SECRET_KEY` is unset or empty, `AuditLogger()` raises `SecurityError` and refuses to initialize. No verification logs will be written until the key is configured.
+    If `QWED_AUDIT_SECRET_KEY` is not set, `AuditLogger()` raises `SecurityError` and the service refuses to log audit events. There is no built-in fallback key.
     </Warning>
 
 2.  **Secure storage:**
-    Ensure this key is stored in a secrets manager (e.g., AWS Secrets Manager, HashiCorp Vault) and injected into the application environment.
+    Store this key in a secrets manager (for example, AWS Secrets Manager or HashiCorp Vault) and inject it into the application environment.
+
+3.  **Persisted chain continuity:**
+    On each append, `AuditLogger` looks up the latest persisted entry hash for the writing organization and binds the new entry to it. Each organization has its own chain head, tracked independently. If the in-memory chain head diverges from the persisted head at write time, the logger raises `SecurityError` and rejects the write rather than starting a fresh chain.
+
+    Before appending, the logger re-verifies the persisted chain head and refuses to extend a chain whose latest entry fails integrity checks. On databases that support it, the chain-head read is taken with a `SELECT ... FOR UPDATE`; on SQLite, the append session opens an `IMMEDIATE` transaction so chain-head validation and the append remain serialized.
 
 3.  **Programmatic override (testing only):**
     You may pass a key directly when constructing the logger, but production deployments should always rely on the environment variable.
@@ -173,7 +189,7 @@ Use this checklist to prepare for an enterprise audit.
 - [ ] **Audit Logs Verified:** Run `verify_audit_trail` on all historical logs.
 - [ ] **API Keys Rotated:** Rotate any API keys older than 90 days.
 - [ ] **SOC 2 Report Generated:** Generate and review the latest SOC 2 report via API.
-- [ ] **Secret Key Secured:** Confirm `QWED_AUDIT_SECRET_KEY` is set to a production-grade value.
+- [ ] **Secret Key Secured:** Confirm `QWED_AUDIT_SECRET_KEY` is set to a production-grade value (the logger refuses to initialize otherwise).
 - [ ] **GDPR Export Tested:** Verify that data export works for a sample organization.
 - [ ] **Security Events Reviewed:** Check the "Security Events" section of the SOC 2 report for any anomalies.
 - [ ] **Rate Limiting Active:** Confirm rate limits are enforced to prevent abuse (DoS protection).
