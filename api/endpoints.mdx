@@ -655,6 +655,29 @@ Verify multiple items in a single request. Processes all items concurrently and 
 }
 ```
 
+#### Math item behavior
+
+Each `math` item in the batch is evaluated according to whether it expresses an equality or proof claim:
+
+| Input shape | Example | Result |
+|-------------|---------|--------|
+| Equality `lhs = rhs` | `x**2 + 2*x + 1 = (x+1)**2` | `is_valid: true` if `simplify(lhs - rhs) == 0`, otherwise `is_valid: false` with `message: "Not equal"`. |
+| Bare expression (no `=`) | `x**2 + 2*x + 1` | `is_valid: false`, `status: "SIMPLIFIED"`, with the simplified form returned in `simplified`. The expression is not treated as a proof. |
+
+A bare expression returns the following result object:
+
+```json
+{
+  "is_valid": false,
+  "status": "SIMPLIFIED",
+  "simplified": "(x + 1)**2",
+  "type": "math",
+  "message": "Expression simplified, but no equality or proof claim was provided"
+}
+```
+
+<Note>To assert mathematical correctness, submit an equality (`lhs = rhs`). A bare expression is simplified for convenience but is never reported as verified.</Note>
+
 ### GET /verify/batch/{job_id}
 
 Get the status and results of a batch verification job. Use this to poll results when processing large batches.
