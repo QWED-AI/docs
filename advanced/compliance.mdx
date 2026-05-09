@@ -163,6 +163,14 @@ On startup, `AuditLogger` loads the most recent persisted entry hash and uses it
 
 If the in-memory chain head and the persisted chain head disagree at write time, `log_verification` raises a `SecurityError` instead of writing a misleading entry. Treat this as a tampering or replication-lag signal and investigate before restarting writes.
 
+### Per-organization chain isolation
+Each organization has its own append-only hash chain. When verifying or appending entries, the logger:
+
+- Locks the chain head per organization to prevent concurrent appends from forking the chain.
+- Re-verifies the persisted chain head before appending a new entry and refuses to append if the head fails integrity checks.
+- Accepts both the current canonical payload (which covers `raw_llm_output`) and the legacy payload during verification, so historical entries written before that field was hashed remain verifiable.
+- Fails closed if a stored `result` payload is malformed JSON or if a chain entry is missing its `entry_hash`.
+
 ### Verify log integrity
 Regularly run the verification process (see "Audit trail verification" above) to detect database tampering. Verification now flags:
 
