@@ -41,6 +41,18 @@ GET /admin/compliance/report/soc2/{org_id}
 ### Audit trail verification
 Verify the cryptographic integrity of your audit logs. This ensures that no logs have been tampered with since creation.
 
+Per-entry verification covers three checks:
+
+- **`hash_valid`**: the entry's SHA-256 hash matches a recomputation of its canonical payload. For backwards compatibility, entries hashed before `raw_llm_output` was covered are also accepted against the legacy canonical form.
+- **`signature_valid`**: the entry's HMAC-SHA256 signature is constant-time-equal to the expected signature.
+- **`chain_valid`**: the entry's `previous_hash` correctly references the prior entry's hash **within the same organization**. Genesis entries (the first entry for an organization) must have a `null` `previous_hash`; non-genesis entries must reference a non-empty prior hash.
+
+<Note>
+Audit chains are isolated per organization. Hash linkage is verified only against prior entries belonging to the same `organization_id`, so cross-tenant activity cannot affect another organization's chain validity.
+</Note>
+
+If an entry's stored `result` payload cannot be decoded as JSON, `verify_log_entry` fails closed with a `SecurityError` rather than reporting the entry as valid.
+
 **Verify a Single Log Entry:**
 ```http
 GET /admin/compliance/verify/{log_id}
