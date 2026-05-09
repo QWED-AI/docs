@@ -655,6 +655,29 @@ Verify multiple items in a single request. Processes all items concurrently and 
 }
 ```
 
+**Math item results:**
+
+For items with `type: "math"`, the result depends on whether the query contains an equality (`=`) or proof claim:
+
+| `is_valid` | `status` | When | Example query |
+|------------|----------|------|---------------|
+| `true` | `"VERIFIED"` | The two sides of an equality reduce to the same canonical form | `x**2 + 2*x + 1 = (x+1)**2` |
+| `false` | `"NOT_EQUAL"` | An equality was provided but the two sides are not equivalent | `x + x = x` |
+| `false` | `"SIMPLIFIED"` | No equality or proof claim was provided. The expression is simplified and returned in `simplified`, but no claim was verified | `x + x` |
+
+A `SIMPLIFIED` result is not a verification. Always pass an explicit equality or proof claim if you need a pass/fail outcome. Example simplification-only response item:
+
+```json
+{
+  "id": "math-1",
+  "type": "math",
+  "is_valid": false,
+  "status": "SIMPLIFIED",
+  "simplified": "2*x",
+  "message": "Expression simplified, but no equality or proof claim was provided"
+}
+```
+
 ### GET /verify/batch/{job_id}
 
 Get the status and results of a batch verification job. Use this to poll results when processing large batches.
