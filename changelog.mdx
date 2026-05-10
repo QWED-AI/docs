@@ -7,6 +7,50 @@ All notable changes to the QWED platform, listed by release.
 
 ---
 
+## QWED-Legal — `StatuteOfLimitationsGuard` fail-closed on unknown jurisdictions and claim types
+**Released: May 10, 2026**
+
+> Hardens `StatuteOfLimitationsGuard` so unknown jurisdictions and claim types return an `UNVERIFIABLE` result instead of fabricating a limitation period from a partial string match or a default fallback table.
+
+### What changed
+
+- **Exact jurisdiction match only** — Lookups uppercase and trim the input, then require an exact key in the rule table. Substring matches (for example, `"CALIF"` → `"CALIFORNIA"`, `"NEW"` → `"NEW YORK"`) are no longer accepted.
+- **No default fallback for unknown jurisdictions** — Unsupported jurisdictions previously fell back to a generic `DEFAULT_LIMITATIONS` table. They now return a `StatuteResult` with `verified=False`, `jurisdiction_matched=False`, all date and period fields set to `None`, and a message that lists the supported jurisdictions.
+- **No silent default for unknown claim types** — Unsupported claim types previously defaulted to a 3-year period. They now return `verified=False`, `claim_type_matched=False`, and a message that lists the supported claim types for the jurisdiction.
+- **`get_limitation_period()` returns `Optional[float]`** — Returns `None` when the jurisdiction or claim type is unsupported, instead of always returning a number.
+- **`compare_jurisdictions()` returns `Dict[str, Optional[float]]`** — Unsupported jurisdictions in the input list map to `None` in the result.
+- **New `StatuteResult` fields** — `jurisdiction_matched: bool` and `claim_type_matched: bool` let callers distinguish "claim is time-barred" from "we cannot determine the limit".
+
+### Breaking changes
+
+- `StatuteResult.incident_date`, `filing_date`, `limitation_period_years`, `expiration_date`, and `days_remaining` are now `Optional` and are `None` when the input is unverifiable. Code that does arithmetic or comparisons on these fields must check `result.verified` (and the new `*_matched` flags) first.
+- `get_limitation_period()` now returns `Optional[float]`. Code that previously assumed a numeric result must handle `None`.
+- Callers that relied on partial jurisdiction matching (for example, passing `"Calif"` and expecting California rules) must update their inputs to a fully spelled, supported jurisdiction.
+
+### Example
+
+```python
+from qwed_legal import StatuteOfLimitationsGuard
+
+guard = StatuteOfLimitationsGuard()
+
+result = guard.verify(
+    claim_type="breach_of_contract",
+    jurisdiction="Atlantis",
+    incident_date="2023-01-15",
+    filing_date="2026-06-01",
+)
+
+print(result.verified)              # False
+print(result.jurisdiction_matched)  # False
+print(result.limitation_period_years)  # None
+# result.message starts with "⚠️ UNVERIFIABLE: Jurisdiction 'Atlantis' ..."
+```
+
+See [Guards — StatuteOfLimitationsGuard](/legal/guards#6-statuteoflimitationsguard) and [Troubleshooting — StatuteOfLimitationsGuard issues](/legal/troubleshooting#statuteoflimitationsguard-issues) for migration guidance.
+
+---
+
 ## QWED-Verification — audit logger fail-closed and per-organization chains
 **Released: May 8, 2026** · [GitHub PR #179](https://github.com/QWED-AI/qwed-verification/pull/179)
 
