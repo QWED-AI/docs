@@ -1,24 +1,24 @@
 ---
 sidebar_position: "2"
 title: "Math engine"
-description: "QWED's Math Engine uses SymPy for 100% accurate verification of arithmetic, algebra, calculus, trigonometry, financial calculations, and statistics."
+description: "QWED's Math Engine uses SymPy for symbolic verification of arithmetic, algebra, calculus, trigonometry, financial calculations, and statistics."
 ---
 
-The Math Engine is QWED's core verification engine. It uses [SymPy](https://www.sympy.org/) for symbolic computation to provide **100% accurate** verification of mathematical claims.
+The Math Engine is QWED's core verification engine. It uses [SymPy](https://www.sympy.org/) for symbolic computation to provide exact verification of mathematical claims.
 
 ---
 
 ## Capabilities
 
-| Category         | Examples                       | Accuracy |
-| ---------------- | ------------------------------ | -------- |
-| **Arithmetic**   | `2+2=4`, `15*3=45`             | 100%     |
-| **Algebra**      | `x^2 - 1 = (x-1)(x+1)`         | 100%     |
-| **Calculus**     | Derivatives, Integrals, Limits | 100%     |
-| **Trigonometry** | `sin(π/2) = 1`, `cos(0) = 1`   | 100%     |
-| **Logarithms**   | `log(e) = 1`, `ln(e^x) = x`    | 100%     |
-| **Financial**    | Compound interest, NPV, IRR    | 100%     |
-| **Statistics**   | Mean, std dev, percentiles     | 100%     |
+| Category         | Examples                       | Method              |
+| ---------------- | ------------------------------ | ------------------- |
+| **Arithmetic**   | `2+2=4`, `15*3=45`             | SymPy exact         |
+| **Algebra**      | `x^2 - 1 = (x-1)(x+1)`         | SymPy `simplify`    |
+| **Calculus**     | Derivatives, integrals, limits | SymPy symbolic      |
+| **Trigonometry** | `sin(π/2) = 1`, `cos(0) = 1`   | SymPy symbolic      |
+| **Logarithms**   | `log(e) = 1`, `ln(e^x) = x`    | SymPy symbolic      |
+| **Financial**    | Compound interest, NPV, IRR    | mpmath + formulas   |
+| **Statistics**   | Mean, std dev, percentiles     | NumPy / SymPy stats |
 
 ---
 
