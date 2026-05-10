@@ -74,25 +74,29 @@ guard.verify("2026-01-15", "30 days", "2026-02-14")
 guard.verify("01/02/2026", ...)  # Is this Jan 2 or Feb 1?
 ```
 
-### `UNVERIFIABLE` for vague legal terms
+### "UNVERIFIABLE" result on a contract term
 
-**Problem:** A term like `"within a reasonable period"`, `"promptly after notice"`, or `"forthwith"` returns `verified=False` with `is_computable=False` and a message starting with `⚠️ UNVERIFIABLE`.
+**Problem:** `verified=False`, `is_computable=False`, and the message starts with `⚠️ UNVERIFIABLE`.
 
-**Cause:** This is the intended fail-closed behavior. `DeadlineGuard` will not fabricate a deadline from ambiguous language. A term must include both a numeric quantity and a recognized time unit (`day`, `week`, `month`, `year`, optionally with a `business`/`working` qualifier).
+**Cause:** The `term` argument did not contain both a numeric quantity and a recognized time unit. `DeadlineGuard` fails closed on ambiguous legal language ("reasonable period", "promptly", "as soon as practicable", "forthwith") instead of inventing a deadline.
 
-**Solution:** Either rewrite the term with an explicit quantity and unit, or treat the result as a signal that the clause requires human legal interpretation:
+**Solution:** Pass an explicit term with a number and a unit. Recognized units are `day(s)`, `business day(s)`, `calendar day(s)`, `week(s)`, `month(s)`, and `year(s)`.
 
 ```python
-result = guard.verify("2026-01-01", "promptly", "2026-01-15")
+# ✅ Good — explicit quantity and unit
+guard.verify("2026-01-01", "30 days", "2026-01-31")
+guard.verify("2026-01-01", "10 business days", "2026-01-15")
+guard.verify("2026-01-01", "2 weeks", "2026-01-15")
 
-if not result.is_computable:
-    # Route to human reviewer — do not auto-approve
-    flag_for_legal_review(result.message)
-else:
-    use_computed(result.computed_deadline)
+# ❌ Fails closed — no numeric quantity
+guard.verify("2026-01-01", "within a reasonable period", "2026-01-31")
+
+# ❌ Fails closed — no recognized time unit
+guard.verify("2026-01-01", "30", "2026-01-31")
+guard.verify("2026-01-01", "15 intervals", "2026-01-16")
 ```
 
-Inputs like `"30"` (no unit) or `"15 intervals"` (unrecognized unit) also fail closed for the same reason.
+If your contract uses subjective language, route the clause to a human reviewer rather than overriding the guard. Always check `is_computable` before consuming `computed_deadline` or `difference_days`.
 
 ---
 
