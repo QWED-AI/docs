@@ -522,47 +522,36 @@ print(result.days_remaining)    # -867 (negative = expired)
 
 ### Fail-closed behavior
 
-`StatuteOfLimitationsGuard` only returns a limitation period when both the jurisdiction and the claim type **exactly** match an entry in its rule tables. Partial string matching and default fallback periods have been removed — the guard never fabricates a limitation period for inputs it does not recognize.
+`StatuteOfLimitationsGuard` is **fail-closed**: it never fabricates a limitation period for jurisdictions or claim types that are not in its rule tables.
 
-When the guard cannot verify an input, it returns a `StatuteResult` where:
-
-- `verified` is `False`
-- `limitation_period_years`, `expiration_date`, and `days_remaining` are `None`
-- `message` starts with `⚠️ UNVERIFIABLE` and lists the supported values
-- `jurisdiction_matched` and/or `claim_type_matched` are `False`
+- **Exact match only.** Jurisdiction lookup uses exact string equality (case-insensitive, trimmed). Partial matches such as `"CALIF"` for `"CALIFORNIA"` or `"NEW"` for `"NEW YORK"` are rejected.
+- **Unknown jurisdiction → unverifiable.** If the jurisdiction is not in the supported list, `verify()` returns `verified=False` with `jurisdiction_matched=False`, all date and period fields set to `None`, and a message listing the supported jurisdictions.
+- **Unknown claim type → unverifiable.** If the jurisdiction is supported but the claim type is not modeled for it, `verify()` returns `verified=False` with `claim_type_matched=False`, and a message listing the supported claim types for that jurisdiction.
 
 ```python
 result = guard.verify(
     claim_type="breach_of_contract",
-    jurisdiction="Mars Colony",
+    jurisdiction="Mars",
     incident_date="2020-01-15",
     filing_date="2026-06-01"
 )
 
-print(result.verified)               # False
-print(result.jurisdiction_matched)   # False
-print(result.claim_type_matched)     # False
-print(result.limitation_period_years) # None
+print(result.verified)              # False
+print(result.jurisdiction_matched)  # False
+print(result.limitation_period_years)  # None
 print(result.message)
-# ⚠️ UNVERIFIABLE: Jurisdiction 'Mars Colony' is not in the supported
-# jurisdiction list. Cannot determine applicable statute of limitations.
-# Supported: AUSTRALIA, CALIFORNIA, CANADA, DELAWARE, ...
+# ⚠️ UNVERIFIABLE: Jurisdiction 'Mars' is not in the supported jurisdiction list.
+# Cannot determine applicable statute of limitations. Supported: AUSTRALIA, CALIFORNIA, ...
 ```
-
-Use the `jurisdiction_matched` and `claim_type_matched` flags to distinguish an unverifiable input from a valid claim that simply expired (where both flags are `True` and `verified` is `False` because the filing date is past `expiration_date`).
-
-<Warning>
-  Inputs such as `"CALIF"`, `"NEW"`, or `"CALIFORNIA STATE"` no longer partial-match a supported jurisdiction. Pass exact names such as `"California"` or `"New York"`.
-</Warning>
 
 ### Parameters
 
 <ParamField path="claim_type" type="str" required>
-  Type of legal claim (e.g., `"breach_of_contract"`, `"negligence"`, `"fraud"`). See supported claim types below.
+  Type of legal claim (e.g., `"breach_of_contract"`, `"negligence"`, `"fraud"`). Must exactly match one of the supported claim types for the given jurisdiction; unknown values produce an unverifiable result.
 </ParamField>
 
 <ParamField path="jurisdiction" type="str" required>
-  State or country name (e.g., `"California"`, `"New York"`, `"UK"`).
+  State or country name (e.g., `"California"`, `"New York"`, `"UK"`). Matched case-insensitively against the supported jurisdictions list — partial or substring matches are not accepted.
 </ParamField>
 
 <ParamField path="incident_date" type="str" required>
@@ -576,6 +565,52 @@ Use the `jurisdiction_matched` and `claim_type_matched` flags to distinguish an 
 <ParamField path="claimed_within_period" type="bool">
   Optional LLM claim to verify. When provided, the guard checks whether the LLM's assertion (within/outside period) matches the computed result.
 </ParamField>
+
+### StatuteResult fields
+
+<ResponseField name="verified" type="bool">
+  `True` only when the jurisdiction and claim type are recognized and the filing falls within the limitation period (and matches `claimed_within_period`, if supplied).
+</ResponseField>
+
+<ResponseField name="claim_type" type="str">
+  The claim type passed in (echoed back).
+</ResponseField>
+
+<ResponseField name="jurisdiction" type="str">
+  The jurisdiction passed in (echoed back).
+</ResponseField>
+
+<ResponseField name="incident_date" type="Optional[datetime]">
+  Parsed incident date, or `None` if date parsing failed.
+</ResponseField>
+
+<ResponseField name="filing_date" type="Optional[datetime]">
+  Parsed filing date, or `None` if date parsing failed.
+</ResponseField>
+
+<ResponseField name="limitation_period_years" type="Optional[float]">
+  Limitation period applied, or `None` if the jurisdiction or claim type is unknown.
+</ResponseField>
+
+<ResponseField name="expiration_date" type="Optional[datetime]">
+  Computed expiration date, or `None` if no limitation period could be determined.
+</ResponseField>
+
+<ResponseField name="days_remaining" type="Optional[int]">
+  Days between filing date and expiration (negative if expired), or `None` if no limitation period could be determined.
+</ResponseField>
+
+<ResponseField name="message" type="str">
+  Human-readable result. Unverifiable results are prefixed with `⚠️ UNVERIFIABLE:` and list the supported jurisdictions or claim types.
+</ResponseField>
+
+<ResponseField name="jurisdiction_matched" type="bool" default="True">
+  `False` when the jurisdiction is not in the supported list.
+</ResponseField>
+
+<ResponseField name="claim_type_matched" type="bool" default="True">
+  `False` when the claim type is not modeled for the given jurisdiction.
+</ResponseField>
 
 ### Supported jurisdictions
 
@@ -600,28 +635,77 @@ Use the `jurisdiction_matched` and `claim_type_matched` flags to distinguish an 
 
 `breach_of_contract`, `breach_of_warranty`, `negligence`, `professional_malpractice`, `fraud`, `personal_injury`, `property_damage`, `employment`, `product_liability`, `defamation`
 
+### Fail-closed on unknown jurisdictions and claim types
+
+`StatuteOfLimitationsGuard` only computes limitation periods for the jurisdictions and claim types it has explicit rules for. Anything outside that table fails closed instead of returning a fabricated period.
+
+- **Exact jurisdiction match only.** Inputs are uppercased and trimmed before lookup. Substring matches like `"CALIF"` no longer resolve to `"CALIFORNIA"`, and a misspelled or unsupported jurisdiction never falls back to a generic default rule table.
+- **Exact claim type match only.** Claim types are lowercased with spaces converted to underscores before lookup. Unknown claim types no longer silently default to a 3-year period.
+- **`UNVERIFIABLE` result.** When either lookup fails, `verify()` returns a `StatuteResult` with `verified=False`, all date and period fields set to `None`, and a `message` that begins with `⚠️ UNVERIFIABLE` and lists the supported values.
+- **New flags.** `StatuteResult` exposes `jurisdiction_matched: bool` and `claim_type_matched: bool` so callers can distinguish "claim is time-barred" from "we cannot determine the limit".
+
+```python
+result = guard.verify(
+    claim_type="breach_of_contract",
+    jurisdiction="Atlantis",
+    incident_date="2023-01-15",
+    filing_date="2026-06-01",
+)
+
+print(result.verified)              # False
+print(result.jurisdiction_matched)  # False
+print(result.claim_type_matched)    # False
+print(result.limitation_period_years)  # None
+print(result.expiration_date)       # None
+print(result.message)
+# ⚠️ UNVERIFIABLE: Jurisdiction 'Atlantis' is not in the supported
+# jurisdiction list. Cannot determine applicable statute of limitations.
+# Supported: AUSTRALIA, CALIFORNIA, CANADA, DELAWARE, FLORIDA, FRANCE,
+# GERMANY, ILLINOIS, INDIA, NEW YORK, TEXAS, UK.
+```
+
+```python
+result = guard.verify(
+    claim_type="cybersquatting",
+    jurisdiction="California",
+    incident_date="2023-01-15",
+    filing_date="2026-06-01",
+)
+
+print(result.jurisdiction_matched)  # True
+print(result.claim_type_matched)    # False
+# Message lists the supported claim types for California.
+```
+
+<Warning>
+  This is a breaking change. `get_limitation_period()` now returns `Optional[float]` and `StatuteResult` date and period fields are `Optional`. Callers that previously assumed a numeric result must handle `None` and treat unverifiable inputs as a hard failure rather than a passing check. See the [changelog entry](/changelog#qwed-legal-statuteoflimitationsguard-fail-closed-on-unknown-jurisdictions-and-claim-types) for migration notes.
+</Warning>
+
 ### Get limitation period
 
-Look up the limitation period for a specific claim type and jurisdiction without performing a full verification. Returns `None` when the jurisdiction or claim type is unknown:
+Look up the limitation period for a specific claim type and jurisdiction without performing a full verification. Returns `None` when the jurisdiction or claim type is not supported:
 
 ```python
 years = guard.get_limitation_period("fraud", "Germany")
 print(years)  # 10.0
 
-unknown = guard.get_limitation_period("antitrust", "California")
-print(unknown)  # None - claim type not modeled
+unknown = guard.get_limitation_period("fraud", "Atlantis")
+print(unknown)  # None
+
+unsupported_claim = guard.get_limitation_period("cybersquatting", "California")
+print(unsupported_claim)  # None
 ```
 
 ### Compare jurisdictions
 
-`compare_jurisdictions` returns `None` for any jurisdiction that is not in the supported list, so callers can distinguish modeled jurisdictions from unknown ones:
+`compare_jurisdictions()` returns `Dict[str, Optional[float]]`. Unsupported jurisdictions map to `None` so you can surface them in the UI rather than mixing them with real periods:
 
 ```python
 comparison = guard.compare_jurisdictions(
     "breach_of_contract",
-    ["California", "New York", "Delaware", "Mars Colony"]
+    ["California", "New York", "Delaware", "Atlantis"]
 )
-# {'California': 4.0, 'New York': 6.0, 'Delaware': 3.0, 'Mars Colony': None}
+# {'California': 4.0, 'New York': 6.0, 'Delaware': 3.0, 'Atlantis': None}
 ```
 
 ---
