@@ -7,6 +7,34 @@ All notable changes to the QWED platform, listed by release.
 
 ---
 
+## QWED-Legal — StatuteOfLimitationsGuard fail-closed on unknown jurisdictions and claim types
+**Released: May 10, 2026** · [qwed-ai/qwed-legal#25](https://github.com/qwed-ai/qwed-legal/pull/25)
+
+> Hardens `StatuteOfLimitationsGuard` so unknown jurisdictions and claim types return an unverifiable result instead of silently falling back to fabricated limitation periods.
+
+### What changed
+
+- **Exact jurisdiction matching** — Partial substring matching (e.g. `"CALIF"` → `"CALIFORNIA"`, `"NEW"` → `"NEW YORK"`) was removed. Jurisdiction lookup is now exact (case-insensitive, trimmed).
+- **Unknown jurisdiction → unverifiable** — `verify()` returns `verified=False`, `jurisdiction_matched=False`, and a message listing the supported jurisdictions instead of falling back to `DEFAULT_LIMITATIONS`.
+- **Unknown claim type → unverifiable** — `verify()` returns `verified=False`, `claim_type_matched=False`, and a message listing the supported claim types for the jurisdiction instead of inventing a 3-year default.
+- **`get_limitation_period()` returns `Optional[float]`** — Returns `None` for unknown jurisdictions or claim types instead of always returning a number.
+- **`compare_jurisdictions()` returns `Dict[str, Optional[float]]`** — Unknown jurisdictions appear as `None` rather than being silently filled.
+- **`StatuteResult` date and period fields are `Optional`** — `incident_date`, `filing_date`, `limitation_period_years`, `expiration_date`, and `days_remaining` are `None` when no result could be computed. Two new fields, `jurisdiction_matched` and `claim_type_matched`, signal which gate failed.
+
+### Breaking changes
+
+| Area | Before | After |
+| --- | --- | --- |
+| Jurisdiction matching | Substring matching | Exact match only |
+| Unknown jurisdiction | `DEFAULT_LIMITATIONS` fallback | `UNVERIFIABLE` result |
+| Unknown claim type | Default `3.0` years | `UNVERIFIABLE` result |
+| `get_limitation_period()` | Always `float` | `Optional[float]` (`None` if unknown) |
+| `StatuteResult` date/period fields | Always populated | `Optional` (`None` if unverifiable) |
+
+See [Legal guards — StatuteOfLimitationsGuard](/legal/guards#6-statuteoflimitationsguard) for the updated parameter list, fail-closed behavior, and `StatuteResult` fields.
+
+---
+
 ## QWED-Verification — audit logger fail-closed and per-organization chains
 **Released: May 8, 2026** · [GitHub PR #179](https://github.com/QWED-AI/qwed-verification/pull/179)
 

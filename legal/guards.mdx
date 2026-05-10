@@ -520,14 +520,38 @@ print(result.expiration_date)   # 2024-01-15
 print(result.days_remaining)    # -867 (negative = expired)
 ```
 
+### Fail-closed behavior
+
+`StatuteOfLimitationsGuard` is **fail-closed**: it never fabricates a limitation period for jurisdictions or claim types that are not in its rule tables.
+
+- **Exact match only.** Jurisdiction lookup uses exact string equality (case-insensitive, trimmed). Partial matches such as `"CALIF"` for `"CALIFORNIA"` or `"NEW"` for `"NEW YORK"` are rejected.
+- **Unknown jurisdiction → unverifiable.** If the jurisdiction is not in the supported list, `verify()` returns `verified=False` with `jurisdiction_matched=False`, all date and period fields set to `None`, and a message listing the supported jurisdictions.
+- **Unknown claim type → unverifiable.** If the jurisdiction is supported but the claim type is not modeled for it, `verify()` returns `verified=False` with `claim_type_matched=False`, and a message listing the supported claim types for that jurisdiction.
+
+```python
+result = guard.verify(
+    claim_type="breach_of_contract",
+    jurisdiction="Mars",
+    incident_date="2020-01-15",
+    filing_date="2026-06-01"
+)
+
+print(result.verified)              # False
+print(result.jurisdiction_matched)  # False
+print(result.limitation_period_years)  # None
+print(result.message)
+# ⚠️ UNVERIFIABLE: Jurisdiction 'Mars' is not in the supported jurisdiction list.
+# Cannot determine applicable statute of limitations. Supported: AUSTRALIA, CALIFORNIA, ...
+```
+
 ### Parameters
 
 <ParamField path="claim_type" type="str" required>
-  Type of legal claim (e.g., `"breach_of_contract"`, `"negligence"`, `"fraud"`). See supported claim types below.
+  Type of legal claim (e.g., `"breach_of_contract"`, `"negligence"`, `"fraud"`). Must exactly match one of the supported claim types for the given jurisdiction; unknown values produce an unverifiable result.
 </ParamField>
 
 <ParamField path="jurisdiction" type="str" required>
-  State or country name (e.g., `"California"`, `"New York"`, `"UK"`).
+  State or country name (e.g., `"California"`, `"New York"`, `"UK"`). Matched case-insensitively against the supported jurisdictions list — partial or substring matches are not accepted.
 </ParamField>
 
 <ParamField path="incident_date" type="str" required>
@@ -541,6 +565,52 @@ print(result.days_remaining)    # -867 (negative = expired)
 <ParamField path="claimed_within_period" type="bool">
   Optional LLM claim to verify. When provided, the guard checks whether the LLM's assertion (within/outside period) matches the computed result.
 </ParamField>
+
+### StatuteResult fields
+
+<ResponseField name="verified" type="bool">
+  `True` only when the jurisdiction and claim type are recognized and the filing falls within the limitation period (and matches `claimed_within_period`, if supplied).
+</ResponseField>
+
+<ResponseField name="claim_type" type="str">
+  The claim type passed in (echoed back).
+</ResponseField>
+
+<ResponseField name="jurisdiction" type="str">
+  The jurisdiction passed in (echoed back).
+</ResponseField>
+
+<ResponseField name="incident_date" type="Optional[datetime]">
+  Parsed incident date, or `None` if date parsing failed.
+</ResponseField>
+
+<ResponseField name="filing_date" type="Optional[datetime]">
+  Parsed filing date, or `None` if date parsing failed.
+</ResponseField>
+
+<ResponseField name="limitation_period_years" type="Optional[float]">
+  Limitation period applied, or `None` if the jurisdiction or claim type is unknown.
+</ResponseField>
+
+<ResponseField name="expiration_date" type="Optional[datetime]">
+  Computed expiration date, or `None` if no limitation period could be determined.
+</ResponseField>
+
+<ResponseField name="days_remaining" type="Optional[int]">
+  Days between filing date and expiration (negative if expired), or `None` if no limitation period could be determined.
+</ResponseField>
+
+<ResponseField name="message" type="str">
+  Human-readable result. Unverifiable results are prefixed with `⚠️ UNVERIFIABLE:` and list the supported jurisdictions or claim types.
+</ResponseField>
+
+<ResponseField name="jurisdiction_matched" type="bool" default="True">
+  `False` when the jurisdiction is not in the supported list.
+</ResponseField>
+
+<ResponseField name="claim_type_matched" type="bool" default="True">
+  `False` when the claim type is not modeled for the given jurisdiction.
+</ResponseField>
 
 ### Supported jurisdictions
 
@@ -567,21 +637,26 @@ print(result.days_remaining)    # -867 (negative = expired)
 
 ### Get limitation period
 
-Look up the limitation period for a specific claim type and jurisdiction without performing a full verification:
+Look up the limitation period for a specific claim type and jurisdiction without performing a full verification. Returns `None` when the jurisdiction or claim type is unknown:
 
 ```python
 years = guard.get_limitation_period("fraud", "Germany")
 print(years)  # 10.0
+
+unknown = guard.get_limitation_period("breach_of_contract", "Mars")
+print(unknown)  # None
 ```
 
 ### Compare jurisdictions
 
+Unknown jurisdictions are returned as `None` rather than being silently filled with a default period:
+
 ```python
 comparison = guard.compare_jurisdictions(
     "breach_of_contract",
-    ["California", "New York", "Delaware"]
+    ["California", "New York", "Delaware", "Mars"]
 )
-# {'California': 4.0, 'New York': 6.0, 'Delaware': 3.0}
+# {'California': 4.0, 'New York': 6.0, 'Delaware': 3.0, 'Mars': None}
 ```
 
 ---
