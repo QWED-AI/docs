@@ -57,11 +57,11 @@ print(result.verified)  # True ✅
 - ✅ QWED controls LLM internally
 - ✅ Structured prompts ensure DSL output
 - ✅ Formal verification layer active
-- ✅ 100% deterministic results
+- ✅ Deterministic results
 
 ---
 
-## 🔄 How QWED really works
+## How QWED works
 
 
 
@@ -223,7 +223,7 @@ Code → QWED → [LLM: Detects SQL] → [AST: f-string in query] → 🚫 BLOCK
 ╚══════════════════════════════════════╝
 ```
 
-**Key Point:** QWED ensures LLM output passes through the trust boundary via formal verification.
+**Key point:** QWED routes LLM output through the trust boundary for formal verification.
 
 ---
 
@@ -286,8 +286,8 @@ use_value_directly(value)  # DANGEROUS!
 result = QWEDClient(api_key="...").verify("Your question here")
 ```
 
-**That's it!** 🚀
+That's it.
 
 ---
 
-*See [Full integration guide](https://docs.qwedai.com/integration) for framework integrations, debugging, and advanced usage.*
+*See the [full integration guide](https://docs.qwedai.com/integration) for framework integrations and debugging.*
