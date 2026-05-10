@@ -300,7 +300,7 @@ print(result.conflicts)
 
 ### Z3-based verification
 
-For power users who want to define precise logical constraints. `verify_using_z3()` only accepts explicit Z3 `BoolRef` expressions — it does **not** parse free-form text. Callers must model the legal meaning themselves.
+When you need to define precise logical constraints, `verify_using_z3()` only accepts explicit Z3 `BoolRef` expressions — it does **not** parse free-form text. You must model the legal meaning yourself.
 
 ```python
 from z3 import Bool, Implies, Not
@@ -1012,7 +1012,7 @@ When verification fails, the `risk` field indicates the type of failure:
 
 ---
 
-## SACProcessor (RAG Helper) 📄
+## SACProcessor (RAG helper) 📄
 
 **Purpose:** Prevent Document-Level Retrieval Mismatch (DRM) in legal RAG systems.
 
