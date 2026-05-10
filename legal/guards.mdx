@@ -66,15 +66,53 @@ print(result.difference_days)    # 13
 
 | Field | Type | Description |
 | --- | --- | --- |
-| `verified` | `bool` | Whether the claimed deadline matches the computed deadline. `False` when the term is ambiguous |
+| `verified` | `bool` | Whether the claimed deadline matches the computed deadline. Always `False` when `is_computable` is `False`. |
 | `signing_date` | `datetime` | Parsed signing date |
 | `claimed_deadline` | `datetime` | The deadline claimed by the LLM |
-| `computed_deadline` | `Optional[datetime]` | The correct deadline computed by the guard. `None` when the term is ambiguous and no deterministic deadline can be computed |
-| `term_parsed` | `str` | The original term string |
-| `difference_days` | `Optional[int]` | Absolute difference in days between claimed and computed. `None` when the term is ambiguous |
-| `message` | `str` | Human-readable verification message |
-| `is_computable` | `bool` | `True` when the term parses into a deterministic deadline. `False` when the term is ambiguous (for example, "promptly", "reasonable period") or no recognizable time unit was found |
+| `computed_deadline` | `Optional[datetime]` | The correct deadline computed by the guard. `None` when the term is ambiguous and the guard fails closed. |
+| `term_parsed` | `str` | The original term string, or `"ERROR"` when date parsing fails |
+| `difference_days` | `Optional[int]` | Absolute difference in days between claimed and computed. `None` when no deadline could be computed. |
+| `message` | `str` | Human-readable verification message. Starts with `⚠️ UNVERIFIABLE` when the term is ambiguous. |
+| `is_computable` | `bool` | `True` when the term parsed into an explicit quantity and unit. `False` when the input was ambiguous, unparseable, or the dates were invalid. |
 | `verification_mode` | `str` | Always `"SYMBOLIC"` for legal verification |
+
+### Fail-closed behavior on ambiguous terms
+
+`DeadlineGuard` does **not** invent deadlines from vague legal language. If the term cannot be parsed into a deterministic `(quantity, unit)` pair, the guard returns a fail-closed result with `verified=False`, `is_computable=False`, and `computed_deadline=None`.
+
+A term is treated as `UNVERIFIABLE` when either:
+
+- It contains **no numeric quantity** (e.g., `"forthwith"`, `"promptly after notice"`, `"within a reasonable period"`, `"as soon as practicable"`, `"without undue delay"`).
+- It contains a number but **no recognized time unit** (e.g., `"30"` alone, `"15 intervals"`).
+
+Recognized time units are `day`/`calendar`, `week`, `month`, and `year`, with optional `business`/`working`/`work` qualifiers for business-day arithmetic.
+
+```python
+from qwed_legal import DeadlineGuard
+
+guard = DeadlineGuard()
+
+# Ambiguous term — no numeric quantity
+result = guard.verify(
+    signing_date="2026-01-01",
+    term="within a reasonable period",
+    claimed_deadline="2026-01-31",
+)
+
+print(result.verified)          # False
+print(result.is_computable)     # False
+print(result.computed_deadline) # None
+print(result.difference_days)   # None
+print(result.message)
+# ⚠️ UNVERIFIABLE: Term 'within a reasonable period' does not contain a
+# provable time quantity and unit. Cannot compute a deterministic deadline...
+```
+
+<Warning>
+  Always check `result.is_computable` before relying on `computed_deadline` or `difference_days`. Ambiguous legal language requires human legal interpretation and is never silently coerced into a 30-day default.
+</Warning>
+
+Date parsing failures are also fail-closed: if `signing_date` or `claimed_deadline` cannot be parsed, the guard returns `verified=False` and `is_computable=False`.
 
 ### Features
 
@@ -84,24 +122,13 @@ print(result.difference_days)    # 13
 | **Holiday Support** | 200\+ countries via `python-holidays` |
 | **Leap Years** | Handles Feb 29 correctly |
 | **Natural Language** | Parses "2 weeks", "3 months", "1 year" |
-| **Fail-closed on ambiguity** | Returns `is_computable=False` and `computed_deadline=None` when the term has no numeric quantity or no recognizable time unit |
+| **Fail-closed parsing** | Rejects ambiguous legal language ("reasonable period", "promptly") instead of inventing a deadline |
 
 ### Fail-closed behavior on ambiguous terms
 
-`DeadlineGuard` does not invent deadlines from vague legal language. When the supplied `term` cannot be reduced to a concrete `(quantity, unit)` pair, the guard fails closed: it marks the result as unverified and returns `None` for the computed deadline rather than substituting a default.
+`DeadlineGuard` only computes a deadline when the term contains both an explicit numeric quantity **and** a recognized time unit (`day`, `business day`, `calendar day`, `week`, `month`, `year`). When either is missing, the guard fails closed: it returns `verified=False`, `is_computable=False`, and a `computed_deadline` of `None` instead of guessing a default.
 
-Two gates trigger fail-closed:
-
-1. **No numeric quantity in the term** — for example, `"forthwith"`, `"promptly"`, `"as soon as practicable"`, `"within a reasonable period"`.
-2. **A number is present but no recognizable time unit** — for example, `"30"` without `days`, `weeks`, `months`, or `years`.
-
-In both cases:
-
-- `verified` is `False`
-- `is_computable` is `False`
-- `computed_deadline` is `None`
-- `difference_days` is `None`
-- `message` explains that the term is unverifiable and requires human legal interpretation
+This protects against silent acceptance of subjective legal language such as `"within a reasonable period"`, `"promptly"`, `"as soon as practicable"`, `"without undue delay"`, or `"forthwith"`. Resolving these terms requires human legal interpretation.
 
 ```python
 from qwed_legal import DeadlineGuard
@@ -109,9 +136,9 @@ from qwed_legal import DeadlineGuard
 guard = DeadlineGuard(country="US")
 
 result = guard.verify(
-    signing_date="2026-01-15",
+    signing_date="2026-01-01",
     term="within a reasonable period",
-    claimed_deadline="2026-02-14",
+    claimed_deadline="2026-01-31",
 )
 
 print(result.verified)           # False
@@ -125,27 +152,7 @@ print(result.message)
 # human legal interpretation.
 ```
 
-Always branch on `is_computable` before trusting `computed_deadline`:
-
-```python
-if not result.is_computable:
-    # Ambiguous term — escalate to a human reviewer.
-    ...
-elif not result.verified:
-    # Computable, but the claimed deadline is wrong.
-    ...
-```
-
-#### Recognized time units
-
-A term is computable only when it contains both a number and one of the following unit keywords (case-insensitive):
-
-| Unit | Keywords |
-| --- | --- |
-| Days | `day`, `calendar` (optionally combined with `business`, `working`, or `work` for business days) |
-| Weeks | `week` |
-| Months | `month` |
-| Years | `year` |
+Always check `is_computable` before relying on `computed_deadline` or `difference_days`. When `is_computable` is `False`, route the contract clause to a human reviewer.
 
 ### Calculate business days between dates
 
