@@ -74,6 +74,30 @@ guard.verify("2026-01-15", "30 days", "2026-02-14")
 guard.verify("01/02/2026", ...)  # Is this Jan 2 or Feb 1?
 ```
 
+### "UNVERIFIABLE" result on a contract term
+
+**Problem:** `verified=False`, `is_computable=False`, and the message starts with `⚠️ UNVERIFIABLE`.
+
+**Cause:** The `term` argument did not contain both a numeric quantity and a recognized time unit. `DeadlineGuard` fails closed on ambiguous legal language ("reasonable period", "promptly", "as soon as practicable", "forthwith") instead of inventing a deadline.
+
+**Solution:** Pass an explicit term with a number and a unit. Recognized units are `day(s)`, `business day(s)`, `calendar day(s)`, `week(s)`, `month(s)`, and `year(s)`.
+
+```python
+# ✅ Good — explicit quantity and unit
+guard.verify("2026-01-01", "30 days", "2026-01-31")
+guard.verify("2026-01-01", "10 business days", "2026-01-15")
+guard.verify("2026-01-01", "2 weeks", "2026-01-15")
+
+# ❌ Fails closed — no numeric quantity
+guard.verify("2026-01-01", "within a reasonable period", "2026-01-31")
+
+# ❌ Fails closed — no recognized time unit
+guard.verify("2026-01-01", "30", "2026-01-31")
+guard.verify("2026-01-01", "15 intervals", "2026-01-16")
+```
+
+If your contract uses subjective language, route the clause to a human reviewer rather than overriding the guard. Always check `is_computable` before consuming `computed_deadline` or `difference_days`.
+
 ---
 
 ## LiabilityGuard issues
