@@ -66,7 +66,7 @@ print(result.difference_days)    # 13
 
 | Field | Type | Description |
 | --- | --- | --- |
-| `verified` | `bool` | Whether the claimed deadline matches the computed deadline |
+| `verified` | `bool` | Whether the claimed deadline matches the computed deadline. Always `False` when `is_computable` is `False`. |
 | `signing_date` | `datetime` | Parsed signing date |
 | `claimed_deadline` | `datetime` | The deadline claimed by the LLM |
 | `computed_deadline` | `Optional[datetime]` | The correct deadline computed by the guard. `None` when the term is ambiguous and the guard fails closed. |
@@ -75,6 +75,44 @@ print(result.difference_days)    # 13
 | `message` | `str` | Human-readable verification message. Starts with `⚠️ UNVERIFIABLE` when the term is ambiguous. |
 | `is_computable` | `bool` | `True` when the term parsed into an explicit quantity and unit. `False` when the input was ambiguous, unparseable, or the dates were invalid. |
 | `verification_mode` | `str` | Always `"SYMBOLIC"` for legal verification |
+
+### Fail-closed behavior on ambiguous terms
+
+`DeadlineGuard` does **not** invent deadlines from vague legal language. If the term cannot be parsed into a deterministic `(quantity, unit)` pair, the guard returns a fail-closed result with `verified=False`, `is_computable=False`, and `computed_deadline=None`.
+
+A term is treated as `UNVERIFIABLE` when either:
+
+- It contains **no numeric quantity** (e.g., `"forthwith"`, `"promptly after notice"`, `"within a reasonable period"`, `"as soon as practicable"`, `"without undue delay"`).
+- It contains a number but **no recognized time unit** (e.g., `"30"` alone, `"15 intervals"`).
+
+Recognized time units are `day`/`calendar`, `week`, `month`, and `year`, with optional `business`/`working`/`work` qualifiers for business-day arithmetic.
+
+```python
+from qwed_legal import DeadlineGuard
+
+guard = DeadlineGuard()
+
+# Ambiguous term — no numeric quantity
+result = guard.verify(
+    signing_date="2026-01-01",
+    term="within a reasonable period",
+    claimed_deadline="2026-01-31",
+)
+
+print(result.verified)          # False
+print(result.is_computable)     # False
+print(result.computed_deadline) # None
+print(result.difference_days)   # None
+print(result.message)
+# ⚠️ UNVERIFIABLE: Term 'within a reasonable period' does not contain a
+# provable time quantity and unit. Cannot compute a deterministic deadline...
+```
+
+<Warning>
+  Always check `result.is_computable` before relying on `computed_deadline` or `difference_days`. Ambiguous legal language requires human legal interpretation and is never silently coerced into a 30-day default.
+</Warning>
+
+Date parsing failures are also fail-closed: if `signing_date` or `claimed_deadline` cannot be parsed, the guard returns `verified=False` and `is_computable=False`.
 
 ### Features
 
