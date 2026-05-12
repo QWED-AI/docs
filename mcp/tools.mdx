@@ -23,7 +23,7 @@ The tool captures `stdout` and `stderr` from the subprocess and returns them as 
 | Parameter | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
 | `code` | string | Yes | - | Python code to execute in a subprocess |
-| `background` | boolean | No | `false` | When `true`, the job runs asynchronously in the background and returns a `job_id` immediately. Use the [`verification_status`](#verification_status) tool to poll for results. Recommended for heavy or long-running verification scripts. |
+| `background` | boolean | No | `false` | When `true`, the job runs asynchronously in the background and returns a `job_id` immediately. Use the [`verification_status`](#verification_status) tool to poll for results. Recommended for heavy or long-running verification scripts. Background jobs are subject to a bounded timeout (default **120 s**, configurable via `QWED_MCP_BACKGROUND_TIMEOUT` up to a hard ceiling of **600 s**). |
 
 ### Risk gateway pre-validation
 
@@ -39,7 +39,7 @@ The server admin must set `QWED_MCP_TRUSTED_CODE_EXECUTION=true` to enable this 
 
 | Limit | Synchronous (`background=false`) | Background (`background=true`) |
 | --- | --- | --- |
-| **Timeout** | 30 seconds | No timeout (runs until completion) |
+| **Timeout** | 30 seconds | 120 seconds (default), configurable via `QWED_MCP_BACKGROUND_TIMEOUT`, hard ceiling 600 seconds |
 | **Output cap** | 1 MB (stdout and stderr each) | 1 MB (stdout and stderr each) |
 | **Process isolation** | New subprocess per invocation | New subprocess per invocation |
 | **Concurrency** | Sequential | Up to 5 concurrent background jobs |
@@ -47,6 +47,10 @@ The server admin must set `QWED_MCP_TRUSTED_CODE_EXECUTION=true` to enable this 
 <Note>
   When the 1 MB output cap is reached, the subprocess is terminated and the output is truncated with a warning message.
 </Note>
+
+<Warning>
+  Background workers enforce a **bounded** timeout to prevent denial-of-service via unbounded execution. Jobs that exceed the timeout are killed and transition to the terminal `timed_out` status. Set `QWED_MCP_BACKGROUND_TIMEOUT` (seconds) to tune this; values above 600 are clamped to the ceiling, and non-numeric or non-positive values fall back to the 120 s default.
+</Warning>
 
 ### Examples
 
@@ -162,7 +166,8 @@ Then poll for results:
 | Code fails safety check | `BLOCKED: QWED blocked python execution: <issues> (verification_id=...)` — error code `QWED-MCP-RISK-005` |
 | Tool disabled (admin policy) | `BLOCKED_ADMIN_POLICY: Python execution was verified, but server policy keeps code execution disabled until QWED_MCP_TRUSTED_CODE_EXECUTION=true. (verification_id=...)` — error code `QWED-MCP-RISK-006` |
 | Script raises exception | `STDERR` contains the traceback; return code is non-zero |
-| Timeout exceeded | `Execution timed out after 30.0 seconds.` |
+| Timeout exceeded (synchronous) | `Execution timed out after 30.0 seconds.` |
+| Timeout exceeded (background) | Job transitions to `timed_out` status with result `Background verification timed out after <N> seconds. Process terminated to prevent resource exhaustion.` |
 | Output cap exceeded | `[WARNING: OUTPUT TRUNCATED DUE TO 1MB SIZE CAP. PROCESS TERMINATED.]` — appended to the truncated output |
 
 ---
@@ -192,7 +197,12 @@ The response text depends on the job state:
 | `success` | `Status: success\n\nResult:\n<stdout/stderr output>` |
 | `failed` | `Status: failed\n\nResult:\n<error details>` |
 | `cancelled` | `Status: cancelled\n\nResult:\nJob was cancelled.` |
+| `timed_out` | `Status: timed_out\n\nResult:\nBackground verification timed out after <N> seconds. Process terminated to prevent resource exhaustion.` |
 | Not found / expired | `Error: Job ID '<id>' not found or expired.` |
+
+<Note>
+  `success`, `failed`, `cancelled`, and `timed_out` are terminal states. Once a job reaches a terminal state, its result remains available until the 1-hour TTL expires.
+</Note>
 
 ### Example
 
@@ -224,7 +234,8 @@ Execution completed successfully.
 
 - Background jobs expire after **1 hour** (3600 seconds). Expired jobs are pruned automatically.
 - A maximum of **5 jobs** can run concurrently. Additional jobs are queued until a slot opens.
-- Once a job completes (`success`, `failed`, or `cancelled`), its result is available until the TTL expires.
+- Each background job is bounded by `QWED_MCP_BACKGROUND_TIMEOUT` (default 120 s, max 600 s). Jobs that exceed this are killed and marked `timed_out`.
+- Once a job completes (`success`, `failed`, `cancelled`, or `timed_out`), its result is available until the TTL expires.
 
 <Warning>
   Background job state is held in memory on the MCP server. If the server restarts, all pending and completed jobs are lost.
