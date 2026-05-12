@@ -224,10 +224,10 @@ gunicorn qwed_new.api.main:app -w 4 -k uvicorn.workers.UvicornWorker --bind 0.0.
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `ACTIVE_PROVIDER` | Selected LLM provider | `azure_openai` |
-| `AZURE_OPENAI_API_KEY` | API Key for Azure OpenAI | - |
+| `AZURE_OPENAI_API_KEY` | API key for Azure OpenAI | - |
 | `AZURE_OPENAI_ENDPOINT` | Endpoint URL | - |
-| `ANTHROPIC_API_KEY` | API Key for Anthropic | - |
-| `GOOGLE_API_KEY` | API Key for Google Gemini (or `GEMINI_API_KEY`) | - |
+| `ANTHROPIC_API_KEY` | API key for Anthropic | - |
+| `GOOGLE_API_KEY` | API key for Google Gemini (or `GEMINI_API_KEY`) | - |
 | `GEMINI_MODEL` | Gemini model name | `gemini-1.5-pro` |
 
 ### Observability
