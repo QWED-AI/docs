@@ -1,4 +1,5 @@
 <div align="center">
+  <img src="assets/logo.svg" alt="QWED Logo" width="80" height="80">
   <h1>QWED Documentation</h1>
   <h3>Official Documentation for the QWED Verification Ecosystem</h3>
 
