@@ -594,7 +594,7 @@ decision = gateway.evaluate_and_route("execute_python_code", {
 
 print(decision["verified"])          # True or False
 print(decision["status"])            # "ALLOW_VERIFIED", "BLOCKED", or "BLOCKED_ADMIN_POLICY"
-print(decision["verification_id"])   # Deterministic SHA-256 fingerprint
+print(decision["verification_id"])   # Context-bound SHA-256 fingerprint (unique per call)
 print(decision["normalized_arguments"])  # Cleaned arguments
 ```
 
@@ -605,7 +605,7 @@ print(decision["normalized_arguments"])  # Cleaned arguments
 | `verified` | `bool` | `True` if the request is approved for execution |
 | `status` | `str` | `ALLOW_VERIFIED`, `BLOCKED`, or `BLOCKED_ADMIN_POLICY` |
 | `risk_level` | `str` | `high` or `low` depending on the tool |
-| `verification_id` | `str` | Deterministic SHA-256 fingerprint of the tool name and normalized arguments |
+| `verification_id` | `str` | Context-bound SHA-256 fingerprint of the tool name, normalized arguments, a per-request nonce, wall-clock timestamp, and the gateway's per-process server instance ID. Unique for every call, even when inputs are identical. |
 | `normalized_arguments` | `dict` | Cleaned and validated arguments |
 | `message` | `str` | Human-readable explanation of the decision |
 | `error_code` | `str` | Present on blocked decisions. See [governance error codes](#governance-error-codes) |
@@ -635,7 +635,7 @@ The gateway defines built-in policies for each registered tool:
 Tools not in this table are blocked by default with `QWED-MCP-RISK-001`.
 
 <Info>
-  The `verification_id` is a deterministic SHA-256 hash of the tool name and normalized arguments. Two identical requests always produce the same `verification_id`, which you can use for auditing and deduplication.
+  The `verification_id` is a context-bound SHA-256 hash. In addition to the tool name and normalized arguments, the hash input includes a random nonce, a wall-clock timestamp, and a per-process `server_instance_id` generated when the gateway is constructed. Two identical requests always produce **different** `verification_id` values, which prevents replay attacks and stale-cache correlation. Treat each `verification_id` as a single-use, temporally-bound artifact when auditing.
 </Info>
 
 ---
