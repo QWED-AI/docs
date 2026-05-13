@@ -508,7 +508,7 @@ curl -X POST https://api.qwedai.com/v1/verify/stats \
 | 503 | Secure Docker sandbox unavailable — statistical verification requires Docker |
 
 <Note>
-Statistical verification requires a running Docker daemon. If Docker is unavailable, the endpoint returns HTTP 503 instead of falling back to in-process execution. See the [Stats Engine](/engines/stats) page for details.
+Statistical verification requires a running Docker daemon. If Docker is unavailable, the endpoint returns HTTP 503 instead of falling back to in-process execution. See the [Stats engine](/engines/stats) page for details.
 </Note>
 
 ---
@@ -655,23 +655,38 @@ Verify multiple items in a single request. Processes all items concurrently and 
 }
 ```
 
-**Math item results:** Math items in a batch are split between proof results and simplification-only results:
+#### Math items: proof vs. simplification
 
-- **Equality claims** (e.g., `x**2 + 2*x + 1 = (x+1)**2`) follow the proof path. Verified identities return `is_valid: true` with `message: "Identity verified"`. Non-identities return `is_valid: false` with `message: "Not equal"`.
-- **Non-equality expressions** (e.g., `x + x`) are symbolically simplified but **not** treated as proven claims. They return `is_valid: false` with `status: "SIMPLIFIED"`, the simplified form in `simplified`, and a `message` explaining that no equality or proof claim was provided.
+Math items are split into two distinct outcomes so that symbolic transformation is never mistaken for a verified claim:
+
+- **Equality or proof claims** (e.g., `x**2 + 2*x + 1 = (x+1)**2`) take the proof path. Verified identities return `is_valid: true` with `message: "Identity verified"`. Non-identities return `is_valid: false` with `message: "Not equal"`.
+- **Non-equality expressions** (e.g., `x + x`) are simplified only. They are returned as explicit simplification results, not as valid proofs.
+
+Simplification-only results include:
+
+| Field | Value |
+|-------|-------|
+| `is_valid` | `false` |
+| `status` | `"SIMPLIFIED"` |
+| `simplified` | The simplified expression as a string |
+| `type` | `"math"` |
+| `message` | `"Expression simplified, but no equality or proof claim was provided"` |
+
+**Example response for `"x + x"`:**
 
 ```json
 {
-  "id": "math-simplified",
-  "type": "math",
   "is_valid": false,
   "status": "SIMPLIFIED",
   "simplified": "2*x",
+  "type": "math",
   "message": "Expression simplified, but no equality or proof claim was provided"
 }
 ```
 
-<Info>Changed: parseable non-equality math expressions previously returned `is_valid: true` from the batch endpoint. They now return `is_valid: false` with `status: "SIMPLIFIED"` so that symbolic transformation is never reported as deterministic verification. Use `POST /verify/math` with an explicit equation to obtain a proof result.</Info>
+<Warning>
+A successfully simplified expression is not a verified claim. Treat `status: "SIMPLIFIED"` results as transformed input, not as proof. To get a `VERIFIED` outcome from a math item, submit an equality (e.g., `x + x = 2*x`).
+</Warning>
 
 ### GET /verify/batch/{job_id}
 
