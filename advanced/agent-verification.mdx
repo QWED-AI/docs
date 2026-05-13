@@ -336,7 +336,7 @@ The denial fires before risk assessment, so unknown actions can never be auto-ap
 To allow a custom action, either bind it to an engine in `ACTION_ENGINES` or add it to your tool registry with an explicit risk level. Tools registered this way are reported with `engine: "tool_control"` in the verification response.
 
 <Warning>
-Before v5.1.1, unknown action types defaulted to `engine: "security"` and proceeded through risk assessment as `MEDIUM` risk, which could result in `APPROVED` or `PENDING` decisions depending on the agent's trust level. Audit any production agents that emit non-standard `action_type` values and register them explicitly before upgrading.
+Before v5.1.1, unknown action types defaulted to `engine: "security"` and proceeded through risk assessment as `MEDIUM` risk. This could result in `APPROVED` or `PENDING` decisions depending on the agent's trust level. Audit any production agents that emit non-standard `action_type` values and register them explicitly before upgrading.
 </Warning>
 
 ### Replay and loop detection

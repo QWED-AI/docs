@@ -61,7 +61,7 @@ See [Guards — StatuteOfLimitationsGuard](/legal/guards#6-statuteoflimitationsg
 - **Signing key required at startup** — `AuditLogger()` now raises `SecurityError` when `QWED_AUDIT_SECRET_KEY` is unset or empty. The previous insecure `dev_only_change_in_production` fallback was removed.
 - **Per-organization hash chains** — Each organization now has its own isolated audit chain. Tampering or gaps in one tenant's chain cannot affect another tenant's verification.
 - **Hash coverage extended to `raw_llm_output`** — New entries hash and verify the raw LLM output. Legacy entries created before this change are still accepted by the verifier via a backward-compatible canonical payload.
-- **Stronger pre-append checks** — Before writing a new entry, the logger verifies the current persisted chain head, refuses to append on top of malformed payloads, missing hashes, or in-memory/persisted divergence, and serializes appends with `BEGIN IMMEDIATE` on SQLite (or `SELECT … FOR UPDATE` on other backends).
+- **Stronger pre-append checks** — Before writing a new entry, the logger verifies the current persisted chain head and refuses to append on top of malformed payloads, missing hashes, or in-memory/persisted divergence. Appends are serialized with `BEGIN IMMEDIATE` on SQLite (or `SELECT … FOR UPDATE` on other backends).
 - **Constant-time HMAC comparison** — Signature checks use `hmac.compare_digest` to prevent timing side channels.
 
 ### Action required
