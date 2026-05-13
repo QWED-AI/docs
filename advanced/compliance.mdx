@@ -18,12 +18,12 @@ QWED provides built-in tools to assist with SOC 2 Type II audits, specifically f
 ### SOC 2 report generator
 Generate a JSON report containing security metrics, control statuses, and evidence summaries.
 
-**API Endpoint:**
+**API endpoint:**
 ```http
 GET /admin/compliance/report/soc2/{org_id}
 ```
 
-**Example Response:**
+**Example response:**
 ```json
 {
   "report_type": "SOC 2 Type II - Security Controls",
@@ -85,7 +85,7 @@ else:
 ### Evidence collection
 Export all verification logs and security events as a CSV file to provide to your auditor.
 
-**API Endpoint:**
+**API endpoint:**
 ```http
 GET /admin/compliance/export/csv?organization_id={org_id}
 ```
@@ -97,20 +97,20 @@ GET /admin/compliance/export/csv?organization_id={org_id}
 ### Data export (Article 15 - right of access)
 QWED supports the Right of Access by allowing you to export all data associated with an organization or user.
 
-**API Endpoint:**
+**API endpoint:**
 Use the CSV export endpoint to retrieve all verification data.
 ```http
 GET /admin/compliance/export/csv?organization_id={org_id}
 ```
 
 ### Data deletion (Article 17 - right to erasure)
-**Note:** Currently, user deletion must be performed by an administrator directly in the database. A self-service deletion API is planned.
+**Note:** Currently, an administrator must delete users directly in the database. A self-service deletion API is planned.
 
 To comply with a deletion request:
-1.  **Delete the User:** Remove the user record from the database.
-2.  **Prune Logs:** For full GDPR Article 17 compliance, ensure all verification logs associated with the user are also deleted or anonymized.
+1.  **Delete the user:** Remove the user record from the database.
+2.  **Prune logs:** For full GDPR Article 17 compliance, ensure all verification logs associated with the user are also deleted or anonymized.
 
-**Manual Database Process (Example):**
+**Manual database process (example):**
 ```sql
 -- Delete User
 DELETE FROM user WHERE id = {user_id};
@@ -122,7 +122,7 @@ DELETE FROM verificationlog WHERE user_id = {user_id};
 ### Consent management
 QWED does not have a built-in "Consent Management Platform" (CMP), but you can use the immutable audit log to track consent events.
 
-**Implementing Consent Tracking:**
+**Implementing consent tracking:**
 Log a specific "verification" event when a user grants consent. This creates a tamper-proof record.
 
 ```python

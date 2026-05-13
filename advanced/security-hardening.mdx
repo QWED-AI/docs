@@ -263,7 +263,7 @@ If you manage a custom tool allowlist, ensure all tools your agents use are expl
 
 ### Safe expression evaluation
 
-All `eval()` calls have been fully eliminated and replaced with a custom AST-walking evaluator. Instead of compiling and executing code, the evaluator parses expressions into an AST, validates every node against a strict allow-list, and then interprets the tree directly — no `eval()` or `compile()` is ever invoked.
+All `eval()` calls have been fully eliminated and replaced with a custom AST-walking evaluator. Instead of compiling and executing code, the evaluator parses expressions into an AST and validates every node against a strict allow-list. It then interprets the tree directly — no `eval()` or `compile()` is ever invoked.
 
 The safe evaluator enforces three layers of defense:
 
