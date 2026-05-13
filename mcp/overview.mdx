@@ -91,7 +91,7 @@ QWED-MCP exposes **deterministic verification** to AI assistants through a singl
 | [`execute_python_code`](/mcp/tools#execute_python_code) | Subprocess execution | The primary entry point for all QWED capabilities. Executes dynamically generated Python code with access to all QWED SDK libraries. Supports optional `background=true` for async execution. |
 | [`verification_status`](/mcp/tools#verification_status) | Job status polling | Check the status and results of background verification jobs dispatched via `execute_python_code` with `background=true`. |
 
-All tool calls pass through the [`RiskBasedExecutionGateway`](/mcp/tools#riskbasedexecutiongateway-governance) before dispatch. The gateway validates arguments, runs code safety analysis, and enforces admin policy. Unknown tools are blocked by default.
+All tool calls pass through the [`RiskBasedExecutionGateway`](/mcp/tools#riskbasedexecutiongateway-governance) before dispatch. The gateway validates arguments, runs code safety analysis, and enforces admin policy. The gateway blocks unknown tools by default.
 
 <Info>
   In v0.1.x, QWED-MCP exposed individual tools like `verify_math`, `verify_logic`, `verify_code`, and `verify_sql`. These were consolidated into `execute_python_code` in v0.2.0 to solve context bloat (RFC-9728 compatibility). See [migration guide](/mcp/tools#migrating-from-v01x).
@@ -226,7 +226,7 @@ asyncio.run(main())
 | `QWED_SKILL_MANIFEST` | Path to a skill manifest JSON file. When set, the server validates the manifest at startup using [`SkillProvenanceGuard`](/mcp/tools#skillprovenanceguard-security) and refuses to start if verification fails | Not set |
 
 <Warning>
-  `QWED_MCP_TRUSTED_CODE_EXECUTION` must be set to `true` to enable code execution. The executed code runs with server privileges — ensure inputs are from trusted sources.
+  Set `QWED_MCP_TRUSTED_CODE_EXECUTION` to `true` to enable code execution. The executed code runs with server privileges — ensure inputs are from trusted sources.
 </Warning>
 
 ### Example with environment variables

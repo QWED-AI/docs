@@ -92,13 +92,13 @@ The response follows the `VerificationResult` schema. For math queries, the top-
 
 | Status | Meaning |
 |--------|---------|
-| `INCONCLUSIVE` | Expression evaluation succeeded, but the LLM translation step is non-deterministic so the result cannot be treated as a proven verdict on the original user query |
+| `INCONCLUSIVE` | Expression evaluation succeeded, but the LLM translation step is non-deterministic, so you cannot treat the result as a proven verdict on the original user query |
 | `ERROR` | The translated expression had a syntax error or the engine could not evaluate it |
 | `NOT_MATH_QUERY` | The query was not recognized as a mathematical question |
 | `BLOCKED` | Request blocked by security policy |
 
 <Note>
-The `status` field was previously set to the inner engine result (e.g., `VERIFIED`). It now returns `INCONCLUSIVE` when the inner engine returns `VERIFIED` or `CORRECTION_NEEDED`, because the natural language pipeline involves a non-deterministic LLM translation step. Use the `trust_boundary` object to inspect the detailed verification breakdown. For fully deterministic results, use `POST /verify/math` directly.
+Previous versions set the `status` field to the inner engine result (e.g., `VERIFIED`). It now returns `INCONCLUSIVE` when the inner engine returns `VERIFIED` or `CORRECTION_NEEDED`, because the natural language pipeline involves a non-deterministic LLM translation step. Use the `trust_boundary` object to inspect the detailed verification breakdown. For fully deterministic results, use `POST /verify/math` directly.
 </Note>
 
 **`trust_boundary` fields:**

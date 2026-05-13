@@ -10,7 +10,7 @@ description: "QWED Infra uses formal verification for infrastructure as code. Ve
 ![Verified by QWED](https://img.shields.io/badge/Verified_by-QWED-00C853?style=flat&logo=checkmarx)
 ![PyPI](https://img.shields.io/pypi/v/qwed-infra?color=blue)
 
-`qwed-infra` is a Python library that uses **formal methods (Z3 solver)** and **graph theory** to mathematically prove the security and compliance of detailed infrastructure definitions (Terraform, AWS IAM, Kubernetes).
+`qwed-infra` is a Python library that mathematically proves the security and compliance of infrastructure definitions (Terraform, AWS IAM, Kubernetes). It uses **formal methods (Z3 solver)** and **graph theory** to do so deterministically.
 
 It prevents AI agents (like Devin or Copilot Workspace) from deploying insecure or expensive infrastructure by verifying configuration *before* deployment.
 
@@ -33,7 +33,7 @@ graph TD
 Verifies AWS IAM policies using the **Z3 theorem prover**. Instead of regex matching, it converts policies into logical formulas to prove reachability and specific permissions.
 
 ### NetworkGuard
-Verifies network reachability using **graph theory** (NetworkX). Validates paths like `Internet -> IGW -> Route -> Security Group -> Instance`.
+Verifies network reachability using **graph theory** (NetworkX). Validates paths like `Internet -> Internet Gateway (IGW) -> Route -> Security Group -> Instance`.
 
 ### CostGuard
 Deterministic cloud cost estimation before deployment. Enforce budgets and prevent expensive instance provisioning errors.

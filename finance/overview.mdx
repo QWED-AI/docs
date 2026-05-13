@@ -11,7 +11,13 @@ description: "QWED Finance uses deterministic verification, SymPy, and Z3 to pre
 
 QWED Finance is a guardrail library that prevents financial hallucinations in LLMs. It combines LLM translation with deterministic solvers (SymPy, Z3, mpmath) and standard financial algorithms.
 
-> **New in v2.1.0:** Security audit hardening — fail-closed enforcement across `OpenResponsesIntegration`, unified AML high-risk country list, `BondGuard._parse_rate()` returns `Decimal`, and full `Decimal`/`mpmath` migration for `BondGuard`, `DerivativesGuard`, and `RiskGuard`. Greeks are now Decimal-quantized strings.
+**New in v2.1.0: Security audit hardening.**
+
+- Fail-closed enforcement across `OpenResponsesIntegration`
+- Unified AML high-risk country list
+- `BondGuard._parse_rate()` returns `Decimal`
+- Full `Decimal`/`mpmath` migration for `BondGuard`, `DerivativesGuard`, and `RiskGuard`
+- Greeks are now Decimal-quantized strings
 
 ## Why QWED Finance?
 
