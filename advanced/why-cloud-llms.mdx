@@ -133,14 +133,14 @@ result1 = client.verify("What is 2+2?")
 result2 = client.verify("What is 2+2?")  # $0 cost!
 ```
 
-**Real Savings:** 50-80% cost reduction on repeated queries!
+**Savings:** repeated queries hit the cache and skip the LLM call.
 
 ---
 
 ## 🔒 Privacy considerations
 
 ### Local LLM advantages
-✅ **100% private** - data never leaves your machine  
+✅ **Private** — data stays on your machine  
 ✅ **No API keys** - no third-party access  
 ✅ **Compliance** - easier GDPR/HIPAA compliance
 
@@ -281,9 +281,9 @@ python -c "from qwed_sdk import QWEDLocal; \
 
 ## 🔗 Related documentation
 
-- **[LLM Configuration Guide](/getting-started/llm-configuration)** - Complete LLM setup
-- **[PII Masking Guide](/advanced/pii-masking)** - Privacy protection
-- **[Caching Guide](/advanced/qwed-local)** - Cost savings
+- **[LLM configuration guide](/getting-started/llm-configuration)** — complete LLM setup
+- **[PII masking guide](/advanced/pii-masking)** — privacy protection
+- **[Caching guide](/advanced/qwed-local)** — cost savings
 
 ---
 
