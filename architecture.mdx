@@ -46,7 +46,7 @@ flowchart TB
 
 - Converts natural language into structured inputs
 - Can use any LLM provider (cloud or local)
-- Output is always treated as untrusted until verified
+- QWED treats all output as untrusted until the verifier confirms it
 
 ### 3) Verification engines (deterministic)
 
@@ -109,7 +109,7 @@ sequenceDiagram
 | Threat | QWED response |
 |---|---|
 | Hallucinated claim | Rejected or corrected by deterministic check |
-| Prompt injection | Translation may be affected, but verifier/guards enforce policy |
+| Prompt injection | Translation can be poisoned; verifier and guards enforce policy regardless |
 | Unsafe code or SQL | Blocked by parser, AST checks, and guard rules |
 | Untrusted tool action | Guarded and policy-checked before execution |
 

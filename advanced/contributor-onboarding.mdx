@@ -47,7 +47,7 @@ pip install -e .
 Enterprises want to use "Text-to-SQL" agents (e.g., "Show me top 10 users").
 **The Risk:** LLMs hallucinate. If an LLM generates `DROP TABLE users` or `SELECT * FROM passwords`, the company is destroyed.
 
-**QWED's Role**: We parse the SQL (using AST analysis) and **Block** dangerous queries before they hit the database.
+**QWED's role:** QWED parses the SQL using AST analysis and blocks dangerous queries before they reach the database.
 
 ### Real-world scenarios (your task)
 
@@ -56,7 +56,7 @@ You are building the **Safety Test Suite** for our SQL Engine.
 
 **Task**: Write 5-10 test cases that simulate these "Bad AI" behaviors:
 
-| Scenario | The Safety Rule (What QWED must catch) | Why it matters (Real World Impact) |
+| Scenario | Safety rule (what QWED must catch) | Why it matters (real-world impact) |
 | --- | --- | --- |
 | **The Destructor** | Query contains `DROP`, `TRUNCATE`, or `ALTER` | Prevents AI from deleting the production database. |
 | **The Data Leak** | Query selects sensitive columns: `password_hash`, `ssn`, `salary` | Prevents AI from revealing PII or credentials. |

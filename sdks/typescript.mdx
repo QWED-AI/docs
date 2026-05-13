@@ -104,7 +104,7 @@ const result = await client.verifySQL(
 
 <Info>New in v4.0.1</Info>
 
-Validate the structural integrity of AI reasoning traces. Use this to ensure workflows follow deterministic process steps with IRAC pattern matching or custom milestone validation.
+Validate the structural integrity of LLM reasoning traces. Use this to ensure workflows follow deterministic process steps with IRAC pattern matching or custom milestone validation.
 
 ```typescript
 // Verify IRAC structure in a reasoning trace
@@ -138,7 +138,7 @@ console.log(result.result?.missed_milestones);  // []
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `reasoningTrace` | `string` | — | The AI reasoning trace to validate |
+| `reasoningTrace` | `string` | — | The LLM reasoning trace to validate |
 | `options.mode` | `'irac' \| 'milestones'` | `'irac'` | Verification mode |
 | `options.keyMilestones` | `string[]` | — | Required milestones (milestones mode only) |
 

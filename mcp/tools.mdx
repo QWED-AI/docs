@@ -245,7 +245,7 @@ Execution completed successfully.
 
 ## Migrating from v0.1.x
 
-In v0.1.x, QWED-MCP exposed individual tools (`verify_math`, `verify_logic`, `verify_code`, `verify_sql`, and others). In v0.2.0, all of these were consolidated into `execute_python_code` to reduce context bloat — instead of loading 14 tool schemas, the LLM loads one.
+In v0.1.x, QWED-MCP exposed individual tools (`verify_math`, `verify_logic`, `verify_code`, `verify_sql`, and others). In v0.2.0, all of these were consolidated into `execute_python_code` to reduce context bloat. The LLM now loads one tool schema instead of 14.
 
 ### Before (v0.1.x)
 

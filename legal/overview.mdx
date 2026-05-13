@@ -172,7 +172,7 @@ LLMs are **probabilistic** and can fail in legally significant ways:
 | Clause inconsistency | Two provisions cannot both be true | Disputes, unenforceable terms |
 | False certainty | Model states a legal conclusion without proof | Liability, audit failure |
 
-QWED-Legal treats LLM output as **untrusted input**. It does not assume correctness, and it requires proof for the properties it is able to verify. When proof is not possible, the correct outcome is to fail closed.
+QWED-Legal treats LLM output as **untrusted input**. It does not assume correctness. It requires proof for every property it verifies. When proof is not possible, it fails closed.
 
 ## Jurisdiction support
 

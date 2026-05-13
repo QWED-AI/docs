@@ -142,7 +142,7 @@ query2 = "The Sun orbits the Earth"
 
 **Option A: Low-level API** (expose all solver internals)
 - Pros: Maximum flexibility
-- Cons: Steep learning curve, you need solver expertise
+- Cons: Steep learning curve, requires solver expertise
 
 **Option B: High-level developer-friendly API** ← **CHOSEN**
 - Pros: Easy to use, hides complexity
@@ -205,7 +205,7 @@ print(result.value)  # 4
 
 **Option B: Graceful degradation with audit trails** ← **CHOSEN**
 - Pros: Better UX, transparent failures
-- Cons: you might miss errors
+- Cons: May miss errors
 
 ### The decision
 
@@ -260,7 +260,7 @@ except VerificationError as e:
 
 ### The mental model
 
-**Why this matters:** helps you understand QWED's scope
+**Why this matters:** This analogy helps you understand QWED's scope.
 
 **Calculator (Deterministic):**
 - Input: 2 + 2
@@ -316,7 +316,7 @@ This project was developed with assistance from generative AI tools:
 - Error handling philosophy
 - Domain modeling and verification workflows
 
-**Validation:** All AI-generated code was reviewed, tested against benchmarks, and validated through comprehensive testing.
+**Validation:** All AI-generated code was reviewed, benchmarked, and validated against the QWED test suite.
 
 ---
 
@@ -332,7 +332,7 @@ This project was developed with assistance from generative AI tools:
 ### What we'd change
 
 1. **Earlier framework integrations:** Should have built LangChain support sooner
-2. **More domain tutorials:** you asked for more examples per domain
+2. **More domain tutorials:** Users requested more examples per domain
 3. **Clearer scope communication:** "Calculator not Wikipedia" analogy should be upfront
 
 ---

@@ -421,7 +421,7 @@ def verify_sql_safety(query: str, schema: Dict) -> Dict[str, Any]:
 
 **Technology Stack:** Multi-provider API calls
 
-**Problem Addressed:** Single-model responses may be confidently wrong.
+**Problem addressed:** Single-model responses can be confidently wrong without detection.
 
 **Verification Approach:**
 1. Query same prompt to multiple LLMs (GPT-4, Claude, Gemini)

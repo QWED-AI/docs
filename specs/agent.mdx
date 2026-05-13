@@ -605,7 +605,7 @@ On server startup, the runtime MUST verify environment integrity (via `StartupHo
 
 Agent token verification MUST use constant-time comparison (`hmac.compare_digest`) to prevent timing side-channel attacks.
 
-### 9.10 Fail-closed on unknown actions
+### 9.11 Fail-closed on unknown actions
 
 The runtime MUST reject any verification request whose `action_type` is not explicitly registered in the agent service. An action is considered registered only when it appears in either the engine map (e.g. `execute_sql`, `execute_code`, `calculate`, `verify_logic`, `verify_fact`) or the tool risk table (e.g. `database_read`, `database_write`, `send_email`, `file_read`, `file_write`, `file_delete`, `api_call`).
 
@@ -621,7 +621,7 @@ This guarantees that verification outcomes are always tied to explicit, determin
 
 ## 10. Implementation guidelines
 
-### 9.1 SDK integration
+### 10.1 SDK integration
 
 ```python
 from qwed_sdk import QWEDAgentClient
@@ -657,7 +657,7 @@ if result.decision == "APPROVED":
     )
 ```
 
-### 9.2 LangChain integration
+### 10.2 LangChain integration
 
 ```python
 from langchain.agents import AgentExecutor
@@ -677,7 +677,7 @@ agent_executor = AgentExecutor(
 result = agent_executor.run("Get customer data")
 ```
 
-### 9.3 CrewAI integration
+### 10.3 CrewAI integration
 
 ```python
 from crewai import Agent, Task, Crew
