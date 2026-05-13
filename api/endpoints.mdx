@@ -517,7 +517,7 @@ Statistical verification requires a running Docker daemon. If Docker is unavaila
 
 <Info>New in v4.0.1</Info>
 
-Verify the structural integrity of AI reasoning traces. Supports IRAC structural compliance checking and custom milestone validation with decimal scoring.
+Verify the structural integrity of LLM reasoning traces. Supports IRAC structural compliance checking and custom milestone validation with decimal scoring.
 
 **Request (IRAC mode):**
 
@@ -540,7 +540,7 @@ Verify the structural integrity of AI reasoning traces. Supports IRAC structural
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
-| `trace` | string | Yes | — | The AI reasoning trace to validate |
+| `trace` | string | Yes | — | The LLM reasoning trace to validate |
 | `mode` | string | No | `irac` | `irac` or `milestones` |
 | `milestones` | string[] | Conditional | — | Required when `mode` is `milestones` |
 
