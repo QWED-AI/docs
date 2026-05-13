@@ -1,18 +1,18 @@
 ---
-title: "QWED Deployment Guide"
+title: "QWED deployment guide"
 description: "Deploy QWED to production using Docker, Kubernetes, or bare metal. Includes environment variables reference, production checklist, and monitoring setup."
 ---
 
 This guide provides instructions for deploying QWED in various environments.
 
 ## Table of contents
-1. [Docker Deployment](#docker-deployment)
-2. [Kubernetes Deployment](#kubernetes-deployment)
-3. [Manual / Bare Metal Deployment](#manual--bare-metal-deployment)
-4. [Environment Variables Reference](#environment-variables-reference)
-5. [Production Checklist](#production-checklist)
+1. [Docker deployment](#docker-deployment)
+2. [Kubernetes deployment](#kubernetes-deployment)
+3. [Manual / bare metal deployment](#manual--bare-metal-deployment)
+4. [Environment variables reference](#environment-variables-reference)
+5. [Production checklist](#production-checklist)
 6. [Troubleshooting](#troubleshooting)
-7. [Operations & Monitoring](#operations--monitoring)
+7. [Operations & monitoring](#operations--monitoring)
 
 ---
 
@@ -127,7 +127,7 @@ For production environments, we provide Kubernetes manifests in `deploy/kubernet
 
 ### Horizontal pod autoscaling (HPA)
 
-For high-traffic environments, we recommend enabling HPA (requires Metrics Server):
+For high-traffic environments, enable HPA (requires Metrics Server):
 
 ```yaml
 apiVersion: autoscaling/v2
@@ -224,10 +224,10 @@ gunicorn qwed_new.api.main:app -w 4 -k uvicorn.workers.UvicornWorker --bind 0.0.
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `ACTIVE_PROVIDER` | Selected LLM provider | `azure_openai` |
-| `AZURE_OPENAI_API_KEY` | API Key for Azure OpenAI | - |
+| `AZURE_OPENAI_API_KEY` | API key for Azure OpenAI | - |
 | `AZURE_OPENAI_ENDPOINT` | Endpoint URL | - |
-| `ANTHROPIC_API_KEY` | API Key for Anthropic | - |
-| `GOOGLE_API_KEY` | API Key for Google Gemini (or `GEMINI_API_KEY`) | - |
+| `ANTHROPIC_API_KEY` | API key for Anthropic | - |
+| `GOOGLE_API_KEY` | API key for Google Gemini (or `GEMINI_API_KEY`) | - |
 | `GEMINI_MODEL` | Gemini model name | `gemini-1.5-pro` |
 
 ### Observability

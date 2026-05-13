@@ -7,7 +7,76 @@ All notable changes to the QWED platform, listed by release.
 
 ---
 
-## QWED-Verification — Fail-closed unknown agent actions
+## QWED-Legal — `StatuteOfLimitationsGuard` fail-closed on unknown jurisdictions and claim types
+**Released: May 10, 2026**
+
+> Hardens `StatuteOfLimitationsGuard` so unknown jurisdictions and claim types return an `UNVERIFIABLE` result instead of fabricating a limitation period from a partial string match or a default fallback table.
+
+### What changed
+
+- **Exact jurisdiction match only** — Lookups uppercase and trim the input, then require an exact key in the rule table. Substring matches (for example, `"CALIF"` → `"CALIFORNIA"`, `"NEW"` → `"NEW YORK"`) are no longer accepted.
+- **No default fallback for unknown jurisdictions** — Unsupported jurisdictions previously fell back to a generic `DEFAULT_LIMITATIONS` table. They now return a `StatuteResult` with `verified=False`, `jurisdiction_matched=False`, all date and period fields set to `None`, and a message that lists the supported jurisdictions.
+- **No silent default for unknown claim types** — Unsupported claim types previously defaulted to a 3-year period. They now return `verified=False`, `claim_type_matched=False`, and a message that lists the supported claim types for the jurisdiction.
+- **`get_limitation_period()` returns `Optional[float]`** — Returns `None` when the jurisdiction or claim type is unsupported, instead of always returning a number.
+- **`compare_jurisdictions()` returns `Dict[str, Optional[float]]`** — Unsupported jurisdictions in the input list map to `None` in the result.
+- **New `StatuteResult` fields** — `jurisdiction_matched: bool` and `claim_type_matched: bool` let callers distinguish "claim is time-barred" from "we cannot determine the limit".
+
+### Breaking changes
+
+- `StatuteResult.incident_date`, `filing_date`, `limitation_period_years`, `expiration_date`, and `days_remaining` are now `Optional` and are `None` when the input is unverifiable. Code that does arithmetic or comparisons on these fields must check `result.verified` (and the new `*_matched` flags) first.
+- `get_limitation_period()` now returns `Optional[float]`. Code that previously assumed a numeric result must handle `None`.
+- Callers that relied on partial jurisdiction matching (for example, passing `"Calif"` and expecting California rules) must update their inputs to a fully spelled, supported jurisdiction.
+
+### Example
+
+```python
+from qwed_legal import StatuteOfLimitationsGuard
+
+guard = StatuteOfLimitationsGuard()
+
+result = guard.verify(
+    claim_type="breach_of_contract",
+    jurisdiction="Atlantis",
+    incident_date="2023-01-15",
+    filing_date="2026-06-01",
+)
+
+print(result.verified)              # False
+print(result.jurisdiction_matched)  # False
+print(result.limitation_period_years)  # None
+# result.message starts with "⚠️ UNVERIFIABLE: Jurisdiction 'Atlantis' ..."
+```
+
+See [Guards — StatuteOfLimitationsGuard](/legal/guards#6-statuteoflimitationsguard) and [Troubleshooting — StatuteOfLimitationsGuard issues](/legal/troubleshooting#statuteoflimitationsguard-issues) for migration guidance.
+
+---
+
+## QWED-Verification — audit logger fail-closed and per-organization chains
+**Released: May 8, 2026** · [GitHub PR #179](https://github.com/QWED-AI/qwed-verification/pull/179)
+
+> Hardens the cryptographic audit logger so signing-key, payload, and chain-continuity failures fail closed instead of silently writing or "verifying" a broken audit trail.
+
+### What changed
+
+- **Signing key required at startup** — `AuditLogger()` now raises `SecurityError` when `QWED_AUDIT_SECRET_KEY` is unset or empty. The previous insecure `dev_only_change_in_production` fallback was removed.
+- **Per-organization hash chains** — Each organization now has its own isolated audit chain. Tampering or gaps in one tenant's chain cannot affect another tenant's verification.
+- **Hash coverage extended to `raw_llm_output`** — New entries hash and verify the raw LLM output. Legacy entries created before this change are still accepted by the verifier via a backward-compatible canonical payload.
+- **Stronger pre-append checks** — Before writing a new entry, the logger verifies the current persisted chain head, refuses to append on top of malformed payloads, missing hashes, or in-memory/persisted divergence, and serializes appends with `BEGIN IMMEDIATE` on SQLite (or `SELECT … FOR UPDATE` on other backends).
+- **Constant-time HMAC comparison** — Signature checks use `hmac.compare_digest` to prevent timing side channels.
+
+### Action required
+
+Set `QWED_AUDIT_SECRET_KEY` in every environment that runs the verification service (including CI and local development). The service will not start without it.
+
+```bash
+export QWED_AUDIT_SECRET_KEY="your-secure-production-key-here"
+```
+
+See [Compliance — Audit trail setup](/advanced/compliance#3-audit-trail-setup) for the updated configuration steps and failure modes.
+
+---
+
+## QWED-Verification — fail-closed denial of unknown agent action types
 **Released: May 6, 2026** · [GitHub PR #176](https://github.com/QWED-AI/qwed-verification/pull/176)
 
 > Hardens `AgentService.verify_action` so action types with no registered engine or tool risk binding are denied instead of routed through a permissive default.
@@ -18,7 +87,34 @@ All notable changes to the QWED platform, listed by release.
 - **Risk assessment is now deterministic** — `_assess_risk` raises `ValueError` if it is invoked for an unregistered `action_type`. Risk levels must come from explicit registration.
 - **Step reservation released on action denial** — A `QWED-AGENT-ACTION-001` denial releases the in-flight step reservation, so the agent can retry the same `(conversation_id, step_number)` pair with a registered action type.
 
-### Breaking changes
+### Example
+
+```python
+result = client.verify_action(
+    agent_id="agent_abc123",
+    action={"type": "transfer_funds_internal_v2", "query": "Move funds between ledgers"},
+    context={"conversation_id": "conv_xyz", "step_number": 1},
+)
+# {
+#   "decision": "DENIED",
+#   "error": {
+#     "code": "QWED-AGENT-ACTION-001",
+#     "message": "Unknown action_type 'transfer_funds_internal_v2' cannot be verified without explicit registered semantics"
+#   }
+# }
+```
+
+### Why
+
+Unknown actions are not verifiable actions. If QWED has no explicit semantics for an action type, it must not approve it or mark it as verified.
+
+See [Agent verification — Unknown action types denied](/advanced/agent-verification#unknown-action-types-denied) and the [Agent spec error code table](/specs/agent#appendix-a-error-codes).
+## QWED-Verification — fail-closed on unknown agent actions
+**Released: May 6, 2026**
+
+> The agent service now rejects verification requests whose `action_type` has no explicit registered semantics. Previously, an unrecognized action could pass through risk assessment and receive an `APPROVED` decision with a generic `"security"` engine fallback.
+
+### Security
 
 <Warning>
 **Unknown agent `action_type` values are rejected.** Agents that previously relied on the implicit `"security"` engine fallback for ad-hoc action types must now register them in `ACTION_ENGINES` (engine binding) or `TOOL_RISK_LEVELS` (tool-control binding). Unregistered actions return `QWED-AGENT-ACTION-001`.
@@ -31,7 +127,7 @@ All notable changes to the QWED platform, listed by release.
 
 ---
 
-## QWED-Finance v2.1.0 — Security audit hardening
+## QWED-Finance v2.1.0 — security audit hardening
 **Released: May 2, 2026** · [GitHub PR #25](https://github.com/QWED-AI/qwed-finance/pull/25)
 
 > Roll-up release that consolidates all P0/P1 findings from the deterministic security audit (Issue #16). Combines the four hardening PRs (#21–#24) into a single tagged release, bumps `pyproject.toml` from `2.0.1` to `2.1.0`, and promotes `mpmath` to an explicit runtime dependency.
@@ -97,7 +193,7 @@ See the per-PR entries below for full implementation detail: [N-01/N-04 release 
 
 ---
 
-## QWED-Finance — Release blockers N-01 and N-04 resolved (NO-GO → GO)
+## QWED-Finance — release blockers N-01 and N-04 resolved (NO-GO → GO)
 **Released: May 2, 2026** · [GitHub PR #24](https://github.com/QWED-AI/qwed-finance/pull/24)
 
 > Closes the two release-blocking findings from the post-fix deterministic audit. The integration layer now shares a single Black-Scholes implementation with `DerivativesGuard`, and `FinanceVerifier.verify_compound_interest` no longer silently defaults unknown compounding frequencies.
@@ -167,7 +263,7 @@ See [Open Responses — Black-Scholes single source of truth](/finance/integrati
 
 ---
 
-## QWED-Finance — Decimal/mpmath migration for BondGuard, DerivativesGuard, and RiskGuard
+## QWED-Finance — decimal/mpmath migration for BondGuard, DerivativesGuard, and RiskGuard
 **Released: May 2, 2026** · [GitHub PR #23](https://github.com/QWED-AI/qwed-finance/pull/23)
 
 > Eliminates IEEE-754 `float` from every financial guard. `BondGuard`, `DerivativesGuard`, and `RiskGuard` now match the precision standard already used by `TradingGuard` and `FinanceVerifier`: exact arithmetic with `Decimal` and arbitrary-precision transcendentals with `mpmath`.
@@ -208,7 +304,37 @@ exposure = delta * Decimal(str(notional))
 
 See [Bond Guard](/finance/guards#8-bond-guard-yield-analytics), [Derivatives Guard](/finance/guards#3-derivatives-guard-black-scholes), and [Risk Guard](/finance/guards#10-risk-guard-portfolio-metrics) for the updated guard documentation.
 
-**Jump to:** [QWED-Finance v2.1.0 — Security Audit Hardening](#qwed-finance-v210--security-audit-hardening) · [QWED-Finance N-01/N-04 release blockers](#qwed-finance--release-blockers-n-01-and-n-04-resolved-no-go--go) · [QWED-Finance Decimal/mpmath migration](#qwed-finance--decimalmpmath-migration-for-bondguard-derivativesguard-and-riskguard) · [QWED-Verification SecureCodeExecutor fail-closed fallback](#qwed-verification--securecodeexecutor-fail-closed-when-codeverifier-is-unavailable) · [QWED-Finance security audit — OpenResponses fail-closed](#qwed-finance--openresponses-fail-closed-and-computed-status) · [QWED-Finance security audit — rate parsing](#qwed-finance--rate-parsing-heuristic-removed) · [QWED-Verification symbolic verifier fail-closed](#qwed-verification--symbolic-verifier-fail-closed-without-proof) · [QWED-Verification strict additionalProperties](#qwed-verification--strict-additionalproperties-fail-closed) · [QWED-Tax example redaction](#qwed-tax-—-redacted-preflight-block-details-in-examples) · [QWED-Tax decimal hardening](#qwed-tax-—-decimal-hardening-in-financial-guards) · [v5.1.0](#v5-1-0-—-agent-state-governance-and-fail-closed-hardening) · [v5.0.0](#v5-0-0-—-enforcement-boundary-hardening) · [v4.0.5](#v4-0-5-—-stats-exception-masking) · [v4.0.4](#v4-0-4-—-fail-closed-execution-enforcement) · [v4.0.3](#v4-0-3-—-server-enforced-agent-security) · [v4.0.2](#v4-0-2-—-security-cleanup) · [v4.0.1](#v4-0-1-—-sentinel-guard-sync) · [v4.0.0](#v4-0-0-—-sentinel-edition) · [v3.0.1](#v3-0-1-—-ironclad-update) · [v2.4.1](#v2-4-1-—-the-reasoning-engine)
+**Jump to:** [QWED-Verification fail-closed unknown agent actions](#qwed-verification--fail-closed-unknown-agent-actions) · [QWED-Finance v2.1.0 — security audit hardening](#qwed-finance-v210--security-audit-hardening) · [QWED-Finance N-01/N-04 release blockers](#qwed-finance--release-blockers-n-01-and-n-04-resolved-no-go--go) · [QWED-Finance Decimal/mpmath migration](#qwed-finance--decimalmpmath-migration-for-bondguard-derivativesguard-and-riskguard) · [QWED-Verification SecureCodeExecutor fail-closed fallback](#qwed-verification--securecodeexecutor-fail-closed-when-codeverifier-is-unavailable) · [QWED-Finance security audit — OpenResponses fail-closed](#qwed-finance--openresponses-fail-closed-and-computed-status) · [QWED-Finance security audit — rate parsing](#qwed-finance--rate-parsing-heuristic-removed) · [QWED-Verification symbolic verifier fail-closed](#qwed-verification--symbolic-verifier-fail-closed-without-proof) · [QWED-Verification strict additionalProperties](#qwed-verification--strict-additionalproperties-fail-closed) · [QWED-Tax example redaction](#qwed-tax-—-redacted-preflight-block-details-in-examples) · [QWED-Tax decimal hardening](#qwed-tax-—-decimal-hardening-in-financial-guards) · [v5.1.0](#v5-1-0-—-agent-state-governance-and-fail-closed-hardening) · [v5.0.0](#v5-0-0-—-enforcement-boundary-hardening) · [v4.0.5](#v4-0-5-—-stats-exception-masking) · [v4.0.4](#v4-0-4-—-fail-closed-execution-enforcement) · [v4.0.3](#v4-0-3-—-server-enforced-agent-security) · [v4.0.2](#v4-0-2-—-security-cleanup) · [v4.0.1](#v4-0-1-—-sentinel-guard-sync) · [v4.0.0](#v4-0-0-—-sentinel-edition) · [v3.0.1](#v3-0-1-—-ironclad-update) · [v2.4.1](#v2-4-1-—-the-reasoning-engine)
+
+---
+
+## QWED-Verification — fail-closed unknown agent actions
+**Released: May 6, 2026** · [GitHub PR #176](https://github.com/QWED-AI/qwed-verification/pull/176)
+
+> Closes a fail-open gap in `AgentService.verify_action()`. Action types that are not bound to a verification engine or a governed tool are now denied with a dedicated error code instead of silently routing through a permissive default engine.
+
+### What changed
+
+- **`AgentService.verify_action`** — Action types not present in `ACTION_ENGINES` or `TOOL_RISK_LEVELS` now return `decision: "DENIED"` with `error.code: "QWED-AGENT-ACTION-001"`. The reserved conversation step is released so the agent can retry with a registered action type.
+- **`AgentService._assess_risk`** — Raises `ValueError` for unregistered action types instead of falling back to `RiskLevel.MEDIUM`. This prevents the deterministic risk path from inferring a default for actions QWED cannot verify.
+- **Engine resolution** — New `_resolve_action_engine` helper distinguishes engine-backed actions (`math`, `logic`, `sql`, etc.) from tool-controlled actions, which now report `engine: "tool_control"` in the verification response. The previous `"security"` default for unknown actions has been removed.
+- **`_run_verification_checks`** — When an action has no registered engine, an `action_registered` check is recorded as failed before any other check runs, making the denial reason visible in the `checks_failed` array.
+
+### Behavior comparison
+
+| Action type | Before | After |
+| --- | --- | --- |
+| Registered engine action (e.g. `verify_math`) | `engine: "math"`, normal risk path | Unchanged |
+| Governed tool (e.g. `read_database`) | `engine: "security"` (default) | `engine: "tool_control"` |
+| Unregistered action (e.g. `do_arbitrary_thing`) | `engine: "security"`, MEDIUM risk, may APPROVE/PENDING by trust level | `DENIED` with `QWED-AGENT-ACTION-001` |
+
+### Upgrade notes
+
+<Warning>
+If your agents emit `action_type` values that are not in QWED's engine map or tool registry, they will now be denied. Audit production traffic for non-standard action types and either bind them to an engine or register them as governed tools with an explicit risk level before upgrading.
+</Warning>
+
+See [Agent Verification — Registered action enforcement](/advanced/agent-verification#registered-action-enforcement) for the full denial flow and migration guidance, and [API errors](/api/errors#agent-errors) for the new error code.
 
 ---
 
@@ -280,7 +406,7 @@ Tools registered without `verification_fn` now return `REJECTED`. Add a `verific
 
 ---
 
-## QWED-Finance — Rate parsing heuristic removed
+## QWED-Finance — rate parsing heuristic removed
 **Released: April 30, 2026** · [GitHub PR #22](https://github.com/QWED-AI/qwed-finance/pull/22)
 
 > Removes silent rate format guessing from `BondGuard._parse_rate()` and `FinanceVerifier.verify_irr()`. Both functions used different heuristics that produced 100x errors for the same input.
@@ -311,7 +437,7 @@ Code that passes bare numbers ≥ 1 to `_parse_rate()` expecting auto-division w
 | H-01 | `verify_irr` guessing | Removed `llm_rate > 1` |
 | S-05 | Cross-guard inconsistency | Unified parsing logic |
 
-## QWED-Verification — Symbolic verifier fail-closed without proof
+## QWED-Verification — symbolic verifier fail-closed without proof
 **Released: April 30, 2026**
 
 > Fix in `SymbolicVerifier.verify_code()` that closes a fail-open gap where absence of symbolic proof could be reported as a successful verification. The verifier now fails closed unless a real CrossHair proof was actually performed.
@@ -359,7 +485,7 @@ Callers that previously treated `is_verified: true` as proof of correctness with
 
 ---
 
-## QWED-Verification — Strict `additionalProperties` fail-closed
+## QWED-Verification — strict `additionalProperties` fail-closed
 **Released: April 30, 2026**
 
 > Patch in `SchemaVerifier` that closes a fail-open gap when `strict=True` and a schema sets `"additionalProperties": false`. Payloads with undeclared properties are now rejected as invalid instead of silently passing with an advisory warning.
@@ -393,7 +519,7 @@ If you previously relied on strict-mode payloads passing despite undeclared prop
 
 ---
 
-## QWED-Tax — Redacted preflight block details in examples
+## QWED-Tax — redacted preflight block details in examples
 **Released: April 24, 2026**
 
 > Example scripts bundled with `qwed-tax` no longer print raw `TaxPreFlight` block reasons. Demo output is reduced to a high-level allow/block outcome so that running the examples cannot incidentally leak field values from the sample intents.
@@ -461,7 +587,7 @@ See the [QWED-Tax guards reference](/tax/guards) for full parameter and return-s
 
 ---
 
-## v5.1.0 — Agent state governance and fail-closed hardening
+## v5.1.0 — agent state governance and fail-closed hardening
 **Released: April 19, 2026** · [GitHub Release](https://github.com/QWED-AI/qwed-verification/releases/tag/v5.1.0)
 
 > Minor release expanding QWED from action verification into state governance while closing adversarial fail-open gaps identified after v5.0.0. Includes AgentStateGuard plus a focused hardening wave across execution, tool governance, mathematical verification, API semantics, and schema validation.
@@ -555,7 +681,7 @@ npm install @qwed-ai/sdk@5.1.0
 
 ---
 
-## v5.0.0 — Enforcement boundary hardening
+## v5.0.0 — enforcement boundary hardening
 **Released: April 4, 2026** · [GitHub Release](https://github.com/QWED-AI/qwed-verification/releases/tag/v5.0.0)
 
 > Major release making QWED's verification boundary fail-closed, deterministic about what it proves, and harder to bypass under adversarial conditions. Consolidates 98 commits and 20 merged PRs since v4.0.1, including the full enforcement hardening series.
@@ -631,7 +757,7 @@ If you use agent verification, all requests must now include `conversation_id` a
 </Warning>
 
 ---
-## v4.0.5 — Stats exception masking
+## v4.0.5 — stats exception masking
 **Released: April 3, 2026** · [GitHub PR #118](https://github.com/QWED-AI/qwed-verification/pull/118)
 
 > Prevents the Stats Engine from leaking internal exception details to API callers. Clients now receive a generic error message when stats code generation fails.
@@ -643,7 +769,7 @@ If you use agent verification, all requests must now include `conversation_id` a
 
 ---
 
-## v4.0.4 — Fail-closed execution enforcement
+## v4.0.4 — fail-closed execution enforcement
 **Released: April 3, 2026** · [GitHub PR #117](https://github.com/QWED-AI/qwed-verification/pull/117)
 
 > Removes unsafe in-process execution fallbacks from statistical and consensus verification. All model-generated Python now runs exclusively in the secure Docker sandbox.
@@ -665,7 +791,7 @@ If you use agent verification, all requests must now include `conversation_id` a
 
 ---
 
-## v4.0.3 — Server-enforced agent security
+## v4.0.3 — server-enforced agent security
 **Released: April 2, 2026** · [GitHub PR #116](https://github.com/QWED-AI/qwed-verification/pull/116)
 
 > Closes critical verification boundary gaps by enforcing agent security checks server-side, adding rate limiting to consensus verification, and removing unsafe fallback paths.
@@ -682,7 +808,7 @@ If you use agent verification, all requests must now include `conversation_id` a
 
 ---
 
-## v4.0.2 — Security cleanup
+## v4.0.2 — security cleanup
 **Released: April 1, 2026** · [GitHub PR #114](https://github.com/QWED-AI/qwed-verification/pull/114)
 
 > Hardens expression evaluation, improves error handling across the SDK and consensus engine, and removes unused code flagged by CodeQL.
@@ -749,13 +875,13 @@ npm install @qwed-ai/sdk@4.0.1
 
 > **147 commits** since v3.0.1 — the largest update in QWED history.
 
-### v4.0.0 patch — Provider fallbacks, .env loading, and Gemini stability
+### v4.0.0 patch — provider fallbacks, .env loading, and Gemini stability
 
 - **Native Gemini provider** — Gemini now runs through a dedicated provider with native support for math, logic, stats, fact, and image verification. All API calls enforce a 30-second timeout and automatically strip Markdown code fences from responses.
 - **Centralized .env loading** — Environment variables now load in a deterministic priority order: project `.env` first, then `~/.qwed/.env`. This prevents configuration drift between CLI and server contexts.
 - **Gemini AST stability** — Fixed intermittent JSON parse failures when Gemini returns code-fenced responses during logic translation.
 
-### Agentic Security Guards (Phase 17)
+### Agentic security guards (Phase 17)
 
 A brand-new guard subsystem for securing AI agent tool chains and RAG pipelines:
 
@@ -815,13 +941,13 @@ docker pull qwedai/qwed-verification:4.0.0
 
 ---
 
-## v3.0.1 — Ironclad update
+## v3.0.1 — ironclad update
 **Released: February 4, 2026** · [GitHub Release](https://github.com/QWED-AI/qwed-verification/releases/tag/v3.0.1)
 
 ### Critical security hardening
 - **CodeQL Remediation**: Resolved 50+ alerts including ReDoS, Clear-text Logging, and Exception Exposure.
 - **Workflow Permissions**: Enforced `permissions: contents: read` across all GitHub Actions to adhere to Least Privilege.
-- **PII Protection**: Implemented `redact_pii` logic across all API endpoints and exception handlers.
+- **PII Protection**: Implemented `redact_pii` logic in all API endpoints and exception handlers.
 
 ### Compliance
 - **Snyk Attribution**: Added Snyk attribution to README and Documentation footer for Partner Program compliance.
@@ -831,7 +957,7 @@ docker pull qwedai/qwed-verification:4.0.0
 
 ---
 
-## v2.4.1 — The reasoning engine
+## v2.4.1 — the reasoning engine
 **Released: January 20, 2026** · [GitHub Release](https://github.com/QWED-AI/qwed-verification/releases/tag/v2.4.1)
 
 ### New features

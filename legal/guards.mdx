@@ -1,7 +1,7 @@
 ---
 sidebar_position: 2
 title: "QWED Legal guards for contract verification"
-sidebarTitle: "The 10 Guards"
+sidebarTitle: "The 10 guards"
 description: "Reference for QWED Legal guards covering deadlines, liability, contradictions, citations, jurisdiction checks, and AI content provenance."
 ---
 
@@ -66,14 +66,53 @@ print(result.difference_days)    # 13
 
 | Field | Type | Description |
 | --- | --- | --- |
-| `verified` | `bool` | Whether the claimed deadline matches the computed deadline |
+| `verified` | `bool` | Whether the claimed deadline matches the computed deadline. Always `False` when `is_computable` is `False`. |
 | `signing_date` | `datetime` | Parsed signing date |
 | `claimed_deadline` | `datetime` | The deadline claimed by the LLM |
-| `computed_deadline` | `datetime` | The correct deadline computed by the guard |
-| `term_parsed` | `str` | The original term string |
-| `difference_days` | `int` | Absolute difference in days between claimed and computed |
-| `message` | `str` | Human-readable verification message |
+| `computed_deadline` | `Optional[datetime]` | The correct deadline computed by the guard. `None` when the term is ambiguous and the guard fails closed. |
+| `term_parsed` | `str` | The original term string, or `"ERROR"` when date parsing fails |
+| `difference_days` | `Optional[int]` | Absolute difference in days between claimed and computed. `None` when no deadline could be computed. |
+| `message` | `str` | Human-readable verification message. Starts with `⚠️ UNVERIFIABLE` when the term is ambiguous. |
+| `is_computable` | `bool` | `True` when the term parsed into an explicit quantity and unit. `False` when the input was ambiguous, unparseable, or the dates were invalid. |
 | `verification_mode` | `str` | Always `"SYMBOLIC"` for legal verification |
+
+### Fail-closed behavior on ambiguous terms
+
+`DeadlineGuard` does **not** invent deadlines from vague legal language. If the term cannot be parsed into a deterministic `(quantity, unit)` pair, the guard returns a fail-closed result with `verified=False`, `is_computable=False`, and `computed_deadline=None`.
+
+A term is treated as `UNVERIFIABLE` when either:
+
+- It contains **no numeric quantity** (e.g., `"forthwith"`, `"promptly after notice"`, `"within a reasonable period"`, `"as soon as practicable"`, `"without undue delay"`).
+- It contains a number but **no recognized time unit** (e.g., `"30"` alone, `"15 intervals"`).
+
+Recognized time units are `day`/`calendar`, `week`, `month`, and `year`, with optional `business`/`working`/`work` qualifiers for business-day arithmetic.
+
+```python
+from qwed_legal import DeadlineGuard
+
+guard = DeadlineGuard()
+
+# Ambiguous term — no numeric quantity
+result = guard.verify(
+    signing_date="2026-01-01",
+    term="within a reasonable period",
+    claimed_deadline="2026-01-31",
+)
+
+print(result.verified)          # False
+print(result.is_computable)     # False
+print(result.computed_deadline) # None
+print(result.difference_days)   # None
+print(result.message)
+# ⚠️ UNVERIFIABLE: Term 'within a reasonable period' does not contain a
+# provable time quantity and unit. Cannot compute a deterministic deadline...
+```
+
+<Warning>
+  Always check `result.is_computable` before relying on `computed_deadline` or `difference_days`. Ambiguous legal language requires human legal interpretation and is never silently coerced into a 30-day default.
+</Warning>
+
+Date parsing failures are also fail-closed: if `signing_date` or `claimed_deadline` cannot be parsed, the guard returns `verified=False` and `is_computable=False`.
 
 ### Features
 
@@ -83,6 +122,37 @@ print(result.difference_days)    # 13
 | **Holiday Support** | 200\+ countries via `python-holidays` |
 | **Leap Years** | Handles Feb 29 correctly |
 | **Natural Language** | Parses "2 weeks", "3 months", "1 year" |
+| **Fail-closed parsing** | Rejects ambiguous legal language ("reasonable period", "promptly") instead of inventing a deadline |
+
+### Fail-closed behavior on ambiguous terms
+
+`DeadlineGuard` only computes a deadline when the term contains both an explicit numeric quantity **and** a recognized time unit (`day`, `business day`, `calendar day`, `week`, `month`, `year`). When either is missing, the guard fails closed: it returns `verified=False`, `is_computable=False`, and a `computed_deadline` of `None` instead of guessing a default.
+
+This protects against silent acceptance of subjective legal language such as `"within a reasonable period"`, `"promptly"`, `"as soon as practicable"`, `"without undue delay"`, or `"forthwith"`. Resolving these terms requires human legal interpretation.
+
+```python
+from qwed_legal import DeadlineGuard
+
+guard = DeadlineGuard(country="US")
+
+result = guard.verify(
+    signing_date="2026-01-01",
+    term="within a reasonable period",
+    claimed_deadline="2026-01-31",
+)
+
+print(result.verified)           # False
+print(result.is_computable)      # False
+print(result.computed_deadline)  # None
+print(result.difference_days)    # None
+print(result.message)
+# ⚠️ UNVERIFIABLE: Term 'within a reasonable period' does not contain a
+# provable time quantity and unit. Cannot compute a deterministic deadline.
+# Ambiguous legal language (e.g., 'reasonable period', 'promptly') requires
+# human legal interpretation.
+```
+
+Always check `is_computable` before relying on `computed_deadline` or `difference_days`. When `is_computable` is `False`, route the contract clause to a human reviewer.
 
 ### Calculate business days between dates
 
@@ -230,7 +300,7 @@ print(result.conflicts)
 
 ### Z3-based verification
 
-For power users who want to define precise logical constraints. `verify_using_z3()` only accepts explicit Z3 `BoolRef` expressions — it does **not** parse free-form text. Callers must model the legal meaning themselves.
+When you need to define precise logical constraints, `verify_using_z3()` only accepts explicit Z3 `BoolRef` expressions — it does **not** parse free-form text. You must model the legal meaning yourself.
 
 ```python
 from z3 import Bool, Implies, Not
@@ -450,14 +520,38 @@ print(result.expiration_date)   # 2024-01-15
 print(result.days_remaining)    # -867 (negative = expired)
 ```
 
+### Fail-closed behavior
+
+`StatuteOfLimitationsGuard` is **fail-closed**: it never fabricates a limitation period for jurisdictions or claim types that are not in its rule tables.
+
+- **Exact match only.** Jurisdiction lookup uses exact string equality (case-insensitive, trimmed). Partial matches such as `"CALIF"` for `"CALIFORNIA"` or `"NEW"` for `"NEW YORK"` are rejected.
+- **Unknown jurisdiction → unverifiable.** If the jurisdiction is not in the supported list, `verify()` returns `verified=False` with `jurisdiction_matched=False`, all date and period fields set to `None`, and a message listing the supported jurisdictions.
+- **Unknown claim type → unverifiable.** If the jurisdiction is supported but the claim type is not modeled for it, `verify()` returns `verified=False` with `claim_type_matched=False`, and a message listing the supported claim types for that jurisdiction.
+
+```python
+result = guard.verify(
+    claim_type="breach_of_contract",
+    jurisdiction="Mars",
+    incident_date="2020-01-15",
+    filing_date="2026-06-01"
+)
+
+print(result.verified)              # False
+print(result.jurisdiction_matched)  # False
+print(result.limitation_period_years)  # None
+print(result.message)
+# ⚠️ UNVERIFIABLE: Jurisdiction 'Mars' is not in the supported jurisdiction list.
+# Cannot determine applicable statute of limitations. Supported: AUSTRALIA, CALIFORNIA, ...
+```
+
 ### Parameters
 
 <ParamField path="claim_type" type="str" required>
-  Type of legal claim (e.g., `"breach_of_contract"`, `"negligence"`, `"fraud"`). See supported claim types below.
+  Type of legal claim (e.g., `"breach_of_contract"`, `"negligence"`, `"fraud"`). Must exactly match one of the supported claim types for the given jurisdiction; unknown values produce an unverifiable result.
 </ParamField>
 
 <ParamField path="jurisdiction" type="str" required>
-  State or country name (e.g., `"California"`, `"New York"`, `"UK"`).
+  State or country name (e.g., `"California"`, `"New York"`, `"UK"`). Matched case-insensitively against the supported jurisdictions list — partial or substring matches are not accepted.
 </ParamField>
 
 <ParamField path="incident_date" type="str" required>
@@ -471,6 +565,52 @@ print(result.days_remaining)    # -867 (negative = expired)
 <ParamField path="claimed_within_period" type="bool">
   Optional LLM claim to verify. When provided, the guard checks whether the LLM's assertion (within/outside period) matches the computed result.
 </ParamField>
+
+### StatuteResult fields
+
+<ResponseField name="verified" type="bool">
+  `True` only when the jurisdiction and claim type are recognized and the filing falls within the limitation period (and matches `claimed_within_period`, if supplied).
+</ResponseField>
+
+<ResponseField name="claim_type" type="str">
+  The claim type passed in (echoed back).
+</ResponseField>
+
+<ResponseField name="jurisdiction" type="str">
+  The jurisdiction passed in (echoed back).
+</ResponseField>
+
+<ResponseField name="incident_date" type="Optional[datetime]">
+  Parsed incident date, or `None` if date parsing failed.
+</ResponseField>
+
+<ResponseField name="filing_date" type="Optional[datetime]">
+  Parsed filing date, or `None` if date parsing failed.
+</ResponseField>
+
+<ResponseField name="limitation_period_years" type="Optional[float]">
+  Limitation period applied, or `None` if the jurisdiction or claim type is unknown.
+</ResponseField>
+
+<ResponseField name="expiration_date" type="Optional[datetime]">
+  Computed expiration date, or `None` if no limitation period could be determined.
+</ResponseField>
+
+<ResponseField name="days_remaining" type="Optional[int]">
+  Days between filing date and expiration (negative if expired), or `None` if no limitation period could be determined.
+</ResponseField>
+
+<ResponseField name="message" type="str">
+  Human-readable result. Unverifiable results are prefixed with `⚠️ UNVERIFIABLE:` and list the supported jurisdictions or claim types.
+</ResponseField>
+
+<ResponseField name="jurisdiction_matched" type="bool" default="True">
+  `False` when the jurisdiction is not in the supported list.
+</ResponseField>
+
+<ResponseField name="claim_type_matched" type="bool" default="True">
+  `False` when the claim type is not modeled for the given jurisdiction.
+</ResponseField>
 
 ### Supported jurisdictions
 
@@ -495,24 +635,80 @@ print(result.days_remaining)    # -867 (negative = expired)
 
 `breach_of_contract`, `breach_of_warranty`, `negligence`, `professional_malpractice`, `fraud`, `personal_injury`, `property_damage`, `employment`, `product_liability`, `defamation`
 
+### Fail-closed on unknown jurisdictions and claim types
+
+`StatuteOfLimitationsGuard` only computes limitation periods for the jurisdictions and claim types it has explicit rules for. Anything outside that table fails closed instead of returning a fabricated period.
+
+- **Exact jurisdiction match only.** Inputs are uppercased and trimmed before lookup. Substring matches like `"CALIF"` no longer resolve to `"CALIFORNIA"`, and a misspelled or unsupported jurisdiction never falls back to a generic default rule table.
+- **Exact claim type match only.** Claim types are lowercased with spaces converted to underscores before lookup. Unknown claim types no longer silently default to a 3-year period.
+- **`UNVERIFIABLE` result.** When either lookup fails, `verify()` returns a `StatuteResult` with `verified=False`, all date and period fields set to `None`, and a `message` that begins with `⚠️ UNVERIFIABLE` and lists the supported values.
+- **New flags.** `StatuteResult` exposes `jurisdiction_matched: bool` and `claim_type_matched: bool` so callers can distinguish "claim is time-barred" from "we cannot determine the limit".
+
+```python
+result = guard.verify(
+    claim_type="breach_of_contract",
+    jurisdiction="Atlantis",
+    incident_date="2023-01-15",
+    filing_date="2026-06-01",
+)
+
+print(result.verified)              # False
+print(result.jurisdiction_matched)  # False
+print(result.claim_type_matched)    # False
+print(result.limitation_period_years)  # None
+print(result.expiration_date)       # None
+print(result.message)
+# ⚠️ UNVERIFIABLE: Jurisdiction 'Atlantis' is not in the supported
+# jurisdiction list. Cannot determine applicable statute of limitations.
+# Supported: AUSTRALIA, CALIFORNIA, CANADA, DELAWARE, FLORIDA, FRANCE,
+# GERMANY, ILLINOIS, INDIA, NEW YORK, TEXAS, UK.
+```
+
+```python
+result = guard.verify(
+    claim_type="cybersquatting",
+    jurisdiction="California",
+    incident_date="2023-01-15",
+    filing_date="2026-06-01",
+)
+
+print(result.jurisdiction_matched)  # True
+print(result.claim_type_matched)    # False
+# Message lists the supported claim types for California.
+```
+
+<Warning>
+  This is a breaking change. `get_limitation_period()` now returns `Optional[float]` and `StatuteResult` date and period fields are `Optional`. Callers that previously assumed a numeric result must handle `None` and treat unverifiable inputs as a hard failure rather than a passing check. See the [changelog entry](/changelog#qwed-legal-statuteoflimitationsguard-fail-closed-on-unknown-jurisdictions-and-claim-types) for migration notes.
+</Warning>
+
 ### Get limitation period
 
-Look up the limitation period for a specific claim type and jurisdiction without performing a full verification:
+Look up the limitation period for a specific claim type and jurisdiction without performing a full verification. Returns `None` when the jurisdiction or claim type is not supported:
 
 ```python
 years = guard.get_limitation_period("fraud", "Germany")
 print(years)  # 10.0
+
+unknown = guard.get_limitation_period("fraud", "Atlantis")
+print(unknown)  # None
+
+unsupported_claim = guard.get_limitation_period("cybersquatting", "California")
+print(unsupported_claim)  # None
 ```
 
 ### Compare jurisdictions
 
+`compare_jurisdictions()` returns `Dict[str, Optional[float]]`. Unsupported jurisdictions map to `None` so you can surface them in the UI rather than mixing them with real periods:
+
 ```python
 comparison = guard.compare_jurisdictions(
     "breach_of_contract",
-    ["California", "New York", "Delaware"]
+    ["California", "New York", "Delaware", "Atlantis"]
 )
-# {'California': 4.0, 'New York': 6.0, 'Delaware': 3.0}
+# {'California': 4.0, 'New York': 6.0, 'Delaware': 3.0, 'Atlantis': None}
 ```
+
+Unsupported jurisdictions map to `None` rather than a default value.
 
 ---
 
@@ -816,7 +1012,7 @@ When verification fails, the `risk` field indicates the type of failure:
 
 ---
 
-## SACProcessor (RAG Helper) 📄
+## SACProcessor (RAG helper) 📄
 
 **Purpose:** Prevent Document-Level Retrieval Mismatch (DRM) in legal RAG systems.
 
@@ -871,7 +1067,7 @@ print(augmented[0])
 
 ---
 
-## All-in-One: LegalGuard
+## All-in-one: LegalGuard
 
 For convenience, use the unified `LegalGuard` class:
 

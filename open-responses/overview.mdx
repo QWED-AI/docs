@@ -86,7 +86,7 @@ AI Agent Output → Guards → Verified? → Execute
 
 ## The 6 guards
 
-| Guard | What It Verifies | Example Catch |
+| Guard | What it verifies | Example catch |
 |-------|------------------|---------------|
 | **SchemaGuard** | JSON Schema compliance | Missing required field |
 | **ToolGuard** | Block dangerous tool calls | `execute_shell` blocked |
@@ -355,10 +355,10 @@ verifier = ResponseVerifier(guards=[tool_guard, safety_guard])
 
 ## Next steps
 
-- [Guards Reference](./guards) - Deep dive into each guard
+- [Guards reference](./guards) - Deep dive into each guard
 - [Examples](./examples) - Real-world use cases
-- [LangChain Integration](./langchain) - Agent verification
-- [OpenAI Integration](./openai) - Responses API
+- [LangChain integration](./langchain) - Agent verification
+- [OpenAI integration](./openai) - Responses API
 - [Troubleshooting](./troubleshooting) - Common issues
 
 ---

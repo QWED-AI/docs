@@ -1,6 +1,6 @@
 ---
 title: "Prompt injection defense and QWED security hardening"
-sidebarTitle: "Security Hardening"
+sidebarTitle: "Security hardening"
 description: "Harden QWED for production with prompt injection defense, secret management, network security, authentication, and OWASP LLM Top 10 compliance."
 ---
 
@@ -16,7 +16,7 @@ QWED relies on environment variables for sensitive configuration. **Never commit
 
 ### Environment variable injection
 
-For production deployments, we recommend injecting environment variables using your infrastructure's secret management solution.
+For production deployments, inject environment variables using your infrastructure's secret management solution.
 
 #### Docker / Kubernetes
 Use Kubernetes Secrets or HashiCorp Vault to inject secrets as environment variables into the container.
@@ -105,7 +105,7 @@ export RATE_LIMIT_WINDOW_SECONDS=60
 The in-memory rate limiter is now thread-safe. All check-and-record operations are protected by a lock, which prevents race conditions when multiple threads handle concurrent requests in a single process. This eliminates a class of bypass where two requests arriving simultaneously could both pass the limit check before either was recorded.
 
 #### Redis backing (recommended)
-The default in-memory limiter does not scale across multiple worker processes or replicas. For high-availability deployments, we recommend using a Redis-backed rate limiter to ensure consistent enforcement across your cluster.
+The default in-memory limiter does not scale across multiple worker processes or replicas. For high-availability deployments, use a Redis-backed rate limiter to ensure consistent enforcement across your cluster.
 
 <Note>
 The Redis-backed rate limiter uses a **fail-closed** policy. If Redis becomes unreachable at runtime, requests are denied rather than allowed through. This prevents a Redis outage from silently disabling rate limiting. An in-memory fallback is only used when Redis is unavailable at initialization time.
@@ -322,7 +322,7 @@ While QWED handles internal verification, you must implement the following "Huma
 #### LLM06: Sensitive information disclosure
 - **Data Minimization**: Do not send PII (Personally Identifiable Information) to QWED unless absolutely necessary. Mask or redact sensitive data *before* it reaches the API.
 
-For related deployment controls, see [Architecture Overview](/architecture), [SDK Guards](/sdks/guards), and [Troubleshooting Guide](/troubleshooting).
+For related deployment controls, see [Architecture overview](/architecture), [SDK guards](/sdks/guards), and [Troubleshooting guide](/troubleshooting).
 
 ---
 

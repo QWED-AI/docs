@@ -6,7 +6,9 @@ description: "Set up QWED in your development environment. Covers backend server
 
 Learn how to set up and run QWED in your development environment.
 
-:::danger Common Mistake **Don't call your LLM directly!** QWED needs to run as a backend server with YOUR LLM API keys configured in environment variables. See [Common Pitfalls](./common-pitfalls) for details. :::
+<Warning>
+**Don't call your LLM directly.** QWED runs as a backend server with your LLM API keys configured in environment variables. See [Common pitfalls](./common-pitfalls) for details.
+</Warning>
 
 ---
 
@@ -15,12 +17,12 @@ Learn how to set up and run QWED in your development environment.
 QWED uses a **backend server model**:
 
 ```text
-Your Application
+Your application
   ↓ (SDK calls)
-QWED Backend Server (you run this!)
-  ├─ Your LLM API Key (from .env)
+QWED backend server (you run this)
+  ├─ Your LLM API key (from .env)
   ├─ LLM calls (OpenAI/Anthropic/etc)
-  ├─ Formal Verifiers (SymPy, Z3)
+  ├─ Formal verifiers (SymPy, Z3)
   └─ Returns verified result
 ```
 
@@ -41,7 +43,7 @@ pip install -r requirements.txt
 
 ## Step 2: Configure LLM provider
 
-QWED is **model agnostic** - select any LLM based on your needs:
+QWED is **model agnostic** — select any LLM based on your needs:
 
 ### Create environment file
 
@@ -52,7 +54,7 @@ cp .env.example .env
 
 ### Select your LLM provider
 
-Edit `.env` and add your API key for ONE provider:
+Edit `.env` and add your API key for one provider:
 
 <Tabs>
   <Tab title="OpenAI">
@@ -62,7 +64,7 @@ Edit `.env` and add your API key for ONE provider:
     OPENAI_API_KEY=sk-proj-...
     ```
 
-    **Get API Key:** [https://platform.openai.com/api-keys](https://platform.openai.com/api-keys)
+    **Get an API key:** [https://platform.openai.com/api-keys](https://platform.openai.com/api-keys)
   </Tab>
   <Tab title="Anthropic Claude">
     ```bash
@@ -71,7 +73,7 @@ Edit `.env` and add your API key for ONE provider:
     ANTHROPIC_API_KEY=sk-ant-api03-...
     ```
 
-    **Get API Key:** [https://console.anthropic.com](https://console.anthropic.com)
+    **Get an API key:** [https://console.anthropic.com](https://console.anthropic.com)
   </Tab>
   <Tab title="Azure OpenAI">
     ```bash
@@ -92,11 +94,13 @@ Edit `.env` and add your API key for ONE provider:
     GOOGLE_API_KEY=AIzaSy...
     ```
 
-    **Get API Key:** [https://makersuite.google.com/app/apikey](https://makersuite.google.com/app/apikey)
+    **Get an API key:** [https://makersuite.google.com/app/apikey](https://makersuite.google.com/app/apikey)
   </Tab>
 </Tabs>
 
-:::tip See Full Configuration Guide For AWS Bedrock and more options, see: [LLM Configuration](https://github.com/QWED-AI/qwed-verification/blob/main/docs/LLM_CONFIGURATION.md) :::
+<Tip>
+For AWS Bedrock and more options, see [LLM configuration](https://github.com/QWED-AI/qwed-verification/blob/main/docs/LLM_CONFIGURATION.md).
+</Tip>
 
 ---
 
@@ -110,7 +114,7 @@ python -m qwed_api
 # INFO: Uvicorn running on http://0.0.0.0:8000
 ```
 
-**Keep this terminal running!** The server needs to stay active.
+**Keep this terminal running.** The server must stay active.
 
 ---
 
@@ -138,7 +142,7 @@ In a **new terminal**, install the QWED SDK in your project:
 
 ---
 
-## Step 5: use the SDK
+## Step 5: Use the SDK
 
 Connect your application to the local QWED backend:
 
@@ -272,9 +276,9 @@ Run this test to ensure everything is working:
 
 Once your integration is working:
 
-- 📖 [Common Pitfalls](./common-pitfalls) - Avoid integration mistakes
-- 🧪 [Testing Your Integration](./testing) - Validate your setup
-- 🚀 [Production Deployment](./production) - Deploy with confidence
+- [Common pitfalls](./common-pitfalls) — avoid integration mistakes
+- [Testing your integration](./testing) — validate your setup
+- [Production deployment](./production) — deploy with confidence
 
 ---
 
@@ -288,7 +292,7 @@ Once your integration is working:
 Error: ANTHROPIC_API_KEY environment variable not set
 ```
 
-**Solution:** Check your `.env` file has the correct API key for your chosen provider.
+**Solution:** Check your `.env` file has the correct API key for your selected provider.
 
 ---
 
@@ -316,12 +320,12 @@ Connection refused to http://localhost:8000
 
 1. Check which LLM provider you configured
 2. Verify your API key is valid
-3. See [Testing Guide](./testing) for detailed diagnostics
+3. See [Testing guide](./testing) for detailed diagnostics
 
 ---
 
 ## Need help?
 
-- 💬 [Community Support](https://github.com/QWED-AI/qwed-verification/discussions)
-- 📧 Email: [support@qwedai.com](mailto:support@qwedai.com)
-- 📖 [Full Documentation](https://docs.qwedai.com)
+- [Community support](https://github.com/QWED-AI/qwed-verification/discussions)
+- Email: [support@qwedai.com](mailto:support@qwedai.com)
+- [Full documentation](https://docs.qwedai.com)

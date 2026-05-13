@@ -1,5 +1,5 @@
 ---
-title: "QWED Design Decisions"
+title: "QWED design decisions"
 description: "QWED's core design philosophy and the Untrusted Translator pattern for deterministic verification of LLM outputs."
 ---
 
@@ -154,7 +154,7 @@ query2 = "The Sun orbits the Earth"
 
 **Design principles:**
 1. **Single method per domain:** `verify_math()`, `verify_logic()`, `verify_code()`
-2. **Smart routing:** Auto-detect domain from query
+2. **Domain-aware routing:** Auto-detect domain from query
 3. **Rich error messages:** Explain what failed and why
 4. **Fallback values:** Graceful degradation on verification failure
 
@@ -166,7 +166,7 @@ print(result.verified)  # True
 print(result.value)  # 4
 ```
 
-**Rationale:** Developers shouldn't need to learn SymPy, Z3, AST separately. QWED provides a unified interface.
+**Rationale:** You shouldn't need to learn SymPy, Z3, and AST separately. QWED provides a unified interface.
 
 ---
 
@@ -205,7 +205,7 @@ print(result.value)  # 4
 
 **Option B: Graceful degradation with audit trails** ← **CHOSEN**
 - Pros: Better UX, transparent failures
-- Cons: Users might miss errors
+- Cons: you might miss errors
 
 ### The decision
 
@@ -260,7 +260,7 @@ except VerificationError as e:
 
 ### The mental model
 
-**Why this matters:** Helps users understand QWED's scope
+**Why this matters:** helps you understand QWED's scope
 
 **Calculator (Deterministic):**
 - Input: 2 + 2
@@ -332,7 +332,7 @@ This project was developed with assistance from generative AI tools:
 ### What we'd change
 
 1. **Earlier framework integrations:** Should have built LangChain support sooner
-2. **More domain tutorials:** Users needed more examples per domain
+2. **More domain tutorials:** you asked for more examples per domain
 3. **Clearer scope communication:** "Calculator not Wikipedia" analogy should be upfront
 
 ---

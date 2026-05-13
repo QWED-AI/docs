@@ -1,38 +1,38 @@
 ---
-title: "QWEDLocal - Client-Side Verification"
-description: "Run QWED verification directly in your code without a backend server. 100% privacy, model-agnostic support, and deterministic result caching for cost reduction."
+title: "QWEDLocal — client-side verification"
+description: "Run QWED verification directly in your code without a backend server. Local execution, model-agnostic support, and deterministic result caching."
 sidebarTitle: "QWEDLocal"
 ---
 
-## 🌟 Why QWEDLocal?
+## Why QWEDLocal?
 
-### **No backend server needed**
+### No backend server needed
 
 - Run verification directly in your application
 - No infrastructure to manage
-- Perfect for prototyping, scripts, and small projects
+- Suitable for prototyping, scripts, and small projects
 
-### **100% privacy**
+### Local execution
 
 - Your API keys stay on your machine
-- Your data never touches QWED servers
-- Perfect for HIPAA, GDPR, sensitive data
+- Your data does not touch QWED servers
+- Useful for HIPAA, GDPR, and sensitive-data workloads
 
-### **Model agnostic**
+### Model agnostic
 
-- Works with **ANY LLM** - OpenAI, Anthropic, Gemini
-- Works with **local models** via Ollama (FREE!)
-- Works with **any OpenAI-compatible API**
+- Works with any supported LLM — OpenAI, Anthropic, Gemini
+- Works with local models via Ollama
+- Works with any OpenAI-compatible API
 
-### **Deterministic caching**
+### Deterministic caching
 
-- Automatic result caching saves API costs
-- 50-80% cost reduction on repeated queries
-- 10x faster for cache hits
+- Cached results return without an LLM round-trip
+- Repeated queries skip the LLM call
+- Cache hits avoid network latency
 
 ---
 
-## 📦 Installation
+## Installation
 
 ```bash
 pip install qwed
@@ -56,9 +56,9 @@ pip install colorama click
 
 ---
 
-## 🚀 Quick start
+## Quick start
 
-### Option 1: Ollama (FREE! \$0/month)
+### Option 1: Ollama (no per-call cost)
 
 ```bash
 # 1. Install Ollama
@@ -116,7 +116,7 @@ result = client.verify("What is 5 factorial?")
 
 ---
 
-## 🔬 Verification engines
+## Verification engines
 
 ### 1. Math verification (SymPy)
 
@@ -162,9 +162,9 @@ print(result.evidence["dangerous_patterns"])
 
 ---
 
-## ⚡ Deterministic caching
+## Deterministic caching
 
-**Automatic caching saves API costs!**
+Caching avoids redundant LLM calls.
 
 ```python
 # First call - hits LLM ($$$)
@@ -199,7 +199,7 @@ client = QWEDLocal(
 
 ---
 
-## 🎨 CLI tool
+## CLI tool
 
 ### One-shot verification
 
@@ -254,21 +254,21 @@ qwed interactive --help
 
 ---
 
-## 🎯 Cost comparison
+## Cost comparison
 
-| Tier | Monthly Cost | LLM Options | Best For |
+| Tier | Monthly cost | LLM options | Use cases |
 | --- | --- | --- | --- |
-| **Local** | **\$0** | Ollama (Llama 3, Mistral, Phi) | Students, Privacy, Development |
-| **Budget** | **~\$5-10** | GPT-4o-mini, Gemini Flash | Startups, Prototypes |
-| **Premium** | **~\$50-100** | GPT-4, Claude Opus | Enterprises, Production |
+| **Local** | **\$0** | Ollama (Llama 3, Mistral, Phi) | students, privacy, development |
+| **Budget** | **~\$5-10** | GPT-4o-mini, Gemini Flash | startups, prototypes |
+| **Premium** | **~\$50-100** | GPT-4, Claude Opus | enterprises, production |
 
-**With caching: 50-80% cost reduction!**
+Caching reduces repeated-query cost by skipping the LLM call.
 
 ---
 
-## 🔒 Privacy and security
+## Privacy and security
 
-### **Your data never leaves your machine**
+### Local-only data flow
 
 **QWEDLocal architecture:**
 
@@ -292,7 +292,7 @@ qwed interactive --help
 └─────────────────────────────────────┘
 ```
 
-**Perfect for:**
+**Use cases:**
 
 - Healthcare (HIPAA compliance)
 - Finance (PCI-DSS compliance)
@@ -301,7 +301,7 @@ qwed interactive --help
 
 ---
 
-## 🔧 Advanced configuration
+## Advanced configuration
 
 ### Custom cache settings
 
@@ -334,7 +334,7 @@ result = client.verify("2+2")
 
 ---
 
-## 📊 Examples
+## Examples
 
 ### Example 1: fact-checking pipeline
 
@@ -396,7 +396,7 @@ print(client.cache_stats)
 
 ---
 
-## 🐛 Troubleshooting
+## Troubleshooting
 
 ### LLM not available
 
@@ -430,28 +430,28 @@ client._cache.clear()
 
 ---
 
-## 🎓 Learn more
+## Learn more
 
-- [**CLI Guide**](/advanced/cli) - Complete CLI reference
-- [**Ollama Integration**](/advanced/ollama) - FREE local LLMs
-- [**LLM Configuration**](/getting-started/llm-configuration) - All provider setups
-- [**Full Documentation**](https://docs.qwedai.com) - Complete docs
-
----
-
-## 🤝 Contributing
-
-Contributions welcome! See [Contributing Guide](https://github.com/QWED-AI/qwed-verification/blob/main/CONTRIBUTING.md)
+- [CLI guide](/advanced/cli) — complete CLI reference
+- [Ollama integration](/advanced/ollama) — local LLMs
+- [LLM configuration](/getting-started/llm-configuration) — provider setup
+- [Full documentation](https://docs.qwedai.com)
 
 ---
 
-## 📝 License
+## Contributing
 
-Apache 2.0 - See [LICENSE](https://github.com/QWED-AI/qwed-verification/blob/main/LICENSE)
+Contributions welcome. See the [contributing guide](https://github.com/QWED-AI/qwed-verification/blob/main/CONTRIBUTING.md).
 
 ---
 
-## ⭐ Support
+## License
+
+Apache 2.0 — see [LICENSE](https://github.com/QWED-AI/qwed-verification/blob/main/LICENSE).
+
+---
+
+## Support
 
 If QWEDLocal saved you time or money, give us a star! ⭐
 

@@ -1,6 +1,6 @@
 ---
 sidebar_position: "8"
-title: "Reasoning Engine"
+title: "Reasoning engine"
 description: "The Reasoning Engine validates LLM reasoning traces using chain-of-thought parsing, multi-provider verification, and caching."
 ---
 
@@ -31,7 +31,7 @@ print(result.reasoning_trace)  # Step-by-step logic
 print(result.cached)       # True/False
 ```
 
-## Multi-Provider Verification
+## Multi-provider verification
 
 ```python
 result = client.verify_reasoning(
@@ -58,24 +58,91 @@ result2 = client.verify_reasoning(query, enable_caching=True)
 print(result2.cached)  # True (instant!)
 ```
 
-### Cache scope and isolation
+Each `ReasoningVerifier` instance owns its own cache, so verifiers configured with different providers or modes do not share entries. Cache keys incorporate the query, primary formula, the provider list (in configured order), and the cross-validation flag, and cached results are returned as defensive copies so callers cannot mutate stored entries.
 
-Cache entries are scoped to the full verification mode, not just the query and formula. The cache key incorporates:
+### Cache key composition
 
-- The query and primary formula.
-- The configured provider list.
-- Whether `enable_cross_validation` was requested.
+A cache entry is only reused when every component below matches the current verification call. Changing any of these forces a fresh computation:
 
-This means a result returned with `enable_cross_validation=False` is never reused for a later call with `enable_cross_validation=True`, and a result computed with one provider configuration will not satisfy a call made with a different one. Each `ReasoningVerifier` instance also keeps its own cache, so results from one verifier never leak into another.
+<ParamField path="query" type="string">
+  The verification query text, byte-for-byte.
+</ParamField>
 
-Cached results are returned as defensive copies. Mutating fields on a returned `ReasoningValidation` (for example, appending to `issues` or `reasoning_trace`) will not affect the stored cache entry or any subsequent call.
+<ParamField path="primary formula" type="string">
+  The expression of the primary task derived from the query.
+</ParamField>
+
+<ParamField path="providers" type="list[string]">
+  The configured provider list, in the order it was supplied. Provider precedence is part of cache identity: reordering providers (for example, swapping the primary) invalidates the cache, as do additions or removals.
+</ParamField>
+
+<ParamField path="enable_cross_validation" type="bool">
+  Whether cross-validation is requested. Toggling this flag invalidates cache reuse, because cross-validated and single-provider results are not interchangeable.
+</ParamField>
+
+### TTL enforcement
+
+Cached entries are bound to their creation time and are evaluated against `cache_ttl_seconds` on every lookup. When an entry's age exceeds the TTL, it is evicted and the verifier recomputes the result. Stale entries are never returned, even if they remain within the LRU window.
 
 ```python
-result1 = client.verify_reasoning(query, enable_cross_validation=False)
-result1.issues.append("local note")  # safe - does not modify cache
+from qwed_sdk import QWEDClient
 
-result2 = client.verify_reasoning(query, enable_cross_validation=False)
-print(result2.issues)  # unchanged from the original cached value
+# 5-second TTL for demonstration
+client = QWEDClient(api_key="qwed_...", cache_ttl_seconds=5)
+
+result1 = client.verify_reasoning(query="...", enable_caching=True)
+print(result1.cached)  # False
+
+# Within TTL - cached
+result2 = client.verify_reasoning(query="...", enable_caching=True)
+print(result2.cached)  # True
+
+# After TTL expiry - recomputed
+import time; time.sleep(6)
+result3 = client.verify_reasoning(query="...", enable_caching=True)
+print(result3.cached)  # False
+```
+
+### Instance isolation
+
+The cache is per-instance state, not shared across `ReasoningVerifier` objects. Two verifiers — even with identical configuration — start with independent caches and never read or write each other's entries. This prevents stale results from one verification context replaying under a different one.
+
+## Fail-closed prerequisites
+
+The engine fails closed when required reasoning evidence is missing. A verification result is only marked valid when both prerequisites below are satisfied.
+
+<ParamField path="reasoning trace" type="required">
+  A substantive reasoning trace must be produced by the primary provider. The verifier scans each numbered or bulleted trace entry and rejects entries that contain any of the following non-substantive markers (case-insensitive):
+
+  - `no llm provider`
+  - `could not generate reasoning trace`
+  - `no structured reasoning trace generated`
+  - `failed to generate reasoning trace`
+  - `n/a`
+  - `unavailable`
+  - `no reasoning`
+  - `rate limit exceeded`
+
+  Indented trace entries are still accepted as long as they begin with a digit or `-` after stripping leading whitespace. If no substantive entries remain, the result includes the issue `Reasoning trace unavailable or non-substantive` and `is_valid` is `False`.
+</ParamField>
+
+<ParamField path="distinct secondary provider" type="required when enable_cross_validation=True">
+  Cross-validation requires a secondary provider that is different from the primary. The primary provider is no longer reused as a fallback.
+
+  If `enable_cross_validation=True` and no distinct secondary provider is configured, the result includes the issue `Cross-validation requested but no distinct secondary provider is available` and `is_valid` is `False`.
+</ParamField>
+
+```python
+# Fails closed: only one provider configured but cross-validation requested
+result = client.verify_reasoning(
+    query="Complex reasoning task...",
+    providers=["anthropic"],
+    enable_cross_validation=True,
+)
+
+print(result.is_valid)  # False
+print(result.issues)
+# ["Cross-validation requested but no distinct secondary provider is available"]
 ```
 
 ## Formula equivalence

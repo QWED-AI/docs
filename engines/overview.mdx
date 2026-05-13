@@ -6,45 +6,45 @@ description: "QWED provides 11 specialized verification engines, each using dete
 
 ## Engine overview
 
-| Engine | Technology | Key Features |
+| Engine | Technology | Key features |
 | --- | --- | --- |
-| **Math** | SymPy \+ Decimal | Calculus, Matrix ops, NPV/IRR, Statistics |
-| **Logic** | Z3 Theorem Prover | ForAll/Exists quantifiers, BitVectors, Arrays |
-| **Reasoning** | Multi-LLM \+ Cache | Chain-of-thought validation, Result caching |
-| **Stats** | Wasm/Docker Sandbox | Secure code execution with AST validation |
-| **Fact** | TF-IDF \+ NLP | Semantic similarity, Entity matching, Citations |
-| **Graph** | Knowledge Graph | Triple verification (Subject-Predicate-Object) |
-| **Code** | Multi-Lang AST | Python, JavaScript, Java, Go security analysis |
-| **SQL** | SQLGlot AST | Complexity limits, Cost estimation, Schema validation |
-| **Taint** | Data Flow Analysis | Trace untrusted inputs to sensitive sinks |
-| **Image** | Deterministic \+ VLM | Metadata extraction, Size verification, Multi-VLM |
+| **Math** | SymPy \+ Decimal | Calculus, matrix ops, NPV/IRR, statistics |
+| **Logic** | Z3 theorem prover | ForAll/Exists quantifiers, BitVectors, arrays |
+| **Reasoning** | Multi-LLM \+ cache | Chain-of-thought validation, result caching |
+| **Stats** | Wasm/Docker sandbox | Secure code execution with AST validation |
+| **Fact** | TF-IDF \+ NLP | Semantic similarity, entity matching, citations |
+| **Graph** | Knowledge graph | Triple verification (subject-predicate-object) |
+| **Code** | Multi-lang AST | Python, JavaScript, Java, Go security analysis |
+| **SQL** | SQLGlot AST | Complexity limits, cost estimation, schema validation |
+| **Taint** | Data flow analysis | Trace untrusted inputs to sensitive sinks |
+| **Image** | Deterministic \+ VLM | Metadata extraction, size verification, multi-VLM |
 | **Schema** | Pydantic \+ Math | JSON structure \+ embedded calculation checks |
 
 ## Deterministic-first philosophy
 
-All engines now follow a **deterministic-first** approach:
+All engines follow a **deterministic-first** approach:
 
 1. **Try deterministic methods first** (100% reproducible)
 2. **Fall back to LLM only when necessary**
 3. **Discount LLM confidence** when used
 
 ```python
-# Example: Fact verification is now deterministic!
+# Example: fact verification is deterministic
 result = client.verify_fact(
     claim="Paris is in France",
     context="Paris is the capital of France."
 )
 # Uses TF-IDF similarity + entity matching
-# No LLM needed for most claims!
+# No LLM needed for most claims
 ```
 
-> 📖 **See [Determinism Guarantee](/advanced/determinism-guarantee)** for the full engine classification and how to check if a response is `SYMBOLIC` or `HEURISTIC`.
+> **See [Determinism guarantee](/advanced/determinism-guarantee)** for the full engine classification and how to check if a response is `SYMBOLIC` or `HEURISTIC`.
 
 ## Engine selection
 
 QWED auto-detects the appropriate engine:
 
-| Content Pattern | Detected Engine |
+| Content pattern | Detected engine |
 | --- | --- |
 | `2+2=4`, `sqrt(16)`, `derivative` | Math |
 | `(AND ...)`, `ForAll`, `Exists` | Logic |
@@ -63,24 +63,24 @@ result = client.verify(query, type="math")
 
 ### Deterministic engines
 
-- [Math Engine](/engines/math) - Calculus, Matrix, Financial
-- [Logic Engine](/engines/logic) - Quantifiers, Theorem Proving
-- [Schema Engine](/engines/schema) - JSON Structure & Math
+- [Math engine](/engines/math) — calculus, matrix, financial
+- [Logic engine](/engines/logic) — quantifiers, theorem proving
+- [Schema engine](/engines/schema) — JSON structure & math
 
 ### Security engines
 
-- [Code Engine](/engines/code) - Multi-language Security
-- [SQL Engine](/engines/sql) - Complexity Limits
-- [Taint Engine](/engines/taint) - Data Flow Analysis
+- [Code engine](/engines/code) — multi-language security
+- [SQL engine](/engines/sql) — complexity limits
+- [Taint engine](/engines/taint) — data flow analysis
 
 ### Data verification engines
 
-- [Stats Engine](/engines/stats) - Wasm Sandbox Execution
-- [Fact Engine](/engines/fact) - TF-IDF \+ Citations
-- [Graph Engine](/engines/graph) - Knowledge Graph Triples
-- [Image Engine](/engines/image) - Deterministic Verification
+- [Stats engine](/engines/stats) — Wasm sandbox execution
+- [Fact engine](/engines/fact) — TF-IDF \+ citations
+- [Graph engine](/engines/graph) — knowledge graph triples
+- [Image engine](/engines/image) — deterministic verification
 
 ### Orchestration engines
 
-- [Reasoning Engine](/engines/reasoning) - Multi-LLM Validation
-- [Consensus Engine](/engines/consensus) - Parallel Execution
+- [Reasoning engine](/engines/reasoning) — multi-LLM validation
+- [Consensus engine](/engines/consensus) — parallel execution

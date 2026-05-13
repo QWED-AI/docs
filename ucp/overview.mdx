@@ -88,7 +88,7 @@ AI Agent → UCP Checkout → QWED-UCP Guard → Payment Gateway
 
 ## The 10 guards
 
-| Guard | What It Verifies | Error When Wrong |
+| Guard | What it verifies | Error when wrong |
 |-------|------------------|------------------|
 | **Money Guard** | `total = subtotal - discount + tax` | "Calculated 98.25, Agent claimed 100.00" (Checked via **SymPy**) |
 | **State Guard** | Valid checkout state transitions | "Invalid transition: completed → incomplete" (Checked via **Z3 Solver**) |

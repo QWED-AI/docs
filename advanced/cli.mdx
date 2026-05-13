@@ -1,9 +1,9 @@
 ---
-title: "QWED CLI Reference"
+title: "QWED CLI reference"
 description: "QWED command-line interface reference. Run qwed verify with provider options, model selection, and caching controls for terminal-based LLM verification."
 ---
 
-**Beautiful command-line interface for QWED verification.**
+Command-line interface for QWED verification.
 
 ## Installation
 
@@ -17,9 +17,9 @@ The `qwed` CLI is automatically available after installation.
 
 ## Commands
 
-### `qwed init` - Onboarding and bootstrap
+### `qwed init` - onboarding and bootstrap
 
-Production-grade onboarding wizard that sets up verification engines, configures your LLM provider, and bootstraps a local API key — all in a single command. Run this once after installing QWED.
+Onboarding wizard that sets up verification engines, configures your LLM provider, and bootstraps a local API key — all in a single command. Run this once after installing QWED.
 
 ```bash
 qwed init
@@ -162,7 +162,7 @@ If you previously encountered `sqlite3.OperationalError: attempt to write a read
 - Symlink targets are refused to prevent path traversal
 - `.gitignore` protection is enforced before writing secrets
 
-**Placeholder API key detection:** During onboarding, `qwed init` automatically detects and ignores common placeholder or dummy API key values. If your environment variable or `--api-key` argument contains a value like `your-api-key`, `changeme`, `placeholder`, `xxx`, or a short NVIDIA key such as `nvapi-xxxx`, QWED treats it as empty and prompts you for a real key. This prevents silent failures caused by example values left in `.env` files or CI templates.
+**Placeholder API key detection:** During onboarding, `qwed init` automatically detects and ignores common placeholder or dummy API key values. If your environment variable or `--api-key` argument contains a placeholder value, QWED treats it as empty and prompts you for a real key. Recognized placeholders include `your-api-key`, `changeme`, `placeholder`, `xxx`, and short NVIDIA keys such as `nvapi-xxxx`. This prevents silent failures caused by example values left in `.env` files or CI templates.
 
 The following patterns are rejected:
 
@@ -177,7 +177,7 @@ In non-interactive mode, the CLI checks three key sources: CLI argument, environ
 
 ---
 
-### `qwed doctor` - System health check
+### `qwed doctor` - system health check
 
 Run a local health check that reports the status of verification engines, LLM provider connectivity, the QWED server, and the database. Use this after installation or when verification calls fail unexpectedly.
 
@@ -274,7 +274,7 @@ Run `qwed doctor --json` in CI to gate deployments on system health. A non-zero 
 
 ---
 
-### `qwed test` - Deterministic verification tests
+### `qwed test` - deterministic verification tests
 
 Run the built-in deterministic test suite across the Math, Logic, SQL, and Code engines. Every test case has a known expected result and does not depend on an LLM, so outcomes are fully reproducible.
 
@@ -349,7 +349,7 @@ Math:
 
 ---
 
-### `qwed verify` - One-shot verification
+### `qwed verify` - one-shot verification
 
 Verify a query and exit.
 
@@ -418,7 +418,7 @@ Hit Rate: 0.0%
 > exit
 ```
 
-**Special Commands:**
+**Special commands:**
 - `stats` - Show cache statistics
 - `exit`, `quit`, `q` - Exit interactive mode
 
@@ -556,7 +556,7 @@ If you have run `qwed init`, the `ACTIVE_PROVIDER` value in your `.env` determin
 
 ### Default models
 
-| Provider | Default Model |
+| Provider | Default model |
 |---|---|
 | NVIDIA NIM | `nvidia/nemotron-3-super-120b-a12b` |
 | OpenAI | `gpt-4o-mini` |
@@ -598,7 +598,7 @@ If you have run `qwed init`, the `ACTIVE_PROVIDER` value in your `.env` determin
 
 ---
 
-### `qwed provider` - Custom provider management
+### `qwed provider` - custom provider management
 
 Manage custom LLM providers defined in `~/.qwed/providers.yaml`. See [Custom providers](/getting-started/custom-providers) for the full guide.
 
