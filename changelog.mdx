@@ -316,7 +316,7 @@ See [Bond Guard](/finance/guards#8-bond-guard-yield-analytics), [Derivatives Gua
 ### What changed
 
 - **`AgentService.verify_action`** — Action types not present in `ACTION_ENGINES` or `TOOL_RISK_LEVELS` now return `decision: "DENIED"` with `error.code: "QWED-AGENT-ACTION-001"`. The reserved conversation step is released so the agent can retry with a registered action type.
-- **`AgentService._assess_risk`** — Raises `ValueError` for unregistered action types instead of falling back to `RiskLevel.MEDIUM`. This prevents the deterministic risk path from inferring a default for actions QWED cannot verify.
+- **`AgentService._assess_risk`** — Raises `ValueError` for unregistered action types instead of falling back to `RiskLevel.MEDIUM`. This prevents the deterministic risk path from inferring a default for actions QWED has no registered semantics for.
 - **Engine resolution** — New `_resolve_action_engine` helper distinguishes engine-backed actions (`math`, `logic`, `sql`, etc.) from tool-controlled actions, which now report `engine: "tool_control"` in the verification response. The previous `"security"` default for unknown actions has been removed.
 - **`_run_verification_checks`** — When an action has no registered engine, an `action_registered` check is recorded as failed before any other check runs, making the denial reason visible in the `checks_failed` array.
 

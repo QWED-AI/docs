@@ -30,14 +30,14 @@ LLMs are unreliable for:
 
 ### The solution
 
-QWED-MCP gives AI assistants access to **deterministic verification** through a single `execute_python_code` tool. The LLM writes a Python script that imports the appropriate QWED SDK, and the MCP server runs it in a sandboxed subprocess.
+QWED-MCP exposes **deterministic verification** to AI assistants through a single `execute_python_code` tool. The LLM writes a Python script that imports the appropriate QWED SDK, and the MCP server runs it in a sandboxed subprocess.
 
 | Without QWED-MCP | With QWED-MCP |
 | --- | --- |
-| Claude calculates → 95% correct | Executes Python script calling `qwed_new` math engine → **100% correct** |
-| Claude writes SQL → unverified for injection | Script uses `qwed_new` SQL analyzer → **injection detected** |
-| Claude reasons → unverified | Z3 solver executed via SDK → **formally proven** |
-| Claude codes → unverified for safety | AST check script executed → **security checked** |
+| LLM-only math → ~95% correct | QWED-MCP executes Python via `qwed_new` math engine → **100% correct** |
+| LLM-only SQL → unverified for injection | Script uses `qwed_new` SQL analyzer → **injection detected** |
+| LLM-only reasoning → unverified | Z3 solver executed via SDK → **formally proven** |
+| LLM-only code → unverified for safety | AST check script executed → **security checked** |
 
 ---
 
