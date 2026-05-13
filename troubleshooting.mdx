@@ -98,7 +98,7 @@ print(result.satisfiable)  # False
 Error: Internal verification error
 ```
 
-This generic message is returned when the Stats Engine fails to generate or translate your query into executable code. The actual error details are masked to prevent leaking sensitive information.
+The Stats Engine returns this generic message when it fails to generate or translate your query into executable code. QWED masks the actual error details to prevent leaking sensitive information.
 
 **Solution:**
 1. Verify your query is a valid statistical question (e.g., "What is the mean of column X?")
@@ -126,7 +126,7 @@ Error: Verification timeout after 30s
 sqlite3.OperationalError: attempt to write a readonly database
 ```
 
-This error occurs during Step 3 of `qwed init`. The local server tries to create a bootstrap SQLite database in a directory that is not writable — for example, a read-only mount, a container filesystem, or a system-managed path.
+This error occurs during Step 3 of `qwed init`. The local server tries to create a bootstrap SQLite database in a directory that is not writable. Common examples include a read-only mount, a container filesystem, or a system-managed path.
 
 **Solution:** Upgrade to QWED v4.0.0 or later:
 

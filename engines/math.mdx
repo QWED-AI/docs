@@ -75,7 +75,7 @@ result = client.verify_math("sin(x)^2 + cos(x)^2 = 1")
 # ✓ Verified: Pythagorean identity
 ```
 
-Identity verification uses symbolic simplification first. If SymPy proves the identity algebraically, the result is `VERIFIED`. When symbolic simplification is inconclusive, the engine samples five test points as a fallback. Only points that can be successfully evaluated count toward agreement — domain-restricted expressions (e.g., `log(x)` at `x = -1`) are skipped rather than causing a false negative.
+Identity verification uses symbolic simplification first. If SymPy proves the identity algebraically, the result is `VERIFIED`. When symbolic simplification is inconclusive, the engine samples five test points as a fallback. Only points that the engine can successfully evaluate count toward agreement — the engine skips domain-restricted expressions (e.g., `log(x)` at `x = -1`) rather than producing a false negative.
 
 <Warning>
 Numerical sampling cannot prove equivalence. If all sample points agree but no formal proof was established, the engine now **fails closed** — returning `BLOCKED` with `is_equivalent: false`, `method: "numerical_sampling_rejected"`, and `confidence: 0.0`. Two expressions can match at fixed points without being algebraically identical, so sampling-only agreement is rejected outright. Treat `BLOCKED` results as unverified.
@@ -181,7 +181,7 @@ result = client.verify_irr(
 
 ## Trust boundary
 
-When you verify a natural language math query through the `/verify/natural_language` endpoint, the response includes a `trust_boundary` object that describes exactly what the pipeline proved and what it did not.
+When you verify a natural language math query through the `/verify/natural_language` endpoint, the response includes a `trust_boundary` object. This object describes exactly what the pipeline proved and what it did not.
 
 ```json
 {
@@ -211,7 +211,7 @@ When you verify a natural language math query through the `/verify/natural_langu
 | `overall_status` | The response-level status reflecting the trust boundary |
 
 <Note>
-The overall status for natural language math queries is `INCONCLUSIVE` because, while the expression evaluation is deterministic, QWED cannot verify that the LLM correctly interpreted the user's intent. The `trust_boundary` gives you the information to decide whether the result is sufficient for your use case.
+The overall status for natural language math queries is `INCONCLUSIVE` because, while QWED evaluates the expression deterministically, it cannot verify that the LLM correctly interpreted the user's intent. The `trust_boundary` gives you the information to decide whether the result is sufficient for your use case.
 </Note>
 
 ---
@@ -270,13 +270,13 @@ result = client.verify_math(
 
 ### Tolerance bounding
 
-To prevent inflated tolerances from masking incorrect results, the math engine enforces a deterministic upper bound on the `tolerance` parameter. The maximum allowed tolerance is computed as a function of the result's magnitude:
+To prevent inflated tolerances from masking incorrect results, the math engine enforces a deterministic upper bound on the `tolerance` parameter. QWED computes the maximum allowed tolerance as a function of the result's magnitude:
 
 ```
 max_tolerance = max(0.01, abs(calculated_value) * 0.01)
 ```
 
-If the requested tolerance exceeds this bound, the verification is rejected with a `BLOCKED` status instead of returning a potentially misleading `VERIFIED` result. This applies to both decimal and float precision modes.
+If the requested tolerance exceeds this bound, QWED rejects the verification with a `BLOCKED` status instead of returning a potentially misleading `VERIFIED` result. This applies to both decimal and float precision modes.
 
 ```python
 # Blocked — tolerance far exceeds the computed bound
