@@ -380,7 +380,7 @@ A denial under `QWED-AGENT-ACTION-001` releases the in-flight step reservation, 
 
 ### In-flight reservation system
 
-When a `verify_action` call is being processed, QWED reserves the step number to prevent concurrent requests from claiming the same step. The reservation is released if the action is denied, allowing the agent to retry with a different action at the same step.
+While QWED processes a `verify_action` call, it reserves the step number so concurrent requests cannot claim the same step. QWED releases the reservation if the action is denied, allowing the agent to retry with a different action at the same step.
 
 ### Budget denial behavior
 

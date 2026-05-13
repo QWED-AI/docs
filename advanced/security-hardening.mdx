@@ -295,11 +295,11 @@ QWED implements technical defenses for the [OWASP LLM Top 10](https://owasp.org/
 
 ### Your responsibilities (user/deployment)
 
-While QWED handles internal verification, you must implement the following "Human in the Loop" and deployment safeguards:
+While QWED handles internal verification, you must implement the following "Human in the loop" and deployment safeguards:
 
 #### LLM01: Prompt injection and LLM02: Insecure output handling
-- **Human in the Loop**: For critical actions (e.g., financial transactions, code deployment), do not rely solely on QWED's verification. Implement a manual approval step.
-- **Output Monitoring**: Log and randomly audit verified outputs to ensure the verification engine itself hasn't been bypassed.
+- **Human in the loop**: For critical actions (e.g., financial transactions, code deployment), do not rely solely on QWED's verification. Implement a manual approval step.
+- **Output monitoring**: Log and randomly audit verified outputs to ensure the verification engine itself hasn't been bypassed.
 
 #### LLM05: Supply-chain vulnerabilities
 - **Startup environment integrity**: QWED enforces environment integrity at startup by verifying all Python `.pth` startup hook files against a built-in allowlist. If any unrecognized `.pth` file is found, the server refuses to start. You can extend the allowlist for custom deployments using the `QWED_ALLOWED_STARTUP_PTH_FILES` environment variable (comma-separated list of filenames).
