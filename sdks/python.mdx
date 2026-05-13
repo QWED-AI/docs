@@ -166,6 +166,8 @@ results = client.verify_batch([
 print(results.summary.success_rate)
 ```
 
+For `math` items, supply equality claims (e.g., `"x + x = 2*x"`) to receive proof results. Non-equality expressions (e.g., `"x + x"`) are returned as simplification-only results with `is_valid: false` and `status: "SIMPLIFIED"` — they are not reported as verified.
+
 ## CLI
 
 ```bash

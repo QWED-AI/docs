@@ -74,6 +74,30 @@ guard.verify("2026-01-15", "30 days", "2026-02-14")
 guard.verify("01/02/2026", ...)  # Is this Jan 2 or Feb 1?
 ```
 
+### "UNVERIFIABLE" result on a contract term
+
+**Problem:** `verified=False`, `is_computable=False`, and the message starts with `⚠️ UNVERIFIABLE`.
+
+**Cause:** The `term` argument did not contain both a numeric quantity and a recognized time unit. `DeadlineGuard` fails closed on ambiguous legal language ("reasonable period", "promptly", "as soon as practicable", "forthwith") instead of inventing a deadline.
+
+**Solution:** Pass an explicit term with a number and a unit. Recognized units are `day(s)`, `business day(s)`, `calendar day(s)`, `week(s)`, `month(s)`, and `year(s)`.
+
+```python
+# ✅ Good — explicit quantity and unit
+guard.verify("2026-01-01", "30 days", "2026-01-31")
+guard.verify("2026-01-01", "10 business days", "2026-01-15")
+guard.verify("2026-01-01", "2 weeks", "2026-01-15")
+
+# ❌ Fails closed — no numeric quantity
+guard.verify("2026-01-01", "within a reasonable period", "2026-01-31")
+
+# ❌ Fails closed — no recognized time unit
+guard.verify("2026-01-01", "30", "2026-01-31")
+guard.verify("2026-01-01", "15 intervals", "2026-01-16")
+```
+
+If your contract uses subjective language, route the clause to a human reviewer rather than overriding the guard. Always check `is_computable` before consuming `computed_deadline` or `difference_days`.
+
 ---
 
 ## LiabilityGuard issues
@@ -140,6 +164,51 @@ guard.check_statute_citation("42 U.S.C. § 1983")
 
 # ❌ Missing section symbol
 guard.check_statute_citation("42 USC 1983")
+```
+
+---
+
+## StatuteOfLimitationsGuard issues
+
+### `UNVERIFIABLE` result for a jurisdiction or claim type
+
+**Problem:** `guard.verify(...)` returns `verified=False` with a message that starts with `⚠️ UNVERIFIABLE`, and `limitation_period_years` is `None`.
+
+**Cause:** As of the fail-closed update, `StatuteOfLimitationsGuard` only computes a result when both the jurisdiction and the claim type match the rule table exactly. There is no longer a substring match (`"CALIF"` → `"CALIFORNIA"`) or a default fallback (3 years for unknown claim types).
+
+**Solution:** Inspect the new flags on `StatuteResult` to see which lookup failed, then pass a supported value:
+
+```python
+result = guard.verify(
+    claim_type="breach_of_contract",
+    jurisdiction="Calif",
+    incident_date="2023-01-15",
+    filing_date="2026-06-01",
+)
+
+if not result.jurisdiction_matched:
+    # Use the full supported name, e.g. "California"
+    ...
+elif not result.claim_type_matched:
+    # Use one of the supported claim types, e.g. "breach_of_contract"
+    ...
+```
+
+The full list of supported jurisdictions and claim types is included in the `result.message` and documented in [Guards — StatuteOfLimitationsGuard](/legal/guards#6-statuteoflimitationsguard).
+
+### Treating unverifiable as "in period"
+
+**Problem:** Downstream code passes when `result.verified` is `False` because it expects a numeric limitation period.
+
+**Cause:** `StatuteResult.limitation_period_years` and `expiration_date` are now `Optional` and are `None` for unverifiable inputs. Code that does `if result.days_remaining > 0` will raise on `None`.
+
+**Solution:** Branch on `verified` and the new `*_matched` flags before reading numeric fields:
+
+```python
+if not result.verified and not (
+    result.jurisdiction_matched and result.claim_type_matched
+):
+    raise ValueError(result.message)  # Surface to the user — do not pass.
 ```
 
 ---

@@ -3,7 +3,7 @@ title: "QWED CLI reference"
 description: "QWED command-line interface reference. Run qwed verify with provider options, model selection, and caching controls for terminal-based LLM verification."
 ---
 
-**Beautiful command-line interface for QWED verification.**
+Command-line interface for QWED verification.
 
 ## Installation
 
@@ -19,7 +19,7 @@ The `qwed` CLI is automatically available after installation.
 
 ### `qwed init` - onboarding and bootstrap
 
-Production-grade onboarding wizard that sets up verification engines, configures your LLM provider, and bootstraps a local API key — all in a single command. Run this once after installing QWED.
+Onboarding wizard that sets up verification engines, configures your LLM provider, and bootstraps a local API key — all in a single command. Run this once after installing QWED.
 
 ```bash
 qwed init
@@ -162,7 +162,7 @@ If you previously encountered `sqlite3.OperationalError: attempt to write a read
 - Symlink targets are refused to prevent path traversal
 - `.gitignore` protection is enforced before writing secrets
 
-**Placeholder API key detection:** During onboarding, `qwed init` automatically detects and ignores common placeholder or dummy API key values. If your environment variable or `--api-key` argument contains a value like `your-api-key`, `changeme`, `placeholder`, `xxx`, or a short NVIDIA key such as `nvapi-xxxx`, QWED treats it as empty and prompts you for a real key. This prevents silent failures caused by example values left in `.env` files or CI templates.
+**Placeholder API key detection:** During onboarding, `qwed init` automatically detects and ignores common placeholder or dummy API key values. If your environment variable or `--api-key` argument contains a placeholder value, QWED treats it as empty and prompts you for a real key. Recognized placeholders include `your-api-key`, `changeme`, `placeholder`, `xxx`, and short NVIDIA keys such as `nvapi-xxxx`. This prevents silent failures caused by example values left in `.env` files or CI templates.
 
 The following patterns are rejected:
 
@@ -418,7 +418,7 @@ Hit Rate: 0.0%
 > exit
 ```
 
-**Special Commands:**
+**Special commands:**
 - `stats` - Show cache statistics
 - `exit`, `quit`, `q` - Exit interactive mode
 
@@ -556,7 +556,7 @@ If you have run `qwed init`, the `ACTIVE_PROVIDER` value in your `.env` determin
 
 ### Default models
 
-| Provider | Default Model |
+| Provider | Default model |
 |---|---|
 | NVIDIA NIM | `nvidia/nemotron-3-super-120b-a12b` |
 | OpenAI | `gpt-4o-mini` |

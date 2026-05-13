@@ -221,7 +221,8 @@ asyncio.run(main())
 | --- | --- | --- |
 | `QWED_MCP_TRUSTED_CODE_EXECUTION` | Enable `execute_python_code` tool (`true`/`false`) | `false` |
 | `QWED_LOG_LEVEL` | Logging level (`DEBUG`, `INFO`, `WARNING`, `ERROR`) | `INFO` |
-| `QWED_TIMEOUT` | Tool execution timeout in seconds | `30` |
+| `QWED_TIMEOUT` | Synchronous tool execution timeout in seconds | `30` |
+| `QWED_MCP_BACKGROUND_TIMEOUT` | Background worker timeout in seconds for jobs dispatched with `background=true`. Clamped to a hard ceiling of `600`. Non-numeric or non-positive values fall back to the default | `120` |
 | `QWED_SKILL_MANIFEST` | Path to a skill manifest JSON file. When set, the server validates the manifest at startup using [`SkillProvenanceGuard`](/mcp/tools#skillprovenanceguard-security) and refuses to start if verification fails | Not set |
 
 <Warning>
