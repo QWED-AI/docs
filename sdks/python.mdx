@@ -186,7 +186,9 @@ qwed batch -f queries.json
 
 ## Verification cache
 
-`qwed_sdk.cache` provides a context-bound SQLite cache for verification results. Cache hits require an exact match of both the normalized query **and** the trust-bound `CacheContext`. A mismatch on any context dimension is a deterministic miss — the cache never returns a result across trust boundaries. Legacy entries stored without a context fingerprint are never returned.
+`qwed_sdk.cache` provides a context-bound SQLite cache for verification results.
+
+A cache hit requires an exact match of both the normalized query **and** the trust-bound `CacheContext`. Any mismatch on a context dimension yields a deterministic miss — the cache never crosses trust boundaries. The cache also ignores legacy entries that lack a context fingerprint.
 
 ```python
 from qwed_sdk.cache import CacheContext, VerificationCache
@@ -241,12 +243,18 @@ Trust-bound context dimensions required for every cache operation. All fields pa
 </ParamField>
 
 <ParamField path="ttl" type="int" default="86400">
-  Time-to-live in seconds (default: 24 hours). Entries older than `ttl` are treated as misses and deleted on access.
+  Time-to-live in seconds (default: 24 hours). `get()` treats entries older than `ttl` as a miss and deletes them on access.
 </ParamField>
 
 #### `get(query, context)`
 
-Return the cached result for `(query, context)`, or `None` on miss. A miss is returned when no entry exists for the pair, when the entry has expired, or when the stored context fingerprint does not match `context` (defence-in-depth replay guard).
+Return the cached result for `(query, context)`, or `None` on miss.
+
+`get()` returns `None` when:
+
+- No entry exists for the `(query, context)` pair.
+- The entry has expired (older than `ttl`).
+- The stored context fingerprint does not match `context` (defence-in-depth replay guard).
 
 <ParamField path="query" type="str" required>
   The verification query string. Normalized (lowercased, whitespace-collapsed) before hashing.
@@ -262,14 +270,16 @@ Return the cached result for `(query, context)`, or `None` on miss. A miss is re
 
 #### `set(query, result, context)`
 
-Store a verification result bound to `(query, context)`. Identical queries stored under different contexts are kept as independent entries (composite primary key `(key, context_fingerprint)`).
+Store a verification result bound to `(query, context)`.
+
+The composite primary key `(key, context_fingerprint)` keeps identical queries under different contexts as independent entries.
 
 <ParamField path="query" type="str" required>
   The verification query string.
 </ParamField>
 
 <ParamField path="result" type="Dict[str, Any]" required>
-  Verification result to cache. Serialized as JSON.
+  Verification result to cache. `set()` serializes this dict as JSON.
 </ParamField>
 
 <ParamField path="context" type="CacheContext" required>
@@ -285,7 +295,7 @@ Remove all cached entries and reset stats.
 Return a `CacheStats` dataclass with `hits`, `misses`, `total_entries`, `cache_size_bytes`, and a `hit_rate` property.
 
 <Note>
-**Breaking change (Issue #187).** `get()` and `set()` now require a `CacheContext` argument. Callers that previously invoked `cache.get("2+2")` or `cache.set("2+2", result)` raise `TypeError`. The on-disk schema is `cache_v2` with composite `PRIMARY KEY (key, context_fingerprint)`; entries in the legacy `cache` (v1) table are never returned.
+**Breaking change (Issue #187).** `get()` and `set()` now require a `CacheContext` argument. Calls like `cache.get("2+2")` or `cache.set("2+2", result)` raise `TypeError`. The on-disk schema is `cache_v2` with composite `PRIMARY KEY (key, context_fingerprint)`. The cache never returns entries from the legacy v1 `cache` table.
 </Note>
 
 ## Guards

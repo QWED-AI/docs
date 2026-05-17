@@ -15,9 +15,9 @@ All notable changes to the QWED platform, listed by release.
 ### What changed
 
 - **New `CacheContext` dataclass** — Carries `provider`, `model`, `policy_version`, and optional `tenant_id` and `env_fingerprint`. All fields participate in the cache key.
-- **Composite, context-bound key** — Key is `SHA-256(normalized_query)` × `SHA-256(canonical_context_json)`. Two identical query strings under different contexts are stored as independent entries and never collide.
-- **Schema v2 (`cache_v2`)** — New table with composite `PRIMARY KEY (key, context_fingerprint)` and a per-entry `context_fingerprint` column. The fingerprint is re-validated on every read as defence-in-depth.
-- **Legacy entries never returned** — Rows in the v1 `cache` table (no context fingerprint) are unreachable from any code path.
+- **Composite, context-bound key** — Key is `SHA-256(normalized_query)` × `SHA-256(canonical_context_json)`. Two identical query strings under different contexts occupy independent entries and never collide.
+- **Schema v2 (`cache_v2`)** — New table with composite `PRIMARY KEY (key, context_fingerprint)` and a per-entry `context_fingerprint` column. `get()` re-validates the fingerprint on every read as defence-in-depth.
+- **Legacy entries never returned** — No code path reaches rows in the v1 `cache` table (which lack a context fingerprint).
 - **Context-mismatch is a deterministic miss** — Provider switch, model change, policy version change, tenant/session change, and env fingerprint change all yield `None`.
 
 ### Breaking changes
