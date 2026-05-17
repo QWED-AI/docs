@@ -216,14 +216,14 @@ ctx_other = CacheContext(provider="anthropic", model="claude-opus-4-5", policy_v
 cache.get("Is 2+2=4?", ctx_other)            # None
 ```
 
-### When you get a miss
+### Miss conditions
 
-A call to `cache.get(query, context)` returns `None` when any of the following is true:
+`cache.get(query, context)` returns `None` when any of the following holds:
 
 - No entry exists for this `(query, context)` pair.
 - The stored entry has expired (TTL, default 24 hours).
 - The stored context fingerprint does not match `context` (replay guard).
-- The entry was written under the legacy v1 schema (legacy rows are never returned).
+- The entry uses the legacy v1 schema. The cache never returns legacy rows.
 
 ### Constructor options
 
