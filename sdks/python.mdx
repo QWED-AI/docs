@@ -184,6 +184,110 @@ qwed verify-code -f script.py
 qwed batch -f queries.json
 ```
 
+## Verification cache
+
+`qwed_sdk.cache` provides a context-bound SQLite cache for verification results. Cache hits require an exact match of both the normalized query **and** the trust-bound `CacheContext`. A mismatch on any context dimension is a deterministic miss — the cache never returns a result across trust boundaries. Legacy entries stored without a context fingerprint are never returned.
+
+```python
+from qwed_sdk.cache import CacheContext, VerificationCache
+
+ctx = CacheContext(
+    provider="openai",
+    model="gpt-4o",
+    policy_version="v1",
+    tenant_id="tenant-alpha",       # optional
+    env_fingerprint="sha256-...",   # optional
+)
+
+cache = VerificationCache()
+
+cache.get("2+2", ctx)              # None (miss)
+cache.set("2+2", {"verified": True}, ctx)
+cache.get("2+2", ctx)              # {"verified": True}
+
+# Different provider — deterministic miss (replay prevention)
+ctx2 = CacheContext(provider="claude", model="claude-opus-4-5", policy_version="v1")
+cache.get("2+2", ctx2)             # None
+```
+
+### `CacheContext`
+
+Trust-bound context dimensions required for every cache operation. All fields participate in the cache key; omitting or changing any field causes a deterministic cache miss.
+
+<ParamField path="provider" type="str" required>
+  Provider or API endpoint identifier (for example, `"openai"`, `"claude"`).
+</ParamField>
+
+<ParamField path="model" type="str" required>
+  Model or deployment name (for example, `"gpt-4o"`).
+</ParamField>
+
+<ParamField path="policy_version" type="str" required>
+  Verifier policy version string (for example, `"v1"`).
+</ParamField>
+
+<ParamField path="tenant_id" type="Optional[str]" default="None">
+  Tenant or session scope identifier. Use to prevent cross-tenant replay.
+</ParamField>
+
+<ParamField path="env_fingerprint" type="Optional[str]" default="None">
+  Environment or config fingerprint for additional binding.
+</ParamField>
+
+### `VerificationCache(cache_dir=None, ttl=86400)`
+
+<ParamField path="cache_dir" type="Optional[str]" default="~/.qwed/cache">
+  Directory for the SQLite cache database.
+</ParamField>
+
+<ParamField path="ttl" type="int" default="86400">
+  Time-to-live in seconds (default: 24 hours). Entries older than `ttl` are treated as misses and deleted on access.
+</ParamField>
+
+#### `get(query, context)`
+
+Return the cached result for `(query, context)`, or `None` on miss. A miss is returned when no entry exists for the pair, when the entry has expired, or when the stored context fingerprint does not match `context` (defence-in-depth replay guard).
+
+<ParamField path="query" type="str" required>
+  The verification query string. Normalized (lowercased, whitespace-collapsed) before hashing.
+</ParamField>
+
+<ParamField path="context" type="CacheContext" required>
+  Trust-bound context that must match exactly. Omitting this argument raises `TypeError`.
+</ParamField>
+
+<ResponseField name="result" type="Optional[Dict[str, Any]]">
+  The cached result dict, or `None` on any miss.
+</ResponseField>
+
+#### `set(query, result, context)`
+
+Store a verification result bound to `(query, context)`. Identical queries stored under different contexts are kept as independent entries (composite primary key `(key, context_fingerprint)`).
+
+<ParamField path="query" type="str" required>
+  The verification query string.
+</ParamField>
+
+<ParamField path="result" type="Dict[str, Any]" required>
+  Verification result to cache. Serialized as JSON.
+</ParamField>
+
+<ParamField path="context" type="CacheContext" required>
+  Trust-bound context to bind this entry to.
+</ParamField>
+
+#### `clear()`
+
+Remove all cached entries and reset stats.
+
+#### `get_stats()`
+
+Return a `CacheStats` dataclass with `hits`, `misses`, `total_entries`, `cache_size_bytes`, and a `hit_rate` property.
+
+<Note>
+**Breaking change (Issue #187).** `get()` and `set()` now require a `CacheContext` argument. Callers that previously invoked `cache.get("2+2")` or `cache.set("2+2", result)` raise `TypeError`. The on-disk schema is `cache_v2` with composite `PRIMARY KEY (key, context_fingerprint)`; entries in the legacy `cache` (v1) table are never returned.
+</Note>
+
 ## Guards
 
 The SDK includes security guards for protecting AI agent pipelines:
