@@ -10,19 +10,19 @@ All notable changes to the QWED platform, listed by release.
 ## QWED-Verification — context-bound verification cache (replay prevention)
 **Released: May 17, 2026**
 
-> `VerificationCache` now keys every entry on both the normalized query **and** the trust-bound context (provider, model, policy version, tenant/session, environment fingerprint). A mismatch on any context dimension is a deterministic cache miss, preventing cross-context replay of `VERIFIED` results.
+> `VerificationCache` now keys every entry on both the normalized query **and** the trust-bound context: provider, model, policy version, tenant or session, and environment fingerprint. A mismatch on any context dimension is a deterministic cache miss. This prevents cross-context replay of `VERIFIED` results.
 
 ### What changed
 
 - **New `CacheContext` datatype** — Required argument to every `get()` and `set()` call. Carries `provider`, `model`, and `policy_version` (required), plus optional `tenant_id` and `env_fingerprint`.
-- **Composite cache key** — Entries are now keyed by `SHA-256(normalized_query)` combined with `SHA-256(canonical_context_json)`. Identical queries stored under different contexts never collide.
-- **New `cache_v2` schema** — The on-disk SQLite table uses a composite `PRIMARY KEY (key, context_fingerprint)` and stores the context fingerprint per entry. The fingerprint is re-validated on every read as defence-in-depth.
-- **Legacy entries are never returned** — Pre-v2 cache rows (without a context fingerprint) are unreachable from any code path and are treated as dead weight.
+- **Composite cache key** — Each key combines `SHA-256(normalized_query)` with `SHA-256(canonical_context_json)`. Identical queries under different contexts never collide.
+- **New `cache_v2` schema** — The on-disk SQLite table uses a composite `PRIMARY KEY (key, context_fingerprint)` and stores the fingerprint per entry. The cache re-validates the fingerprint on every read as defence-in-depth.
+- **Legacy entries are never returned** — Pre-v2 cache rows have no context fingerprint. No code path reads them, and the cache treats them as `UNVERIFIABLE`.
 
 ### Breaking changes
 
 - `VerificationCache.get(query)` and `VerificationCache.set(query, result)` now require a `CacheContext` argument. Calls without one raise `TypeError`.
-- Cached results created under one (provider, model, policy version, tenant) tuple will not be returned to a caller using a different tuple — even if the query string is identical.
+- Results stored under one `(provider, model, policy_version, tenant_id)` tuple are not returned to a caller using a different tuple, even when the query string is identical.
 
 ### Example
 

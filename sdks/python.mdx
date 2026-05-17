@@ -170,9 +170,11 @@ For `math` items, supply equality claims (e.g., `"x + x = 2*x"`) to receive proo
 
 ## Verification cache
 
-`qwed_sdk.cache.VerificationCache` is the persistent SQLite-backed cache used to speed up repeated verifications and reduce LLM cost. Cache entries are **context-bound**: a hit requires an exact match of both the normalized query and the trust-bound `CacheContext`.
+`qwed_sdk.cache.VerificationCache` is the persistent SQLite-backed cache for verification results. It reduces LLM cost on repeated queries.
 
-A mismatch on any context dimension is a deterministic miss — the cache never falls back to a query-only match. This prevents cross-provider, cross-model, cross-policy, and cross-tenant replay of `VERIFIED` results.
+Cache entries are **context-bound**. A hit requires an exact match of both the normalized query and the trust-bound `CacheContext`.
+
+A mismatch on any context dimension is a deterministic miss. The cache never falls back to a query-only match. This prevents cross-provider, cross-model, cross-policy, and cross-tenant replay of `VERIFIED` results.
 
 ### `CacheContext`
 
