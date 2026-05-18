@@ -28,9 +28,9 @@ print(result.attestation)
 ## Fail-closed contract
 
 `create_verification_attestation()` never returns `None`. It always returns an
-`AttestationResult` whose `status` is one of three explicit states. Callers
-**must** check `result.is_issued` before treating the attestation as valid —
-silent downgrades (treating a missing proof as success) are not possible.
+`AttestationResult` whose `status` is one of three explicit states. You **must**
+check `result.is_issued` before treating the attestation as valid. This contract
+prevents silent downgrades — a missing proof cannot be mistaken for success.
 
 ### `AttestationResult`
 
@@ -59,8 +59,8 @@ silent downgrades (treating a missing proof as success) are not possible.
 
 ### Caller pattern
 
-Treat anything other than `ISSUED` as a hard failure. Do **not** proceed as
-`VERIFIED` without a valid attestation token:
+Treat any status other than `ISSUED` as a hard failure. Do **not** return a
+`VERIFIED` verdict without a valid attestation token:
 
 ```python
 from qwed_sdk.attestation import create_verification_attestation
@@ -83,7 +83,7 @@ use(result.token)
 
 <Warning>
 Never branch on `result.token is not None` alone. Always gate on `result.is_issued`
-so that future failure states cannot silently bypass your check.
+so future failure states cannot bypass your check.
 </Warning>
 
 ## Key lifecycle and continuity
@@ -96,11 +96,11 @@ it follows. This makes key rotation and process-restart events auditable.
 | `generated_at` | Unix timestamp when the key pair was created. |
 | `key_continuity_policy` | `"ephemeral"` (default) or `"persistent"`. |
 
-- **`ephemeral`** — Key material lives only in process memory. A new key is
-  generated on every restart. Use this for short-lived workers or local dev.
-- **`persistent`** — Key material is durably stored outside the process
-  (for example, in an external KMS). Use this when verifiers across restarts
-  or replicas must accept the same issuer key.
+- **`ephemeral`** — The key lives only in process memory. QWED generates a new
+  key on every restart. Use this for short-lived workers or local development.
+- **`persistent`** — An external system (for example, a KMS) stores the key
+  material outside the process. Use this when verifiers across restarts or
+  replicas must accept the same issuer key.
 
 ```python
 from qwed_sdk.attestation import IssuerKeyPair
@@ -112,9 +112,9 @@ key_pair = IssuerKeyPair(
 )
 ```
 
-Any other value for `key_continuity_policy` raises `ValueError` — typos cannot
-silently degrade audit signal. Every key generation emits a structured log
-line for downstream auditing:
+Any other value for `key_continuity_policy` raises `ValueError`. This rejects
+typos explicitly so they cannot silently degrade the audit signal. Every key
+generation emits a structured log line for downstream auditing:
 
 ```text
 attestation.key_generated issuer=did:qwed:node:production key_id=signing-key-2026 policy=persistent generated_at=1747526400
