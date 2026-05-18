@@ -25,6 +25,72 @@ print(result.attestation)
 # eyJhbGciOiJFUzI1NiIsInR5cCI6InF3ZWQtYXR0ZXN...
 ```
 
+## Fail-closed contract
+
+<Warning>
+**Since PR #194 (Issue #188):** `create_verification_attestation()` **never returns `None`**. It always returns an `AttestationResult` whose `status` is one of `ISSUED`, `BLOCKED`, or `UNVERIFIABLE`. Callers MUST check `result.is_issued` before treating the attestation as valid — a missing or failed attestation must hard-block the verification path, not be silently downgraded to `VERIFIED`.
+</Warning>
+
+### `AttestationResult`
+
+<ParamField path="status" type="AttestationStatus" required>
+  Lifecycle state of the attestation. One of `ISSUED`, `BLOCKED`, or `UNVERIFIABLE`.
+</ParamField>
+
+<ParamField path="token" type="string | None">
+  Signed JWT string. Present only when `status == ISSUED`; `None` otherwise.
+</ParamField>
+
+<ParamField path="error_code" type="string | None">
+  Machine-readable failure code: `"SIGNING_FAILURE"` when signing was attempted and failed, `"CRYPTO_UNAVAILABLE"` when the `cryptography` / `PyJWT` package is not installed, `None` on success.
+</ParamField>
+
+<ParamField path="error" type="string | None">
+  Human-readable failure detail. `None` on success.
+</ParamField>
+
+<ParamField path="is_issued" type="bool">
+  Property. `True` only when `status is AttestationStatus.ISSUED`. Callers must gate use of `token` on this flag.
+</ParamField>
+
+### `AttestationStatus` values
+
+| Status | Meaning | `token` | `error_code` |
+| --- | --- | --- | --- |
+| `ISSUED` | Attestation was successfully signed. | JWT string | `None` |
+| `BLOCKED` | Crypto is available but signing failed (key error, JWT error). Hard block. | `None` | `SIGNING_FAILURE` |
+| `UNVERIFIABLE` | `cryptography` / `PyJWT` not installed; signing was not attempted. | `None` | `CRYPTO_UNAVAILABLE` |
+| `VALID` / `EXPIRED` / `REVOKED` | Lifecycle states for previously issued attestations during verification. | — | — |
+
+### Caller pattern
+
+```python
+from src.qwed_new.core.attestation import create_verification_attestation
+
+result = create_verification_attestation(
+    status="VERIFIED",
+    verified=True,
+    engine="math",
+    query="2+2=4",
+)
+
+if not result.is_issued:
+    # Fail-closed: do not proceed as VERIFIED without a proof artifact
+    raise RuntimeError(f"Attestation unavailable [{result.error_code}]: {result.error}")
+
+use(result.token)
+```
+
+### Key lifecycle auditability
+
+Every `IssuerKeyPair` records `generated_at` (epoch seconds) and `key_continuity_policy`. A structured log entry (`attestation.key_generated`) is emitted on every new key generation so continuity events are auditable.
+
+<ParamField path="key_continuity_policy" type="string" default="ephemeral">
+  Policy for the issuer key pair. Must be one of `"ephemeral"` (in-memory, non-persistent — default) or `"persistent"` (durably stored, e.g. external KMS). Any other value raises `ValueError`.
+</ParamField>
+
+`AttestationService.get_issuer_info()` now includes `key_generated_at` and `key_continuity_policy` alongside the existing issuer registry fields.
+
 ## Attestation structure
 
 ### Header
