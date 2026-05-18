@@ -28,7 +28,7 @@ print(result.attestation)
 ## Fail-closed contract
 
 <Warning>
-**Since PR #194 (Issue #188):** `create_verification_attestation()` **never returns `None`**. It always returns an `AttestationResult` whose `status` is one of `ISSUED`, `BLOCKED`, or `UNVERIFIABLE`. Callers MUST check `result.is_issued` before treating the attestation as valid — a missing or failed attestation must hard-block the verification path, not be silently downgraded to `VERIFIED`.
+**Since PR #194 (Issue #188):** `create_verification_attestation()` **never returns `None`**. It always returns an `AttestationResult` with `status` set to `ISSUED`, `BLOCKED`, or `UNVERIFIABLE`. You MUST check `result.is_issued` before you treat the attestation as valid. A missing or failed attestation must hard-block the verification path. Never downgrade it to `VERIFIED`.
 </Warning>
 
 ### `AttestationResult`
@@ -42,7 +42,7 @@ print(result.attestation)
 </ParamField>
 
 <ParamField path="error_code" type="string | None">
-  Machine-readable failure code: `"SIGNING_FAILURE"` when signing was attempted and failed, `"CRYPTO_UNAVAILABLE"` when the `cryptography` / `PyJWT` package is not installed, `None` on success.
+  Machine-readable failure code: `"SIGNING_FAILURE"` when signing failed, `"CRYPTO_UNAVAILABLE"` when the `cryptography` / `PyJWT` package is not installed, `None` on success.
 </ParamField>
 
 <ParamField path="error" type="string | None">
@@ -50,16 +50,16 @@ print(result.attestation)
 </ParamField>
 
 <ParamField path="is_issued" type="bool">
-  Property. `True` only when `status is AttestationStatus.ISSUED`. Callers must gate use of `token` on this flag.
+  Property. `True` only when `status is AttestationStatus.ISSUED`. You must check this flag before you use `token`.
 </ParamField>
 
 ### `AttestationStatus` values
 
 | Status | Meaning | `token` | `error_code` |
 | --- | --- | --- | --- |
-| `ISSUED` | Attestation was successfully signed. | JWT string | `None` |
+| `ISSUED` | QWED signed the attestation. | JWT string | `None` |
 | `BLOCKED` | Crypto is available but signing failed (key error, JWT error). Hard block. | `None` | `SIGNING_FAILURE` |
-| `UNVERIFIABLE` | `cryptography` / `PyJWT` not installed; signing was not attempted. | `None` | `CRYPTO_UNAVAILABLE` |
+| `UNVERIFIABLE` | `cryptography` / `PyJWT` not installed. QWED did not attempt signing. | `None` | `CRYPTO_UNAVAILABLE` |
 | `VALID` / `EXPIRED` / `REVOKED` | Lifecycle states for previously issued attestations during verification. | — | — |
 
 ### Caller pattern
@@ -83,7 +83,7 @@ use(result.token)
 
 ### Key lifecycle auditability
 
-Every `IssuerKeyPair` records `generated_at` (epoch seconds) and `key_continuity_policy`. A structured log entry (`attestation.key_generated`) is emitted on every new key generation so continuity events are auditable.
+Every `IssuerKeyPair` records `generated_at` (epoch seconds) and `key_continuity_policy`. QWED emits a structured log entry (`attestation.key_generated`) on every new key generation, so you can audit continuity events.
 
 <ParamField path="key_continuity_policy" type="string" default="ephemeral">
   Policy for the issuer key pair. Must be one of `"ephemeral"` (in-memory, non-persistent — default) or `"persistent"` (durably stored, e.g. external KMS). Any other value raises `ValueError`.
