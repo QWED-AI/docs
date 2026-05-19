@@ -168,6 +168,76 @@ print(results.summary.success_rate)
 
 For `math` items, supply equality claims (e.g., `"x + x = 2*x"`) to receive proof results. Non-equality expressions (e.g., `"x + x"`) are returned as simplification-only results with `is_valid: false` and `status: "SIMPLIFIED"` — they are not reported as verified.
 
+## Verification cache
+
+`qwed_sdk.cache.VerificationCache` is the persistent SQLite-backed cache for verification results. It reduces LLM cost on repeated queries.
+
+Cache entries are **context-bound**. A hit requires an exact match of both the normalized query and the trust-bound `CacheContext`.
+
+A mismatch on any context dimension is a deterministic miss. The cache never falls back to a query-only match. This prevents cross-provider, cross-model, cross-policy, and cross-tenant replay of `VERIFIED` results.
+
+### `CacheContext`
+
+Every `get()` and `set()` call requires a `CacheContext`. All fields participate in the cache key.
+
+| Field             | Type            | Required | Description                                                |
+| ----------------- | --------------- | -------- | ---------------------------------------------------------- |
+| `provider`        | `str`           | yes      | Provider or API endpoint identifier (e.g., `"openai"`).    |
+| `model`           | `str`           | yes      | Model or deployment name (e.g., `"gpt-4o"`).               |
+| `policy_version`  | `str`           | yes      | Verifier policy version string (e.g., `"v1"`).             |
+| `tenant_id`       | `Optional[str]` | no       | Tenant or session scope identifier.                        |
+| `env_fingerprint` | `Optional[str]` | no       | Environment or configuration fingerprint for extra binding. |
+
+### Usage
+
+```python
+from qwed_sdk.cache import CacheContext, VerificationCache
+
+cache = VerificationCache()  # defaults to ~/.qwed/cache, TTL 24h
+
+ctx = CacheContext(
+    provider="openai",
+    model="gpt-4o",
+    policy_version="v1",
+    tenant_id="tenant-alpha",
+)
+
+# Cache miss on first call
+result = cache.get("Is 2+2=4?", ctx)         # None
+
+# Populate the cache for this (query, context) pair
+cache.set("Is 2+2=4?", {"verified": True, "value": 4}, ctx)
+
+# Same query, same context → hit
+cache.get("Is 2+2=4?", ctx)                  # {"verified": True, "value": 4}
+
+# Same query, different provider → deterministic miss
+ctx_other = CacheContext(provider="anthropic", model="claude-opus-4-5", policy_version="v1")
+cache.get("Is 2+2=4?", ctx_other)            # None
+```
+
+### Miss conditions
+
+`cache.get(query, context)` returns `None` when any of the following holds:
+
+- No entry exists for this `(query, context)` pair.
+- The stored entry has expired (TTL, default 24 hours).
+- The stored context fingerprint does not match `context` (replay guard).
+- The entry uses the legacy v1 schema. The cache never returns legacy rows.
+
+### Constructor options
+
+```python
+VerificationCache(cache_dir: Optional[str] = None, ttl: int = 86400)
+```
+
+- `cache_dir` — Directory for the SQLite database. Defaults to `~/.qwed/cache`.
+- `ttl` — Time-to-live in seconds. Defaults to 24 hours.
+
+<Warning>
+`get()` and `set()` require a `CacheContext` argument as of the May 17, 2026 release. Calls that omit the context raise `TypeError`. See the [changelog entry](/changelog#qwed-verification-—-context-bound-verification-cache-replay-prevention) for migration details.
+</Warning>
+
 ## CLI
 
 ```bash

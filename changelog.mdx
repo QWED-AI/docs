@@ -7,45 +7,51 @@ All notable changes to the QWED platform, listed by release.
 
 ---
 
-## QWED-Verification — `VerificationCache` keys bound to trust context
+## QWED-Verification — context-bound verification cache (replay prevention)
 **Released: May 17, 2026**
 
-> Hardens `qwed_sdk.cache.VerificationCache` so a cache hit requires an exact match of both the normalized query **and** all trust-bound context dimensions (provider, model, policy version, tenant/session, environment fingerprint). Closes Issue #187.
+> `VerificationCache` now keys every entry on both the normalized query **and** the trust-bound context: provider, model, policy version, tenant or session, and environment fingerprint. A mismatch on any context dimension is a deterministic cache miss. This prevents cross-context replay of `VERIFIED` results.
 
 ### What changed
 
-- **New `CacheContext` dataclass** — Carries `provider`, `model`, `policy_version`, and optional `tenant_id` and `env_fingerprint`. All fields participate in the cache key.
-- **Composite, context-bound key** — Key is `SHA-256(normalized_query)` × `SHA-256(canonical_context_json)`. Two identical query strings under different contexts occupy independent entries and never collide.
-- **Schema v2 (`cache_v2`)** — New table with composite `PRIMARY KEY (key, context_fingerprint)` and a per-entry `context_fingerprint` column. `get()` re-validates the fingerprint on every read as defence-in-depth.
-- **Legacy entries never returned** — No code path reaches rows in the v1 `cache` table (which lack a context fingerprint).
-- **Context-mismatch is a deterministic miss** — Provider switch, model change, policy version change, tenant/session change, and env fingerprint change all yield `None`.
+- **New `CacheContext` datatype** — Required argument to every `get()` and `set()` call. Carries `provider`, `model`, and `policy_version` (required), plus optional `tenant_id` and `env_fingerprint`.
+- **Composite cache key** — Each key combines `SHA-256(normalized_query)` with `SHA-256(canonical_context_json)`. Identical queries under different contexts never collide.
+- **New `cache_v2` schema** — The on-disk SQLite table uses a composite `PRIMARY KEY (key, context_fingerprint)` and stores the fingerprint per entry. The cache re-validates the fingerprint on every read as defence-in-depth.
+- **Legacy entries are never returned** — Pre-v2 cache rows have no context fingerprint. No code path reads them, and the cache treats them as `UNVERIFIABLE`.
 
 ### Breaking changes
 
-- `VerificationCache.get()` and `VerificationCache.set()` now require a `CacheContext` argument. Calls like `cache.get("2+2")` or `cache.set("2+2", result)` raise `TypeError`.
+- `VerificationCache.get(query)` and `VerificationCache.set(query, result)` now require a `CacheContext` argument. Calls without one raise `TypeError`.
+- Results stored under one `(provider, model, policy_version, tenant_id)` tuple are not returned to a caller using a different tuple, even when the query string is identical.
 
 ### Example
 
 ```python
 from qwed_sdk.cache import CacheContext, VerificationCache
 
+cache = VerificationCache()
+
 ctx = CacheContext(
     provider="openai",
     model="gpt-4o",
     policy_version="v1",
-    tenant_id="tenant-alpha",
+    tenant_id="tenant-alpha",       # optional
+    env_fingerprint="sha256-...",   # optional
 )
 
-cache = VerificationCache()
+# First call: miss, then populate
+result = cache.get("2+2", ctx)            # None
 cache.set("2+2", {"verified": True}, ctx)
-cache.get("2+2", ctx)              # {"verified": True}
 
-# Provider switch — replay prevented
-ctx2 = CacheContext(provider="claude", model="claude-opus-4-5", policy_version="v1")
-cache.get("2+2", ctx2)             # None
+# Same query + same context: hit
+cache.get("2+2", ctx)                     # {"verified": True}
+
+# Same query, different provider: deterministic miss (replay prevention)
+ctx2 = CacheContext(provider="anthropic", model="claude-opus-4-5", policy_version="v1")
+cache.get("2+2", ctx2)                    # None
 ```
 
-See [Python SDK — Verification cache](/sdks/python#verification-cache) for the full API reference.
+See [Python SDK — Verification cache](/sdks/python#verification-cache) for the full API.
 
 ---
 
