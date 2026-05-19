@@ -27,105 +27,69 @@ print(result.attestation)
 
 ## Fail-closed contract
 
-`create_verification_attestation()` never returns `None`. It always returns an
-`AttestationResult` whose `status` is one of three explicit states. You **must**
-check `result.is_issued` before treating the attestation as valid. This contract
-prevents silent downgrades — a missing proof cannot be mistaken for success.
+<Warning>
+**Since PR #194 (Issue #188):** `create_verification_attestation()` **never returns `None`**. It always returns an `AttestationResult` with `status` set to `ISSUED`, `BLOCKED`, or `UNVERIFIABLE`. You MUST check `result.is_issued` before you treat the attestation as valid. A missing or failed attestation must hard-block the verification path. Never downgrade it to `VERIFIED`.
+</Warning>
 
 ### `AttestationResult`
 
-| Field | Type | Description |
-| --- | --- | --- |
-| `status` | `AttestationStatus` | `ISSUED`, `BLOCKED`, or `UNVERIFIABLE`. |
-| `token` | `str \| None` | JWT string. Present only when `status == ISSUED`. |
-| `error_code` | `str \| None` | Machine-readable failure reason. |
-| `error` | `str \| None` | Human-readable error detail (safe to log). |
-| `is_issued` | `bool` | `True` only when `status == ISSUED`. Use this as the gate. |
+<ParamField path="status" type="AttestationStatus" required>
+  Lifecycle state of the attestation. One of `ISSUED`, `BLOCKED`, or `UNVERIFIABLE`.
+</ParamField>
 
-### Status values
+<ParamField path="token" type="string | None">
+  Signed JWT string. Present only when `status == ISSUED`; `None` otherwise.
+</ParamField>
 
-| Status | Meaning | When it occurs |
-| --- | --- | --- |
-| `ISSUED` | Attestation signed and ready to use. | Normal success path. |
-| `BLOCKED` | Crypto is available but signing failed. | Key error, JWT library error, or any signing exception. |
-| `UNVERIFIABLE` | Cannot attempt signing. | `cryptography` / `PyJWT` not installed. |
+<ParamField path="error_code" type="string | None">
+  Machine-readable failure code: `"SIGNING_FAILURE"` when signing failed, `"CRYPTO_UNAVAILABLE"` when the `cryptography` / `PyJWT` package is not installed, `None` on success.
+</ParamField>
 
-### Error codes
+<ParamField path="error" type="string | None">
+  Human-readable failure detail. `None` on success.
+</ParamField>
 
-| `error_code` | Paired status | Caller action |
-| --- | --- | --- |
-| `SIGNING_FAILURE` | `BLOCKED` | Hard-block the response; do not return verdict as `VERIFIED`. |
-| `CRYPTO_UNAVAILABLE` | `UNVERIFIABLE` | Install `cryptography` and `PyJWT`, or run in a mode that does not require proofs. |
+<ParamField path="is_issued" type="bool">
+  Property. `True` only when `status is AttestationStatus.ISSUED`. You must check this flag before you use `token`.
+</ParamField>
+
+### `AttestationStatus` values
+
+| Status | Meaning | `token` | `error_code` |
+| --- | --- | --- | --- |
+| `ISSUED` | QWED signed the attestation. | JWT string | `None` |
+| `BLOCKED` | Crypto is available but signing failed (key error, JWT error). Hard block. | `None` | `SIGNING_FAILURE` |
+| `UNVERIFIABLE` | `cryptography` / `PyJWT` not installed. QWED did not attempt signing. | `None` | `CRYPTO_UNAVAILABLE` |
+| `VALID` / `EXPIRED` / `REVOKED` | Lifecycle states for previously issued attestations during verification. | — | — |
 
 ### Caller pattern
 
-Treat any status other than `ISSUED` as a hard failure. Do **not** return a
-`VERIFIED` verdict without a valid attestation token:
-
 ```python
-from qwed_sdk.attestation import create_verification_attestation
+from src.qwed_new.core.attestation import create_verification_attestation
 
 result = create_verification_attestation(
     status="VERIFIED",
     verified=True,
     engine="math",
-    query="2+2",
+    query="2+2=4",
 )
 
 if not result.is_issued:
-    # Fail-closed: refuse to surface an unproven verdict.
-    raise RuntimeError(
-        f"Attestation unavailable [{result.error_code}]: {result.error}"
-    )
+    # Fail-closed: do not proceed as VERIFIED without a proof artifact
+    raise RuntimeError(f"Attestation unavailable [{result.error_code}]: {result.error}")
 
 use(result.token)
 ```
 
-<Warning>
-Never branch on `result.token is not None` alone. Always gate on `result.is_issued`
-so future failure states cannot bypass your check.
-</Warning>
+### Key lifecycle auditability
 
-## Key lifecycle and continuity
+Every `IssuerKeyPair` records `generated_at` (epoch seconds) and `key_continuity_policy`. QWED emits a structured log entry (`attestation.key_generated`) on every new key generation, so you can audit continuity events.
 
-Each `IssuerKeyPair` records when it was generated and which continuity policy
-it follows. This makes key rotation and process-restart events auditable.
+<ParamField path="key_continuity_policy" type="string" default="ephemeral">
+  Policy for the issuer key pair. Must be one of `"ephemeral"` (in-memory, non-persistent — default) or `"persistent"` (durably stored, e.g. external KMS). Any other value raises `ValueError`.
+</ParamField>
 
-| Field | Description |
-| --- | --- |
-| `generated_at` | Unix timestamp when the key pair was created. |
-| `key_continuity_policy` | `"ephemeral"` (default) or `"persistent"`. |
-
-- **`ephemeral`** — The key lives only in process memory. QWED generates a new
-  key on every restart. Use this for short-lived workers or local development.
-- **`persistent`** — An external system (for example, a KMS) stores the key
-  material outside the process. Use this when verifiers across restarts or
-  replicas must accept the same issuer key.
-
-```python
-from qwed_sdk.attestation import IssuerKeyPair
-
-key_pair = IssuerKeyPair(
-    issuer_did="did:qwed:node:production",
-    key_id="signing-key-2026",
-    key_continuity_policy="persistent",
-)
-```
-
-Any other value for `key_continuity_policy` raises `ValueError`. This rejects
-typos explicitly so they cannot silently degrade the audit signal. Every key
-generation emits a structured log line for downstream auditing:
-
-```text
-attestation.key_generated issuer=did:qwed:node:production key_id=signing-key-2026 policy=persistent generated_at=1747526400
-```
-
-Signing failures and crypto-unavailable paths emit matching audit lines:
-
-```text
-attestation.blocked       query_hash=<sha256-prefix> reason=SIGNING_FAILURE
-attestation.unverifiable  query_hash=<sha256-prefix> reason=CRYPTO_UNAVAILABLE
-```
+`AttestationService.get_issuer_info()` now includes `key_generated_at` and `key_continuity_policy` alongside the existing issuer registry fields.
 
 ## Attestation structure
 
