@@ -5,8 +5,8 @@ description: "QWED Protocol release history — download links, installation, an
 
 ## Current release
 
-<Card title="v5.1.0 — Agent State Governance and Fail-Closed Hardening" icon="shield-check" href="/changelog">
-  AgentStateGuard for deterministic state verification, plus fail-closed hardening across execution, tool governance, math tolerance, and schema validation.
+<Card title="v5.1.1 — Trust Boundary Hardening" icon="shield-check" href="/changelog">
+  Cache trust-context binding (replay resistance), attestation fail-closed hardening, audit log isolation, proof-path corrections, and agent/executor boundary fixes.
 </Card>
 
 ### Install
@@ -14,23 +14,23 @@ description: "QWED Protocol release history — download links, installation, an
 <CodeGroup>
 
 ```bash pip
-pip install qwed==5.1.0
+pip install qwed==5.1.1
 ```
 
 ```bash docker
-docker pull qwedai/qwed-verification:5.1.0
+docker pull qwedai/qwed-verification:5.1.1
 ```
 
 ```bash npm
-npm install @qwed-ai/sdk@5.1.0
+npm install @qwed-ai/sdk@5.1.1
 ```
 
 ```bash cargo
-cargo add qwed@5.1.0
+cargo add qwed@5.1.1
 ```
 
 ```bash go
-go get github.com/QWED-AI/qwed-verification/sdk-go@v5.1.0
+go get github.com/QWED-AI/qwed-verification/sdk-go@v5.1.1
 ```
 
 </CodeGroup>
@@ -41,7 +41,13 @@ go get github.com/QWED-AI/qwed-verification/sdk-go@v5.1.0
 
 <AccordionGroup>
 
-<Accordion title="v5.1.0 — Agent State Governance and Fail-Closed Hardening (April 19, 2026)" icon="shield-check" defaultOpen>
+<Accordion title="v5.1.1 — Trust Boundary Hardening (May 22, 2026)" icon="shield-check" defaultOpen>
+  Cache keys bound to full trust context (provider/model/policy/session) — prevents cross-context replay. Attestation path hardened with `AttestationStatus` enum and `is_issued` contract. Audit chain isolated per-org with `BEGIN IMMEDIATE` transactions. Reasoning proof prerequisites enforced. Symbolic/batch verifiers return `BLOCKED` on missing proof. Unknown agent actions denied. `additionalProperties: false` strictly enforced. SDK `5.1.1` across Python, TypeScript, Rust.
+
+  [Full Release Notes →](/changelog) · [GitHub Release ↗](https://github.com/QWED-AI/qwed-verification/releases/tag/v5.1.1)
+</Accordion>
+
+<Accordion title="v5.1.0 — Agent State Governance and Fail-Closed Hardening (April 19, 2026)" icon="shield-check">
   AgentStateGuard for deterministic state verification · Legacy `CodeExecutor` hard-blocked · Default-deny for unknown tools · Bounded math tolerance · `verify_logic_rule` / `verify_identity` fail-closed · Ambiguous math expressions blocked · Schema `uniqueItems` fail-closed · SDK `5.1.0` across Python, TypeScript, Go.
 
   [Full Release Notes →](/changelog) · [GitHub Release ↗](https://github.com/QWED-AI/qwed-verification/releases/tag/v5.1.0)

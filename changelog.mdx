@@ -635,6 +635,61 @@ See the [QWED-Tax guards reference](/tax/guards) for full parameter and return-s
 
 ---
 
+## v5.1.1 — Trust Boundary Hardening
+
+**Released: May 22, 2026** · [GitHub Release](https://github.com/QWED-AI/qwed-verification/releases/tag/v5.1.1) · Patch
+
+Packages the post-v5.1.0 trust-boundary and fail-closed corrections into a coherent release. Changes are correctness and security class — not cosmetic.
+
+### Cache trust-context binding
+**PRs #178, #192** · `qwed_sdk/cache.py`, `qwed_sdk/qwed_local.py`
+
+Verification cache keys are now bound to the full trust context — provider, model, policy version, and session ID. A cache miss is forced when any of these change, even if the query string matches. Prevents cross-context replay in multi-tenant and multi-provider deployments.
+
+### Attestation fail-closed hardening
+**PRs #188, #194** · `src/qwed_new/core/attestation.py`
+
+`create_verification_attestation()` now returns an explicit `AttestationResult` on all code paths. `AttestationStatus` is now an enum. `is_issued` property enforces the fail-closed contract. `IssuerKeyPair` gains `generated_at` epoch and `key_continuity_policy` with an allowlist.
+
+### Audit logger fail-closed
+**PR #179** · `src/qwed_new/core/audit.py`
+
+Malformed audit payloads now fail closed. Organization-level audit chains are isolated. SQLite writes use `BEGIN IMMEDIATE` transactions — no partial-write records.
+
+### Proof-path and reasoning corrections
+**PRs #177, #180, #161**
+
+Reasoning acceptance requires proof prerequisites. Batch math simplification is separated from the proof path. Symbolic verifier returns `BLOCKED` when no proof exists.
+
+### Agent and executor boundary fixes
+**PRs #176, #168**
+
+Unknown agent actions explicitly denied and logged. Secure executor hard-blocked on unrecognized input shapes.
+
+### Schema validation tightening
+**PR #160**
+
+`additionalProperties: false` enforcement is now strict.
+
+### Version table
+
+| Artifact | Previous | This release |
+|---|---|---|
+| `qwed` (PyPI) | 5.1.0 | 5.1.1 |
+| `qwed_sdk` (Python) | 5.1.0 | 5.1.1 |
+| `@qwed-ai/sdk` (npm) | 5.1.0 | 5.1.1 |
+| `qwed` (Rust crate) | 5.1.0 | 5.1.1 |
+
+```bash
+pip install qwed==5.1.1
+docker pull qwedai/qwed-verification:5.1.1
+npm install @qwed-ai/sdk@5.1.1
+cargo add qwed@5.1.1
+go get github.com/QWED-AI/qwed-verification/sdk-go@v5.1.1
+```
+
+---
+
 ## v5.1.0 — agent state governance and fail-closed hardening
 **Released: April 19, 2026** · [GitHub Release](https://github.com/QWED-AI/qwed-verification/releases/tag/v5.1.0)
 
