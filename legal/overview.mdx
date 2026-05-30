@@ -52,16 +52,47 @@ Not every guard provides full formal verification. Some operate on partial rules
 |-------|--------|----------------|
 | **DeadlineGuard** | `DETERMINISTIC` | Date arithmetic and business-day calculations for supported, structured inputs |
 | **LiabilityGuard** | `DETERMINISTIC` | Cap and tiered amount computations for supported numeric inputs |
-| **ClauseGuard** | `PARTIAL / HEURISTIC` | Limited text-based clause consistency and contradiction checks |
+| **ClauseGuard** | `PARTIAL / HEURISTIC` | Limited text-based clause consistency and contradiction checks (explicit Z3 path is deterministic) |
 | **CitationGuard** | `PARTIAL / HEURISTIC` | Citation shape / format validation, not authoritative existence proof |
 | **JurisdictionGuard** | `PARTIAL / HEURISTIC` | Structured checks around governing law and forum combinations |
-| **StatuteOfLimitationsGuard** | `PARTIAL / HEURISTIC` | Limitation-period calculations for supported jurisdictions and claim types |
+| **StatuteOfLimitationsGuard** | `MIXED` | Deterministic date arithmetic over a parsed limitation-period lookup; the lookup itself is `PARSED`, not authority proof |
 | **IRACGuard** | `PARTIAL / HEURISTIC` | IRAC structure and consistency checks, not proof of legal reasoning |
-| **FairnessGuard** | `PARTIAL / HEURISTIC` | Counterfactual consistency checks (requires an external LLM client) |
-| **ContradictionGuard** | `PARTIAL / HEURISTIC` | Structured contradiction checks for a limited set of modeled clause categories |
+| **FairnessGuard** | `HEURISTIC / FAIL-CLOSED` | Counterfactual consistency signal only; **never** returns `verified=True` — fairness cannot be proven by text substitution (requires an external LLM client) |
+| **ContradictionGuard** | `MIXED` | Deterministic Z3 SAT/UNSAT over a limited set of modeled clause categories; unmodeled inputs fail closed |
 | **ProvenanceGuard** | `DETERMINISTIC` | SHA-256 hash integrity, disclosure markers, model allowlist, timestamp validity |
 
-A valid result from a `PARTIAL / HEURISTIC` guard does **not** mean the underlying legal claim is correct. It means the claim matched a supported structural pattern.
+A valid result from a `PARTIAL / HEURISTIC` or `MIXED` guard does **not** mean the underlying legal claim is correct. It means the claim matched a supported structural pattern, or that a deterministic sub-computation succeeded over parsed inputs.
+
+## Verification traces
+
+As of **v0.4.0**, every guard returns a `verification_trace` — an ordered list of `VerificationStep` records that make each decision auditable. A trace is **not** a narrative explanation; each step carries an `evidence_type` that classifies *how* its output was derived:
+
+| `evidence_type` | Meaning | `is_proven()` |
+|-----------------|---------|:-------------:|
+| `DETERMINISTIC` | Proven by math/logic (Z3, date arithmetic, exact compare) | `True` |
+| `PARSED` | Read/matched from structure or a lookup table — not authority proof | `False` |
+| `INFERRED` | Pattern/keyword derived — may be wrong on edge cases | `False` |
+| `HEURISTIC` | Approximate/statistical signal | `False` |
+| `UNSUPPORTED` | Guard cannot model this input — fail-closed | `False` |
+
+Only `DETERMINISTIC` steps constitute proof. `PARSED`, `INFERRED`, `HEURISTIC`, and `UNSUPPORTED` steps are visible for auditability but must **not** be treated as verification.
+
+```python
+from qwed_legal import StatuteOfLimitationsGuard, trace_to_dict
+
+result = StatuteOfLimitationsGuard().verify(
+    claim_type="breach_of_contract",
+    jurisdiction="California",
+    incident_date="2020-01-01",
+    filing_date="2023-01-01",
+)
+
+for step in result.verification_trace:
+    print(step.step, step.evidence_type, "->", step.output)
+
+# JSON-safe export for audit logs (each entry includes an explicit is_proven flag)
+serialized = trace_to_dict(result.verification_trace)
+```
 
 ## Quick example
 
@@ -90,12 +121,14 @@ from qwed_legal import CitationGuard
 guard = CitationGuard()
 result = guard.verify("Brown v. Board of Education, 347 U.S. 483 (1954)")
 
-print(result.valid)  # True - matches a supported citation format
+print(result.format_valid)  # True - matches a supported citation format
+print(result.status)        # "unverifiable_authority" - format ok, authority unknown
+print(result.verified)      # False - authority can never be proven by format
 print(result.parsed_components)
 # {'volume': 347, 'reporter': 'U.S.', 'page': '483'}
 ```
 
-A valid format result does **not** prove that the cited authority exists or is controlling. It only means the citation matched a supported structural pattern.
+A valid format result does **not** prove that the cited authority exists or is controlling. `result.verified` is always `False` and `result.status` is `unverifiable_authority` whenever the format matches — CitationGuard has no case-law database. It only confirms the citation matched a supported structural pattern.
 
 ## Architecture
 

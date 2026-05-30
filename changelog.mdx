@@ -7,6 +7,45 @@ All notable changes to the QWED platform, listed by release.
 
 ---
 
+## QWED-Legal v0.4.0 — verification traces across all guards + fail-closed hardening
+**Released: May 30, 2026**
+
+> Every guard now returns an auditable `verification_trace` with explicit evidence types, and a batch of trust-boundary fixes stop guards from presenting heuristic or unsupported results as proof. Closes 8 hardening issues (#11, #12, #16, #17, #18, #19, #20, #21).
+
+### Verification traces (new)
+
+- **`verification_trace` on every guard** — an ordered list of `VerificationStep` records that make each decision auditable. Not a narrative explanation.
+- **`evidence_type` taxonomy** — each step is `DETERMINISTIC`, `PARSED`, `INFERRED`, `HEURISTIC`, or `UNSUPPORTED`. `VerificationStep.is_proven()` returns `True` only for `DETERMINISTIC`.
+- **`to_dict()` / `trace_to_dict()`** — JSON-safe serialization for audit logs. Non-serializable inputs are stringified (no silent data loss); each serialized step carries an explicit `is_proven` flag.
+
+### Trust-boundary changes
+
+- **`FairnessGuard` never returns `verified=True`** (#18) — fairness cannot be proven by counterfactual text substitution and string equality. A consistent outcome is `UNVERIFIABLE_FAIRNESS`; a differing outcome is a `HEURISTIC_BIAS_SIGNAL` for human review. Malformed swap input (empty, non-string values, case-colliding keys) fails closed.
+- **`CitationGuard` separates format from authority** (#17) — `verified` is always `False`; a format match returns `status="unverifiable_authority"`. Format validity is never treated as proof a cited authority exists.
+- **`IRACGuard` fail-closed reasoning boundary** (#12) — structure checks are `INFERRED` and the reasoning conclusion is `UNSUPPORTED`; a passing result is `unverifiable_reasoning`, never proof of correct legal reasoning.
+- **`ClauseGuard` non-operative keyword handling** (#11) — heuristic conclusions are `INFERRED`; limited or ambiguous coverage fails closed instead of returning a misleading "consistent".
+- **`StatuteOfLimitationsGuard` and `ContradictionGuard` reclassified as `MIXED`** — deterministic core (date arithmetic / Z3 SAT-UNSAT) over a parsed lookup; unmodeled inputs fail closed.
+
+### Security hardening
+
+- **`JurisdictionGuard` fail-closed on ambiguity and empty parties** (#16, #20) — unresolved warnings fail verification; empty `parties_countries` no longer returns a false `verified=True` (`all([])` fail-open fixed) in both `verify_choice_of_law` and `check_convention_applicability`.
+- **`LiabilityGuard` exact-match caps** (#19) — cap, tiered, and indemnity checks require exact match after currency rounding; approximate tolerance is not accepted as proof.
+- **`DeadlineGuard`** — business-day results fail closed when the requested holiday calendar cannot be built; on date parse failure, dates are `None` (not `datetime.min`).
+
+### SDK changes (TypeScript `@qwed-ai/legal`)
+
+- Every result interface now exposes `verification_trace`.
+- Added `FairnessVerifier` reflecting the fail-closed contract; `verified` is hardcoded `false` at the boundary.
+- `CitationResult` exposes `format_valid` / `status` / `verified: false`; `ClauseResult.conflicts` typed as `[number, number, string][]`.
+- The fairness client factory is resolved via a validated `importlib` descriptor (no raw code execution).
+- npm version reconciled from `1.0.0` to `0.4.0` to match the Python package.
+
+### Breaking changes
+
+- `FairnessGuard.verify_decision_fairness` no longer returns `verified=True`. Migration: treat the output as a signal requiring human review, consuming `status` / `risk` instead of `verified`.
+
+---
+
 ## QWED-Verification — context-bound verification cache (replay prevention)
 **Released: May 17, 2026**
 
