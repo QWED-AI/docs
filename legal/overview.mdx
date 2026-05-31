@@ -65,7 +65,7 @@ A valid result from a `PARTIAL / HEURISTIC` or `MIXED` guard does **not** mean t
 
 ## Verification traces
 
-As of **v0.4.0**, every guard returns a `verification_trace` — an ordered list of `VerificationStep` records that make each decision auditable. A trace is **not** a narrative explanation; each step carries an `evidence_type` that classifies *how* its output was derived:
+As of **v0.4.0**, every guard returns a `verification_trace` — an ordered list of `VerificationStep` records that make each decision auditable. A trace is **not** a narrative explanation. Each step carries an `evidence_type` that classifies *how* its output was derived:
 
 | `evidence_type` | Meaning | `is_proven()` |
 |-----------------|---------|:-------------:|
@@ -128,7 +128,7 @@ print(result.parsed_components)
 # {'volume': 347, 'reporter': 'U.S.', 'page': '483'}
 ```
 
-A valid format result does **not** prove that the cited authority exists or is controlling. `result.verified` is always `False` and `result.status` is `unverifiable_authority` whenever the format matches — CitationGuard has no case-law database. It only confirms the citation matched a supported structural pattern.
+A valid format result does **not** prove that the cited authority exists or is controlling. `result.verified` is always `False`, and `result.status` is `unverifiable_authority` when the format matches. CitationGuard has no case-law database. It only confirms the citation matched a supported structural pattern.
 
 ## Architecture
 

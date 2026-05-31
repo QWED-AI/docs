@@ -773,9 +773,15 @@ Conclusion: The defendant breached the employment contract.
 
 result = guard.verify_structure(llm_output)
 
-print(result["verified"])    # True
-print(result["components"])  # {'issue': '...', 'rule': '...', 'application': '...', 'conclusion': '...'}
+print(result["structure_valid"])  # True - all four IRAC sections present and coherent
+print(result["status"])           # "unverifiable_reasoning"
+print(result["verified"])         # False - reasoning correctness is never proven
+print(result["components"])       # {'issue': '...', 'rule': '...', 'application': '...', 'conclusion': '...'}
 ```
+
+<Info>
+  `result["verified"]` is **always** `False` for `IRACGuard` — structural validity is not proof of correct legal reasoning. Branch on `structure_valid` and `status` instead, and route `unverifiable_reasoning` results to a human reviewer.
+</Info>
 
 ### Detection types
 
