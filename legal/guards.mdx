@@ -5,12 +5,35 @@ sidebarTitle: "The 10 guards"
 description: "Reference for QWED Legal guards covering deadlines, liability, contradictions, citations, jurisdiction checks, and AI content provenance."
 ---
 
-Each guard verifies a specific aspect of legal output. Guards are labeled `DETERMINISTIC` or `PARTIAL / HEURISTIC` to indicate the strength of the underlying check.
+Each guard verifies a specific aspect of legal output. Guards are labeled `DETERMINISTIC`, `MIXED`, or `PARTIAL / HEURISTIC` to indicate the strength of the underlying check.
 
-- `DETERMINISTIC` guards return reproducible results for supported, structured inputs.
+- `DETERMINISTIC` guards return reproducible, provable results for supported, structured inputs.
+- `MIXED` guards run a deterministic computation (date arithmetic, Z3 SAT/UNSAT) over parsed inputs. The computation is provable; the parsed lookup that feeds it is not authority proof.
 - `PARTIAL / HEURISTIC` guards apply structural or rule-based checks. A passing result does **not** prove that the underlying legal claim is correct — only that it matched a supported pattern.
 
-When a claim falls outside a guard's supported boundary, the guard should be treated as fail-closed: reject or mark the claim unverified rather than accepting it.
+When a claim falls outside a guard's supported boundary, the guard fails closed: it rejects or marks the claim unverified rather than accepting it.
+
+## Verification traces and evidence types
+
+As of **v0.4.0**, every guard returns a `verification_trace` — an ordered list of `VerificationStep` records. Each step is tagged with an `evidence_type`, and `VerificationStep.is_proven()` returns `True` **only** for `DETERMINISTIC` steps.
+
+| `evidence_type` | Meaning | `is_proven()` |
+|-----------------|---------|:-------------:|
+| `DETERMINISTIC` | Proven by math/logic (Z3, date arithmetic, exact compare) | `True` |
+| `PARSED` | Read/matched from structure or lookup — not authority proof | `False` |
+| `INFERRED` | Pattern/keyword derived — may be wrong on edge cases | `False` |
+| `HEURISTIC` | Approximate/statistical signal | `False` |
+| `UNSUPPORTED` | Guard cannot model this input — fail-closed | `False` |
+
+```python
+from qwed_legal import trace_to_dict
+
+# Any guard result exposes .verification_trace
+serialized = trace_to_dict(result.verification_trace)  # JSON-safe list of dicts
+# each entry carries an explicit "is_proven" flag
+```
+
+Use `trace_to_dict()` to export a trace into audit logs. Non-serializable input values are stringified (no silent data loss).
 
 ## 1. DeadlineGuard
 
@@ -356,17 +379,24 @@ from qwed_legal import CitationGuard
 
 guard = CitationGuard()
 
-# Valid citation
+# Valid format
 result = guard.verify("Brown v. Board of Education, 347 U.S. 483 (1954)")
-print(result.valid)  # True
+print(result.format_valid)  # True
+print(result.status)        # "unverifiable_authority" - format ok, authority unknown
+print(result.verified)      # False - authority is never proven by format
 print(result.parsed_components)
 # {'volume': 347, 'reporter': 'U.S.', 'page': '483'}
 
-# Invalid citation (fake reporter)
+# Invalid format (fake reporter)
 result = guard.verify("Smith v. Jones, 999 FAKE 123 (2020)")
-print(result.valid)   # False
-print(result.issues)  # ["Unknown reporter"]
+print(result.format_valid)  # False
+print(result.status)        # "format_invalid"
+print(result.issues)        # ["Unknown reporter"]
 ```
+
+<Warning>
+  `CitationGuard` checks **format only**. `result.verified` is **always** `False`, and a format-valid citation has `status="unverifiable_authority"`. A well-formatted citation can still refer to a case that does not exist — confirming authority requires an external legal database, which this guard does not have. Use `format_valid` to check shape; never treat it as proof of authority.
+</Warning>
 
 ### Supported citation patterns
 
@@ -394,7 +424,7 @@ print(result.invalid)  # 1
 
 ```python
 result = guard.check_statute_citation("42 U.S.C. § 1983")
-print(result.valid)  # True
+print(result.format_valid)  # True (format only — not proof the statute exists or applies)
 print(result.parsed_components)
 # {'title': 42, 'code': 'U.S.C.', 'section': '1983'}
 ```
@@ -489,9 +519,9 @@ print(result.verified)  # True - both are CISG members
 
 ## 6. StatuteOfLimitationsGuard
 
-**Status:** `PARTIAL / HEURISTIC`
+**Status:** `MIXED`
 
-**Purpose:** Compute claim limitation periods for supported jurisdictions and claim types using rule tables. Coverage is limited to the modeled jurisdictions and claim types listed below.
+**Purpose:** Compute claim limitation periods for supported jurisdictions and claim types using rule tables. The limitation-period lookup is `PARSED`; the date arithmetic over it (expiration, days remaining) is `DETERMINISTIC`. Coverage is limited to the modeled jurisdictions and claim types listed below.
 
 ### The problem
 
@@ -743,9 +773,15 @@ Conclusion: The defendant breached the employment contract.
 
 result = guard.verify_structure(llm_output)
 
-print(result["verified"])    # True
-print(result["components"])  # {'issue': '...', 'rule': '...', 'application': '...', 'conclusion': '...'}
+print(result["structure_valid"])  # True - all four IRAC sections present and coherent
+print(result["status"])           # "unverifiable_reasoning"
+print(result["verified"])         # False - reasoning correctness is never proven
+print(result["components"])       # {'issue': '...', 'rule': '...', 'application': '...', 'conclusion': '...'}
 ```
+
+<Info>
+  `result["verified"]` is **always** `False` for `IRACGuard` — structural validity is not proof of correct legal reasoning. Branch on `structure_valid` and `status` instead, and route `unverifiable_reasoning` results to a human reviewer.
+</Info>
 
 ### Detection types
 
@@ -760,18 +796,30 @@ print(result["components"])  # {'issue': '...', 'rule': '...', 'application': '.
 ```python
 result = guard.verify_structure("The defendant should pay damages.")
 
-print(result["verified"])  # False
-print(result["error"])     # "Failed Reasoned Elaboration. Missing steps: issue, rule, application, conclusion..."
-print(result["missing"])   # ['issue', 'rule', 'application', 'conclusion']
+print(result["verified"])         # False
+print(result["status"])           # "structure_invalid"
+print(result["structure_valid"])  # False
+print(result["error"])
+# "STRUCTURE INVALID: Missing IRAC section(s): issue, rule, application,
+#  conclusion. Legal analysis must contain Issue, Rule, Application, and Conclusion."
+print(result["missing"])          # ['issue', 'rule', 'application', 'conclusion']
 ```
+
+<Warning>
+  `IRACGuard` checks **structure and surface-level coherence only**. A passing result has `status="unverifiable_reasoning"` — it confirms the four IRAC sections are present and structurally coherent, **not** that the cited rule exists or that the reasoning is legally sound. In the `verification_trace`, structure steps are `INFERRED` and the reasoning conclusion is `UNSUPPORTED` — never `DETERMINISTIC`.
+</Warning>
 
 ---
 
 ## 8. FairnessGuard
 
-**Status:** `PARTIAL / HEURISTIC`
+**Status:** `HEURISTIC / FAIL-CLOSED`
 
-**Purpose:** Apply counterfactual consistency checks to detect output that changes when protected attributes are swapped. This is a structural fairness check, not a complete fairness proof. Requires an external LLM client.
+**Purpose:** Apply a counterfactual consistency check that flags when output changes after protected attributes are swapped. This is a **heuristic signal**, not a fairness proof. Requires an external LLM client.
+
+<Warning>
+  As of **v0.4.0**, `FairnessGuard` **never returns `verified=True`** (issue #18). Legal fairness cannot be proven by text substitution and string equality, so the guard does not claim it. A consistent outcome is reported as `UNVERIFIABLE_FAIRNESS`; a differing outcome is a `HEURISTIC_BIAS_SIGNAL` that warrants human review. This is a breaking change from earlier versions that returned `FAIRNESS_VERIFIED`.
+</Warning>
 
 ### The problem
 
@@ -780,6 +828,8 @@ AI legal systems can exhibit bias based on protected attributes:
 - Different sentencing recommendations based on gender
 - Inconsistent contract assessments based on party names
 - Discriminatory loan approval reasoning
+
+A single counterfactual swap with string-equality comparison cannot *prove* fairness — equivalent outcomes may differ in wording, and a single swap does not cover all relevant dimensions. So the result is always treated as a signal, never a pass.
 
 ### The solution
 
@@ -792,50 +842,56 @@ guard = FairnessGuard(llm_client=my_llm)
 result = guard.verify_decision_fairness(
     original_prompt="Should John Smith receive parole given his rehabilitation record?",
     original_decision="Parole recommended based on positive rehabilitation.",
-    protected_attribute_swap={"John": "Jane", "his": "her"}
+    protected_attribute_swap={"John": "Jane", "his": "her"},
 )
 
-print(result["verified"])  # True if decision is consistent
-print(result["status"])    # "FAIRNESS_VERIFIED" or "JUDICIAL_BIAS_DETECTED"
+print(result["verified"])  # Always False — fairness is never "proven"
+print(result["status"])    # "UNVERIFIABLE_FAIRNESS"
+print(result.get("risk"))  # "HEURISTIC_BIAS_SIGNAL" when outcomes differ
 ```
 
 ### How it works
 
-1. **Early exit** - If `protected_attribute_swap` is empty (`{}`), returns immediately with `NO_SWAP_REQUIRED` without calling the LLM
-2. **Counterfactual Generation** - Swaps protected attributes (names, pronouns) while preserving case
-3. **Re-evaluation** - Runs the modified prompt through the LLM
-4. **Deterministic Comparison** - Checks if outcomes match exactly
+1. **Input validation** — Rejects an empty swap, non-string values, and keys that collide when lowercased (fail-closed `ValueError` or `UNVERIFIABLE_FAIRNESS`).
+2. **Counterfactual generation** — Swaps protected attributes (names, pronouns) in a single pass while preserving case.
+3. **Re-evaluation** — Runs the modified prompt through the LLM.
+4. **Heuristic comparison** — Compares outcomes by string equality. Consistency is reported as `UNVERIFIABLE_FAIRNESS` (not proof); a difference is a `HEURISTIC_BIAS_SIGNAL`.
 
 ### Response fields
 
 | Field | Type | Description |
 | --- | --- | --- |
-| `verified` | `bool` | Whether the decision is fair |
-| `status` | `str` | `FAIRNESS_VERIFIED` or `NO_SWAP_REQUIRED` (on success) |
-| `risk` | `str` | `JUDICIAL_BIAS_DETECTED` or `LLM_GENERATION_FAILED` (on failure) |
+| `verified` | `bool` | **Always `False`.** Fairness is never proven by this guard. |
+| `status` | `str` | `UNVERIFIABLE_FAIRNESS` or `LLM_GENERATION_FAILED` |
+| `risk` | `str` | `HEURISTIC_BIAS_SIGNAL` (outcomes differed) or `LLM_GENERATION_FAILED`. Present only when applicable. |
 | `message` | `str` | Explanation of the result |
-| `variance` | `dict` | Present when bias detected — contains `original` and `counterfactual` decisions |
+| `variance` | `dict` | Present only when outcomes differ — contains `original` and `counterfactual` decisions |
+| `verification_trace` | `list` | `VerificationStep` records; steps are `HEURISTIC`/`UNSUPPORTED`, never `DETERMINISTIC` |
 
-### Detection types
+### Outcomes
 
-| Status / Risk | Description |
+| status / risk | Meaning |
 | --- | --- |
-| `FAIRNESS_VERIFIED` | Decision unchanged after attribute swap |
-| `JUDICIAL_BIAS_DETECTED` | Decision changed based on protected attributes |
-| `NO_SWAP_REQUIRED` | No protected attributes to swap (empty dict passed) |
+| `UNVERIFIABLE_FAIRNESS` (consistent) | Outcomes matched under one swap — **not** proof of fairness |
+| `HEURISTIC_BIAS_SIGNAL` (differing) | Outcome changed under swap — route to human review |
+| `UNVERIFIABLE_FAIRNESS` (empty swap) | No protected attributes provided — fail-closed |
 | `LLM_GENERATION_FAILED` | The LLM client returned `None` for the counterfactual prompt |
 
 <Warning>
-  FairnessGuard requires an LLM client at initialization. Without it, `verify_decision_fairness()` will raise a `ValueError`.
+  `FairnessGuard` requires an LLM client at initialization. Without it, `verify_decision_fairness()` raises a `ValueError`. Malformed `protected_attribute_swap` input (non-string values, case-colliding keys) also raises a `ValueError` — the guard never silently processes ambiguous input.
 </Warning>
+
+<Info>
+  **Migration from earlier versions:** if your code branched on `result["verified"] == True` or `status == "FAIRNESS_VERIFIED"`, update it to treat the output as a signal. Consume `status` / `risk` and route `HEURISTIC_BIAS_SIGNAL` (and consistent-but-unverifiable) results to a human reviewer.
+</Info>
 
 ---
 
 ## 9. ContradictionGuard
 
-**Status:** `PARTIAL / HEURISTIC`
+**Status:** `MIXED`
 
-**Purpose:** Detect logical contradictions between modeled clauses using a constraint solver. Coverage is limited to the supported clause categories below — a "consistent" result is **not** a proof of full contract consistency.
+**Purpose:** Detect logical contradictions between modeled clauses using a Z3 constraint solver. The SAT/UNSAT result is `DETERMINISTIC`; clause categorization from text is `PARSED`. Coverage is limited to the supported clause categories below — a "consistent" result is **not** a proof of full contract consistency, and unmodeled clauses fail closed.
 
 ### The problem
 
