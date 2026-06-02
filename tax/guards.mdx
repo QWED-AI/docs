@@ -7,6 +7,26 @@ description: "Reference for QWED Tax guards covering US and India workflows incl
 
 QWED-Tax verifies logic deterministically. No probabilities, just rules.
 
+## Statutory audit trace
+
+Several guards attach a structured, machine-readable `audit_trace` to their verdict so an auditor can see exactly **which statute drove the decision** — instead of parsing free-text reasons. The field is **additive**: existing result keys are unchanged, so callers that ignore it keep working.
+
+```python
+{
+  "verified": False,
+  "reason": "ITC is blocked for 'catering' under Section 17(5) / VAT Rules.",
+  "audit_trace": {
+    "rule_id": "ITC_BLOCKED_17_5",
+    "statute": "CGST Act, Section 17(5)",
+    "jurisdiction": "INDIA",
+    "outcome": "BLOCKED",
+    "inputs": {"expense_category": "CATERING"}
+  }
+}
+```
+
+Guards currently emitting `audit_trace` include **InputCreditGuard** (ITC), **TDSGuard** (Sec 194J/194C/194H/194I), and **GSTGuard** (RCM). Rule identifiers and statute strings are centralized in `qwed_tax/audit.py`.
+
 ## United States (IRS)
 
 ### ClassificationGuard (IRS common law)
@@ -248,13 +268,19 @@ result = guard.verify_flat_tax_rate(
 
 ### GSTGuard (RCM)
 
-**Rule:** Certain services (GTA, Legal) require **Reverse Charge Mechanism** (Recipient pays tax).
+**Rule:** Certain notified services require the **Reverse Charge Mechanism** (the recipient pays the tax instead of the provider). RCM applicability is expressed as a declarative rule table — one entry per notified service, each carrying its predicate and statutory reference.
 
 | Service | Provider | Recipient | Liability |
 | --- | --- | --- | --- |
 | GTA | Any | Body Corporate / Partnership | RCM (Recipient) |
-| Legal | Any | Body Corporate | RCM (Recipient) |
+| Legal | Any | Body Corporate / Partnership | RCM (Recipient) |
 | Security | Non-Body Corporate | Body Corporate | RCM (Recipient) |
+| Director | Any | Body Corporate | RCM (Recipient) |
+| Sponsorship | Any | Body Corporate / Partnership | RCM (Recipient) |
+| Renting of motor vehicle | Non-Body Corporate | Body Corporate | RCM (Recipient) |
+| Import of service | Any | Any (recipient in India) | RCM (Recipient) |
+
+Any service/recipient combination outside these rules resolves to **forward charge** (the provider pays).
 
 ```python
 from qwed_tax.jurisdictions.india.guards.gst_guard import GSTGuard, ServiceType, EntityType
@@ -267,8 +293,55 @@ result = guard.verify_rcm_applicability(
     recipient=EntityType.BODY_CORPORATE
 )
 # {"verified": True, "liability": "RECIPIENT (RCM)", "is_rcm": True,
-#  "reason": "Legal service to Business Entity attracts RCM."}
+#  "reason": "Legal service to a Business Entity (Body Corporate/Partnership) attracts RCM.",
+#  "audit_trace": {"rule_id": "RCM_LEGAL", "statute": "Notification 13/2017-CT(R), Sl. 2 (Legal)", ...}}
 ```
+
+<Note>
+  `verify_rcm_applicability` accepts either enum members or their raw string values (e.g. `"LEGAL"`, `"BODY_CORPORATE"`), so JSON-sourced payloads work without pre-conversion. Unknown values resolve to forward charge.
+</Note>
+
+### GSTGuard (CGST/SGST/IGST split)
+
+**Goal:** Verify that a claimed tax breakup matches the **place of supply**. This verifies the split — the GST rate is an input, not something the guard derives.
+
+- **Intra-state** (supplier state == place of supply): `CGST = SGST = value × rate / 2`, and `IGST` must be `0`.
+- **Inter-state** (supplier state != place of supply): `IGST = value × rate`, and `CGST`/`SGST` must be `0`.
+
+A small rounding tolerance (2 paise) applies only to tax-carrying CGST/SGST legs. Legs that must be exactly zero (the wrong tax type for the supply) get **no** tolerance, so even a tiny wrong-type amount is rejected. Negative claimed amounts fail closed.
+
+```python
+from qwed_tax.jurisdictions.india.guards.gst_guard import GSTGuard
+
+guard = GSTGuard()
+
+# Intra-state supply: 18% of 1000 -> CGST 90 + SGST 90, IGST 0
+result = guard.verify_gst_split(
+    supplier_state="KA",
+    place_of_supply="KA",
+    taxable_value=1000,
+    gst_rate=18,
+    claimed_cgst=90,
+    claimed_sgst=90,
+    claimed_igst=0,
+)
+# {"verified": True, "supply_type": "INTRA_STATE",
+#  "expected": {"cgst": "90", "sgst": "90", "igst": "0"}, ...}
+```
+
+| Parameter | Type | Required | Description |
+| --- | --- | --- | --- |
+| `supplier_state` | `str` | Yes | Supplier's state code |
+| `place_of_supply` | `str` | Yes | Place-of-supply state code (case-insensitive) |
+| `taxable_value` | `Decimal \| str \| int \| float` | Yes | Taxable value. Must be finite and non-negative |
+| `gst_rate` | `Decimal \| str \| int \| float` | Yes | GST rate as a percentage. Must be finite and non-negative |
+| `claimed_cgst` | `Decimal \| str \| int \| float` | Yes | Claimed CGST. Must be non-negative |
+| `claimed_sgst` | `Decimal \| str \| int \| float` | Yes | Claimed SGST. Must be non-negative |
+| `claimed_igst` | `Decimal \| str \| int \| float` | Yes | Claimed IGST. Must be non-negative |
+
+<Note>
+  The guard **fails closed**: missing states, non-finite values, or negative amounts return `{"verified": False, "error": "..."}` rather than raising.
+</Note>
 
 ### InvestmentGuard (Trading / Z3)
 
@@ -362,11 +435,22 @@ result = guard.verify_fd_rate(
   - _Food/Beverages:_ Blocked.
   - _Motor Vehicles:_ Blocked (unless transport biz).
   - _Gift to Employee:_ Blocked only above INR 50,000. Gifts below the threshold are ITC-eligible.
+- **InputCreditGuard.verify_gstin_format:** Validates a GSTIN's structure **and its 15th-digit checksum** (base-36 GSTN algorithm). A string that matches the format but carries an incorrect check digit is rejected with a generic `"Invalid GSTIN checksum."` error (the correct digit is never echoed back).
 - **TDSGuard:** Calculates withholding based on service type.
   - _Professional Fees:_ 10% (Sec 194J).
   - _Contractors:_ 1% or 2% (Sec 194C).
   - _Commission:_ 5% (Sec 194H).
   - _Rent (Land):_ 10% (Sec 194I).
+
+```python
+from qwed_tax.guards.indirect_tax_guard import InputCreditGuard
+
+guard = InputCreditGuard()
+
+guard.verify_gstin_format("27AAPFU0939F1ZV")   # {"verified": True}
+guard.verify_gstin_format("22AAAAA0000A1Z5")   # {"verified": False, "error": "Invalid GSTIN checksum."}
+guard.verify_gstin_format("INVALID")           # {"verified": False, "error": "Invalid GSTIN format."}
+```
 
 | Service type | Threshold (INR) | TDS rate | Section |
 | --- | --- | --- | --- |
