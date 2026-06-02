@@ -270,15 +270,15 @@ result = guard.verify_flat_tax_rate(
 
 **Rule:** Certain notified services require the **Reverse Charge Mechanism** (the recipient pays the tax instead of the provider). RCM applicability is expressed as a declarative rule table — one entry per notified service, each carrying its predicate and statutory reference.
 
-| Service | Provider | Recipient | Liability |
-| --- | --- | --- | --- |
-| GTA | Any | Body Corporate / Partnership | RCM (Recipient) |
-| Legal | Any | Body Corporate / Partnership | RCM (Recipient) |
-| Security | Non-Body Corporate | Body Corporate | RCM (Recipient) |
-| Director | Any | Body Corporate | RCM (Recipient) |
-| Sponsorship | Any | Body Corporate / Partnership | RCM (Recipient) |
-| Renting of motor vehicle | Non-Body Corporate | Body Corporate | RCM (Recipient) |
-| Import of service | Any | Any (recipient in India) | RCM (Recipient) |
+| Service | Provider | Recipient | Liability | Statutory reference |
+| --- | --- | --- | --- | --- |
+| GTA | Any | Body Corporate / Partnership | RCM (Recipient) | Notification 13/2017-CT(R), Sl. 1 |
+| Legal | Any | Body Corporate / Partnership | RCM (Recipient) | Notification 13/2017-CT(R), Sl. 2 |
+| Security | Non-Body Corporate | Body Corporate | RCM (Recipient) | Notification 29/2018-CT(R) |
+| Director | Any | Body Corporate | RCM (Recipient) | Notification 13/2017-CT(R), Sl. 6 |
+| Sponsorship | Any | Body Corporate / Partnership | RCM (Recipient) | Notification 13/2017-CT(R), Sl. 4 |
+| Renting of motor vehicle | Non-Body Corporate | Body Corporate | RCM (Recipient) | Notification 13/2017-CT(R), Sl. 15 |
+| Import of service | Any | Any (recipient in India) | RCM (Recipient) | Notification 10/2017-IT(R), Sl. 1 |
 
 Any service/recipient combination outside these rules resolves to **forward charge** (the provider pays).
 
@@ -305,10 +305,10 @@ result = guard.verify_rcm_applicability(
 
 **Goal:** Verify that a claimed tax breakup matches the **place of supply**. This verifies the split — the GST rate is an input, not something the guard derives.
 
-- **Intra-state** (supplier state == place of supply): `CGST = SGST = value × rate / 2`, and `IGST` must be `0`.
-- **Inter-state** (supplier state != place of supply): `IGST = value × rate`, and `CGST`/`SGST` must be `0`.
+- **Intra-state** (supplier state == place of supply): `CGST = SGST = value × rate / 200`, and `IGST` must be `0`.
+- **Inter-state** (supplier state != place of supply): `IGST = value × rate / 100`, and `CGST`/`SGST` must be `0`.
 
-A small rounding tolerance (2 paise) applies only to tax-carrying CGST/SGST legs. Legs that must be exactly zero (the wrong tax type for the supply) get **no** tolerance, so even a tiny wrong-type amount is rejected. Negative claimed amounts fail closed.
+A small rounding tolerance (2 paise) applies only to tax-carrying legs (CGST/SGST for intra-state supplies, IGST for inter-state supplies). Legs that must be exactly zero (the wrong tax type for the supply) get **no** tolerance, so even a tiny wrong-type amount is rejected. Negative claimed amounts fail closed.
 
 ```python
 from qwed_tax.jurisdictions.india.guards.gst_guard import GSTGuard
