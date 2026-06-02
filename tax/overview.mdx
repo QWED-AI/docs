@@ -46,7 +46,7 @@ QWED-Tax ships with **20+ deterministic guards** across three jurisdictions:
 
 `qwed-tax` secures the entire "Procure-to-Pay" cycle for AI Agents:
 
-- **Validation:** Checks GSTIN/VAT ID formats via `InputCreditGuard.verify_gstin_format()`.
+- **Validation:** Checks GSTIN structure **and the 15th-digit checksum** via `InputCreditGuard.verify_gstin_format()`.
 - **Compliance:** Blocks Input Tax Credit (ITC) on "Personal" categories (Food, Cars, Gifts).
 - **Withholding:** Auto-calculates TDS/Retention amounts before commercial payment via `TDSGuard`.
 
