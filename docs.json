@@ -321,6 +321,7 @@
                 "group": "Architecture",
                 "pages": [
                   "advanced/architecture-diagrams",
+                  "advanced/diagnostics",
                   "advanced/neurosymbolic",
                   "advanced/determinism-guarantee",
                   "advanced/symbolic-limits",

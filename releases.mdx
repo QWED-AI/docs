@@ -5,8 +5,8 @@ description: "QWED Protocol release history — download links, installation, an
 
 ## Current release
 
-<Card title="v5.1.1 — Trust Boundary Hardening" icon="shield-check" href="/changelog">
-  Cache trust-context binding (replay resistance), attestation fail-closed hardening, audit log isolation, proof-path corrections, and agent/executor boundary fixes.
+<Card title="v5.2.0 — Structured Verification Diagnostics" icon="shield-check" href="/changelog">
+  Unified 3-layer DiagnosticResult model — agent-safe, developer, and proof diagnostics. Tri-state status (VERIFIED / UNVERIFIABLE / BLOCKED) with proof_ref as the authority bit. Additive release — no existing engine return types changed.
 </Card>
 
 ### Install
@@ -14,23 +14,23 @@ description: "QWED Protocol release history — download links, installation, an
 <CodeGroup>
 
 ```bash pip
-pip install qwed==5.1.1
+pip install qwed==5.2.0
 ```
 
 ```bash docker
-docker pull qwedai/qwed-verification:5.1.1
+docker pull qwedai/qwed-verification:5.2.0
 ```
 
 ```bash npm
-npm install @qwed-ai/sdk@5.1.1
+npm install @qwed-ai/sdk@5.2.0
 ```
 
 ```bash cargo
-cargo add qwed@5.1.1
+cargo add qwed@5.2.0
 ```
 
 ```bash go
-go get github.com/QWED-AI/qwed-verification/sdk-go@v5.1.1
+go get github.com/QWED-AI/qwed-verification/sdk-go@v5.2.0
 ```
 
 </CodeGroup>
@@ -41,7 +41,19 @@ go get github.com/QWED-AI/qwed-verification/sdk-go@v5.1.1
 
 <AccordionGroup>
 
-<Accordion title="v5.1.1 — Trust Boundary Hardening (May 22, 2026)" icon="shield-check" defaultOpen>
+<Accordion title="v5.2.0 — Structured Verification Diagnostics (June 19, 2026)" icon="shield-check" defaultOpen>
+  Unified 3-layer `DiagnosticResult` model with `agent_message` (agent-safe), `developer_fields` (structured evidence), and `proof_ref` (sha256 proof hash — the authority bit). Tri-state status only (VERIFIED / UNVERIFIABLE / BLOCKED). Frozen dataclasses prevent post-construction bypass. Advisory checks structurally separated from verdicts. Migration helper for legacy engine dicts. 83 tests. Additive — no breaking changes.
+
+  [Full Release Notes →](/changelog) · [GitHub Release ↗](https://github.com/QWED-AI/qwed-verification/releases/tag/v5.2.0)
+</Accordion>
+
+<Accordion title="v5.1.2 — SymPy Expression Injection Fix (June 14, 2026)" icon="shield-check">
+  Emergency security patch fixing High severity (CVSS 8.8) authenticated RCE via unsafe SymPy `parse_expr()`. Added `safe_parse_expr()` wrapper with denylist, stripped `__builtins__`, allow-listed math namespace. Cache Redis fail-closed. CodSpeed benchmarks.
+
+  [Full Release Notes →](/changelog) · [GitHub Release ↗](https://github.com/QWED-AI/qwed-verification/releases/tag/v5.1.2)
+</Accordion>
+
+<Accordion title="v5.1.1 — Trust Boundary Hardening (May 22, 2026)" icon="shield-check">
   Cache keys bound to full trust context (provider/model/policy/session) — prevents cross-context replay. Attestation path hardened with `AttestationStatus` enum and `is_issued` contract. Audit chain isolated per-org with `BEGIN IMMEDIATE` transactions. Reasoning proof prerequisites enforced. Symbolic/batch verifiers return `BLOCKED` on missing proof. Unknown agent actions denied. `additionalProperties: false` strictly enforced. SDK `5.1.1` across Python, TypeScript, Rust.
 
   [Full Release Notes →](/changelog) · [GitHub Release ↗](https://github.com/QWED-AI/qwed-verification/releases/tag/v5.1.1)

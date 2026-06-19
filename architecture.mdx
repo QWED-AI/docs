@@ -85,6 +85,10 @@ Each verification can emit signed evidence for traceability and compliance workf
 }
 ```
 
+<Info>
+**v5.2.0** introduces the unified `DiagnosticResult` model with 3-layer diagnostics — agent-safe, developer, and proof. See the [Verification Diagnostics guide](/advanced/diagnostics) for the full model.
+</Info>
+
 ## Request lifecycle
 
 ```mermaid
@@ -116,6 +120,9 @@ sequenceDiagram
 ## Related verification guides
 
 <CardGroup cols={2}>
+  <Card title="Verification Diagnostics" icon="stethoscope" href="/advanced/diagnostics">
+    The 3-layer DiagnosticResult model — agent-safe, developer, and proof diagnostics.
+  </Card>
   <Card title="LLM verification" icon="badge-check" href="/advanced/llm-verification">
     See how QWED verifies LLM outputs with formal methods instead of probability-only confidence.
   </Card>
@@ -124,9 +131,6 @@ sequenceDiagram
   </Card>
   <Card title="Prompt injection defense" icon="lock" href="/advanced/security-hardening">
     Review production guidance for prompt injection defense and OWASP LLM risks.
-  </Card>
-  <Card title="MCP security" icon="plug" href="/mcp/overview">
-    Secure Model Context Protocol integrations and verify tool execution paths.
   </Card>
 </CardGroup>
 
