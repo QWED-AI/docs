@@ -7,6 +7,58 @@ All notable changes to the QWED platform, listed by release.
 
 ---
 
+## v5.2.0 — Structured Verification Diagnostics
+
+**Released: June 19, 2026** · [GitHub Release](https://github.com/QWED-AI/qwed-verification/releases/tag/v5.2.0) · Minor
+
+> Introduces the unified 3-layer `DiagnosticResult` model — the diagnostic contract that all QWED verification engines will conform to. This is an **additive** release: no existing engine return types are changed. Engine conformance is tracked in blocked issues (#129, #130, #131, #133, #134, #162, #163, #164, #190, #205).
+
+### New: `DiagnosticResult` model
+
+Three disclosure layers:
+
+- **Layer 1 — Agent-Safe**: `agent_message: str` — agent/model-facing summary, no internals leaked
+- **Layer 2 — Developer**: `developer_fields: dict` — structured evidence (`constraint_id`, `advisory_checks`, `methods_used`, evidence)
+- **Layer 3 — Proof**: `proof_ref: Optional[str]` — sha256 hash of retained proof artifact; the authority bit
+
+### Key design
+
+- **Tri-state status** — `VERIFIED` / `UNVERIFIABLE` / `BLOCKED` only. No `HEURISTIC` or `AMBIGUOUS` proliferation; richer distinctions live in `developer_fields.constraint_id`
+- **`proof_ref` is the authority bit** — present = admissible for control flow, None = reject. No separate `authoritative` boolean needed (resolves #190 design debate)
+- **VERIFIED requires proof** — structurally enforced in `__post_init__`; "VERIFIED without proof" is impossible to construct
+- **Frozen dataclasses** — `DiagnosticResult` and `AdvisoryCheck` are `frozen=True`; post-construction mutation blocked
+- **Advisory checks never influence verdicts** — `AdvisoryCheck.advisory_only=True` enforced via `__post_init__`
+- **`compute_proof_ref()`** — deterministic sha256 hashing of JSON-serialized evidence
+- **`from_legacy_dict()`** — migration helper for ad-hoc engine dicts (fail-closed states only; raises for legacy VERIFIED)
+
+### Version propagation
+
+| Artifact | Previous | This release |
+|---|---|---|
+| `qwed` (PyPI) | 5.1.2 | 5.2.0 |
+| `qwed_sdk` (Python) | 5.1.1 | 5.2.0 |
+| `@qwed-ai/sdk` (npm) | 5.1.2 | 5.2.0 |
+| `qwed` (Rust crate) | 5.1.2 | 5.2.0 |
+| API version marker | 5.1.2 | 5.2.0 |
+| K8s deployment image | 5.1.2 | 5.2.0 |
+
+### Tests
+
+83 new tests covering: status taxonomy, all 3 layers, authority contract, fail-closed enforcement, advisory checks, proof hashing determinism, serialization round-trip, legacy migration, frozen dataclass immutability, and realistic scenarios drawn from the 10 blocked issues.
+
+### Compatibility
+
+**Additive release.** No breaking changes. Existing `VerificationResult` dataclasses and ad-hoc engine dicts continue to work. `DiagnosticResult` is opt-in — engines migrate incrementally.
+
+### Included PRs
+
+- [#206](https://github.com/QWED-AI/qwed-verification/pull/206) — feat(diagnostics): unified 3-layer DiagnosticResult model (#204)
+- [#207](https://github.com/QWED-AI/qwed-verification/pull/207) — release: v5.2.0 version propagation
+
+See the [Verification Diagnostics guide](/advanced/diagnostics) for full API documentation.
+
+---
+
 ## QWED-Legal v0.4.0 — verification traces across all guards + fail-closed hardening
 **Released: May 30, 2026**
 
