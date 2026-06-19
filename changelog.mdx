@@ -7,6 +7,63 @@ All notable changes to the QWED platform, listed by release.
 
 ---
 
+## QWED-Tax — fail-closed on unknown tax rules
+
+**Released: June 19, 2026**
+
+> Tax guards no longer silently pass when they encounter a service, asset, jurisdiction, or payment type they don't model. Six guards now return `verified=False` with a structured error instead of an unsafe default.
+
+### What changed
+
+- **TDSGuard** — unrecognized payment categories no longer return "verified, zero deduction." This closes a path where an agent could classify a payment into an unknown bucket and have it execute with no withholding. `TaxPreFlight` now blocks these payments.
+- **CapitalGainsGuard** — unknown asset class or holding term fails closed instead of returning "no hard constraint."
+- **NexusGuard** — states not in the configured risk list now require manual review instead of being treated as low-risk.
+- **AddressGuard** — unknown state codes fail closed with "manual review required" instead of "assumed valid."
+- **Form1099Guard (US)** — unmodeled payment types return `filing_required=None` with a manual-determination flag, instead of defaulting to "no filing required."
+- **InputCreditGuard (GST)** — `verified=True` remains the legal default (ITC is allowed unless specifically blocked), but unknown categories now carry an explicit `unverified_category=True` flag in the result and an `audit_trace` entry of `category_match: "default_allow"` so downstream consumers can distinguish known-eligible from default-allowed.
+
+### What this means for you
+
+If your agent currently relies on a `verified=True` response for inputs the guards don't model, those calls will start blocking. Add explicit rules for the categories you care about, or route unverified results to human review.
+
+See the [tax guards reference](/tax/guards) and [tax integration guide](/tax/integration) for the updated contracts.
+
+---
+
+## QWED-Infra — ecosystem policy framework adopted
+
+**Released: June 17, 2026**
+
+> `qwed-infra` now ships with the shared QWED governance baseline: `QWED_RULES.md`, contributor guidance, PR template, CodeRabbit config, and a boundary-check workflow that is consistent with the other QWED repositories.
+
+No runtime behavior changes. Affects contributors and anyone consuming the repository's CI.
+
+---
+
+## QWED-MCP — boundary-check parity with QWED-Infra
+
+**Released: June 18, 2026**
+
+> The `qwed-mcp` boundary-check tool now catches the same import-alias, module-alias, wildcard-import, `eval`/`exec` alias, and `shell=True` patterns that `qwed-infra` does, and fails closed when the scan root is missing.
+
+### What this means for you
+
+If you run `qwed-mcp` boundary checks in CI, expect to catch additional bypass patterns that previously slipped through. Existing passing scans should continue to pass; previously hidden findings may now surface as failures.
+
+See the [MCP tools reference](/mcp/tools) for the current rule set.
+
+---
+
+## QWED Open Responses v0.3.0 — version sync and dependency fix
+
+**Released: June 12, 2026**
+
+> Aligns `qwed-open-responses` with the rest of the QWED package versions and patches a transitive `qs` CVE flagged by Dependabot.
+
+No API changes. Upgrade to pick up the dependency fix.
+
+---
+
 ## v5.2.0 — Structured Verification Diagnostics
 
 **Released: June 19, 2026** · [GitHub Release](https://github.com/QWED-AI/qwed-verification/releases/tag/v5.2.0) · Minor
