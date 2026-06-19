@@ -108,6 +108,10 @@ result = guard.verify_classification(params, claimed_status_contractor=True)
 | OH | \$100,000 | 200 |
 | GA | \$100,000 | 200 |
 
+<Note>
+  **Fails closed on unmodeled states.** A call with a `state` code that is not in the threshold table returns `{"verified": False, "error": "State <CODE> not in configured nexus threshold table. Cannot verify nexus liability — block pending rule configuration."}`. The guard never falls back to "not high-risk → no tax" for jurisdictions it has not been configured for.
+</Note>
+
 ### PayrollGuard (FICA limits)
 
 **Goal:** Verify paycheck math. **Logic:**
@@ -199,6 +203,10 @@ result = guard.verify_address(Address(
 # {"verified": False, "message": "MISMATCH: Zip 90210 does not belong to NJ."}
 ```
 
+<Note>
+  **Fails closed on unmodeled states.** States that are not in the simplified zip-prefix table (currently CA, FL, NJ, NY, PA, TX) return `{"verified": False, "message": "State <CODE> not in validation database. Address cannot be auto-verified — manual review required."}`. The guard never assumes an unknown state is valid.
+</Note>
+
 ### Form1099Guard
 
 **Goal:** Verify IRS 1099 filing requirements for contractor payments. **Logic:**
@@ -232,7 +240,7 @@ result = guard.verify_filing_requirement(payment)
 ```
 
 <Note>
-  Payment types without a defined filing rule return `{"filing_required": False, "form": None}` with a descriptive reason.
+  **Fails closed on unmodeled payment types.** Payment types without a defined filing rule return `{"filing_required": "UNVERIFIABLE", "form": None, "reason": "No filing rule configured for payment type '<TYPE>'. Cannot verify filing requirement — manual determination required."}`. Treat any value other than `True` or `False` as a hold-and-escalate signal — the guard will not silently report `filing_required=False` for a payment category it has not been configured to evaluate.
 </Note>
 
 ## India (CBDT)
@@ -427,6 +435,10 @@ result = guard.verify_fd_rate(
 | Real estate | > 730 days | — | — |
 | Debt | > 1095 days | Slab rate | Slab rate |
 
+<Note>
+  **Fails closed on unmodeled asset/term pairs.** `verify_tax_rate` returns `{"verified": False, "error": "No statutory rate configured for <asset>_<term>. Cannot verify claimed rate."}` when the `(asset_type, term)` combination is not in the rate table. The previous "no hard constraint, assume verified" path has been removed — the guard no longer signs off on rates it cannot independently check.
+</Note>
+
 ### Accounts payable guards (indirect tax)
 
 **Goal:** Automate GST/VAT and TDS compliance. **Logic:**
@@ -462,6 +474,14 @@ guard.verify_gstin_format("INVALID")           # {"verified": False, "error": "I
 
 <Note>
   Category matching for `InputCreditGuard` uses exact match (not substring). Ensure you pass the canonical category name (e.g., `FOOD_AND_BEVERAGE`, `MOTOR_VEHICLE`, `GIFT_TO_EMPLOYEE`).
+</Note>
+
+<Warning>
+  **TDSGuard fails closed on unknown service types.** `calculate_deduction` now returns `{"verified": False, "error": "No TDS rule configured for service type '<TYPE>'. Cannot verify — block pending rule configuration."}` when `service_type` does not match a configured rule. Previously, unknown service types returned `verified=True` with `deduction="0"`, which `TaxPreFlight._check_invoice_tds` would treat as a clean payment and let through with zero withholding. Any integration that branched on `verified` must now handle `verified=False` for the unknown-rule path.
+</Warning>
+
+<Note>
+  **InputCreditGuard flags default-allow categories.** ITC is "allowed unless specifically blocked" under GST law, so unknown categories still return `verified=True` — but the response now also carries `"unverified_category": True` and `audit_trace.inputs.category_match: "default_allow"`. Consumers that need to distinguish "explicitly eligible" from "allowed by default" should branch on `unverified_category` before posting the credit.
 </Note>
 
 ### CorporateGuard (Loans and valuation)
