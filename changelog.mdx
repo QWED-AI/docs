@@ -1,6 +1,6 @@
 ---
 title: "Changelog"
-description: "Release notes for the QWED Protocol platform — new features, verification engine updates, guard hardening, security fixes, and SDK changes by version."
+description: "Release notes for QWED Protocol: version history, new guards, breaking changes, security fixes, and audit-driven hardening across all QWED engines."
 ---
 
 All notable changes to the QWED platform, listed by release.
@@ -128,7 +128,7 @@ See the [Verification Diagnostics guide](/advanced/diagnostics) for full API doc
 - **`NexusGuard.check_nexus_liability`** — Unconfigured `state` returns `{"verified": False, "error": "State <CODE> not in configured nexus threshold table. Cannot verify nexus liability — block pending rule configuration."}` instead of `verified=True` "not in high-risk list".
 - **`AddressGuard.verify_address`** — Unmodeled state returns `{"verified": False, "message": "State <CODE> not in validation database. Address cannot be auto-verified — manual review required."}` instead of `verified=True` "assumed valid".
 - **`Form1099Guard.verify_filing_requirement`** — Unmodeled `payment_type` returns `{"filing_required": "UNVERIFIABLE", "form": None, "reason": "No filing rule configured for payment type '<TYPE>'. Cannot verify filing requirement — manual determination required."}`. Previously returned `filing_required=False`.
-- **`InputCreditGuard`** — ITC under GST is "allowed unless specifically blocked", so the default verdict for unknown categories is still `verified=True`. The response now also carries `"unverified_category": True` and `audit_trace.details.category_match: "default_allow"` so consumers can distinguish a known-eligible category from a default-allow fallback.
+- **`InputCreditGuard`** — ITC under GST is "allowed unless specifically blocked", so the default verdict for unknown categories is still `verified=True`. The response now also carries `"unverified_category": True` and `audit_trace.inputs.category_match: "default_allow"` so consumers can distinguish a known-eligible category from a default-allow fallback.
 
 ### Why this matters
 
@@ -148,7 +148,7 @@ See the [Verification Diagnostics guide](/advanced/diagnostics) for full API doc
 ### Breaking changes
 
 <Warning>
-  Any integration that branched only on `verified=True` from `TDSGuard`, `CapitalGainsGuard`, or `NexusGuard` to mean "proceed" must now also handle a `verified=False` response with `error` for the unknown-rule path. The recommended action is to surface the error to a human reviewer rather than retry with a different input.
+  Any integration that branched only on `verified=True` from `TDSGuard`, `CapitalGainsGuard`, `NexusGuard`, or `AddressGuard` to mean "proceed" must now also handle a `verified=False` response with `error` for the unknown-rule path. The recommended action is to surface the error to a human reviewer rather than retry with a different input.
 </Warning>
 
 <Warning>
@@ -563,7 +563,7 @@ exposure = delta * Decimal(str(notional))
 
 See [Bond Guard](/finance/guards#8-bond-guard-yield-analytics), [Derivatives Guard](/finance/guards#3-derivatives-guard-black-scholes), and [Risk Guard](/finance/guards#10-risk-guard-portfolio-metrics) for the updated guard documentation.
 
-**Jump to:** [QWED-Tax fail-closed unknown tax rules](#qwed-tax--fail-closed-on-unknown-or-unmodeled-tax-rules) · [QWED-Verification fail-closed unknown agent actions](#qwed-verification--fail-closed-unknown-agent-actions) · [QWED-Finance v2.1.0 — security audit hardening](#qwed-finance-v210--security-audit-hardening) · [QWED-Finance N-01/N-04 release blockers](#qwed-finance--release-blockers-n-01-and-n-04-resolved-no-go--go) · [QWED-Finance Decimal/mpmath migration](#qwed-finance--decimalmpmath-migration-for-bondguard-derivativesguard-and-riskguard) · [QWED-Verification SecureCodeExecutor fail-closed fallback](#qwed-verification--securecodeexecutor-fail-closed-when-codeverifier-is-unavailable) · [QWED-Finance security audit — OpenResponses fail-closed](#qwed-finance--openresponses-fail-closed-and-computed-status) · [QWED-Finance security audit — rate parsing](#qwed-finance--rate-parsing-heuristic-removed) · [QWED-Verification symbolic verifier fail-closed](#qwed-verification--symbolic-verifier-fail-closed-without-proof) · [QWED-Verification strict additionalProperties](#qwed-verification--strict-additionalproperties-fail-closed) · [QWED-Tax example redaction](#qwed-tax-—-redacted-preflight-block-details-in-examples) · [QWED-Tax decimal hardening](#qwed-tax-—-decimal-hardening-in-financial-guards) · [v5.1.0](#v5-1-0-—-agent-state-governance-and-fail-closed-hardening) · [v5.0.0](#v5-0-0-—-enforcement-boundary-hardening) · [v4.0.5](#v4-0-5-—-stats-exception-masking) · [v4.0.4](#v4-0-4-—-fail-closed-execution-enforcement) · [v4.0.3](#v4-0-3-—-server-enforced-agent-security) · [v4.0.2](#v4-0-2-—-security-cleanup) · [v4.0.1](#v4-0-1-—-sentinel-guard-sync) · [v4.0.0](#v4-0-0-—-sentinel-edition) · [v3.0.1](#v3-0-1-—-ironclad-update) · [v2.4.1](#v2-4-1-—-the-reasoning-engine)
+**Jump to:** [QWED-Tax fail-closed unknown tax rules](#qwed-tax-—-fail-closed-on-unknown-or-unmodeled-tax-rules) · [QWED-Verification fail-closed unknown agent actions](#qwed-verification--fail-closed-unknown-agent-actions) · [QWED-Finance v2.1.0 — security audit hardening](#qwed-finance-v210--security-audit-hardening) · [QWED-Finance N-01/N-04 release blockers](#qwed-finance--release-blockers-n-01-and-n-04-resolved-no-go--go) · [QWED-Finance Decimal/mpmath migration](#qwed-finance--decimalmpmath-migration-for-bondguard-derivativesguard-and-riskguard) · [QWED-Verification SecureCodeExecutor fail-closed fallback](#qwed-verification--securecodeexecutor-fail-closed-when-codeverifier-is-unavailable) · [QWED-Finance security audit — OpenResponses fail-closed](#qwed-finance--openresponses-fail-closed-and-computed-status) · [QWED-Finance security audit — rate parsing](#qwed-finance--rate-parsing-heuristic-removed) · [QWED-Verification symbolic verifier fail-closed](#qwed-verification--symbolic-verifier-fail-closed-without-proof) · [QWED-Verification strict additionalProperties](#qwed-verification--strict-additionalproperties-fail-closed) · [QWED-Tax example redaction](#qwed-tax-—-redacted-preflight-block-details-in-examples) · [QWED-Tax decimal hardening](#qwed-tax-—-decimal-hardening-in-financial-guards) · [v5.1.0](#v5-1-0-—-agent-state-governance-and-fail-closed-hardening) · [v5.0.0](#v5-0-0-—-enforcement-boundary-hardening) · [v4.0.5](#v4-0-5-—-stats-exception-masking) · [v4.0.4](#v4-0-4-—-fail-closed-execution-enforcement) · [v4.0.3](#v4-0-3-—-server-enforced-agent-security) · [v4.0.2](#v4-0-2-—-security-cleanup) · [v4.0.1](#v4-0-1-—-sentinel-guard-sync) · [v4.0.0](#v4-0-0-—-sentinel-edition) · [v3.0.1](#v3-0-1-—-ironclad-update) · [v2.4.1](#v2-4-1-—-the-reasoning-engine)
 
 ---
 

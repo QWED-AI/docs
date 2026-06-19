@@ -481,7 +481,7 @@ guard.verify_gstin_format("INVALID")           # {"verified": False, "error": "I
 </Warning>
 
 <Note>
-  **InputCreditGuard flags default-allow categories.** ITC is "allowed unless specifically blocked" under GST law, so unknown categories still return `verified=True` — but the response now also carries `"unverified_category": True` and `audit_trace.details.category_match: "default_allow"`. Consumers that need to distinguish "explicitly eligible" from "allowed by default" should branch on `unverified_category` before posting the credit.
+  **InputCreditGuard flags default-allow categories.** ITC is "allowed unless specifically blocked" under GST law, so unknown categories still return `verified=True` — but the response now also carries `"unverified_category": True` and `audit_trace.inputs.category_match: "default_allow"`. Consumers that need to distinguish "explicitly eligible" from "allowed by default" should branch on `unverified_category` before posting the credit.
 </Note>
 
 ### CorporateGuard (Loans and valuation)
