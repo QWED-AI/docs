@@ -7,34 +7,50 @@ All notable changes to the QWED platform, listed by release.
 
 ---
 
-## QWED-Tax — input strictness across guards and models
+## QWED-Tax — exact paise comparison, edge-case input rejection, and strict payload schemas
 
 **Released: June 21, 2026** · [GitHub PR #44](https://github.com/QWED-AI/qwed-tax/pull/44)
 
-> Three input-strictness fixes ship together. Edge-case numeric inputs are now blocked instead of distorting guard logic, the crypto tax check uses exact paise-level comparison, and every tax input model rejects unexpected fields at the boundary.
+> Three input-strictness fixes ship together. `CryptoTaxGuard.verify_flat_tax_rate` now compares quantized paise values exactly instead of within a 0.1 tolerance, `ValuationGuard` and `RemittanceGuard` reject the edge-case numeric inputs that previously slipped through, and every QWED-Tax Pydantic input model now forbids unexpected fields.
 
-### Bug fixes
+### What changed
 
-- **CryptoTaxGuard** — Claimed VDA tax is now compared to the expected tax at exact paise precision (`ROUND_HALF_UP` to two decimals). The previous 0.1-rupee tolerance is gone — a 1-paise deviation now correctly returns `verified=False`.
-- **ValuationGuard** — Numeric inputs are range-checked before any conversion math runs. Discount must be between 0 and 1; cap, next-round price, and investment must be positive. Negative-share outputs from `discount > 1` and division-by-zero crashes from `cap = 0` are blocked with a structured error.
-- **RemittanceGuard** — Negative `amount_usd` or `financial_year_usage` now returns `verified=False` instead of flowing through and distorting the LRS limit check.
-- **Tax input models reject extra fields** — All eight Pydantic input models (`Address`, `WorkArrangement`, `WorkerClassificationParams`, `ContractorPayment`, `TaxEntry`, `DeductionEntry`, `PayrollEntry`, `VerificationResult`) now raise `ValidationError` on any unexpected key. The Gusto interceptor middleware already fails closed on these validation errors, so unexpected fields are blocked at the request boundary.
+- **`CryptoTaxGuard.verify_flat_tax_rate`** — The `Decimal("0.1")` tolerance was removed. Both the computed `expected_tax` and the caller's `claimed_tax` are now quantized to two decimal places using `ROUND_HALF_UP` and compared with an exact `==`. A 1-paise (`0.01`) deviation correctly returns `verified=False`.
+- **`ValuationGuard.verify_conversion`** — Added explicit range checks: `discount` must be in `[0, 1)`, and `cap`, `next_round_price`, and `investment` must all be strictly positive. `DivisionByZero` is now caught alongside `InvalidOperation` so a degenerate `cap = 0` or `discount = 1` no longer crashes — it fails closed with a structured `{"verified": False, "error": "..."}` response. The previous behavior allowed a `discount > 1` to produce a negative share count.
+- **`RemittanceGuard.verify_lrs_limit`** — After numeric parsing, `amount_usd` and `financial_year_usage` are now checked for negativity. Negative inputs return `{"verified": False, "error": "BLOCKED: ..."}` instead of being summed into the limit check, where a negative usage could mask a transaction that exceeds the \$250,000 LRS cap.
+- **Input models** — `Address`, `WorkArrangement`, `WorkerClassificationParams`, `ContractorPayment`, `TaxEntry`, `DeductionEntry`, `PayrollEntry`, and `VerificationResult` are now configured with `model_config = ConfigDict(extra="forbid")`. Any payload with an unexpected key raises a Pydantic `ValidationError` at the boundary. `QWEDTaxMiddleware` already surfaces this as `status: "BLOCKED"` with `risk: "INVALID_PAYLOAD"`.
+
+### Breaking changes
+
+<Warning>
+  Callers that previously relied on the 0.1-rupee tolerance in `CryptoTaxGuard.verify_flat_tax_rate` will now receive `verified=False` for claims that differ from `vda_income * 0.30` by 1 paise or more. Round your claimed tax to two decimal places with `ROUND_HALF_UP` before calling the guard.
+
+  ```python
+  from decimal import Decimal, ROUND_HALF_UP
+
+  claimed = (vda_income * Decimal("0.30")).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+  ```
+</Warning>
+
+<Warning>
+  Payloads sent through `QWEDTaxMiddleware` (or constructed directly with the QWED-Tax input models) that include keys outside the declared schema now raise `ValidationError`. Strip unknown fields from AI-generated output — including typos and speculative overrides like `"override_verification": true` — before invoking the middleware.
+</Warning>
+
+<Warning>
+  `ValuationGuard.verify_conversion` no longer returns a result for `cap <= 0`, `next_round_price <= 0`, `investment <= 0`, `discount < 0`, or `discount >= 1`. These inputs now return `{"verified": False, "error": "..."}` instead of crashing or producing nonsensical share counts.
+</Warning>
 
 ### What this means for you
 
-If your agent submits tax payloads with extra keys (typos, debug fields, legacy parameters), those calls will now be rejected at the model layer instead of silently ignored. Strip unknown fields before submitting, or extend the model if the field is actually required.
-
-Callers that relied on the previous 0.1-rupee tolerance in `CryptoTaxGuard` should round their claimed tax to two decimal places before submission to avoid spurious mismatches.
-
-See the [QWED-Tax guards reference](/tax/guards) for the updated guard contracts and the [tax integration guide](/tax/integration) for the input model shapes.
+If your agent forwards Indian VDA tax claims, startup conversion math, or LRS remittance requests through QWED-Tax, audit the calling code for: (1) tax claims that aren't pre-quantized to two decimal places, (2) discount/cap/investment inputs that can legitimately be zero or out of range, (3) negative remittance amounts being passed defensively, and (4) AI payloads that include fields not declared on the QWED-Tax input models. See the [CryptoTaxGuard](/tax/guards#cryptotaxguard-sec-115bbh), [ValuationGuard](/tax/guards#valuationguard), [RemittanceGuard](/tax/guards#remittanceguard), and [middleware integration guide](/tax/integration#qwedtaxmiddleware-gusto-interceptor) for the updated contracts.
 
 ### Audit reference
 
 | Issue | Area | Fix |
 | --- | --- | --- |
-| #20 | `CryptoTaxGuard` accepted 0.1-rupee tolerance as verified | Exact paise-level comparison after `ROUND_HALF_UP` quantization |
-| #21 | Edge-case inputs (negative amounts, out-of-range discount, zero cap) flowed through guards | Range and negativity checks added to `ValuationGuard` and `RemittanceGuard` |
-| #22 | Input models silently accepted unexpected fields | `extra="forbid"` on all eight tax input models |
+| #20 | `CryptoTaxGuard` accepted claims within a 0.1-rupee tolerance | Quantize to paise with `ROUND_HALF_UP`, compare with exact `==` |
+| #21 | `ValuationGuard` and `RemittanceGuard` accepted edge-case numeric inputs | Range checks on discount/cap/investment; negativity checks on LRS amount and usage; `DivisionByZero` caught |
+| #22 | Input models silently accepted unexpected fields | `model_config = ConfigDict(extra="forbid")` on all eight input models |
 
 ---
 
