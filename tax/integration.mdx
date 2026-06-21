@@ -332,6 +332,10 @@ result = india_verifier.verify_india_deposit(
 
 The `QWEDTaxMiddleware` intercepts AI-generated payroll payloads before they reach execution APIs like Gusto. It validates the payload schema using Pydantic models and then runs deterministic gross-to-net verification.
 
+<Note>
+  **Unexpected fields are rejected.** The `PayrollEntry`, `TaxEntry`, `DeductionEntry`, `WorkerClassificationParams`, `ContractorPayment`, `WorkArrangement`, `Address`, and `VerificationResult` models are configured with `extra="forbid"`. Any payload with a key the model doesn't declare — including typos like `"net_pay_calimed"` or speculative additions like `"override_verification": true` — raises a `ValidationError` at the boundary, which the middleware surfaces as `status: "BLOCKED"` with `risk: "INVALID_PAYLOAD"`. Strip unknown fields from AI output before calling the middleware.
+</Note>
+
 ```python
 from qwed_tax.middleware.gusto_interceptor import QWEDTaxMiddleware
 

@@ -323,6 +323,10 @@ result = guard.verify_flat_tax_rate(
   The previous behavior — silently returning `verified=True` for any `vda_income <= 0` and ignoring `claimed_tax` — has been removed.
 </Note>
 
+<Note>
+  **Comparison is exact at the paise (1/100) level.** Both `expected_tax` (`vda_income * 0.30`) and `claimed_tax` are quantized to two decimal places using `ROUND_HALF_UP` before an exact `==` comparison. A 1-paise deviation now returns `verified=False`. There is no `Decimal("0.1")` rounding tolerance — callers must round their claim to two decimal places with `ROUND_HALF_UP` to match.
+</Note>
+
 
 ### GSTGuard (RCM)
 
@@ -622,6 +626,40 @@ guard.verify_gstin_format("INVALID")           # {"verified": False, "error": "I
 
 **Prohibited borrower roles:** `DIRECTOR`, `DIRECTOR_RELATIVE`, `PARTNER`, `PARTNER_OF_DIRECTOR`, `HOLDING_COMPANY_DIRECTOR`.
 
+#### ValuationGuard.verify_conversion
+
+```python
+from qwed_tax.guards.valuation_guard import ValuationGuard
+
+guard = ValuationGuard()
+
+result = guard.verify_conversion(
+    investment="100000",
+    cap="5.00",
+    discount="0.20",
+    next_round_price="10.00"
+)
+# {"verified": True, "deterministic_price": "5.00", "shares_issued": "20000", "method": "CAP"}
+```
+
+| Parameter | Type | Required | Description |
+| --- | --- | --- | --- |
+| `investment` | `str` | Yes | Investment amount. Must parse as a Decimal and be strictly positive |
+| `cap` | `str` | Yes | Valuation cap price per share. Must parse as a Decimal and be strictly positive |
+| `discount` | `str` | Yes | Discount rate expressed as a fraction (e.g. `"0.20"` for 20%). Must be `>= 0` and `< 1` |
+| `next_round_price` | `str` | Yes | Price per share in the priced round. Must parse as a Decimal and be strictly positive |
+
+<Note>
+  **Fails closed on edge-case inputs.** The guard returns `{"verified": False, "error": "..."}` when:
+
+  - Any input fails to parse as a `Decimal` (`"Invalid numerical input for valuation."`).
+  - `discount` is outside `[0, 1)` (`"Discount must be between 0 and 1."`). A discount of exactly `1` is rejected because it would force the discounted price to zero; values above `1` would otherwise produce negative shares.
+  - `cap`, `next_round_price`, or `investment` is zero or negative (`"Cap, next round price, and investment must be positive."`).
+  - The final share price resolves to zero through any other path (`"Final price resolved to zero — cannot compute shares."`).
+
+  Callers must handle the `verified=False` branch explicitly — there is no exception to catch.
+</Note>
+
 ## International
 
 ### DTAAGuard (foreign tax credit)
@@ -774,7 +812,7 @@ The `metrics` object returns each ratio as a stable plain-string Decimal rounded
 - **Prohibited List:** Blocks Gambling, Lottery, Racing, and **Margin Trading**.
 - **TCS Logic:** Applies 20% tax for generic remittance, 5% for Education/Medical. Education with loan funding is 0.5%. Threshold exemption of INR 7,00,000.
 
-`verify_lrs_limit` accepts `Decimal`, `str`, `int`, or `float` for `amount_usd` and `financial_year_usage`. Non-numeric, non-finite, or boolean inputs fail closed with `{"verified": False, "error": "BLOCKED: ..."}`. `calculate_tcs` returns a `Decimal` and raises `ValueError` on invalid numeric input.
+`verify_lrs_limit` accepts `Decimal`, `str`, `int`, or `float` for `amount_usd` and `financial_year_usage`. Non-numeric, non-finite, or boolean inputs fail closed with `{"verified": False, "error": "BLOCKED: ..."}`. Negative values for either parameter are also rejected (`"BLOCKED: Remittance amount must be non-negative."` / `"BLOCKED: Financial year usage must be non-negative."`) so a negative usage can't push a real transaction back under the \$250,000 LRS cap. `calculate_tcs` returns a `Decimal` and raises `ValueError` on invalid numeric input.
 
 | Purpose | TCS rate | Notes |
 | --- | --- | --- |
