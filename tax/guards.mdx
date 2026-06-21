@@ -167,11 +167,34 @@ result = guard.verify_exempt_status(form)
 | --- | --- | --- | --- |
 | `form` | `W4Form` | Yes | W-4 form data including exempt claim, prior year liability, and expected refund |
 
-### ReciprocityGuard (State tax / Z3)
+### ReciprocityGuard (State tax)
 
-**Goal:** Determine which state receives income tax withholding when an employee lives in one state and works in another. Uses **Z3** to prove the correct withholding state under reciprocity agreements.
+**Goal:** Determine which state receives income tax withholding when an employee lives in one state and works in another. The guard is a deterministic lookup against a fixed table of reciprocity agreements — it **fails closed** whenever the agreement, or either state, is not recognized.
 
 **Covered reciprocity pairs:** NJ-PA, PA-NJ, MD-PA, PA-MD, VA-MD, MD-VA.
+
+<Note>
+  The pair table is limited to the states modeled in the `State` enum (NY, NJ, CA, TX, PA, FL, MD, VA). Pennsylvania has additional reciprocity agreements (with IN, MI, OH, VA, WV, WI) that are not modeled here because those states are not in the enum. VA-PA is a known gap — callers will receive `verified=False` for that pair until the enum and table are extended.
+</Note>
+
+| Method | Description |
+| --- | --- |
+| `verify_reciprocity(residence_state, work_state, same_state=None)` | String-input API. Pass two-letter state codes (or `State` enum values); optionally pass `same_state` to assert the claim and have it cross-checked. |
+| `determine_withholding_state(arrangement)` | `WorkArrangement`-input API. Extracts residence and work states from the addresses on the arrangement and delegates to the same lookup. |
+
+Both methods return the same result shape:
+
+| Condition | `verified` | Returned fields |
+| --- | --- | --- |
+| Residence == work state | `True` | `withholding_state`, `reason` |
+| Known reciprocity pair (e.g., NJ ↔ PA) | `True` | `withholding_state` (residence), `reason` |
+| Different states, no reciprocity agreement | `False` | `message` explaining the work-state default and that the claim could not be verified |
+| Unknown residence or work state | `False` | `message` naming the unrecognized state |
+| `same_state` claim conflicts with the actual states | `False` | `message` flagging the conflict |
+
+<Note>
+  **Evaluation order:** The `same_state` conflict check runs **before** the same-state and reciprocity lookups. If a caller passes `same_state=True` with different states (or `same_state=False` with identical states), the guard returns `verified=False` immediately — the same-state and reciprocity branches are never reached. Pass `same_state=None` (the default) to skip the conflict check and let the guard evaluate states on their own.
+</Note>
 
 ```python
 from qwed_tax.jurisdictions.us.reciprocity_guard import ReciprocityGuard
@@ -179,17 +202,29 @@ from qwed_tax.models import WorkArrangement, Address, State
 
 guard = ReciprocityGuard()
 
+# String API
+result = guard.verify_reciprocity(residence_state="NJ", work_state="PA")
+# {"verified": True, "withholding_state": State.NJ,
+#  "reason": "Reciprocity Agreement exists between NJ and PA. Withhold for Residence (NJ)."}
+
+# WorkArrangement API
 arrangement = WorkArrangement(
     employee_id="E001",
     residence_address=Address(street="123 Main St", city="Newark", state=State.NJ, zip_code="07102"),
     work_address=Address(street="456 Market St", city="Philadelphia", state=State.PA, zip_code="19103"),
     is_remote=False
 )
-
 result = guard.determine_withholding_state(arrangement)
-# {"verified": True, "withholding_state": State.NJ,
-#  "reason": "Reciprocity Agreement exists between NJ and PA. Withhold for Residence (NJ)."}
+# Same shape as above.
+
+# Fails closed when no agreement exists
+guard.verify_reciprocity("NJ", "NY")
+# {"verified": False, "message": "No reciprocity agreement between NJ and NY. ..."}
 ```
+
+<Note>
+  ReciprocityGuard no longer uses a Z3 solver. A prior implementation built a Z3 expression that was tautologically satisfiable regardless of the input states, causing the guard to return `verified=True` for arrangements that had no reciprocity agreement. The current implementation is a deterministic lookup against the table above — same input, same output, no solver state.
+</Note>
 
 ### AddressGuard
 

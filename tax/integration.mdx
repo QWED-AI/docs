@@ -2,7 +2,7 @@
 sidebar_position: 3
 title: "QWED Tax integration for AI payroll and tax workflows"
 sidebarTitle: "Integration"
-description: "Use QWED Tax pre-flight middleware to verify payroll and tax actions in AI agent workflows before execution."
+description: "Verify AI-generated payroll, tax, and withholding payloads with QWED Tax pre-flight middleware before forwarding them to Gusto, Avalara, or Stripe."
 ---
 
 The primary usage patterns for QWED-Tax are the **TaxPreFlight** auditor for intent-based checks and the **QWEDTaxMiddleware** for intercepting AI-generated payroll payloads.
@@ -40,7 +40,10 @@ if not report["allowed"]:
     print(f"BLOCKED: {report['blocks']}")
     # Do NOT call Gusto/Stripe API
 else:
-    print(f"Verified. Checks run: {report['checks_run']}")
+    print(f"Checks run: {report['checks_run']}")
+    print(f"Checks NOT run (known gaps): {report['checks_not_run']}")
+    # Before calling Gusto/Stripe, decide whether the remaining gaps need
+    # to be covered by additional guards or human review.
     # call_gusto_api()
 ```
 
@@ -79,7 +82,8 @@ The following legacy action names are accepted and canonicalized automatically:
     #   "allowed": False,
     #   "action": None,
     #   "blocks": ["TaxPreFlight requires a non-empty intent payload with an explicit action."],
-    #   "checks_run": []
+    #   "checks_run": [],
+    #   "checks_not_run": []
     # }
     ```
   </Tab>
@@ -94,7 +98,8 @@ The following legacy action names are accepted and canonicalized automatically:
     #     "corporate_action, economic_nexus, expense_claim, hire, pay_invoice, "
     #     "remit_money, trade_tax."
     #   ],
-    #   "checks_run": []
+    #   "checks_run": [],
+    #   "checks_not_run": []
     # }
     ```
   </Tab>
@@ -109,7 +114,8 @@ The following legacy action names are accepted and canonicalized automatically:
     #     "Supported claim shapes: trader_setoff (loss_head, offset_head, loss_amount); "
     #     "capital_gains (asset_type, dates.buy, dates.sell, claimed_rate)."
     #   ],
-    #   "checks_run": []
+    #   "checks_run": [],
+    #   "checks_not_run": ["trader_setoff", "capital_gains"]
     # }
     ```
   </Tab>
@@ -132,6 +138,9 @@ The report always echoes the canonical action (after alias resolution) in the `a
 </ResponseField>
 <ResponseField name="checks_run" type="string[]">
   Names of the guards that actually executed (for example, `["worker_classification"]`). Empty when the intent was rejected before any guard ran.
+</ResponseField>
+<ResponseField name="checks_not_run" type="string[]">
+  Checks that were **not** executed for this action — either guards that weren't selected because their trigger fields were absent, or **known gaps** (checks not yet implemented for the action). For example, `action="hire"` reports `payroll_arithmetic`, `withholding_legality`, `reciprocity`, and `filing_obligations` as known gaps; `action="pay_invoice"` reports `itc_eligibility`, `gst_split`, and `rcm_applicability`. Use this list to decide which follow-up guards or human reviews are still required before execution.
 </ResponseField>
 <ResponseField name="advisories" type="string[]">
   Optional advisory messages emitted by guards (for example, required TDS deduction amounts).
@@ -349,13 +358,24 @@ decision = middleware.process_ai_payroll_request(ai_payload)
 
 ### Response format
 
+<Warning>
+  Gross-to-net arithmetic alone is **not** full tax verification. When the middleware confirms the AI's math, it returns `status: "ARITHMETIC_VERIFIED"` with `execution_permitted: false` — execution remains blocked until classification, withholding legality, reciprocity, and filing obligations are also verified. There is no response shape that returns `execution_permitted: true` today.
+</Warning>
+
 <Tabs>
-  <Tab title="Verified">
+  <Tab title="Arithmetic verified (still blocked)">
     ```json
     {
-      "status": "VERIFIED",
-      "message": "AI tax logic mathematically verified. Safe to execute.",
-      "execution_permitted": true,
+      "status": "ARITHMETIC_VERIFIED",
+      "message": "Gross-to-net arithmetic verified. Legal/tax classification, withholding legality, reciprocity, and filing obligations were NOT checked. Execution blocked until full verification.",
+      "execution_permitted": false,
+      "checks_run": ["gross_to_net_arithmetic"],
+      "checks_not_run": [
+        "worker_classification",
+        "withholding_legality",
+        "reciprocity",
+        "filing_obligations"
+      ],
       "validated_payload": { ... }
     }
     ```
@@ -365,7 +385,7 @@ decision = middleware.process_ai_payroll_request(ai_payload)
     {
       "status": "BLOCKED",
       "risk": "TAX_LOGIC_HALLUCINATION",
-      "reason": "Mathematical discrepancy detected. Claimed Net: 3640.00, Calculated: 3640.00.",
+      "reason": "Mathematical discrepancy detected. Claimed Net: 3640.00, Calculated: 3500.00.",
       "execution_permitted": false
     }
     ```
@@ -383,10 +403,19 @@ decision = middleware.process_ai_payroll_request(ai_payload)
 </Tabs>
 
 <ResponseField name="status" type="string">
-  `VERIFIED` or `BLOCKED`.
+  `ARITHMETIC_VERIFIED` when the gross-to-net math passes, `BLOCKED` otherwise. There is no `VERIFIED` status — full verification requires legal checks that are not yet implemented in the middleware.
 </ResponseField>
 <ResponseField name="execution_permitted" type="boolean">
-  Whether the payload is safe to forward to the execution API.
+  Whether the payload is safe to forward to the execution API. Currently always `false`: the middleware fails closed until classification, withholding, reciprocity, and filing checks are wired in.
+</ResponseField>
+<ResponseField name="message" type="string">
+  Human-readable summary of what was verified and what was skipped (only present on `ARITHMETIC_VERIFIED`).
+</ResponseField>
+<ResponseField name="checks_run" type="string[]">
+  Names of the checks the middleware actually executed (for example, `["gross_to_net_arithmetic"]`). Only present on `ARITHMETIC_VERIFIED`.
+</ResponseField>
+<ResponseField name="checks_not_run" type="string[]">
+  Checks the middleware did **not** run for this payload — currently `worker_classification`, `withholding_legality`, `reciprocity`, and `filing_obligations`. Use this list to decide which guards to run separately (or which human reviews to require) before executing.
 </ResponseField>
 <ResponseField name="risk" type="string">
   Risk code when blocked: `TAX_LOGIC_HALLUCINATION`, `INVALID_PAYLOAD`, or `VERIFIER_ERROR`.
@@ -395,8 +424,12 @@ decision = middleware.process_ai_payroll_request(ai_payload)
   Human-readable explanation of why the payload was blocked.
 </ResponseField>
 <ResponseField name="validated_payload" type="object">
-  The validated payload (JSON-serialized) when execution is permitted.
+  The validated payload (JSON-serialized) when the arithmetic check passes.
 </ResponseField>
+
+<Note>
+  To move past `ARITHMETIC_VERIFIED`, call the remaining guards yourself: `ClassificationGuard` (worker type), `WithholdingGuard` (W-4 exempt legality), `ReciprocityGuard.verify_reciprocity()` (state withholding), and `Form1099Guard` (filing). Only forward the payload to Gusto/Avalara once every `checks_not_run` entry has an explicit pass.
+</Note>
 
 ## Standalone guard usage
 

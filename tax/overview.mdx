@@ -93,9 +93,10 @@ The system supports two entry points:
 Several guards use the **Z3 SMT solver** for formal verification instead of heuristic rules:
 
 - **WithholdingGuard** — Proves W-4 exempt status validity against IRS Pub 505 rules.
-- **ReciprocityGuard** — Proves correct state withholding under reciprocity agreements.
 - **ClassificationGuard (ABC Test)** — Proves worker classification under CA AB5 / NJ / MA laws.
 - **InvestmentGuard** — Proves correct tax head classification for stock market transactions.
+
+`ReciprocityGuard` is a deterministic lookup against a fixed reciprocity-pair table — it does not use Z3. See the [ReciprocityGuard reference](/tax/guards#reciprocityguard-state-tax) for the current contract.
 
 This means QWED-Tax does not just check rules — it **formally proves** that the AI's tax logic is consistent.
 

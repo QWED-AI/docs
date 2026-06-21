@@ -7,23 +7,46 @@ All notable changes to the QWED platform, listed by release.
 
 ---
 
-## QWED-Tax — middleware no longer overstates verification, ReciprocityGuard is deterministic
+## QWED-Tax — middleware never returns full "verified" and ReciprocityGuard no longer always-passes
 
 **Released: June 21, 2026** · [GitHub PR #43](https://github.com/QWED-AI/qwed-tax/pull/43)
 
-> Two fail-closed fixes for the payroll path: the Gusto middleware now reports exactly which checks it ran (and which it didn't), and the US `ReciprocityGuard` returns deterministic verdicts instead of a solver result that always came back satisfiable.
+> Two fail-closed fixes ship together. The Gusto interceptor middleware no longer overstates a gross-to-net arithmetic pass as full tax verification, and `ReciprocityGuard` no longer returns `verified=True` for arrangements with no reciprocity agreement.
 
-### Bug fixes
+<Note>
+  `ARITHMETIC_VERIFIED` is a **pre-conformance middleware-layer status**, not part of the `DiagnosticResult` tri-state vocabulary (`VERIFIED` / `UNVERIFIABLE` / `BLOCKED`) introduced in v5.2.0. The middleware will migrate to `DiagnosticResult` when engine-conformance work lands. Until then, treat `ARITHMETIC_VERIFIED` as a distinct middleware signal — it is not equivalent to `VERIFIED`.
+</Note>
 
-- **QWEDTaxMiddleware (Gusto interceptor)** — A successful middleware run no longer returns a full `VERIFIED` verdict with execution permitted. The payload-validation + gross-to-net path is now reported as `ARITHMETIC_VERIFIED` with `execution_permitted=False`, and the result includes `checks_run` and `checks_not_run` so callers can see exactly which compliance checks were performed and which were skipped. Downstream systems must run the rest of the tax pre-flight before executing payroll.
-- **TaxPreFlight** — Reports now include a `checks_not_run` field listing both checks that weren't triggered by the intent fields and known gaps (checks not yet implemented for the requested action), so callers can distinguish "passed" from "not evaluated."
-- **ReciprocityGuard (US)** — Replaced the Z3-based withholding-state check, which was always returning satisfiable regardless of input, with a deterministic lookup. The new `verify_reciprocity()` method returns `verified=True` only when the work and residence states match or are a known reciprocity pair (NJ-PA, PA-NJ, MD-PA, PA-MD, VA-MD, MD-VA); same-state, no-agreement, and unrecognized-state cases all return a definite verdict instead of a silent pass. `determine_withholding_state(arrangement)` is preserved for backward compatibility and now delegates to the new logic.
+### What changed
+
+- **`QWEDTaxMiddleware.process_ai_payroll_request`** — The success response is now `status: "ARITHMETIC_VERIFIED"` with `execution_permitted: false`. The middleware only verifies gross-to-net math; classification, withholding legality, reciprocity, and filing checks are still required before execution. The response includes `checks_run` (what was verified) and `checks_not_run` (what is still required) so callers can decide what to run next.
+- **`TaxPreFlight` report** — Every report now includes a `checks_not_run` list covering both unselected guards and **known gaps** (checks not yet implemented for the action). For example, `action="hire"` reports `payroll_arithmetic`, `withholding_legality`, `reciprocity`, and `filing_obligations` as known gaps.
+- **`ReciprocityGuard`** — The Z3 solver was removed (the prior expression was tautologically satisfiable and ignored the `same_state` parameter). The guard is now a deterministic lookup against the reciprocity-pair table with explicit fail-closed paths: same state → verified, known pair → verified, no agreement → `verified=False`, unknown state → `verified=False`. A new `verify_reciprocity(residence_state, work_state, same_state=None)` method takes string inputs; `determine_withholding_state(arrangement)` is kept for backwards compatibility.
+
+<Note>
+  The reciprocity-pair table covers only the pairs modeled within the `State` enum's 8-state scope (NJ, PA, MD, VA). Pennsylvania has additional reciprocity agreements (with IN, MI, OH, VA, WV, WI) that are not modeled here because those states are not in the enum. VA-PA in particular is a known gap — callers will receive `verified=False` for that pair until the enum and table are extended.
+</Note>
+
+### Breaking changes
+
+<Warning>
+  The middleware no longer returns `status: "VERIFIED"` or `execution_permitted: true`. Any caller that gated execution on `decision["status"] == "VERIFIED"` or `decision["execution_permitted"]` being truthy will now always block. Update your integration to handle `ARITHMETIC_VERIFIED` and run the checks listed in `checks_not_run` (worker classification, withholding legality, reciprocity, filing) before forwarding to Gusto/Avalara.
+</Warning>
+
+<Warning>
+  `ReciprocityGuard` no longer returns `verified=True` for state pairs without a reciprocity agreement. Callers that previously relied on a Z3-backed "always sat" result for, e.g., NJ → NY will now correctly receive `verified=False`. Route these to your withholding logic for the work state or to human review.
+</Warning>
 
 ### What this means for you
 
-If your integration treated a successful middleware response as a green light to call Gusto, it must now also clear the `TaxPreFlight` checks listed in `checks_not_run` before executing. Any agent that depended on `ReciprocityGuard` quietly returning a withholding state for unmodeled jurisdictions will now see `verified=False` for those inputs and must route to manual review.
+If your agent forwards payroll payloads to Gusto/Avalara based on a `VERIFIED` status from the middleware, those calls will start blocking until you run the remaining guards (`ClassificationGuard`, `WithholdingGuard`, `ReciprocityGuard.verify_reciprocity`, `Form1099Guard`) yourself. See the [tax integration guide](/tax/integration#qwedtaxmiddleware-gusto-interceptor) for the updated response shape and the [ReciprocityGuard reference](/tax/guards#reciprocityguard-state-tax) for the new lookup contract.
 
-See the [QWED-Tax integration guide](/tax/integration) and the [guards reference](/tax/guards) for the updated middleware response shape and `ReciprocityGuard` contract.
+### Audit reference
+
+| Issue | Area | Fix |
+| --- | --- | --- |
+| #19 | Middleware overstated partial verification as full verification | Status narrowed to `ARITHMETIC_VERIFIED`, `execution_permitted` forced to `false`, `checks_run`/`checks_not_run` surfaced |
+| #40 | `ReciprocityGuard` Z3 solver always returned sat | Z3 removed; deterministic lookup with explicit fail-closed branches |
 
 ---
 
