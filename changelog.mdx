@@ -7,6 +7,37 @@ All notable changes to the QWED platform, listed by release.
 
 ---
 
+## QWED-Tax — input strictness across guards and models
+
+**Released: June 21, 2026** · [GitHub PR #44](https://github.com/QWED-AI/qwed-tax/pull/44)
+
+> Three input-strictness fixes ship together. Edge-case numeric inputs are now blocked instead of distorting guard logic, the crypto tax check uses exact paise-level comparison, and every tax input model rejects unexpected fields at the boundary.
+
+### Bug fixes
+
+- **CryptoTaxGuard** — Claimed VDA tax is now compared to the expected tax at exact paise precision (`ROUND_HALF_UP` to two decimals). The previous 0.1-rupee tolerance is gone — a 1-paise deviation now correctly returns `verified=False`.
+- **ValuationGuard** — Numeric inputs are range-checked before any conversion math runs. Discount must be between 0 and 1; cap, next-round price, and investment must be positive. Negative-share outputs from `discount > 1` and division-by-zero crashes from `cap = 0` are blocked with a structured error.
+- **RemittanceGuard** — Negative `amount_usd` or `financial_year_usage` now returns `verified=False` instead of flowing through and distorting the LRS limit check.
+- **Tax input models reject extra fields** — All eight Pydantic input models (`Address`, `WorkArrangement`, `WorkerClassificationParams`, `ContractorPayment`, `TaxEntry`, `DeductionEntry`, `PayrollEntry`, `VerificationResult`) now raise `ValidationError` on any unexpected key. The Gusto interceptor middleware already fails closed on these validation errors, so unexpected fields are blocked at the request boundary.
+
+### What this means for you
+
+If your agent submits tax payloads with extra keys (typos, debug fields, legacy parameters), those calls will now be rejected at the model layer instead of silently ignored. Strip unknown fields before submitting, or extend the model if the field is actually required.
+
+Callers that relied on the previous 0.1-rupee tolerance in `CryptoTaxGuard` should round their claimed tax to two decimal places before submission to avoid spurious mismatches.
+
+See the [QWED-Tax guards reference](/tax/guards) for the updated guard contracts and the [tax integration guide](/tax/integration) for the input model shapes.
+
+### Audit reference
+
+| Issue | Area | Fix |
+| --- | --- | --- |
+| #20 | `CryptoTaxGuard` accepted 0.1-rupee tolerance as verified | Exact paise-level comparison after `ROUND_HALF_UP` quantization |
+| #21 | Edge-case inputs (negative amounts, out-of-range discount, zero cap) flowed through guards | Range and negativity checks added to `ValuationGuard` and `RemittanceGuard` |
+| #22 | Input models silently accepted unexpected fields | `extra="forbid"` on all eight tax input models |
+
+---
+
 ## QWED-Tax — middleware never returns full "verified" and ReciprocityGuard no longer always-passes
 
 **Released: June 21, 2026** · [GitHub PR #43](https://github.com/QWED-AI/qwed-tax/pull/43)
