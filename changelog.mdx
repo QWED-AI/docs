@@ -23,7 +23,7 @@ All notable changes to the QWED platform, listed by release.
 ### Breaking changes
 
 <Warning>
-  Callers that previously relied on the 0.1-rupee tolerance in `CryptoTaxGuard.verify_flat_tax_rate` will now receive `verified=False` for claims that differ from `vda_income * 0.30` by more than 1 paise. Round your claimed tax to two decimal places with `ROUND_HALF_UP` before calling the guard.
+  Callers that previously relied on the 0.1-rupee tolerance in `CryptoTaxGuard.verify_flat_tax_rate` will now receive `verified=False` for claims that differ from `vda_income * 0.30` by 1 paise or more. Round your claimed tax to two decimal places with `ROUND_HALF_UP` before calling the guard.
 
   ```python
   from decimal import Decimal, ROUND_HALF_UP
@@ -42,7 +42,7 @@ All notable changes to the QWED platform, listed by release.
 
 ### What this means for you
 
-If your agent forwards Indian VDA tax claims, startup conversion math, or LRS remittance requests through QWED-Tax, audit the calling code for: (1) tax claims that aren't pre-quantized to two decimal places, (2) discount/cap/investment inputs that can legitimately be zero or out of range, (3) negative remittance amounts being passed defensively, and (4) AI payloads that include fields not declared on the QWED-Tax input models. See the [CryptoTaxGuard](/tax/guards#cryptotaxguard-sec-115bbh), [ValuationGuard](/tax/guards#valuationguard-verify-conversion), [RemittanceGuard](/tax/guards#remittanceguard-fema-lrs), and [middleware integration guide](/tax/integration#qwedtaxmiddleware-gusto-interceptor) for the updated contracts.
+If your agent forwards Indian VDA tax claims, startup conversion math, or LRS remittance requests through QWED-Tax, audit the calling code for: (1) tax claims that aren't pre-quantized to two decimal places, (2) discount/cap/investment inputs that can legitimately be zero or out of range, (3) negative remittance amounts being passed defensively, and (4) AI payloads that include fields not declared on the QWED-Tax input models. See the [CryptoTaxGuard](/tax/guards#cryptotaxguard-sec-115bbh), [ValuationGuard](/tax/guards#valuationguard), [RemittanceGuard](/tax/guards#remittanceguard), and [middleware integration guide](/tax/integration#qwedtaxmiddleware-gusto-interceptor) for the updated contracts.
 
 ### Audit reference
 
