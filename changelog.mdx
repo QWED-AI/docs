@@ -7,6 +7,26 @@ All notable changes to the QWED platform, listed by release.
 
 ---
 
+## QWED-Tax — middleware no longer overstates verification, ReciprocityGuard is deterministic
+
+**Released: June 21, 2026** · [GitHub PR #43](https://github.com/QWED-AI/qwed-tax/pull/43)
+
+> Two fail-closed fixes for the payroll path: the Gusto middleware now reports exactly which checks it ran (and which it didn't), and the US `ReciprocityGuard` returns deterministic verdicts instead of a solver result that always came back satisfiable.
+
+### Bug fixes
+
+- **QWEDTaxMiddleware (Gusto interceptor)** — A successful middleware run no longer returns a full `VERIFIED` verdict with execution permitted. The payload-validation + gross-to-net path is now reported as `ARITHMETIC_VERIFIED` with `execution_permitted=False`, and the result includes `checks_run` and `checks_not_run` so callers can see exactly which compliance checks were performed and which were skipped. Downstream systems must run the rest of the tax pre-flight before executing payroll.
+- **TaxPreFlight** — Reports now include a `checks_not_run` field listing both checks that weren't triggered by the intent fields and known gaps (checks not yet implemented for the requested action), so callers can distinguish "passed" from "not evaluated."
+- **ReciprocityGuard (US)** — Replaced the Z3-based withholding-state check, which was always returning satisfiable regardless of input, with a deterministic lookup. The new `verify_reciprocity()` method returns `verified=True` only when the work and residence states match or are a known reciprocity pair (NJ-PA, PA-NJ, MD-PA, PA-MD, VA-MD, MD-VA); same-state, no-agreement, and unrecognized-state cases all return a definite verdict instead of a silent pass. `determine_withholding_state(arrangement)` is preserved for backward compatibility and now delegates to the new logic.
+
+### What this means for you
+
+If your integration treated a successful middleware response as a green light to call Gusto, it must now also clear the `TaxPreFlight` checks listed in `checks_not_run` before executing. Any agent that depended on `ReciprocityGuard` quietly returning a withholding state for unmodeled jurisdictions will now see `verified=False` for those inputs and must route to manual review.
+
+See the [QWED-Tax integration guide](/tax/integration) and the [guards reference](/tax/guards) for the updated middleware response shape and `ReciprocityGuard` contract.
+
+---
+
 ## QWED-Tax — fail-closed on ambiguous classification and unverified claims
 
 **Released: June 21, 2026** · [GitHub PR #42](https://github.com/QWED-AI/qwed-tax/pull/42)
