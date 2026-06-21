@@ -73,7 +73,7 @@ if diag.status is TaxDiagnosticStatus.VERIFIED:
     submit_payment(net_payable=diag.developer_fields["net_payable"])
 else:
     # diag.proof_ref is None — never admit for control flow
-    escalate(diag.agent_message, constraint_id=diag.constraint_id)
+    escalate(diag.agent_message, constraint_id=diag.developer_fields["constraint_id"])
 ```
 
 The same shape applies to `InputCreditGuard.to_diagnostic()` (ITC) and `GSTGuard.to_diagnostic()` (RCM).
@@ -100,6 +100,8 @@ For custom guards or wrapper code, use the factory methods rather than the raw c
 from qwed_tax.diagnostics import TaxDiagnosticResult
 
 # VERIFIED — proof_ref is computed from evidence
+from qwed_tax.audit import build_trace, TDS_194J
+trace = build_trace(TDS_194J, outcome="DEDUCTION_REQUIRED", inputs={"amount": "50000"})
 diag = TaxDiagnosticResult.verified(
     agent_message="Tax deduction verified.",
     developer_fields={"constraint_id": "TDS_194J", "deduction": "5000"},
