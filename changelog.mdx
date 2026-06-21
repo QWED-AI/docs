@@ -7,6 +7,29 @@ All notable changes to the QWED platform, listed by release.
 
 ---
 
+## QWED-Tax — structured 3-layer diagnostics for TDS, ITC, and GST-RCM
+
+**Released: June 21, 2026** · [GitHub PR #45](https://github.com/QWED-AI/qwed-tax/pull/45)
+
+> QWED-Tax adopts the same 3-layer `DiagnosticResult` contract introduced in [QWED-Verification v5.2.0](/changelog#v520--structured-verification-diagnostics) — as an independent model, no cross-package dependency. The first three guards (TDS, Input Tax Credit, GST reverse-charge) now expose a structured diagnostic in addition to their existing dict response.
+
+### What's new
+
+- **Tri-state status** — Every diagnostic resolves to `VERIFIED`, `UNVERIFIABLE`, or `BLOCKED`. No `HEURISTIC` or `AMBIGUOUS` middle ground.
+- **Three disclosure layers** — A short agent-safe summary (no statute IDs or detection logic), a structured developer evidence block (constraint ID, statute, jurisdiction, audit trace, deduction, net payable), and an optional proof reference.
+- **Proof reference is the authority bit** — A deterministic sha256 hash of the audit trace, present only when a result is `VERIFIED`. Absent on `UNVERIFIABLE` and `BLOCKED`.
+- **First migrations** — `TDSGuard`, `InputCreditGuard`, and `GSTGuard` (reverse-charge) each expose the new diagnostic format alongside their existing return shape.
+
+### Compatibility
+
+**Additive release.** The legacy dict API on every guard is unchanged — the diagnostic format is opt-in. Existing integrations continue to work without modification. The remaining nine QWED-Tax guards (CapitalGains, Classification, Speculation, Setoff, Crypto, Valuation, Remittance, PoEM, Withholding) will migrate in follow-up releases.
+
+### What this means for you
+
+If you've already adopted the QWED-Verification diagnostic contract, the same response shape now applies to TDS, ITC, and GST-RCM checks — including the proof-reference authority bit you can gate execution on. See the [Verification Diagnostics guide](/advanced/diagnostics) for the response shape and the [tax guards reference](/tax/guards) for guard-by-guard coverage.
+
+---
+
 ## QWED-Tax — exact paise comparison, edge-case input rejection, and strict payload schemas
 
 **Released: June 21, 2026** · [GitHub PR #44](https://github.com/QWED-AI/qwed-tax/pull/44)
