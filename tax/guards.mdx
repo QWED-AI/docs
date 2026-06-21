@@ -27,6 +27,112 @@ Several guards attach a structured, machine-readable `audit_trace` to their verd
 
 Guards currently emitting `audit_trace` include **InputCreditGuard** (ITC), **TDSGuard** (Sec 194J/194C/194H/194I), and **GSTGuard** (RCM). Rule identifiers and statute strings are centralized in `qwed_tax/audit.py`.
 
+## Structured diagnostics (`TaxDiagnosticResult`)
+
+`TaxDiagnosticResult` is an opt-in, three-layer model that converts a guard's legacy dict return into a typed, tri-state verdict with a cryptographic proof reference. The legacy `{"verified": ..., "audit_trace": ...}` dict is unchanged — `to_diagnostic()` is additive, so existing callers keep working.
+
+Use it when you need a single, uniform shape across guards (for API responses, gating logic, or audit pipelines) instead of branching on guard-specific keys.
+
+### The three layers
+
+| Layer | Field | Purpose |
+| --- | --- | --- |
+| 1. Agent-safe | `agent_message: str` | Short, model-facing summary. No statute IDs, no rule IDs, no detection logic — safe to feed back to an LLM for correction. |
+| 2. Developer | `developer_fields: dict` | Structured evidence: `constraint_id`, `statute`, `jurisdiction`, `audit_trace`, plus guard-specific fields like `deduction`, `net_payable`, `allowable_credit`. |
+| 3. Proof | `proof_ref: Optional[str]` | `sha256:…` hash of the retained proof artifact. Present **only** when `status == VERIFIED`. This is the authority bit. |
+
+### Status states
+
+`TaxDiagnosticStatus` is a strict tri-state:
+
+- **`VERIFIED`** — the tax decision was deterministically proven. `proof_ref` MUST be present. Downstream gates MAY admit for control flow.
+- **`UNVERIFIABLE`** — the decision could not be proven (insufficient evidence, computation-only mode, unknown rule). `proof_ref` MUST be `None`. Gates MUST NOT admit.
+- **`BLOCKED`** — verification could not even be attempted (missing fields, parse error, unsupported service). `proof_ref` MUST be `None`. Gates MUST NOT admit.
+
+Richer distinctions (e.g. "below threshold" vs. "unknown service") live in `developer_fields.constraint_id`, not in the status.
+
+<Warning>
+  **Authority contract.** `proof_ref is not None` is the **only** signal that a verdict is admissible for control flow. A `VERIFIED` status without a `proof_ref` is structurally impossible — the dataclass raises in `__post_init__`. Do not infer authority from any other field.
+</Warning>
+
+### Calling `to_diagnostic()`
+
+`TDSGuard`, `InputCreditGuard`, and `GSTGuard` expose a `to_diagnostic()` static method that converts their existing dict result into a `TaxDiagnosticResult`.
+
+```python
+from qwed_tax.guards.tds_guard import TDSGuard
+from qwed_tax.diagnostics import TaxDiagnosticStatus
+
+guard = TDSGuard()
+raw = guard.calculate_deduction(service="professional_fees", amount=50_000)
+
+diag = TDSGuard.to_diagnostic(raw)
+
+if diag.status is TaxDiagnosticStatus.VERIFIED:
+    # diag.proof_ref is guaranteed non-None here
+    submit_payment(net_payable=diag.developer_fields["net_payable"])
+else:
+    # diag.proof_ref is None — never admit for control flow
+    escalate(diag.agent_message, constraint_id=diag.developer_fields["constraint_id"])
+```
+
+The same shape applies to `InputCreditGuard.to_diagnostic()` (ITC) and `GSTGuard.to_diagnostic()` (RCM).
+
+### Proof references
+
+`compute_proof_ref(evidence)` returns a deterministic `sha256:…` hash over a JSON-serialized evidence dict. `trace_proof_ref(trace)` is a convenience wrapper for the output of `build_trace()`. Both fail closed if the evidence is not JSON-serializable.
+
+```python
+from qwed_tax.audit import build_trace, trace_proof_ref, TDS_194J
+
+trace = build_trace(TDS_194J, outcome="DEDUCTION_REQUIRED", inputs={"amount": "50000"})
+proof = trace_proof_ref(trace)
+# "sha256:9f4c…"
+```
+
+The proof reference binds a verdict to the exact evidence that justified it. If any input, rule, or outcome changes, the hash changes — making verdict/evidence drift structurally detectable in downstream audit logs.
+
+### Constructing results directly
+
+For custom guards or wrapper code, use the factory methods rather than the raw constructor:
+
+```python
+from qwed_tax.diagnostics import TaxDiagnosticResult
+
+# VERIFIED — proof_ref is computed from evidence
+from qwed_tax.audit import build_trace, TDS_194J
+trace = build_trace(TDS_194J, outcome="DEDUCTION_REQUIRED", inputs={"amount": "50000"})
+diag = TaxDiagnosticResult.verified(
+    agent_message="Tax deduction verified.",
+    developer_fields={"constraint_id": "TDS_194J", "deduction": "5000"},
+    evidence=trace,
+)
+
+# UNVERIFIABLE — no proof was established
+diag = TaxDiagnosticResult.unverifiable(
+    agent_message="Amount is below the deduction threshold; no TDS required.",
+    developer_fields={"constraint_id": "TDS_194J_BELOW_THRESHOLD"},
+)
+
+# BLOCKED — verification could not be attempted
+diag = TaxDiagnosticResult.blocked(
+    agent_message="Unknown service type. Cannot determine deduction.",
+    developer_fields={"constraint_id": "TDS_UNKNOWN"},
+)
+```
+
+### Advisory checks
+
+`TaxAdvisoryCheck` attaches non-proof-bearing analysis as metadata. The `advisory_only=True` invariant is enforced in `__post_init__` — advisory checks populate `developer_fields["advisory_checks"]` and **never** influence `status` or `proof_ref`. Use them to surface useful context (e.g. "supplier GSTIN appears inactive") without making it part of the verdict.
+
+### Serialization
+
+`TaxDiagnosticResult` is frozen and provides `to_dict()` / `from_dict()` for API responses. `to_dict()` includes a flat `is_authoritative` boolean for clients that don't want to inspect `proof_ref` directly.
+
+### Migration status
+
+`to_diagnostic()` is currently available on **TDSGuard**, **InputCreditGuard**, and **GSTGuard** — the three guards that already emit `audit_trace`. The remaining guards still return their legacy dict shapes; subsequent releases will extend `to_diagnostic()` coverage.
+
 ## United States (IRS)
 
 ### ClassificationGuard (IRS common law)
