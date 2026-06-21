@@ -515,6 +515,11 @@ result = guard.verify_setoff(
 | Equity | > 365 days | 12.5% | 20% |
 | Real estate | > 730 days | — | — |
 | Debt | > 1095 days | Slab rate | Slab rate |
+| Debt fund | Always STCG (post-Apr 2023) | — | Slab rate |
+
+<Note>
+  **`debt_fund` always classifies as STCG.** `determine_term` returns `"STCG"` for `asset_type="debt_fund"` regardless of holding period, reflecting the Budget 2023 amendment. However, `verify_tax_rate` does not have a configured rate for `debt_fund_STCG` — it will return `{"verified": False, "error": "No statutory rate configured for debt_fund_STCG. Cannot verify claimed rate."}`. Callers must handle this fail-closed response and verify the slab rate against the taxpayer's bracket through a separate path.
+</Note>
 
 <Note>
   **Fails closed on unmodeled asset/term pairs.** `verify_tax_rate` returns `{"verified": False, "error": "No statutory rate configured for <asset>_<term>. Cannot verify claimed rate."}` when the `(asset_type, term)` combination is not in the rate table. The previous "no hard constraint, assume verified" path has been removed — the guard no longer signs off on rates it cannot independently check.
