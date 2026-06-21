@@ -20,7 +20,7 @@ All notable changes to the QWED platform, listed by release.
 - **SpeculationGuard** — Set-off verification now requires a known income source (`intraday`, `f&o`, `futures`, `options`, `delivery`, `business`, `capital_gains`). Unrecognized sources are blocked instead of silently treated as non-speculative.
 - **InterHeadAdjustmentGuard** — Set-off eligibility now runs against an explicit allowlist of heads. Salary loss set-off is added to the prohibition matrix, and unknown heads are blocked rather than defaulting to allow.
 - **GSTGuard (RCM)** — Unrecognized service or entity types in reverse-charge checks now surface as a `verified=False` error naming the unknown value, instead of being coerced to `OTHER` or `INDIVIDUAL` and potentially suppressing a statutory RCM obligation. The verifier also gained an optional claim parameter — when you pass a `claimed_is_rcm` value, the guard compares it to the computed result and only returns `verified=True` on an exact match. Calls without the claim get a `computed_only=True` flag so calculation and verification are no longer conflated.
-- **CryptoTaxGuard** — Zero VDA income now verifies a claimed tax of zero, instead of returning `verified=True` regardless of claim. Negative VDA income (a loss) is treated as a loss and routed to set-off logic, not silently treated as "no income."
+- **CryptoTaxGuard** — Zero VDA income now verifies a claimed tax of zero, instead of returning `verified=True` regardless of claim. Negative VDA income (a loss) returns `verified=False` with a message directing the caller to use `verify_set_off` for loss treatment — the method does not internally invoke `verify_set_off`, so callers must handle the `verified=False` branch explicitly.
 
 ### What this means for you
 

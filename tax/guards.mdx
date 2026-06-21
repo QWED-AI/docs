@@ -55,6 +55,10 @@ result = guard.verify_classification_claim(
 # {"verified": False, "error": "Misclassification Risk: Facts indicate W2, but AI claimed 1099..."}
 ```
 
+<Note>
+  **Fails closed on ambiguous facts.** `verify_worker_status` returns `WorkerType.CONTRACTOR` only when **no** employee indicators are present. When some — but not all — of `behavioral_control`, `financial_control`, and `relationship_permanence` are true, it returns `None`, and `verify_classification_claim` then returns `{"verified": False, "error": "Ambiguous classification: facts contain mixed employee/contractor indicators. Cannot deterministically classify — manual review required."}`. The previous default-to-contractor path on mixed signals has been removed.
+</Note>
+
 ### ClassificationGuard (ABC Test / Z3)
 
 **Goal:** Formal verification of worker classification under state-specific ABC Test laws (CA AB5, NJ, MA). Uses the **Z3 theorem prover** to prove classification correctness.
@@ -274,6 +278,17 @@ result = guard.verify_flat_tax_rate(
 # TaxResult(verified=True, message="VDA Tax correct (30% of 100000)")
 ```
 
+<Note>
+  **Negative VDA income is a loss, not "no income".** `verify_flat_tax_rate` distinguishes three cases:
+
+  - `vda_income == 0` — verifies `claimed_tax == 0`. Any non-zero claim returns `verified=False`.
+  - `vda_income < 0` — returns `verified=False` with the message `"VDA income is negative (<X>) — this is a loss, not income. Use verify_set_off for loss treatment."` Losses must be routed to `verify_set_off` (and under Section 115BBH, they lapse rather than offsetting other heads).
+  - `vda_income > 0` — verifies the 30% flat tax.
+
+  The previous behavior — silently returning `verified=True` for any `vda_income <= 0` and ignoring `claimed_tax` — has been removed.
+</Note>
+
+
 ### GSTGuard (RCM)
 
 **Rule:** Certain notified services require the **Reverse Charge Mechanism** (the recipient pays the tax instead of the provider). RCM applicability is expressed as a declarative rule table — one entry per notified service, each carrying its predicate and statutory reference.
@@ -290,23 +305,57 @@ result = guard.verify_flat_tax_rate(
 
 Any service/recipient combination outside these rules resolves to **forward charge** (the provider pays).
 
+`verify_rcm_applicability` runs in two modes:
+
+- **Verification mode** (recommended) — pass `claimed_is_rcm` and the guard compares the computed RCM liability against the claim. `verified=True` only on exact match.
+- **Calculation mode** (backward compatible) — omit `claimed_is_rcm` and the guard returns the computed result with `computed_only=True` to signal that no claim was checked.
+
 ```python
 from qwed_tax.jurisdictions.india.guards.gst_guard import GSTGuard, ServiceType, EntityType
 
 guard = GSTGuard()
 
+# Verification mode — compare the agent's claim against the rule table
 result = guard.verify_rcm_applicability(
     service=ServiceType.LEGAL,
     provider=EntityType.INDIVIDUAL,
-    recipient=EntityType.BODY_CORPORATE
+    recipient=EntityType.BODY_CORPORATE,
+    claimed_is_rcm=True,
 )
-# {"verified": True, "liability": "RECIPIENT (RCM)", "is_rcm": True,
-#  "reason": "Legal service to a Business Entity (Body Corporate/Partnership) attracts RCM.",
-#  "audit_trace": {"rule_id": "RCM_LEGAL", "statute": "Notification 13/2017-CT(R), Sl. 2 (Legal)", ...}}
+# {"verified": True, "liability": "RECIPIENT (RCM)", "is_rcm": True, "claimed_is_rcm": True,
+#  "reason": "Legal service to a Business Entity (Body Corporate/Partnership) attracts RCM.", ...}
+
+# Mismatch — agent claimed forward charge on a notified service
+result = guard.verify_rcm_applicability(
+    service=ServiceType.LEGAL,
+    provider=EntityType.INDIVIDUAL,
+    recipient=EntityType.BODY_CORPORATE,
+    claimed_is_rcm=False,
+)
+# {"verified": False, "error": "RCM mismatch: computed is_rcm=True, claimed is_rcm=False. ..."}
+
+# Calculation mode — no claim supplied
+result = guard.verify_rcm_applicability(
+    service=ServiceType.LEGAL,
+    provider=EntityType.INDIVIDUAL,
+    recipient=EntityType.BODY_CORPORATE,
+)
+# {"computed_only": True, "liability": "RECIPIENT (RCM)", "is_rcm": True, ...}
 ```
 
+| Parameter | Type | Required | Description |
+| --- | --- | --- | --- |
+| `service` | `ServiceType \| str` | Yes | Notified service. Enum or raw string (e.g. `"LEGAL"`) |
+| `provider` | `EntityType \| str` | Yes | Supplier entity. Enum or raw string |
+| `recipient` | `EntityType \| str` | Yes | Recipient entity. Enum or raw string |
+| `claimed_is_rcm` | `bool` | No | When provided, the guard verifies the claim against the computed RCM liability. When omitted, the response carries `computed_only=True` and is not a verification |
+
 <Note>
-  `verify_rcm_applicability` accepts either enum members or their raw string values (e.g. `"LEGAL"`, `"BODY_CORPORATE"`), so JSON-sourced payloads work without pre-conversion. Unknown values resolve to forward charge.
+  `verify_rcm_applicability` accepts either enum members or their raw string values (e.g. `"LEGAL"`, `"BODY_CORPORATE"`), so JSON-sourced payloads work without pre-conversion.
+</Note>
+
+<Note>
+  **Fails closed on unknown service/entity values.** Service names outside `ServiceType` and entity values outside `EntityType` now return `{"verified": False, "error": "Unknown service type '<X>'. Cannot determine RCM applicability.", "is_rcm": None}` (and equivalents for provider/recipient). The previous behavior of silently coercing unknown services to `OTHER` and unknown entities to `INDIVIDUAL` — which could suppress a statutory RCM liability — has been removed. Normalize inputs to a known enum value before calling, or treat the error as a hold-and-escalate signal.
 </Note>
 
 ### GSTGuard (CGST/SGST/IGST split)
@@ -381,6 +430,9 @@ result = guard.verify_classification(
 | Long-term Capital Gains | Only Long-term Capital Gains |
 | Short-term Capital Gains | Short-term or Long-term Capital Gains |
 | VDA (Crypto) | Nothing (lapses entirely) |
+| Salary | Nothing (cannot generate a loss for inter-head set-off) |
+
+Heads with no inter-head restrictions per the Income Tax Act — `HOUSE_PROPERTY`, `BUSINESS_NON_SPECULATIVE`, and `OTHER_SOURCES` — are on an explicit allowlist and always return `verified=True`.
 
 ```python
 from qwed_tax.jurisdictions.india.guards.setoff_guard import InterHeadAdjustmentGuard, TaxHead
@@ -393,6 +445,10 @@ result = guard.verify_setoff(
 )
 # {"verified": False, "message": "Illegal Set-Off: Loss from VDA cannot be set off against anything (it lapses)."}
 ```
+
+<Note>
+  **Fails closed on unknown heads and blocks SALARY losses.** Loss heads that are neither in the prohibition matrix nor on the explicit allowlist return `{"verified": False, "message": "Loss head <X> is not in the configured prohibition matrix or allowlist. Cannot verify set-off legality — manual review required."}`. `TaxHead.SALARY` is now in the prohibition matrix with `["ALL"]` — agents that try to set off a salary loss against any profit head are blocked. The previous "default allow" path for any head not in the matrix has been removed.
+</Note>
 
 ### DepositRateGuard
 
@@ -425,6 +481,31 @@ result = guard.verify_fd_rate(
 
 **Rule:** Intraday (Speculative) losses can **only** be set off against Intraday (Speculative) profits. They cannot reduce F&O or Delivery income. Losses must be carried forward for up to 4 years.
 
+`verify_setoff` classifies the loss and profit sources against a fixed vocabulary:
+
+- **Speculative:** `intraday`
+- **Non-speculative:** `f&o`, `f_o`, `futures`, `options`, `delivery`, `business`, `capital_gains`
+
+```python
+from qwed_tax.guards.speculation_guard import SpeculationGuard
+
+guard = SpeculationGuard()
+
+# Intraday loss vs F&O profit — illegal set-off
+result = guard.verify_setoff(
+    loss_source="intraday",
+    loss_amount="50000",
+    profit_source="f&o",
+)
+# {"verified": False,
+#  "error": "Illegal Set-Off: Intraday (Speculative) loss of 50000 cannot reduce f&o.",
+#  "fix": "Loss of 50000 must be CARRIED FORWARD (4 years). It cannot be consumed now."}
+```
+
+<Note>
+  **Fails closed on unknown source strings.** The guard no longer relies on substring matching (the previous `"intraday" in source` check treated everything else as non-speculative). Source names outside the known vocabulary return `{"verified": False, "error": "Unrecognized loss source '<X>'. Known sources: ..."}` with a `fix` hint. Normalize agent output to one of the recognized names before calling.
+</Note>
+
 ### CapitalGainsGuard
 
 **Goal:** Classify assets as STCG or LTCG based on holding period and verify the statutory tax rate.
@@ -434,9 +515,22 @@ result = guard.verify_fd_rate(
 | Equity | > 365 days | 12.5% | 20% |
 | Real estate | > 730 days | — | — |
 | Debt | > 1095 days | Slab rate | Slab rate |
+| Debt fund | Always STCG (post-Apr 2023) | — | Slab rate |
+
+<Note>
+  **`debt_fund` always classifies as STCG.** `determine_term` returns `"STCG"` for `asset_type="debt_fund"` regardless of holding period, reflecting the Budget 2023 amendment. However, `verify_tax_rate` does not have a configured rate for `debt_fund_STCG` — it will return `{"verified": False, "error": "No statutory rate configured for debt_fund_STCG. Cannot verify claimed rate."}`. Callers must handle this fail-closed response and verify the slab rate against the taxpayer's bracket through a separate path.
+</Note>
 
 <Note>
   **Fails closed on unmodeled asset/term pairs.** `verify_tax_rate` returns `{"verified": False, "error": "No statutory rate configured for <asset>_<term>. Cannot verify claimed rate."}` when the `(asset_type, term)` combination is not in the rate table. The previous "no hard constraint, assume verified" path has been removed — the guard no longer signs off on rates it cannot independently check.
+</Note>
+
+<Note>
+  **Slab-rated assets cannot be verified without the taxpayer's bracket.** When the rate table resolves to `SLAB` (e.g. `debt_LTCG`, `debt_STCG`), `verify_tax_rate` returns `{"verified": False, "error": "Rate for <key> is subject to slab rates — cannot deterministically verify claimed rate of <X>. Taxpayer's slab band is required for verification."}`. Slab rates depend on the filer's total income bracket and are out of scope for the rate-table check.
+</Note>
+
+<Note>
+  **`determine_term` raises `ValueError` on unparseable dates and unknown asset types.** Pass `purchase_date` and `sale_date` as `YYYY-MM-DD` strings and an `asset_type` of `equity`, `real_estate`, `debt`, or `debt_fund`. Anything else raises `ValueError` — the previous behavior of returning an `"ERROR_DATE_FORMAT"` sentinel (which then flowed to `verified=True` upstream) or fabricating a 1095-day threshold for unknown assets has been removed. Callers should catch `ValueError` and block. `TaxPreFlight._check_capital_gains` now does this and produces a structured block with the error message.
 </Note>
 
 ### Accounts payable guards (indirect tax)
