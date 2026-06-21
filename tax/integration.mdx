@@ -82,7 +82,8 @@ The following legacy action names are accepted and canonicalized automatically:
     #   "allowed": False,
     #   "action": None,
     #   "blocks": ["TaxPreFlight requires a non-empty intent payload with an explicit action."],
-    #   "checks_run": []
+    #   "checks_run": [],
+    #   "checks_not_run": []
     # }
     ```
   </Tab>
@@ -97,7 +98,8 @@ The following legacy action names are accepted and canonicalized automatically:
     #     "corporate_action, economic_nexus, expense_claim, hire, pay_invoice, "
     #     "remit_money, trade_tax."
     #   ],
-    #   "checks_run": []
+    #   "checks_run": [],
+    #   "checks_not_run": []
     # }
     ```
   </Tab>
@@ -112,7 +114,8 @@ The following legacy action names are accepted and canonicalized automatically:
     #     "Supported claim shapes: trader_setoff (loss_head, offset_head, loss_amount); "
     #     "capital_gains (asset_type, dates.buy, dates.sell, claimed_rate)."
     #   ],
-    #   "checks_run": []
+    #   "checks_run": [],
+    #   "checks_not_run": ["trader_setoff", "capital_gains"]
     # }
     ```
   </Tab>

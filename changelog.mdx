@@ -1,6 +1,6 @@
 ---
 title: "Changelog"
-description: "Release notes for QWED Protocol: version history, new guards, breaking changes, security fixes, and audit-driven hardening across all QWED engines."
+description: "Release notes for the QWED Protocol: version history, new guards, breaking changes, security fixes, and hardening across QWED engines."
 ---
 
 All notable changes to the QWED platform, listed by release.
@@ -13,11 +13,19 @@ All notable changes to the QWED platform, listed by release.
 
 > Two fail-closed fixes ship together. The Gusto interceptor middleware no longer overstates a gross-to-net arithmetic pass as full tax verification, and `ReciprocityGuard` no longer returns `verified=True` for arrangements with no reciprocity agreement.
 
+<Note>
+  `ARITHMETIC_VERIFIED` is a **pre-conformance middleware-layer status**, not part of the `DiagnosticResult` tri-state vocabulary (`VERIFIED` / `UNVERIFIABLE` / `BLOCKED`) introduced in v5.2.0. The middleware will migrate to `DiagnosticResult` when engine-conformance work lands. Until then, treat `ARITHMETIC_VERIFIED` as a distinct middleware signal — it is not equivalent to `VERIFIED`.
+</Note>
+
 ### What changed
 
 - **`QWEDTaxMiddleware.process_ai_payroll_request`** — The success response is now `status: "ARITHMETIC_VERIFIED"` with `execution_permitted: false`. The middleware only verifies gross-to-net math; classification, withholding legality, reciprocity, and filing checks are still required before execution. The response includes `checks_run` (what was verified) and `checks_not_run` (what is still required) so callers can decide what to run next.
 - **`TaxPreFlight` report** — Every report now includes a `checks_not_run` list covering both unselected guards and **known gaps** (checks not yet implemented for the action). For example, `action="hire"` reports `payroll_arithmetic`, `withholding_legality`, `reciprocity`, and `filing_obligations` as known gaps.
 - **`ReciprocityGuard`** — The Z3 solver was removed (the prior expression was tautologically satisfiable and ignored the `same_state` parameter). The guard is now a deterministic lookup against the reciprocity-pair table with explicit fail-closed paths: same state → verified, known pair → verified, no agreement → `verified=False`, unknown state → `verified=False`. A new `verify_reciprocity(residence_state, work_state, same_state=None)` method takes string inputs; `determine_withholding_state(arrangement)` is kept for backwards compatibility.
+
+<Note>
+  The reciprocity-pair table covers only the pairs modeled within the `State` enum's 8-state scope (NJ, PA, MD, VA). Pennsylvania has additional reciprocity agreements (with IN, MI, OH, VA, WV, WI) that are not modeled here because those states are not in the enum. VA-PA in particular is a known gap — callers will receive `verified=False` for that pair until the enum and table are extended.
+</Note>
 
 ### Breaking changes
 
