@@ -7,6 +7,29 @@ All notable changes to the QWED platform, listed by release.
 
 ---
 
+## QWED-Tax — fail-closed on ambiguous classification and claim comparison
+
+**Released: June 21, 2026**
+
+> Six tax guards no longer return success when the inputs are ambiguous or when the agent's claim was never compared against the computed truth. Where a guard previously guessed a classification or returned a calculation as if it were a verification, it now blocks or surfaces an explicit `computed_only` flag.
+
+### What changed
+
+- **ClassificationGuard (IRS Common Law)** — `verify_worker_status` returns `None` (and `verify_classification_claim` returns `verified=False` with `"Ambiguous classification"`) when behavioral, financial, and relationship indicators are mixed. The previous default-to-contractor path on partial employee indicators has been removed.
+- **CapitalGainsGuard** — `determine_term` raises `ValueError` on unparseable dates and unknown asset types instead of returning a sentinel string or fabricating a 1095-day threshold. `TaxPreFlight._check_capital_gains` catches the error and produces a structured block. `verify_tax_rate` now returns `verified=False` for `SLAB`-rated assets (e.g. `debt_LTCG`) because slab rates depend on the filer's bracket.
+- **SpeculationGuard** — `verify_setoff` requires loss/profit sources to match a known vocabulary (`intraday`, `f&o`, `f_o`, `futures`, `options`, `delivery`, `business`, `capital_gains`). Unrecognized strings return `verified=False` instead of being treated as non-speculative by substring match.
+- **InterHeadAdjustmentGuard** — explicit allowlist (`HOUSE_PROPERTY`, `BUSINESS_NON_SPECULATIVE`, `OTHER_SOURCES`) plus prohibition matrix. `SALARY` losses are now blocked against every other head, and heads outside both lists return `verified=False` with a manual-review message. The previous "default allow" path is gone.
+- **GSTGuard RCM** — `verify_rcm_applicability` accepts an optional `claimed_is_rcm` boolean. When provided, the guard compares the computed RCM liability against the claim and returns `verified=True` only on exact match. When omitted, the response carries `computed_only=True` so callers can distinguish a calculation from a verification. Unknown service or entity values fail closed instead of being coerced to `OTHER` / `INDIVIDUAL`.
+- **CryptoTaxGuard** — `verify_flat_tax_rate` now distinguishes zero income (verifies `claimed_tax == 0`) from a loss (`vda_income < 0` returns `verified=False` and routes to `verify_set_off`). The previous behavior of treating any non-positive income as "no income" and ignoring `claimed_tax` has been removed.
+
+### What this means for you
+
+If your agent relied on `verified=True` for mixed classification facts, unparseable dates, unknown trading sources, or unrecognized GST services, those calls will start blocking. If you call `verify_rcm_applicability` without `claimed_is_rcm`, expect a `computed_only=True` flag in the response — pass the agent's claim to get a real verification result. Crypto agents that reported a loss as `vda_income=-X` must now route through `verify_set_off`.
+
+See the [tax guards reference](/tax/guards) and [tax integration guide](/tax/integration) for the updated contracts.
+
+---
+
 ## QWED-Tax — fail-closed on unknown tax rules
 
 **Released: June 19, 2026**
