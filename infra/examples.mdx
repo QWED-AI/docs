@@ -1,64 +1,79 @@
 ---
 sidebar_position: 3
 title: "Usage examples"
-description: "QWED-Infra code examples for parsing Terraform, verifying IAM policies with context-aware checks, and cloud cost budget verification with Python samples."
+description: "QWED-Infra code examples for parsing Terraform, verifying IAM policies with Z3, cloud cost budgets, network reachability, release boundaries, and diagnostics conversion."
 ---
 
-## 1. Parsing and verifying IAM
+## 1. Parsing Terraform
 
 ```python
-from qwed_infra import TerraformParser, IamGuard 
+from qwed_infra import TerraformParser
 
-# Parse a real Terraform directory
 parser = TerraformParser()
 resources = parser.parse_directory("./terraform/prod")
 
-# Verify IAM Policies found in Terraform
-guard = IamGuard()
-
-for policy in resources.get("policies", []):
-    # Context-Aware Verification
-    result = guard.verify_access(
-        policy, 
-        action="s3:GetObject", 
-        resource="*",
-        context={"aws:SourceIp": "192.168.1.5"} # Corporate VPN Only
-    )
-    print(f"Policy {policy['id']} allows VPN access? {result.allowed}")
+# Returns normalized resources:
+# {
+#   "policies": [...],
+#   "instances": [...],
+#   "subnets": [...],
+#   "route_tables": [...],
+#   "security_groups": {...},
+#   ...
+# }
 ```
 
-## 2. Verifying cloud costs
+## 2. IAM Policy Verification (Z3)
+
+```python
+from qwed_infra import IamGuard
+
+guard = IamGuard()
+
+# Context-aware access check
+result = guard.verify_access(
+    policy,
+    action="s3:GetObject",
+    resource="arn:aws:s3:::bucket/*",
+    context={"aws:SourceIp": "192.168.1.5"},
+)
+print(f"Allowed? {result.allowed}")   # True/False
+print(f"Verified? {result.verified}") # True/False
+print(f"Proof: {result.proof}")       # Z3 proof string
+
+# Least-privilege check
+result = guard.verify_least_privilege(policy)
+print(f"Over-privileged? {result.allowed}")
+```
+
+## 3. Cloud Cost Budget Enforcement
 
 ```python
 from qwed_infra import CostGuard
 
 cost = CostGuard()
 
-# Define resources (or parse from Terraform)
 resources = {
     "instances": [
         {"id": "web-cluster", "instance_type": "t3.micro", "count": 2},
-        {"id": "gpu-trainer", "instance_type": "p4d.24xlarge", "count": 1} # $32/hr!
+        {"id": "gpu-trainer", "instance_type": "p4d.24xlarge", "count": 1},
     ]
 }
 
-# Check against budget
 result = cost.verify_budget(resources, budget_monthly=500.0)
 
-print(f"Within Budget? {result.within_budget}") # -> False
-print(f"Total: ${result.total_monthly_cost:.2f}") # -> ~$23,900
+print(f"Within Budget? {result.within_budget}")  # False
+print(f"Total: ${result.total_monthly_cost}")     # ~23905.36
 print(f"Reason: {result.reason}")
 ```
 
-## 3. Verifying network reachability
+## 4. Network Reachability
 
 ```python
 from qwed_infra import NetworkGuard
 
-net_guard = NetworkGuard()
+net = NetworkGuard()
 
-# Graph-based Verification
-# (Normally parsed from TF, here shown as dict structure)
 infra = {
     "subnets": [
         {"id": "public-subnet", "security_groups": ["sg-web"]}
@@ -68,10 +83,84 @@ infra = {
     ],
     "security_groups": {
         "sg-web": {"ingress": [{"port": 80, "cidr": "0.0.0.0/0"}]}
-    }
+    },
 }
 
-# Is Web Accessible?
-res = net_guard.verify_reachability(infra, "internet", "public-subnet", 80)
-print(f"Internet Reachable? {res.reachable}") # -> True
+# Is port 80 accessible from the internet?
+res = net.verify_reachability(infra, "internet", "public-subnet", 80)
+print(f"Reachable? {res.reachable}")  # True
+print(f"Path: {res.path}")           # ['internet', 'igw-main', ...]
+```
+
+## 5. Release Boundary Verification
+
+```python
+from pathlib import Path
+from qwed_infra import ArtifactBoundaryGuard
+
+guard = ArtifactBoundaryGuard()
+
+result = guard.verify_package_boundary(
+    package_dir=Path("./src/qwed_infra"),
+    pyproject_path=Path("./pyproject.toml"),
+    package_name="qwed_infra",
+)
+
+print(f"Safe to publish? {result.is_safe}")
+print(f"Findings: {len(result.findings)}")
+for f in result.findings:
+    print(f"  [{f.severity}] {f.finding_type}: {f.file_path} — {f.reason}")
+```
+
+## 6. Converting Results to Diagnostics
+
+Every guard exposes a `to_diagnostic()` method that converts its native result into a unified `InfraDiagnosticResult`:
+
+```python
+# From IamGuard
+diag = IamGuard.to_diagnostic(result)  # returns InfraDiagnosticResult
+
+print(f"Status: {diag.status.value}")         # VERIFIED / UNVERIFIABLE / BLOCKED
+print(f"Agent: {diag.agent_message}")          # Layer 1
+print(f"Constraint: {diag.constraint_id}")     # Layer 2 field
+print(f"Authoritative: {diag.is_authoritative}")  # True iff proof_ref is set
+print(f"Proof: {diag.proof_ref}")              # Layer 3 — sha256:... or None
+
+# Serialize for audit logging
+payload = diag.to_dict()
+
+# Deserialize back
+from qwed_infra.diagnostics import InfraDiagnosticResult
+restored = InfraDiagnosticResult.from_dict(payload)
+```
+
+## 7. Working with Audit Traces
+
+```python
+from qwed_infra.audit import (
+    IAM_DENY_PRECEDENCE,
+    NETWORK_REACHABILITY,
+    COST_WITHIN_BUDGET,
+    ARTIFACT_BOUNDARY_VERIFIED,
+    build_trace,
+    trace_proof_ref,
+)
+
+# Build a structured audit trace
+trace = build_trace(
+    IAM_DENY_PRECEDENCE,
+    outcome="ALLOWED",
+    inputs={"action": "s3:GetObject", "resource": "arn:aws:s3:::bucket/*"},
+)
+# trace = {
+#     "rule_id": "IAM_DENY_PRECEDENCE",
+#     "statute": "AWS IAM Evaluation Logic (deny precedence)",
+#     "jurisdiction": "GENERIC",
+#     "outcome": "ALLOWED",
+#     "inputs": {"action": "s3:GetObject", "resource": "..."},
+# }
+
+# Compute proof reference from a trace
+ref = trace_proof_ref(trace)
+print(ref)  # sha256:abc123...
 ```
