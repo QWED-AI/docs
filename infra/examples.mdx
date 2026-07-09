@@ -30,6 +30,9 @@ from qwed_infra import IamGuard
 
 guard = IamGuard()
 
+# policy comes from parsed Terraform resources (see Example 1)
+policy = resources["policies"][0]
+
 # Context-aware access check
 result = guard.verify_access(
     policy,

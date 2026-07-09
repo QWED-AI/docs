@@ -36,6 +36,7 @@ diag = IamGuard.to_diagnostic(result, audit_trace=None)
 |--------------------------|----------------------|-----------|
 | `verified=True, allowed=True/False` | `VERIFIED` | `sha256:...` |
 | `verified=False` | `UNVERIFIABLE` | `None` |
+| Unknown operator / exception | `BLOCKED` | `None` |
 
 ## 2. NetworkGuard
 
@@ -46,7 +47,7 @@ NetworkGuard builds a directed graph of your network topology (VPCs, Subnets, Ro
 ### Capabilities
 
 - **Public Access Check:** Validates if a path exists from `Internet` to a specific `Instance`.
-  - Path: `Internet -> IGW -> Route Table -> Subnet -> NACL -> Security Group -> Instance`.
+  - Path: `Internet -> IGW -> Route Table -> Subnet -> Security Group -> Instance`.
 - **Port Verification:** Ensures critical management ports (22 SSH, 3389 RDP) are not exposed to `0.0.0.0/0`.
 - **Segmentation Verification:** Proves that sensitive subnets (e.g., Database) are isolated from public subnets.
 - **Fail-Closed Topologies:** Returns `UNVERIFIABLE` when the topology contains NAT Gateways, VPC Peering, NACLs, or Transit Gateway — constructs the guard cannot model deterministically.
