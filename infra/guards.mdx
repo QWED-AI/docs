@@ -2,45 +2,132 @@
 sidebar_position: 2
 title: "QWED Infra guards for infrastructure verification"
 sidebarTitle: "Verification guards"
-description: "Reference for IamGuard, NetworkGuard, and CostGuard — the three QWED-Infra guards for IAM, network, and budget verification."
+description: "Reference for IamGuard, NetworkGuard, CostGuard, and ArtifactBoundaryGuard — the four QWED-Infra guards for IAM, network, budget, and release boundary verification."
 ---
 
-`qwed-infra` provides three primary guards to verify different aspects of your infrastructure.
+`qwed-infra` provides four guards to verify different aspects of your infrastructure. Every guard's `to_diagnostic()` method converts its result into a unified `InfraDiagnosticResult` with an audit trace and proof reference.
 
-## 1. 🛡️ IamGuard
+## 1. IamGuard
 
 **Engine:** Z3 Theorem Prover
 
-IamGuard converts AWS IAM Policies into First-Order Logic formulas to prove or disprove access. This is superior to regex-based policy checks because it reasons about logic (AND, OR, NOT, Conditions).
+IamGuard converts AWS IAM Policies into first-order logic formulas to prove or disprove access. This is superior to regex-based policy checks because it reasons about logic (AND, OR, NOT, Conditions) using an SMT solver.
 
 ### Capabilities
 
-- **Wildcard Logic:** Correctly handles `s3:*`, `bucket/*` expansion.
-- **Conditions:** Supports context keys like `aws:SourceIp` (CIDR blocks), `aws:CurrentTime` (Date), and `StringEquals`.
+- **Wildcard Logic:** Correctly handles `s3:*`, `bucket/*` expansion using Z3 regex (`InRe`).
+- **Conditions:** Supports context keys like `aws:SourceIp` (CIDR blocks), `aws:CurrentTime` (Date comparisons), `StringEquals`, and `StringLike`.
 - **Deny Overrides:** Mathematically proves that an explicit `Deny` always overrides an `Allow`, regardless of statement order.
-- **Least Privilege Analysis:** Proves if a policy allows stronger permissions than intended (e.g., proves `Admin` access is NOT possible).
+- **Least Privilege Analysis:** `verify_least_privilege(policy)` proves whether a policy allows full admin access (`*` on `*`).
+- **Unknown Operator Fail-Closed:** An unrecognized condition operator causes a `BLOCKED` result — never a silent pass.
 
-## 2. 🌐 NetworkGuard
+### API
+
+```python
+guard = IamGuard()
+result = guard.verify_access(policy, action="s3:GetObject", resource="*", context={})
+result = guard.verify_least_privilege(policy)
+diag = IamGuard.to_diagnostic(result, audit_trace=None)
+```
+
+### Diagnostic Mapping
+
+| VerificationResult state | InfraDiagnosticStatus | proof_ref |
+|--------------------------|----------------------|-----------|
+| `verified=True, allowed=True/False` | `VERIFIED` | `sha256:...` |
+| `verified=False` | `UNVERIFIABLE` | `None` |
+| Unknown operator / exception | `BLOCKED` | `None` |
+
+## 2. NetworkGuard
 
 **Engine:** NetworkX (Graph Theory)
 
-NetworkGuard builds a directed graph of your network topology (VPCs, Subnets, Route Tables, Security Groups, NACLs, Internet Gateways). It then uses graph traversal algorithms to verify reachability.
+NetworkGuard builds a directed graph of your network topology (VPCs, Subnets, Route Tables, Security Groups, NACLs, Internet Gateways). It uses graph traversal algorithms to verify reachability.
 
 ### Capabilities
 
 - **Public Access Check:** Validates if a path exists from `Internet` to a specific `Instance`.
-  - Path: `Internet -> IGW -> Route Table -> Subnet -> NACL -> Security Group -> Instance`.
+  - Path: `Internet -> IGW -> Route Table -> Subnet -> Security Group -> Instance`.
 - **Port Verification:** Ensures critical management ports (22 SSH, 3389 RDP) are not exposed to `0.0.0.0/0`.
 - **Segmentation Verification:** Proves that sensitive subnets (e.g., Database) are isolated from public subnets.
+- **Fail-Closed Topologies:** Returns `UNVERIFIABLE` when the topology contains NAT Gateways, VPC Peering, NACLs, or Transit Gateway — constructs the guard cannot model deterministically.
 
-## 3. 💰 CostGuard
+### API
+
+```python
+guard = NetworkGuard()
+guard.build_graph(resources)  # Build NetworkX digraph from infra definition
+result = guard.verify_reachability(resources, source="internet", destination="public-subnet", port=80)
+diag = NetworkGuard.to_diagnostic(result)
+```
+
+### Diagnostic Mapping
+
+| ComputedPath state | InfraDiagnosticStatus | proof_ref |
+|--------------------|----------------------|-----------|
+| `reachable=True` | `VERIFIED` | `sha256:...` |
+| `unsupported_topology=True` | `UNVERIFIABLE` | `None` |
+| `reachable=False` (with failure_code) | `BLOCKED` | `None` |
+
+## 3. CostGuard
 
 **Engine:** Deterministic Arithmetic & Pricing Catalog
 
-CostGuard estimates the monthly cost of your infrastructure definition _before_ deployment. It uses an embedded, static pricing catalog for standard cloud resources.
+CostGuard estimates the monthly cost of your infrastructure definition *before* deployment using an embedded, static pricing catalog with **Decimal arithmetic** (no floating-point rounding errors).
 
 ### Capabilities
 
 - **Budget enforcement:** Blocks deployment if `estimated_cost > budget`.
 - **Anomaly detection:** Flags expensive instance types (e.g., `p4d.24xlarge` GPU instances) as suspected hallucinations.
 - **Granular breakdown:** Provides cost breakdown by resource type (Compute, Storage, Database).
+- **Fail-Closed Unknown Types:** Unknown instance or volume types produce a `BLOCKED` result — never a silent zero-cost estimate.
+
+### API
+
+```python
+guard = CostGuard()
+result = guard.verify_budget(resources, budget_monthly=500.0)
+diag = CostGuard.to_diagnostic(result)
+```
+
+### Diagnostic Mapping
+
+| CostEstimate state | InfraDiagnosticStatus | proof_ref |
+|--------------------|----------------------|-----------|
+| `within_budget=True, has_unknown_types=False` | `VERIFIED` | `sha256:...` |
+| `within_budget=False` | `BLOCKED` | `None` |
+| `has_unknown_types=True` | `BLOCKED` | `None` |
+| Cost parse error | `BLOCKED` | `None` |
+
+## 4. ArtifactBoundaryGuard
+
+**Engine:** File system scanning + TOML build config validation
+
+ArtifactBoundaryGuard is a release gate that verifies a Python package's source tree and `pyproject.toml` build configuration before publishing. It ensures that no secrets, debug artifacts, or unintended files leak into the distribution.
+
+### Capabilities
+
+- **Secret Detection:** Scans for `.pem`, `.key`, `.env`, credential files, and other sensitive patterns in the package surface.
+- **Debug Artifact Detection:** Flags test files (`test_*.py`), notebooks (`*.ipynb`), and debug directories (`__pycache__`, `.git`) included in the package.
+- **Build Config Validation:** Parses `[tool.hatch.build.targets.wheel]` to confirm the package boundary is explicit. Blocks if the config is missing, invalid, or doesn't reference the expected package name.
+- **Disclosure Risk Detection:** Flags project-structure files (`.gitignore`, `.dockerignore`) that could leak internal conventions.
+- **Fail-Closed on Missing TOML Parser:** If neither `tomllib` nor `tomli` is available, every package is `BLOCKED`.
+
+### API
+
+```python
+guard = ArtifactBoundaryGuard()
+result = guard.verify_package_boundary(
+    package_dir=Path("./src/mypackage"),
+    pyproject_path=Path("./pyproject.toml"),
+    package_name="mypackage",
+)
+diag = ArtifactBoundaryGuard.to_diagnostic(result)
+```
+
+### Diagnostic Mapping
+
+| ArtifactBoundaryResult state | InfraDiagnosticStatus | proof_ref |
+|------------------------------|----------------------|-----------|
+| `is_safe=True` | `VERIFIED` | `sha256:...` |
+| `is_safe=False` (with BLOCK-severity findings) | `BLOCKED` | `None` |

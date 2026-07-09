@@ -2,22 +2,34 @@
 sidebar_position: 4
 title: "QWED Infra troubleshooting"
 sidebarTitle: "Troubleshooting"
-description: "Troubleshoot QWED Infra issues including Z3 solver errors, Terraform parsing failures, IAM checks, and missing cloud pricing data."
+description: "Troubleshoot QWED Infra issues including Z3 solver errors, Terraform parsing failures, IAM checks, cost pricing, artifact boundary, and diagnostic serialization."
 ---
 
 ## Common issues
 
 ### 1. Z3 solver errors
 
-**Error:** `Z3Exception: ...` **Cause:** Typical z3 installation issues or complex logical contradictions. **Fix:** Ensure `z3-solver` is correctly installed. Check for contradictory policy statements (e.g., Allow and Deny on the same resource/action without conditions).
+**Error:** `Z3Exception: ...` **Cause:** Typical z3 installation issues or complex logical contradictions. **Fix:** Ensure `z3-solver>=4.12.0` is installed. Check for contradictory policy statements (e.g., Allow and Deny on the same resource/action without conditions).
 
 ### 2. Terraform parsing failures
 
-**Error:** `HCLParserError` **Cause:** Syntax error in `.tf` files or unsupported HCL features (e.g., complex modules or dynamic blocks not yet supported). **Fix:** Validate your terraform code with `terraform validate`.
+**Error:** `ParseError` **Cause:** Syntax error in `.tf` files or unsupported HCL features (e.g., complex modules or dynamic blocks not yet supported). **Fix:** Validate your terraform code with `terraform validate`. The parser fails closed — it raises `ParseError` with a full error list rather than silently skipping problematic blocks.
 
 ### 3. Missing pricing data
 
-**Error:** `PriceNotFound` **Cause:** Instance type not in the embedded static catalog. **Fix:** Update `qwed-infra` or check `CostGuard.pricing_catalog` to verify coverage.
+**Error:** `CostEstimate.has_unknown_types=True` or `CostEstimate.within_budget=False` with unknown types. **Cause:** Instance or volume type not in the embedded static catalog. **Fix:** Update `qwed-infra` or check `CostGuard.PRICING_CATALOG` to verify coverage. Unknown types always produce a `BLOCKED` diagnostic — never a silent zero-cost estimate.
+
+### 4. NetworkGuard unsupported topology
+
+**Error:** `ComputedPath.unsupported_topology=True` **Cause:** The topology contains NAT Gateways, VPC Peering, NACLs, or Transit Gateway — constructs the guard cannot model deterministically. **Fix:** Restructure the network to avoid these constructs, or implement a manual review gate for those topologies. The guard returns `UNVERIFIABLE` (not a silent pass).
+
+### 5. ArtifactBoundaryGuard blocks with unknown boundary
+
+**Error:** `ArtifactBoundaryFinding.finding_type="unknown_boundary"` **Cause:** Missing or invalid `[tool.hatch.build.targets.wheel]` in `pyproject.toml`, or no TOML parser available. **Fix:** Add an explicit wheel packages configuration to your `pyproject.toml`. Install `tomli` for Python <3.11.
+
+### 6. Diagnostic serialization errors
+
+**Error:** `InfraDiagnosticResult.from_dict()` raises `ValueError` **Cause:** Missing or invalid `status` field. **Fix:** Ensure the serialized dict has a `status` key with one of `VERIFIED`, `UNVERIFIABLE`, or `BLOCKED`. Use `diag.to_dict()` for canonical serialization.
 
 ## Support
 

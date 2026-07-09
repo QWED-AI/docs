@@ -2,7 +2,7 @@
 sidebar_position: 1
 title: "QWED Infra: AI infrastructure verification for Terraform, IAM, and Kubernetes"
 sidebarTitle: "Overview"
-description: "QWED Infra uses formal verification for infrastructure as code. Verify Terraform, AWS IAM, and Kubernetes changes before AI agents deploy them."
+description: "QWED Infra uses formal verification for infrastructure as code. Verify Terraform, AWS IAM, Kubernetes, cloud costs, and release boundaries before AI agents deploy them."
 ---
 
 **Deterministic verification for infrastructure as code (IaC).**
@@ -10,36 +10,62 @@ description: "QWED Infra uses formal verification for infrastructure as code. Ve
 ![Verified by QWED](https://img.shields.io/badge/Verified_by-QWED-00C853?style=flat&logo=checkmarx)
 ![PyPI](https://img.shields.io/pypi/v/qwed-infra?color=blue)
 
-`qwed-infra` is a Python library that mathematically proves the security and compliance of infrastructure definitions (Terraform, AWS IAM, Kubernetes). It uses **formal methods (Z3 solver)** and **graph theory** to do so deterministically.
+`qwed-infra` is a Python library (v0.2.0) that mathematically proves the security and compliance of infrastructure definitions (Terraform, AWS IAM, Kubernetes). It uses **formal methods (Z3 solver)**, **graph theory**, and **deterministic arithmetic** to do so without ML, heuristics, or confidence scores.
 
-It prevents AI agents (like Devin or Copilot Workspace) from deploying insecure or expensive infrastructure by verifying configuration *before* deployment.
+It prevents AI agents (like Devin or Copilot Workspace) from deploying insecure, non-compliant, or expensive infrastructure by verifying configuration *before* deployment.
 
 ## Architecture
 
 ```mermaid
 graph TD
-    A[Terraform Code] -->|TerraformParser| B{QWED Engine}
-    B -->|Mathematical Proof| C["Z3 Solver (IAM)"]
-    B -->|Graph Traversal| D["NetworkX (Reachability)"]
-    B -->|Arithmetic| E["Pricing Catalog (Cost)"]
-    C --> F[Verification Result]
-    D --> F
-    E --> F
+    subgraph "IaC Parsing"
+        A[Terraform Code] -->|TerraformParser| B[Normalized Resources]
+    end
+    subgraph "Verification Engines"
+        B -->|IAM Policies| C["IamGuard (Z3 Solver)"]
+        B -->|Network Topology| D["NetworkGuard (NetworkX)"]
+        B -->|Instance Types| E["CostGuard (Decimal Arithmetic)"]
+    end
+    subgraph "Release Gate"
+        F[Source Package] --> G["ArtifactBoundaryGuard<br/>(Secret Scan + Build Config)"]
+    end
+    C --> H[InfraDiagnosticResult]
+    D --> H
+    E --> H
+    G --> H
+    H --> I{"proof_ref present?"}
+    I -->|Yes| J[Authoritative - admit for deploy]
+    I -->|No| K[Non-authoritative - block]
 ```
 
 ## Key features
 
 ### IamGuard
-Verifies AWS IAM policies using the **Z3 theorem prover**. Instead of regex matching, it converts policies into logical formulas to prove reachability and specific permissions.
+Verifies AWS IAM policies using the **Z3 theorem prover**. Converts policies into first-order logic formulas to prove or disprove access, wildcard expansion, condition evaluation, and deny precedence.
 
 ### NetworkGuard
-Verifies network reachability using **graph theory** (NetworkX). Validates paths like `Internet -> Internet Gateway (IGW) -> Route -> Security Group -> Instance`.
+Verifies network reachability using **graph theory** (NetworkX). Validates paths like `Internet -> Internet Gateway (IGW) -> Route -> Security Group -> Instance`. Fail-closed on NAT gateways, VPC peering, NACLs, and Transit Gateway.
 
 ### CostGuard
-Deterministic cloud cost estimation before deployment. Enforce budgets and prevent expensive instance provisioning errors.
+Deterministic cloud cost estimation using **Decimal arithmetic** (no floating-point rounding errors). Enforce budgets and detect expensive instance types before deployment.
+
+### ArtifactBoundaryGuard
+Release-gate verification for Python packages. Scans for secret leaks, debug artifact inclusion, and validates hatch build configuration. Blocks publishing when the package surface is unknown or unsafe.
+
+## Audit & Diagnostics
+
+Every guard produces an `InfraDiagnosticResult` — a 3-layer diagnostic with:
+
+- **Layer 1 (`agent_message`):** Human-readable status, safe for downstream tools
+- **Layer 2 (`developer_fields`):** Structured evidence — constraint IDs, audit traces, findings
+- **Layer 3 (`proof_ref`):** SHA-256 hash of verification evidence; present only when the result is `VERIFIED` and authoritative
+
+Each result also carries a canonical **`RuleRef`** audit trace (`build_trace()`) referencing the specific statute or policy rule that drove the verdict.
 
 ## Installation
 
+Install with a minimum version:
+
 ```bash
-pip install qwed-infra
+pip install "qwed-infra>=0.2.0"
 ```
