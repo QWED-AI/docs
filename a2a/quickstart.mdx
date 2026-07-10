@@ -27,6 +27,23 @@ QWED A2A requires Python 3.10+. The `cryptography` and `PyJWT` packages are inst
 
 ---
 
+## Configure a signing key
+
+QWED A2A signs every verdict with a persistent ECDSA P-256 key so attestations remain verifiable across restarts. Set `QWED_A2A_SIGNING_KEY_PEM` before importing `qwed_a2a` — without it the interceptor fails closed on the first call.
+
+```bash
+openssl ecparam -name prime256v1 -genkey -noout \
+  | openssl pkcs8 -topk8 -nocrypt \
+  > qwed_a2a_signing_key.pem
+
+export QWED_A2A_SIGNING_KEY_PEM="$(cat qwed_a2a_signing_key.pem)"
+export QWED_A2A_DEPLOYMENT_ID="local-dev"
+```
+
+See [Crypto attestations](/a2a/crypto-attestations) for key rotation and multi-replica guidance.
+
+---
+
 ## Your first verification
 
 <Steps>

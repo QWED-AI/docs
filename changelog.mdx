@@ -7,6 +7,39 @@ All notable changes to the QWED platform, listed by release.
 
 ---
 
+## QWED-A2A — persistent signing key and JWKS discovery endpoint
+
+**Released: July 10, 2026** · [GitHub PR #29](https://github.com/QWED-AI/qwed-a2a/pull/29)
+
+> `A2ACryptoService` no longer generates an ephemeral ECDSA P-256 key per process. The signing key is now loaded from the `QWED_A2A_SIGNING_KEY_PEM` environment variable (or the `pem_key` constructor argument) so attestation JWTs issued before a restart remain verifiable afterwards. A new `/.well-known/jwks.json` endpoint publishes the current public key for external consumers.
+
+### What changed
+
+- **Persistent signing key** — `A2ACryptoService` reads an unencrypted PKCS#8 P-256 PEM from `QWED_A2A_SIGNING_KEY_PEM` on first use. The derived `key_id` is a SHA-256 fingerprint of the public key, so it stays stable as long as the PEM does.
+- **Fail-closed on missing key** — `sign_verdict`, `verify_attestation`, `get_public_key_jwk`, and `A2AVerificationInterceptor.intercept()` all raise `RuntimeError` when the PEM is missing, malformed, or uses a curve other than `SECP256R1`. The FastAPI gateway surfaces this as `HTTP 503 Signing key unavailable`.
+- **JWKS endpoint** — A new `wellknown_router` exposes `GET /.well-known/jwks.json` for downstream services and auditors to fetch the current public key without an out-of-band exchange.
+- **`get_public_key_jwk()`** — Returns the current public key as a JWK (`kty`, `crv`, `x`, `y`, `kid`, `use`, `alg`).
+
+### Breaking changes
+
+<Warning>
+`A2ACryptoService()` and `A2AVerificationInterceptor()` no longer produce a working signer without configuration. Every deployment must now set `QWED_A2A_SIGNING_KEY_PEM` (and continue to set `QWED_A2A_DEPLOYMENT_ID`) before the service starts. Generate a key with:
+
+```bash
+openssl ecparam -name prime256v1 -genkey -noout \
+  | openssl pkcs8 -topk8 -nocrypt \
+  > qwed_a2a_signing_key.pem
+```
+
+Load the PEM into `QWED_A2A_SIGNING_KEY_PEM` from your secrets manager, and make sure every replica in a logical deployment uses the same PEM so their `kid`s match and tokens cross-verify.
+</Warning>
+
+### What this means for you
+
+If you deploy the QWED-A2A gateway, you now get audit continuity across restarts and rolling deployments — a JWT signed by an earlier process is still verifiable by the next one, provided the PEM is unchanged. External services can also verify attestations by fetching `/.well-known/jwks.json` directly. See [Crypto attestations](/a2a/crypto-attestations) and [Deployment](/a2a/deployment) for the full setup, JWKS shape, and key rotation guidance.
+
+---
+
 ## QWED-Tax — structured 3-layer diagnostics for TDS, ITC, and GST-RCM
 
 **Released: June 21, 2026** · [GitHub PR #45](https://github.com/QWED-AI/qwed-tax/pull/45)
