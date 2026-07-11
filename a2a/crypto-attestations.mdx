@@ -207,7 +207,7 @@ is_valid, claims, _ = service_b.verify_attestation(token)
 ```
 
 <Tip>
-Rotate keys by deploying a new `QWED_A2A_SIGNING_KEY_PEM` across all replicas. The `kid` on newly issued tokens changes automatically; tokens signed by the previous key remain verifiable until they expire. See [Deployment](/a2a/deployment) for the JWKS endpoint and rollout guidance.
+If you rotate `QWED_A2A_SIGNING_KEY_PEM`, attestations signed with the previous key become unverifiable once the new JWKS is served — the endpoint only publishes the current key. To avoid rejecting in-flight attestations during rotation, keep the previous key accessible until all tokens signed with it expire (check their `exp` claim). Future releases may add multi-key JWKS support for seamless rotation.
 </Tip>
 
 ---

@@ -138,7 +138,7 @@ services:
       - QWED_LOG_LEVEL=INFO
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/a2a/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:8000/.well-known/jwks.json"]
       interval: 30s
       timeout: 5s
       retries: 3
