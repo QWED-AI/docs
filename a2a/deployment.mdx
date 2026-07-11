@@ -1,7 +1,7 @@
 ---
 title: "QWED A2A deployment for zero-trust agent gateways"
 sidebarTitle: "Deployment"
-description: "Deploy QWED A2A as a zero-trust FastAPI gateway for agent security, monitoring, and CI/CD integration."
+description: "Deploy the QWED A2A zero-trust FastAPI gateway with persistent ES256 signing keys, JWKS discovery, monitoring, and CI/CD integration."
 icon: "cloud-arrow-up"
 ---
 
@@ -41,6 +41,26 @@ flowchart TB
 
 ---
 
+## Prerequisites
+
+Before starting the gateway, generate a persistent ECDSA P-256 signing key and expose it as `QWED_A2A_SIGNING_KEY_PEM`. Attestation JWTs are signed with this key; without it the gateway fails closed (`HTTP 503`) on every request.
+
+```bash
+openssl ecparam -name prime256v1 -genkey -noout \
+  | openssl pkcs8 -topk8 -nocrypt \
+  > qwed_a2a_signing_key.pem
+
+export QWED_A2A_SIGNING_KEY_PEM="$(cat qwed_a2a_signing_key.pem)"
+export QWED_A2A_DEPLOYMENT_ID="prod-us-east-1"
+export QWED_A2A_TRUSTED_AGENTS="procurement-agent,treasury-agent"
+```
+
+<Warning>
+Every replica in the same logical deployment must load the **same** PEM. Different keys across replicas would produce different `kid`s, and attestations issued by one instance would fail verification on another. Store the PEM in your secrets manager and inject it at runtime.
+</Warning>
+
+---
+
 ## FastAPI application
 
 Create your production entrypoint:
@@ -48,7 +68,7 @@ Create your production entrypoint:
 ```python
 # main.py
 from fastapi import FastAPI
-from qwed_a2a.protocol.endpoints import router
+from qwed_a2a.protocol.endpoints import router, wellknown_router
 
 app = FastAPI(
     title="QWED A2A Gateway",
@@ -57,6 +77,7 @@ app = FastAPI(
 )
 
 app.include_router(router)
+app.include_router(wellknown_router)  # Exposes /.well-known/jwks.json
 
 @app.on_event("startup")
 async def startup():
@@ -117,7 +138,7 @@ services:
       - QWED_LOG_LEVEL=INFO
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/a2a/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:8000/.well-known/jwks.json"]
       interval: 30s
       timeout: 5s
       retries: 3
@@ -134,6 +155,7 @@ services:
 | `/a2a/intercept` | POST | Primary verification gateway — accepts `AgentMessage`, returns `VerificationVerdict` |
 | `/a2a/health` | GET | Service health check with version |
 | `/a2a/metrics` | GET | Aggregated intercept metrics |
+| `/.well-known/jwks.json` | GET | Public signing key in JWKS format for external attestation verification |
 
 ### Health check response
 
@@ -163,12 +185,39 @@ services:
 }
 ```
 
+### JWKS endpoint
+
+`GET /.well-known/jwks.json` returns the current signing public key so downstream services can verify attestation JWTs without an out-of-band key exchange.
+
+```json
+{
+  "keys": [
+    {
+      "kty": "EC",
+      "crv": "P-256",
+      "x": "…base64url…",
+      "y": "…base64url…",
+      "kid": "did:qwed:a2a:local#key-<sha256-fingerprint>",
+      "use": "sig",
+      "alg": "ES256"
+    }
+  ]
+}
+```
+
+The `kid` is derived from a SHA-256 fingerprint of the public key, so it remains stable across restarts as long as `QWED_A2A_SIGNING_KEY_PEM` is unchanged. When the PEM is missing or invalid, the endpoint responds with `HTTP 503 Signing key unavailable` — use this as a readiness signal for orchestrators and load balancers.
+
+See [Crypto attestations](/a2a/crypto-attestations) for the full JWT structure and verification flow.
+
 ---
 
 ## Environment variables
 
 | Variable | Description | Default |
 |----------|-------------|---------|
+| `QWED_A2A_SIGNING_KEY_PEM` | Unencrypted PKCS#8 EC P-256 private key used to sign attestation JWTs. **Required** — the service fails closed if unset. | *(none)* |
+| `QWED_A2A_DEPLOYMENT_ID` | Stable identifier shared by all replicas in the same logical deployment. **Required** — import fails without it. | *(none)* |
+| `QWED_A2A_TRUSTED_AGENTS` | Comma-separated allowlist of sender agent IDs for the zero-trust boundary. | *(none — deny all)* |
 | `SENTRY_DSN` | Sentry error tracking DSN | *(disabled)* |
 | `QWED_LOG_LEVEL` | Logging level (`DEBUG`, `INFO`, `WARNING`, `ERROR`) | `INFO` |
 | `QWED_A2A_BLOCK_ON_ERROR` | Block on internal errors (`true`/`false`) | `true` |

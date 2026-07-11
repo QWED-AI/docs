@@ -1,7 +1,7 @@
 ---
-title: "Crypto attestations"
+title: "ES256 JWT crypto attestations for QWED A2A verdicts"
 sidebarTitle: "Attestations"
-description: "ES256 JWT attestations for tamper-proof verification audit trails between agents."
+description: "Sign and verify QWED A2A verification verdicts with persistent ES256 JWT attestations, JWKS key discovery, and fail-closed tamper detection."
 icon: "certificate"
 ---
 
@@ -46,9 +46,11 @@ sequenceDiagram
 {
   "alg": "ES256",
   "typ": "qwed-a2a-attestation+jwt",
-  "kid": "did:qwed:a2a:local#signing-key-v1"
+  "kid": "did:qwed:a2a:local#key-<sha256-fingerprint>"
 }
 ```
+
+The `kid` is derived from a SHA-256 fingerprint of the public key, so it stays stable as long as `QWED_A2A_SIGNING_KEY_PEM` is unchanged — even across process restarts.
 
 ### Payload
 
@@ -80,11 +82,34 @@ sequenceDiagram
 
 ---
 
+## Configure the signing key
+
+QWED A2A requires a **persistent** ECDSA P-256 signing key so that JWT attestations signed before a restart can still be verified afterwards. Keys are never generated inside the process — the service loads them from the `QWED_A2A_SIGNING_KEY_PEM` environment variable (or the `pem_key` constructor argument).
+
+<Warning>
+If `QWED_A2A_SIGNING_KEY_PEM` is not set, `A2ACryptoService` fails closed: calls to `sign_verdict`, `verify_attestation`, `get_public_key_jwk`, and the interceptor's `intercept()` raise `RuntimeError`. This is deliberate — signing with a per-process ephemeral key would silently break audit continuity.
+</Warning>
+
+Generate an unencrypted PKCS#8 P-256 key with `openssl`:
+
+```bash
+openssl ecparam -name prime256v1 -genkey -noout \
+  | openssl pkcs8 -topk8 -nocrypt \
+  > qwed_a2a_signing_key.pem
+
+export QWED_A2A_SIGNING_KEY_PEM="$(cat qwed_a2a_signing_key.pem)"
+```
+
+Store the PEM in your secrets manager (AWS Secrets Manager, Vault, etc.) and inject it as an environment variable at runtime. Every replica in the same logical deployment must load the same PEM so all instances share one `key_id` and can verify each other's tokens.
+
+---
+
 ## Signing a verdict
 
 ```python
 from qwed_a2a.security.crypto import A2ACryptoService
 
+# Key is loaded from QWED_A2A_SIGNING_KEY_PEM
 crypto = A2ACryptoService(
     issuer_id="did:qwed:a2a:production",
     validity_seconds=86400,  # 24 hours
@@ -145,35 +170,57 @@ If the original payload is modified after signing, the hash will not match the `
 
 ---
 
-## Cross-service isolation
+## Publishing the public key (JWKS)
 
-Each `A2ACryptoService` instance generates its own ECDSA P-256 key pair. Tokens signed by one instance **cannot** be verified by another:
+External consumers verify attestations by fetching the public key. `A2ACryptoService.get_public_key_jwk()` returns the current key in JWK format:
 
 ```python
-service_a = A2ACryptoService(issuer_id="did:qwed:a2a:node-A")
-service_b = A2ACryptoService(issuer_id="did:qwed:a2a:node-B")
+jwk = crypto.get_public_key_jwk()
+# {
+#   "kty": "EC",
+#   "crv": "P-256",
+#   "x":   "…base64url…",
+#   "y":   "…base64url…",
+#   "kid": "did:qwed:a2a:production#key-<sha256-fingerprint>",
+#   "use": "sig",
+#   "alg": "ES256"
+# }
+```
+
+The FastAPI gateway exposes this at [`GET /.well-known/jwks.json`](/a2a/deployment#jwks-endpoint) so downstream services and auditors can fetch keys over HTTP.
+
+---
+
+## Cross-service verification
+
+Because every replica loads the same PEM from `QWED_A2A_SIGNING_KEY_PEM`, they all derive the same `key_id` and can verify each other's tokens:
+
+```python
+# Both processes load the same PEM (from env or secrets manager)
+service_a = A2ACryptoService(issuer_id="did:qwed:a2a:production")
+service_b = A2ACryptoService(issuer_id="did:qwed:a2a:production")
 
 token = service_a.sign_verdict(...)
 
-is_valid, _, error = service_b.verify_attestation(token)
-# is_valid = False — different key pairs
+is_valid, claims, _ = service_b.verify_attestation(token)
+# is_valid = True — shared key pair
 ```
 
 <Tip>
-For multi-node deployments, share the same key pair across instances or implement a key distribution protocol. See [Deployment](/a2a/deployment) for details.
+If you rotate `QWED_A2A_SIGNING_KEY_PEM`, attestations signed with the previous key become unverifiable once the new JWKS is served — the endpoint only publishes the current key. To avoid rejecting in-flight attestations during rotation, keep the previous key accessible until all tokens signed with it expire (check their `exp` claim). Future releases may add multi-key JWKS support for seamless rotation.
 </Tip>
 
 ---
 
-## Graceful degradation
+## Fail-closed behavior
 
-If `cryptography` and `PyJWT` packages are not installed, the interceptor operates **without attestations**. Verdicts are still generated, but `attestation_jwt` will be `None`.
+QWED A2A treats missing or invalid signing keys as an unrecoverable configuration error, not a soft warning. There is no ephemeral-key fallback.
 
-```python
-from qwed_a2a.security.crypto import HAS_CRYPTO
+| Condition | Behavior |
+|-----------|----------|
+| `QWED_A2A_SIGNING_KEY_PEM` not set | `sign_verdict`, `verify_attestation`, `get_public_key_jwk`, and `interceptor.intercept()` raise `RuntimeError` |
+| PEM is not a valid EC private key | `RuntimeError` at first key access |
+| PEM uses a curve other than `SECP256R1` (P-256) | `RuntimeError` at first key access |
+| `cryptography` or `PyJWT` not installed | `RuntimeError` at first key access |
 
-if HAS_CRYPTO:
-    print("✅ Crypto available — attestations enabled")
-else:
-    print("⚠️ Crypto unavailable — attestations disabled")
-```
+The FastAPI gateway surfaces these as `HTTP 503 Signing key unavailable` on both `/a2a/intercept` and `/.well-known/jwks.json` so orchestrators can detect a misconfigured deployment before it accepts traffic.
