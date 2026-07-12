@@ -217,7 +217,7 @@ See [Crypto attestations](/a2a/crypto-attestations) for the full JWT structure a
 |----------|-------------|---------|
 | `QWED_A2A_SIGNING_KEY_PEM` | Unencrypted PKCS#8 EC P-256 private key used to sign attestation JWTs. **Required** — the service fails closed if unset. | *(none)* |
 | `QWED_A2A_DEPLOYMENT_ID` | Stable identifier shared by all replicas in the same logical deployment. **Required** — import fails without it. | *(none)* |
-| `QWED_A2A_TRUSTED_AGENTS` | Comma-separated allowlist of sender agent IDs for the zero-trust boundary. | *(none — deny all)* |
+| `QWED_A2A_TRUSTED_AGENTS` | Trust allowlist. Comma-separated agent IDs (unrestricted) or a JSON array of scoped [trust entries](/a2a/trust-boundary#scoped-trust-grants) with `allowed_receivers`, `allowed_payload_types`, and `valid_until`. | *(none — deny all)* |
 | `SENTRY_DSN` | Sentry error tracking DSN | *(disabled)* |
 | `QWED_LOG_LEVEL` | Logging level (`DEBUG`, `INFO`, `WARNING`, `ERROR`) | `INFO` |
 | `QWED_A2A_BLOCK_ON_ERROR` | Block on internal errors (`true`/`false`) | `true` |

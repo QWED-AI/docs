@@ -65,6 +65,34 @@ allowed, reason = boundary.evaluate("agent-A", "agent-B")
     Trusting automatically removes the agent from the blocked list.
   </Accordion>
 
+  <Accordion title="Scoped trust grants" icon="filter">
+    Restrict trust to specific receivers and payload types, and optionally set an expiry:
+
+    ```python
+    import time
+
+    boundary.trust_agent(
+        "analytics-agent",
+        allowed_receivers={"metrics-agent"},
+        allowed_payload_types={"data_query"},
+        valid_until=time.time() + 3600,   # 1 hour
+        granted_by="ops-oncall",
+    )
+    ```
+
+    A message from `analytics-agent` is only permitted when the receiver matches `allowed_receivers` **and** the payload type matches `allowed_payload_types`. Any field left as `None` means "unrestricted for this dimension". Once `valid_until` passes, the entry is treated as if it never existed and is auto-evicted on the next evaluation.
+  </Accordion>
+
+  <Accordion title="Runtime revocation" icon="rotate-left">
+    Revoke a trust grant without restarting the service:
+
+    ```python
+    was_trusted = boundary.revoke_agent("analytics-agent", revoked_by="ops-oncall")
+    ```
+
+    Grants and revocations are written to the audit log with the redacted agent ID and `granted_by` / `revoked_by` attribution. `block_agent()` also removes any existing trust entry as a side effect.
+  </Accordion>
+
   <Accordion title="Pair-level blocking" icon="link-slash">
     Block a specific directional pair:
 
@@ -74,6 +102,64 @@ allowed, reason = boundary.evaluate("agent-A", "agent-B")
     ```
   </Accordion>
 </AccordionGroup>
+
+---
+
+## Scoped trust grants
+
+`trust_agent()` accepts optional scope and expiry parameters so operators can grant narrow, time-bounded exceptions instead of permanent, unscoped bypasses.
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `agent_id` | `str` | Agent receiving the trust grant. |
+| `allowed_receivers` | `Set[str]?` | Receivers the sender may reach. `None` means "any receiver". |
+| `allowed_payload_types` | `Set[str]?` | Payload type values (e.g. `"financial_transaction"`, `"code_execution"`) the sender may emit. `None` means "any type". |
+| `valid_until` | `float?` | Unix timestamp when the grant expires. `None` means process-lifetime. |
+| `granted_by` | `str` | Free-form principal recorded in the audit log. Defaults to `"config"`. |
+
+`evaluate()` takes an optional `payload_type` argument that is compared against both the sender's and the receiver's scope:
+
+```python
+allowed, reason = boundary.evaluate(
+    sender_id="analytics-agent",
+    receiver_id="metrics-agent",
+    payload_type="data_query",
+)
+```
+
+<Info>
+Expired entries are treated as non-existent — including their scope. If you need permanent scope restrictions, leave `valid_until=None` rather than setting a far-future expiry.
+</Info>
+
+Expired trust entries are auto-evicted at most once per minute during `evaluate()`, so revocation via `revoke_agent()` or expiry via `valid_until` never requires a service restart.
+
+---
+
+## Loading trust from environment
+
+`QWED_A2A_TRUSTED_AGENTS` accepts two formats. The HTTP gateway calls `load_from_env()` on startup; both formats work interchangeably.
+
+**Simple CSV (unrestricted, no expiry):**
+
+```bash
+export QWED_A2A_TRUSTED_AGENTS="agent-a,agent-b"
+```
+
+**JSON array (scoped and/or expiring):**
+
+```bash
+export QWED_A2A_TRUSTED_AGENTS='[
+  {
+    "agent_id": "analytics-agent",
+    "allowed_receivers": ["metrics-agent"],
+    "allowed_payload_types": ["data_query"],
+    "valid_until": 1785000000
+  },
+  {"agent_id": "orchestrator-001"}
+]'
+```
+
+Each JSON entry requires a non-empty `agent_id`; the other fields are optional. Invalid entries (non-object, missing ID, non-string scope values, non-finite `valid_until`) are logged and skipped without failing the load — the remaining entries still apply.
 
 ---
 
