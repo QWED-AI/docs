@@ -1,7 +1,7 @@
 ---
 sidebar_position: 6
 title: "Determinism guarantee"
-description: "How QWED classifies engines by determinism level: fully symbolic, hybrid with LLM fallback, and heuristic."
+description: "How QWED classifies verification engines by determinism level: fully symbolic, hybrid with LLM fallback, and heuristic, and what to trust in production."
 ---
 
 > **TL;DR:** QWED uses **deterministic solvers** (SymPy, Z3, AST, SQLGlot) wherever possible. When LLM fallback is required, the response is explicitly marked as `HEURISTIC`.
