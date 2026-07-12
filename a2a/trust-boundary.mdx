@@ -117,7 +117,7 @@ allowed, reason = boundary.evaluate("agent-A", "agent-B")
 | `valid_until` | `float?` | Unix timestamp when the grant expires. `None` means process-lifetime. |
 | `granted_by` | `str` | Free-form principal recorded in the audit log. Defaults to `"config"`. |
 
-`evaluate()` takes an optional `payload_type` argument that is compared against both the sender's and the receiver's scope:
+`evaluate()` accepts an optional `payload_type`. When provided, it is checked against the `allowed_payload_types` field of both the sender entry (outbound filter) and the receiver entry (inbound filter) — the message is only trusted if the payload type is permitted by both sides:
 
 ```python
 allowed, reason = boundary.evaluate(
