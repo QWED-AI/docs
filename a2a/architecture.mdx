@@ -127,7 +127,7 @@ flowchart TB
     BL -->|No| PB{"Pair<br/>blocked?"}
     PB -->|Yes| Block
     PB -->|No| DA{"default_allow<br/>= true?"}
-    DA -->|No| AL{"Both agents<br/>in allowlist?"}
+    DA -->|No| AL{"Sender<br/>in allowlist?"}
     AL -->|No| Block
     AL -->|Yes| RL
     DA -->|Yes| RL{"Token bucket<br/>has tokens?"}

@@ -28,15 +28,18 @@ allowed, reason = boundary.evaluate("agent-A", "agent-B")
 # reason = "Sender 'agent-A' is not in the trust allowlist"
 ```
 
-To allow communication, explicitly trust the agents:
+To allow communication, explicitly trust the **sender**:
 
 ```python
 boundary.trust_agent("agent-A")
-boundary.trust_agent("agent-B")
 
 allowed, reason = boundary.evaluate("agent-A", "agent-B")
 # allowed = True ✅
 ```
+
+<Warning>
+**Trust is directional.** Only the *sender* must be in the allowlist for a message to pass the gate — trusting the *receiver* alone is not sufficient. This closes a "name-drop" attack where an untrusted sender addresses a trusted receiver to bypass the allowlist. If you need to restrict which receivers a trusted sender may reach, use [scoped trust grants](#scoped-trust-grants) with `allowed_receivers`.
+</Warning>
 
 ---
 
@@ -215,7 +218,7 @@ The trust boundary evaluates requests in this exact order:
 | 1 | Sender on global blocklist? | **BLOCKED** |
 | 2 | Receiver on global blocklist? | **BLOCKED** |
 | 3 | Pair explicitly blocked? | **BLOCKED** |
-| 4 | (Strict mode) Both agents in allowlist? | **BLOCKED** |
+| 4 | (Strict mode) Sender in allowlist? | **BLOCKED** |
 | 5 | Token bucket has tokens? | **RATE LIMITED** |
 | ✅ | All passed | **ALLOWED** |
 
