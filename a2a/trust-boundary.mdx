@@ -38,7 +38,7 @@ allowed, reason = boundary.evaluate("agent-A", "agent-B")
 ```
 
 <Warning>
-**Trust is directional.** Only the *sender* must be in the allowlist for a message to pass the gate — trusting the *receiver* alone is not sufficient. This closes a "name-drop" attack where an untrusted sender addresses a trusted receiver to bypass the allowlist. If you need to restrict which receivers a trusted sender may reach, use [scoped trust grants](#scoped-trust-grants) with `allowed_receivers`.
+**Trust is directional for the allowlist gate.** Only the *sender* must be in the allowlist for a message to pass the gate — trusting the *receiver* alone is not sufficient. This closes a "name-drop" attack where an untrusted sender addresses a trusted receiver to bypass the allowlist. However, receiver-side [scoped filters](#scoped-trust-grants) (e.g. `allowed_payload_types`) are still enforced independently on the receiver's entry and can block a communication even when the sender passes the allowlist gate.
 </Warning>
 
 ---
