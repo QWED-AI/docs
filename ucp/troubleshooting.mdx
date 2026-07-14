@@ -239,9 +239,10 @@ if checkout_hash in verified_cache:
 | "Invalid transition" | State | Wrong state flow | Follow state machine |
 | "Schema validation failed" | Schema | Missing fields | Check UCP schema |
 | "Discount exceeds subtotal" | Discount | Over 100% off | Cap discount |
-| "Empty request body" | Middleware | No body on protected path | Send a JSON object body |
-| "Malformed request body: expected JSON" | Middleware | Non-JSON or non-UTF-8 body | Use `Content-Type: application/json` |
-| "Invalid request body: expected JSON object" | Middleware | Top-level array/primitive | Wrap payload in an object |
+| "Empty request body" | FastAPI Middleware | No body on protected path | Send a JSON object body |
+| "Malformed request body: expected JSON" | FastAPI Middleware | Non-JSON or non-UTF-8 body | Use `Content-Type: application/json` |
+| "Invalid request body: expected JSON object" | FastAPI Middleware | Top-level array/primitive | Wrap payload in an object |
+| "Empty or non-JSON request body: cannot verify unparseable payload" | Express Middleware | Empty, malformed, or non-object body | Use `Content-Type: application/json` with `express.json()` registered first |
 
 ---
 

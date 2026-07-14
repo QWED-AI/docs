@@ -15,9 +15,11 @@ All notable changes to the QWED platform, listed by release.
 
 ### What changed
 
-- **Empty body** on a protected path and method now returns `422` with `"Empty request body: cannot verify empty payload"`.
-- **Malformed or non-UTF-8 body** returns `422` with `"Malformed request body: expected JSON"`.
-- **Top-level non-object JSON** (array, number, string, `null`, boolean) returns `422` with `"Invalid request body: expected JSON object"`.
+- **FastAPI:** returns a distinct message per case:
+  - Empty body → `"Empty request body: cannot verify empty payload"`
+  - Malformed or non-UTF-8 body → `"Malformed request body: expected JSON"`
+  - Top-level non-object JSON → `"Invalid request body: expected JSON object"`
+- **Express:** all three cases return `"Empty or non-JSON request body: cannot verify unparseable payload"`.
 - **Non-protected methods and paths** (for example, `GET /health` or a `POST` to a route outside `verify_paths`) still pass through untouched.
 
 <Warning>
