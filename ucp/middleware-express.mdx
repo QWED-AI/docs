@@ -71,6 +71,24 @@ app.use(middleware);
 
 ---
 
+## Fail-closed on unparseable bodies
+
+On a protected path and method, the middleware refuses to forward requests it cannot verify. Empty bodies and bodies that don't decode to a JSON object are rejected with `422`, `X-QWED-Verified: false`, and `code: "UNPARSEABLE_REQUEST"` before your handler runs:
+
+```json
+{
+  "error": "QWED-UCP Verification Failed",
+  "message": "Empty or non-JSON request body: cannot verify unparseable payload",
+  "code": "UNPARSEABLE_REQUEST"
+}
+```
+
+<Note>
+Make sure `express.json()` is registered before `createQWEDUCPMiddleware()` so the middleware sees the parsed body. Send checkout payloads as `application/json` with a JSON object at the top level; arrays, primitives, and form-encoded bodies fail closed.
+</Note>
+
+---
+
 ## Error response
 
 When verification fails:

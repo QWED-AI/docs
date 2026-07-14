@@ -239,6 +239,36 @@ if checkout_hash in verified_cache:
 | "Invalid transition" | State | Wrong state flow | Follow state machine |
 | "Schema validation failed" | Schema | Missing fields | Check UCP schema |
 | "Discount exceeds subtotal" | Discount | Over 100% off | Cap discount |
+| "Empty request body" | Middleware | No body on protected path | Send a JSON object body |
+| "Malformed request body: expected JSON" | Middleware | Non-JSON or non-UTF-8 body | Use `Content-Type: application/json` |
+| "Invalid request body: expected JSON object" | Middleware | Top-level array/primitive | Wrap payload in an object |
+
+---
+
+### `UNPARSEABLE_REQUEST` (422) from middleware
+
+**Cause:** The FastAPI or Express middleware received a request on a protected path (`/checkout-sessions`, `/checkout`, `/cart`, `/payment`) that it could not parse as a JSON object, so it failed closed before running guards.
+
+**Common triggers:**
+
+- Empty body on a `POST`/`PUT`/`PATCH`
+- Form-encoded, XML, or binary body instead of JSON
+- Malformed JSON (trailing comma, unquoted key, truncated payload)
+- Top-level JSON array, number, string, `null`, or boolean
+
+**Fix:** Send a JSON object with `Content-Type: application/json`:
+
+```bash
+curl -X POST http://localhost:8182/checkout-sessions \
+  -H "Content-Type: application/json" \
+  -d '{"currency":"USD","line_items":[]}'
+```
+
+If your endpoint is not a checkout route, either rename it or narrow `verify_paths` so the middleware skips it:
+
+```python
+app.add_middleware(QWEDUCPMiddleware, verify_paths=["/checkout-sessions"])
+```
 
 ---
 
