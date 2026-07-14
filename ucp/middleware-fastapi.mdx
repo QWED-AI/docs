@@ -62,6 +62,29 @@ The middleware adds verification headers to all responses:
 
 ---
 
+## Fail-closed on unparseable bodies
+
+On a protected path and method, the middleware refuses to forward requests it cannot verify. Any of the following returns `422` with `X-QWED-Verified: false` and `code: "UNPARSEABLE_REQUEST"` before your handler runs:
+
+- Empty request body
+- Malformed JSON or non-UTF-8 bytes
+- Valid JSON that decodes to a non-object (array, number, string, `null`, boolean)
+
+```json
+{
+  "error": "QWED-UCP Verification Failed",
+  "message": "Empty request body: cannot verify empty payload",
+  "code": "UNPARSEABLE_REQUEST",
+  "details": { "guards_passed": 0, "guards_failed": 0, "guards": [] }
+}
+```
+
+<Note>
+Requests to non-protected paths and methods still pass through untouched — this only applies to routes that match `verify_paths` and `verify_methods`. Send checkout payloads as `application/json` with a JSON object at the top level.
+</Note>
+
+---
+
 ## Error response
 
 When verification fails, the middleware returns a 422 response:

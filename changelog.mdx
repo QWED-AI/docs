@@ -7,6 +7,31 @@ All notable changes to the QWED platform, listed by release.
 
 ---
 
+## QWED-UCP — middleware fails closed on empty and non-JSON request bodies
+
+**Released: July 14, 2026** · [GitHub PR #32](https://github.com/QWED-AI/qwed-ucp/pull/32)
+
+> The FastAPI and Express middleware previously forwarded requests with an empty body, malformed JSON, or a non-object JSON payload to the downstream handler without running any guards. On a `/checkout-sessions` route that defeated the trust boundary — an attacker could send `{}`'s worth of nothing and skip verification. Both middlewares now reject those requests with `HTTP 422`, `X-QWED-Verified: false`, and `code: "UNPARSEABLE_REQUEST"` before the handler runs.
+
+### What changed
+
+- **FastAPI:** returns a distinct message per case:
+  - Empty body → `"Empty request body: cannot verify empty payload"`
+  - Malformed or non-UTF-8 body → `"Malformed request body: expected JSON"`
+  - Top-level non-object JSON → `"Invalid request body: expected JSON object"`
+- **Express:** all three cases return `"Empty or non-JSON request body: cannot verify unparseable payload"`.
+- **Non-protected methods and paths** (for example, `GET /health` or a `POST` to a route outside `verify_paths`) still pass through untouched.
+
+<Warning>
+This is a fail-closed behavior change. Any client that was previously reaching a `/checkout-sessions`, `/checkout`, `/cart`, or `/payment` handler with a missing, malformed, or non-object JSON body will now receive `422 UNPARSEABLE_REQUEST` instead. Send checkout payloads as `application/json` with a JSON object at the top level, or narrow `verify_paths` if a route should not be treated as a checkout endpoint.
+</Warning>
+
+### What this means for you
+
+If you deploy QWED-UCP as middleware in front of a UCP merchant server, unparseable requests can no longer bypass the guards. See [FastAPI middleware](/ucp/middleware-fastapi#fail-closed-on-unparseable-bodies), [Express.js middleware](/ucp/middleware-express#fail-closed-on-unparseable-bodies), and the [troubleshooting entry](/ucp/troubleshooting#unparseable_request-422-from-middleware) for the exact response shape and how to configure protected paths.
+
+---
+
 ## QWED-A2A — persistent signing key and JWKS discovery endpoint
 
 **Released: July 10, 2026** · [GitHub PR #29](https://github.com/QWED-AI/qwed-a2a/pull/29)
