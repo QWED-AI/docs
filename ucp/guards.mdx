@@ -417,10 +417,63 @@ All guard results and `UCPVerificationResult` include:
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `verified` | `bool` | Whether verification passed |
+| `verified` | `bool` | Convenience flag — `True` only when `status == TrustStatus.VERIFIED` |
+| `status` | `TrustStatus` | Typed trust verdict — see [Trust status](#trust-status) below |
 | `engine` | `string` | `"QWED-Deterministic-v1"` |
 | `verification_mode` | `string` | `"deterministic"` |
 | `error` | `string` | Error message (when `verified` is `false`) |
+
+---
+
+## Trust status
+
+Every guard result and `UCPVerificationResult` carries a typed `status: TrustStatus` field that distinguishes between materially different failure modes. Downstream policy code should branch on `status` rather than the derived `verified: bool`, so that "proof disproved" is not treated the same as "verifier engine crashed."
+
+### States
+
+| State | When it's used |
+|-------|----------------|
+| `VERIFIED` | Deterministic proof succeeded under supported conditions. |
+| `FAILED` | Proof was attempted and disproved (for example, totals mismatch). |
+| `UNVERIFIABLE` | Proof could not be established (for example, missing proof basis). |
+| `UNSUPPORTED` | Input or state is outside supported semantics. |
+| `PARTIAL` | Some checks ran, but no final verdict is justified. |
+| `ENGINE_ERROR` | A verifier dependency or the runtime crashed or degraded. |
+| `QUARANTINED` | Reserved for policy-level rejection (not yet wired). |
+
+### Reading `status`
+
+```python
+from qwed_ucp import UCPVerifier, TrustStatus
+
+verifier = UCPVerifier()
+result = verifier.verify_checkout(checkout_data)
+
+if result.status == TrustStatus.VERIFIED:
+    # Safe to proceed to payment
+    ...
+elif result.status == TrustStatus.FAILED:
+    # A guard deterministically disproved the transaction
+    return reject(reason="proof_failed", errors=result.errors)
+elif result.status == TrustStatus.ENGINE_ERROR:
+    # A guard raised an exception — fail closed and page an operator
+    return reject(reason="verifier_unavailable")
+else:
+    # UNVERIFIABLE / UNSUPPORTED / PARTIAL — treat as untrusted
+    return reject(reason=str(result.status))
+```
+
+### Verifier-level aggregation
+
+`UCPVerifier.verify_checkout()` sets the top-level `status` from the individual guard results:
+
+- `ENGINE_ERROR` — if any guard raised an exception during verification.
+- `FAILED` — if any guard deterministically disproved the transaction.
+- `VERIFIED` — if all guards passed.
+
+<Note>
+`verified: bool` remains a backward-compatible derived field: `result.verified` is `True` only when `result.status == TrustStatus.VERIFIED`. Existing code that reads `result.verified` continues to work unchanged, and existing constructors that pass `verified=True` or `verified=False` still produce the corresponding `VERIFIED` or `FAILED` status.
+</Note>
 
 ---
 
@@ -429,13 +482,14 @@ All guard results and `UCPVerificationResult` include:
 Use `UCPVerifier` to run all guards at once:
 
 ```python
-from qwed_ucp import UCPVerifier
+from qwed_ucp import UCPVerifier, TrustStatus
 
 verifier = UCPVerifier()
 result = verifier.verify_checkout(checkout_data)
 
 print(f"Verified: {result.verified}")
+print(f"Status: {result.status}")                      # TrustStatus.VERIFIED
 print(f"Engine: {result.engine}")                     # "QWED-Deterministic-v1"
 print(f"Mode: {result.verification_mode}")             # "deterministic"
-print(f"Guards passed: {len([g for g in result.guards if g.verified])}")
+print(f"Guards passed: {len([g for g in result.guards if g.status == TrustStatus.VERIFIED])}")
 ```
