@@ -465,11 +465,17 @@ else:
 
 ### Verifier-level aggregation
 
-`UCPVerifier.verify_checkout()` sets the top-level `status` from the individual guard results:
+`UCPVerifier.verify_checkout()` propagates the most-severe guard status to the top-level result (fail-closed ordering):
 
-- `ENGINE_ERROR` — if any guard raised an exception during verification.
-- `FAILED` — if any guard deterministically disproved the transaction.
-- `VERIFIED` — if all guards passed.
+| Top-level status | When it's used |
+|---|---|
+| `ENGINE_ERROR` | Any guard raised an exception during verification. |
+| `QUARANTINED` | A guard returned `QUARANTINED` (reserved for policy-level rejection). |
+| `FAILED` | A guard deterministically disproved the transaction. |
+| `UNVERIFIABLE` | Most-severe guard status is `UNVERIFIABLE` (e.g. missing proof basis). |
+| `UNSUPPORTED` | Most-severe guard status is `UNSUPPORTED` (input outside supported semantics). |
+| `PARTIAL` | Most-severe guard status is `PARTIAL` (inconclusive checks). |
+| `VERIFIED` | All guards passed (`VERIFIED`). |
 
 <Note>
 `verified: bool` remains a backward-compatible derived field: `result.verified` is `True` only when `result.status == TrustStatus.VERIFIED`. Existing code that reads `result.verified` continues to work unchanged, and existing constructors that pass `verified=True` or `verified=False` still produce the corresponding `VERIFIED` or `FAILED` status.
