@@ -7,6 +7,25 @@ All notable changes to the QWED platform, listed by release.
 
 ---
 
+## QWED-UCP — typed `TrustStatus` enum on every verification result
+
+**Released: July 15, 2026** · [GitHub PR #33](https://github.com/qwed-ai/qwed-ucp/pull/33)
+
+> Verification results previously exposed a single `verified: bool` that collapsed "proof disproved," "proof could not be established," "input outside supported semantics," and "verifier engine crashed" into the same `False` bucket. Every result dataclass now also carries a typed `status: TrustStatus` field so downstream policy code can make trust-aware decisions without parsing error strings.
+
+### What changed
+
+- **New `TrustStatus` enum** exported from `qwed_ucp` with seven states: `VERIFIED`, `FAILED`, `UNVERIFIABLE`, `UNSUPPORTED`, `PARTIAL`, `ENGINE_ERROR`, and `QUARANTINED` (reserved).
+- **`status` field on every result** — `GuardResult`, `UCPVerificationResult`, and each per-guard result type (`MoneyGuardResult`, `StateGuardResult`, `SchemaGuardResult`, `LineItemsGuardResult`, `DiscountGuardResult`, `CurrencyGuardResult`, `RefundGuardResult`, `TipGuardResult`, `FeeGuardResult`, `AttestationResult`).
+- **`UCPVerifier.verify_checkout()` now surfaces `ENGINE_ERROR`** when any guard raises an exception, instead of silently collapsing to `verified=False`.
+- **`verified: bool` is preserved** as a backward-compatible derived field: `result.verified` is `True` only when `result.status == TrustStatus.VERIFIED`. Existing constructors that pass `verified=True`/`verified=False` continue to produce the corresponding `VERIFIED`/`FAILED` status.
+
+### What this means for you
+
+Existing code that reads `result.verified` or constructs results with `verified=...` keeps working unchanged. New policy code should branch on `result.status` to distinguish a disproved proof from a crashed verifier — see [Trust status](/ucp/guards#trust-status) for the full state table and an example.
+
+---
+
 ## QWED-UCP — middleware fails closed on empty and non-JSON request bodies
 
 **Released: July 14, 2026** · [GitHub PR #32](https://github.com/QWED-AI/qwed-ucp/pull/32)
