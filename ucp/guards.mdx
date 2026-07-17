@@ -366,10 +366,11 @@ transaction_attempt_id = str(uuid.uuid4())
 request_nonce = str(uuid.uuid4())
 
 # You can pass a UCPVerificationResult directly — no need to convert to a dict
+checkout = {"currency": "USD", "totals": [{"type": "total", "amount": 82.79}]}
 verifier = UCPVerifier()
 verification = verifier.verify_checkout(checkout)
 
-result = guard.sign_checkout(
+signed = guard.sign_checkout(
     checkout=checkout,
     verification_result=verification,
     guards_passed=[g.guard_name for g in verification.guards if g.verified],
@@ -379,10 +380,10 @@ result = guard.sign_checkout(
     merchant_id="merchant_42",       # optional
 )
 
-print(result.token)                              # JWT token string
-print(result.verified)                           # True on success
-print(result.details["attestation_id"])          # UUID — matches JWT `jti`
-print(result.details["checkout_hash"])           # SHA-256 of checkout
+print(signed.token)                              # JWT token string
+print(signed.verified)                          # True on success
+print(signed.details["attestation_id"])          # UUID — matches JWT `jti`
+print(signed.details["checkout_hash"])           # SHA-256 of checkout
 ```
 
 <Note>
@@ -419,7 +420,7 @@ Attestations are single-use by default. When `consume=True` (the default), the g
 receipt = guard.create_receipt(
     checkout=checkout,
     verification_result=verification,
-    attestation_id=result.details["attestation_id"],
+    attestation_id=signed.details["attestation_id"],
     transaction_attempt_id=transaction_attempt_id,
     previous_receipt_id=None,   # optional predecessor for audit chains
 )
