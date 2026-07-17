@@ -348,7 +348,11 @@ result = guard.verify_platform_fee(
 
 ### Usage - sign a checkout
 
+Every attestation is bound to a **single verification event**. You must pass a unique `transaction_attempt_id` and a one-time `request_nonce` when signing — the same values must be supplied at verify time. This prevents an attestation from one checkout being replayed against another.
+
 ```python
+import uuid
+from qwed_ucp import UCPVerifier
 from qwed_ucp.guards.attestation import AttestationGuard
 
 # Production: provide a secret key or set QWED_ATTESTATION_SECRET env var
@@ -357,38 +361,74 @@ guard = AttestationGuard(secret_key="your-secret-key")
 # Dev mode: use allow_insecure=True (generates a random secret)
 guard = AttestationGuard(allow_insecure=True)
 
+# Bindings for this verification event
+transaction_attempt_id = str(uuid.uuid4())
+request_nonce = str(uuid.uuid4())
+
+# You can pass a UCPVerificationResult directly — no need to convert to a dict
+verifier = UCPVerifier()
+verification = verifier.verify_checkout(checkout)
+
 result = guard.sign_checkout(
-    checkout={"currency": "USD", "totals": [{"type": "total", "amount": 82.79}]},
-    verification_result={"verified": True},
-    guards_passed=["MoneyGuard", "StateGuard", "LineItemsGuard"]
+    checkout=checkout,
+    verification_result=verification,
+    guards_passed=[g.guard_name for g in verification.guards if g.verified],
+    transaction_attempt_id=transaction_attempt_id,
+    request_nonce=request_nonce,
+    session_id="sess_abc123",       # optional
+    merchant_id="merchant_42",       # optional
 )
 
-print(result.token)    # JWT token string
-print(result.verified) # True
-print(result.details)  # {"checkout_hash": "...", "issued_at": ..., "expires_at": ...}
+print(result.token)                              # JWT token string
+print(result.verified)                           # True on success
+print(result.details["attestation_id"])          # UUID — matches JWT `jti`
+print(result.details["checkout_hash"])           # SHA-256 of checkout
 ```
+
+<Note>
+`verification_result` accepts either a `UCPVerificationResult` returned by `UCPVerifier.verify_checkout(...)` or a legacy `{"verified": bool, "errors": [...]}` dict. Both are normalized internally.
+</Note>
 
 ### Usage - verify an attestation
 
-```python
-result = guard.verify_attestation(token="eyJ...")
+Verification is fail-closed on binding mismatch. You must pass the same `transaction_attempt_id` and `request_nonce` used when signing; any mismatch — or a missing `jti`, or a token that has already been consumed — returns `verified=False`.
 
-print(result.verified)  # True if valid and not expired
+```python
+result = guard.verify_attestation(
+    token="eyJ...",
+    expected_transaction_attempt_id=transaction_attempt_id,
+    expected_request_nonce=request_nonce,
+    expected_session_id="sess_abc123",   # optional, enforced if provided
+    expected_merchant_id="merchant_42",   # optional, enforced if provided
+    consume=True,                         # mark token consumed to prevent replay
+)
+
+print(result.verified)  # True if valid, unexpired, bindings match, not consumed
 print(result.details)   # Decoded JWT payload
 ```
 
+<Warning>
+Attestations are single-use by default. When `consume=True` (the default), the guard records the JWT's `jti` and rejects any later call that presents the same token. Set `consume=False` only for read-only inspection.
+</Warning>
+
 ### Usage - create a receipt
+
+`create_receipt` produces a non-cryptographic audit summary that pairs with an attestation. The `attestation_id` should be the same UUID returned in `sign_checkout(...).details["attestation_id"]`, and `transaction_attempt_id` must match the value bound into the JWT.
 
 ```python
 receipt = guard.create_receipt(
-    checkout=checkout_data,
-    verification_result={"verified": True}
+    checkout=checkout,
+    verification_result=verification,
+    attestation_id=result.details["attestation_id"],
+    transaction_attempt_id=transaction_attempt_id,
+    previous_receipt_id=None,   # optional predecessor for audit chains
 )
 
-print(receipt["receipt_id"])          # "QWED-A1B2C3D4..."
-print(receipt["verified"])            # True
-print(receipt["engine"])              # "QWED-Deterministic-v1"
-print(receipt["verification_mode"])   # "deterministic"
+print(receipt["receipt_id"])              # "QWED-<attestation-id-uppercase>"
+print(receipt["attestation_id"])          # Matches the JWT `jti`
+print(receipt["transaction_attempt_id"])  # Same value passed to sign_checkout
+print(receipt["verified"])                # True
+print(receipt["engine"])                  # "QWED-Deterministic-v1"
 ```
 
 ### JWT payload fields
@@ -396,9 +436,15 @@ print(receipt["verification_mode"])   # "deterministic"
 | Field | Type | Description |
 |-------|------|-------------|
 | `iss` | `string` | Always `"qwed-ucp-attestation"` |
+| `jti` | `string` | Unique attestation ID (UUID) — used for single-use enforcement |
 | `iat` | `int` | Issued-at Unix timestamp |
 | `exp` | `int` | Expiration timestamp (1 hour after issuance) |
 | `checkout_hash` | `string` | SHA-256 hash of the checkout object |
+| `transaction_attempt_id` | `string` | Verification attempt binding (required) |
+| `request_nonce` | `string` | One-time nonce for this verification event (required) |
+| `session_id` | `string` \| `null` | Optional session binding, enforced at verify time when set |
+| `merchant_id` | `string` \| `null` | Optional merchant binding, enforced at verify time when set |
+| `previous_attestation_id` | `string` \| `null` | Optional predecessor for audit chains |
 | `verified` | `bool` | Whether the checkout passed verification |
 | `guards_passed` | `array` | List of guard names that passed |
 | `errors` | `array` | List of errors (if any) |
