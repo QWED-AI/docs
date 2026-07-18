@@ -73,7 +73,7 @@ app.use(middleware);
 
 ## Fail-closed on internal verification errors
 
-If a guard raises an unexpected exception mid-verification, the middleware refuses to forward the request. Instead of calling `next()` and letting an unverified payload through, it responds with `HTTP 500`, `X-QWED-Verified: false`, and `code: "INTERNAL_VERIFICATION_ERROR"`:
+If a guard raises an unexpected exception mid-verification, the middleware refuses to forward the request. Instead of calling `next()` and letting an unverified payload through, it responds with `HTTP 500`, `X-QWED-Verified: false`, `X-QWED-Error`, and `code: "INTERNAL_VERIFICATION_ERROR"`:
 
 ```json
 {
