@@ -2,7 +2,7 @@
 sidebar_position: 6
 title: "QWED UCP troubleshooting"
 sidebarTitle: "Troubleshooting"
-description: "Troubleshoot QWED UCP issues including Python version requirements, middleware setup, checkout verification failures, and Express/FastAPI integration errors."
+description: "Fix common QWED UCP issues: Python version errors, middleware setup, checkout verification failures, and Express and FastAPI integration errors."
 ---
 
 Common issues and solutions when using QWED-UCP.
@@ -172,19 +172,25 @@ app.add_middleware(
 
 ---
 
-### Express middleware returns 500 instead of 422
+### Express middleware returns `500 INTERNAL_VERIFICATION_ERROR`
 
-**Check error handling:**
-```javascript
-app.use('/checkout', createQWEDUCPMiddleware({
-    onFailure: (error, req, res) => {
-        // Make sure this doesn't throw
-        res.status(422).json({
-            error: error.message
-        });
-    }
-}));
+**Cause:** A guard raised an unexpected exception mid-verification. The Express middleware fails closed on this path — it does **not** call `next()`, and the client receives:
+
+```json
+{
+  "error": "QWED-UCP Verification Failed",
+  "message": "Internal verification error: verification could not be completed",
+  "code": "INTERNAL_VERIFICATION_ERROR"
+}
 ```
+
+The response is intentional: an unverified request must not settle. The underlying exception is written to `stderr` via `console.error('QWED-UCP Middleware Error:', error)` — check your server logs for the stack trace.
+
+**Fix:**
+
+- Reproduce the request locally and inspect the logged exception.
+- If the payload has unexpected shape (missing `currency`, non-numeric amounts, etc.), tighten your upstream validation or add the field before the middleware runs.
+- If a specific guard is crashing, file an issue with the offending payload — do not "recover" by catching the 500 and forwarding the request.
 
 ---
 
@@ -243,6 +249,7 @@ if checkout_hash in verified_cache:
 | "Malformed request body: expected JSON" | FastAPI Middleware | Non-JSON or non-UTF-8 body | Use `Content-Type: application/json` |
 | "Invalid request body: expected JSON object" | FastAPI Middleware | Top-level array/primitive | Wrap payload in an object |
 | "Empty or non-JSON request body: cannot verify unparseable payload" | Express Middleware | Empty, malformed, or non-object body | Use `Content-Type: application/json` with `express.json()` registered first |
+| "Internal verification error: verification could not be completed" | Express Middleware | Guard raised an unexpected exception (returns `500 INTERNAL_VERIFICATION_ERROR`, fail-closed) | Check server logs for the underlying stack trace |
 
 ---
 
