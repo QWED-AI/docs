@@ -7,6 +7,36 @@ All notable changes to the QWED platform, listed by release.
 
 ---
 
+## QWED-UCP — Express middleware fails closed on internal verification errors
+
+**Released: July 18, 2026** · [GitHub PR #36](https://github.com/qwed-ai/qwed-ucp/pull/36)
+
+> When a guard raised an unexpected exception, the Express middleware previously logged the error and called `next()` — letting an unverified checkout through to the downstream handler. That defeated the trust boundary. The `catch` block now short-circuits with `HTTP 500`, `X-QWED-Verified: false`, and `code: "INTERNAL_VERIFICATION_ERROR"` so an internal crash can no longer be mistaken for a passing verification.
+
+### What changed
+
+- **Express middleware `catch` block is now fail-closed.** On any exception raised during `verifyCheckoutLocally()`, the middleware returns:
+  ```json
+  {
+    "error": "QWED-UCP Verification Failed",
+    "message": "Internal verification error: verification could not be completed",
+    "code": "INTERNAL_VERIFICATION_ERROR"
+  }
+  ```
+  The underlying exception is logged server-side via `console.error` but is **not** included in the response body — raw stack traces, file paths, and internal messages stay out of client-visible output.
+- **`X-QWED-Verified: false`** is set on the 500 response so upstream policy layers can treat it the same as a 422 failure.
+- **npm package fix.** `qwed-ucp-middleware.js` is now included in the published `files` array. Previous versions installed via npm were missing the entrypoint that `index.js` required at runtime.
+
+<Warning>
+**Behavior change.** Any client code that treated an Express middleware error as a soft pass (e.g. retrying without checking the status, or relying on `next()` being called) will now see a `500`. Treat `500 INTERNAL_VERIFICATION_ERROR` the same as `422 VERIFICATION_FAILED` — the request has **not** been verified and must not be settled.
+</Warning>
+
+### What this means for you
+
+Existing integrations that already branched on `X-QWED-Verified` or on the response status keep working — they just start seeing a new `500` path that was previously invisible. New integrations should treat both `4xx` and `5xx` responses from the middleware as an unverified request. See [Express.js middleware — Fail-closed on internal verification errors](/ucp/middleware-express#fail-closed-on-internal-verification-errors) for the full response contract.
+
+---
+
 ## QWED-UCP — typed `TrustStatus` enum on every verification result
 
 **Released: July 15, 2026** · [GitHub PR #33](https://github.com/qwed-ai/qwed-ucp/pull/33)

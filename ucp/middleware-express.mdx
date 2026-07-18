@@ -67,7 +67,23 @@ app.use(middleware);
 |--------|-------|-------------|
 | `X-QWED-Verified` | `true` / `false` | Verification result |
 | `X-QWED-Guards-Passed` | `4` | Number of guards passed |
-| `X-QWED-Error` | Error message | Only on failure |
+| `X-QWED-Error` | Error message | Only on failure or internal error |
+
+---
+
+## Fail-closed on internal verification errors
+
+If a guard raises an unexpected exception mid-verification, the middleware refuses to forward the request. Instead of calling `next()` and letting an unverified payload through, it responds with `HTTP 500`, `X-QWED-Verified: false`, and `code: "INTERNAL_VERIFICATION_ERROR"`:
+
+```json
+{
+  "error": "QWED-UCP Verification Failed",
+  "message": "Internal verification error: verification could not be completed",
+  "code": "INTERNAL_VERIFICATION_ERROR"
+}
+```
+
+The exception detail is logged server-side but not returned to the client, so raw error messages, stack traces, and file paths stay out of the response. Treat a `500` from a `/checkout-sessions` route the same as a `422` — the request has **not** been verified and must not be settled.
 
 ---
 
