@@ -474,7 +474,7 @@ All guard results and `UCPVerificationResult` include:
 
 ## Trust status
 
-Every guard result and `UCPVerificationResult` carries a typed `status: TrustStatus` field that distinguishes between materially different failure modes. Downstream policy code should branch on `status` rather than the derived `verified: bool`, so that "proof disproved" is not treated the same as "verifier engine crashed."
+Every guard result and `UCPVerificationResult` carries a typed `status: TrustStatus` field that distinguishes between materially different failure modes. The `TrustStatus` enum is available from `qwed-ucp` v0.3.0 onward. Downstream policy code should branch on `status` rather than the derived `verified: bool`, so that "proof disproved" is not treated the same as "verifier engine crashed."
 
 ### States
 
