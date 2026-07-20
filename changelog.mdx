@@ -7,6 +7,38 @@ All notable changes to the QWED platform, listed by release.
 
 ---
 
+## QWED-UCP — v0.3.0 released
+
+**Released: July 20, 2026** · [GitHub PR #38](https://github.com/qwed-ai/qwed-ucp/pull/38)
+
+> `qwed-ucp` v0.3.0 is now the current release. This version ships the typed `TrustStatus` enum on every verification result, alongside the fail-closed middleware and internal-error handling delivered over the v0.2.x series.
+
+### What changed
+
+- **`qwed-ucp` Python package is now v0.3.0** on PyPI.
+- **Express middleware `qwed-ucp-middleware`** package version bumped to match.
+- **`TrustStatus` enum** is confirmed as available from v0.3.0 onward — see [Trust status](/ucp/guards#trust-status) for the full state table and usage.
+- **GitHub Action** should now be pinned to `QWED-AI/qwed-ucp@v0.3.0`.
+
+### What this means for you
+
+Upgrade your dependency to pick up the current release:
+
+```bash
+pip install --upgrade qwed-ucp
+```
+
+If you audit checkouts in CI, update the action reference:
+
+```yaml
+- name: Audit Commerce Transactions
+  uses: QWED-AI/qwed-ucp@v0.3.0
+```
+
+Existing code that branches on `result.verified` continues to work unchanged. New code should branch on `result.status` (a `TrustStatus`) to distinguish `FAILED` from `ENGINE_ERROR`, `UNVERIFIABLE`, and other non-`VERIFIED` verdicts.
+
+---
+
 ## QWED-UCP — Express middleware fails closed on internal verification errors
 
 **Released: July 18, 2026** · [GitHub PR #36](https://github.com/qwed-ai/qwed-ucp/pull/36)
