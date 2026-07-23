@@ -4,7 +4,7 @@ title: "GitHub Action (CI/CD)"
 description: "QWED Finance GitHub Action for CI/CD integration. Basic verification, SARIF scanning for security dashboards, and GitHub Advanced Security integration included."
 ---
 
-QWED Finance v2.0 includes a production-ready GitHub Action to verify financial logic in your CI/CD pipeline.
+QWED Finance v2.1.0 includes a production-ready GitHub Action to verify financial logic in your CI/CD pipeline.
 
 ## Usage
 
@@ -16,7 +16,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Verify IRR calculation
-        uses: QWED-AI/qwed-finance@v2
+        uses: QWED-AI/qwed-finance@v2.1.0
         with:
           action: verify
           verification_type: irr
@@ -36,7 +36,7 @@ jobs:
       security-events: write
     steps:
       - name: Scan financial models
-        uses: QWED-AI/qwed-finance@v2
+        uses: QWED-AI/qwed-finance@v2.1.0
         with:
           action: scan
           scan_target: ./models
