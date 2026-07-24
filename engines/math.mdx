@@ -177,6 +177,183 @@ result = client.verify_irr(
 # ✓ Verified
 ```
 
+<Note>
+Cash flows with more than one sign change, or that fail to converge, are now rejected with `BLOCKED` rather than returning a best-effort iterate. See [`verify_irr` — convergence proof](#verify_irr--convergence-proof) for the full state table.
+</Note>
+
+---
+
+## Fail-closed semantics
+
+Three verification methods require an additional proof step before returning `VERIFIED`. When the underlying claim is ambiguous, incomplete, or numerically unproven, the engine returns `BLOCKED` or `CORRECTION_NEEDED` with structured diagnostics rather than a best-effort answer.
+
+### `verify_statistics(statistic="mode")` — unique mode required
+
+`mode` verification returns `VERIFIED` only when a single value has the maximum frequency. When two or more values tie for the maximum frequency, the engine returns `BLOCKED` with an `ambiguous_modes` list — it will not heuristically pick one.
+
+| Condition | Status | Notes |
+| --- | --- | --- |
+| Exactly one value at max frequency, claim matches | `VERIFIED` | Unique mode |
+| Exactly one value at max frequency, claim differs | `CORRECTION_NEEDED` | `calculated` returned |
+| Two or more values tied at max frequency | `BLOCKED` | `ambiguous_modes` returned; result is independent of the claimed value |
+| All values equal (e.g., [5, 5, 5]) | `VERIFIED` (if claim matches) | Single distinct value at max frequency � unique mode |
+
+Response fields on the `BLOCKED` case:
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `status` | string | `"BLOCKED"` |
+| `error` | string | Human-readable message including the tied mode count and frequency |
+| `statistic` | string | `"mode"` |
+| `data_points` | integer | Number of observations |
+| `ambiguous_modes` | list | Sorted list of all values tied at the maximum frequency |
+
+```python
+# BLOCKED — two values tied at max frequency
+result = client.verify_statistics(
+    statistic="mode",
+    data=[1, 1, 2, 2, 3],
+    expected=1,
+)
+# result["status"] == "BLOCKED"
+# result["ambiguous_modes"] == [1, 2]
+# result["error"].startswith("Ambiguous mode: 2 values share the maximum frequency")
+
+# VERIFIED — unique mode
+result = client.verify_statistics(
+    statistic="mode",
+    data=[1, 1, 2, 3],
+    expected=1,
+)
+# result["status"] == "VERIFIED"
+```
+
+The Stats Engine's `compute_statistics` method returns an equivalent multimodal error on its own surface — see [Stats engine — Errors](/engines/stats#errors).
+
+### `verify_matrix_operation(operation="eigenvalues")` — cardinality match required
+
+Eigenvalue verification requires the claimed list to have the same length as the calculated eigenvalue set, counting algebraic multiplicity. Previously the value comparison used `zip`, which silently truncated to the shorter list — so a claim of `[2]` for a matrix with eigenvalues `[2, 3]` could pass. The cardinality check now runs before the value comparison.
+
+| Condition | Status | Notes |
+| --- | --- | --- |
+| `len(claimed) == len(calculated)` and all values match within `1e-6` | `VERIFIED` | Full agreement |
+| `len(claimed) == len(calculated)` and any value differs | `CORRECTION_NEEDED` | Values compared pairwise after sorting |
+| `len(claimed) != len(calculated)` (under- or over-complete) | `CORRECTION_NEEDED` | `calculated_count` and `claimed_count` returned |
+
+Response fields on the cardinality-mismatch case:
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `status` | string | `"CORRECTION_NEEDED"` |
+| `error` | string | Message noting the mismatch and that all eigenvalues, including repeated roots, must be specified |
+| `calculated_eigenvalues` | list | Full eigenvalue list computed by SymPy (expanded by algebraic multiplicity) |
+| `claimed_eigenvalues` | list | The list you submitted |
+| `calculated_count` | integer | Length of `calculated_eigenvalues` |
+| `claimed_count` | integer | Length of `claimed_eigenvalues` |
+
+```python
+# CORRECTION_NEEDED — claim omits the second eigenvalue
+result = client.verify_matrix_operation(
+    operation="eigenvalues",
+    matrix=[[2, 0], [0, 3]],
+    expected=[2],
+)
+# result["status"] == "CORRECTION_NEEDED"
+# result["calculated_count"] == 2
+# result["claimed_count"] == 1
+# result["calculated_eigenvalues"] == [2.0, 3.0]
+
+# CORRECTION_NEEDED — repeated root must be listed twice
+result = client.verify_matrix_operation(
+    operation="eigenvalues",
+    matrix=[[2, 0], [0, 2]],
+    expected=[2],
+)
+# result["status"] == "CORRECTION_NEEDED"
+# result["calculated_eigenvalues"] == [2.0, 2.0]
+
+# VERIFIED — full list including multiplicity
+result = client.verify_matrix_operation(
+    operation="eigenvalues",
+    matrix=[[2, 0], [0, 2]],
+    expected=[2, 2],
+)
+# result["status"] == "VERIFIED"
+```
+
+### `verify_irr` — convergence proof
+
+IRR verification now requires proof that Newton-Raphson converged before returning `VERIFIED`. Successful results include `converged: true` and `iterations_used` for auditability. The engine blocks inputs whose IRR is mathematically ambiguous or numerically unreachable rather than returning the current iterate.
+
+| Condition | Status | Notes |
+| --- | --- | --- |
+| Converged and claimed IRR matches within `tolerance` | `VERIFIED` | `converged: true`, `iterations_used` returned |
+| Converged and claimed IRR differs by more than `tolerance` | `CORRECTION_NEEDED` | `calculated_irr` returned |
+| All cash flows are zero | `BLOCKED` | IRR is undefined — any rate satisfies `NPV = 0` |
+| Zero sign changes (all cash flows same sign) | `BLOCKED` | No real IRR exists (Descartes' rule) |
+| More than one sign change in cash flows | `BLOCKED` | Multi-root ambiguity — multiple real IRRs may exist |
+| Derivative reaches zero mid-iteration | `BLOCKED` | Newton-Raphson stalled — cannot proceed from this path |
+| Did not converge within 100 iterations | `BLOCKED` | `iterations_used: 100`, residual reported in `error` |
+
+Response fields:
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `status` | string | `"VERIFIED"`, `"CORRECTION_NEEDED"`, or `"BLOCKED"` |
+| `converged` | boolean | `true` only on successful convergence (present on `VERIFIED`) |
+| `iterations_used` | integer | Newton-Raphson iterations run (present on `VERIFIED` and iteration-related `BLOCKED` cases) |
+| `calculated_irr` | float | Present when Newton-Raphson converged |
+| `claimed_irr` | float | The value you submitted (present when converged) |
+| `sign_changes` | integer | Present on sign-change `BLOCKED` cases |
+| `cash_flows` | list | Echoed on `BLOCKED` cases for auditability |
+
+```python
+# VERIFIED — single sign change, Newton converges
+result = client.verify_irr(
+    cash_flows=[-1000, 400, 400, 400],
+    expected=0.0985,
+)
+# result["status"] == "VERIFIED"
+# result["converged"] is True
+# result["iterations_used"] <= 100
+
+# BLOCKED — multi-root ambiguity (two sign changes)
+result = client.verify_irr(
+    cash_flows=[-100, 230, -132],
+    expected=0.10,
+)
+# result["status"] == "BLOCKED"
+# result["sign_changes"] == 2
+
+# BLOCKED — zeros do not hide real sign transitions
+result = client.verify_irr(
+    cash_flows=[-100, 0, 230, -132],
+    expected=0.10,
+)
+# result["status"] == "BLOCKED"
+# result["sign_changes"] == 2
+
+# BLOCKED — all cash flows are zero, IRR undefined
+result = client.verify_irr(
+    cash_flows=[0, 0, 0],
+    expected=0.0,
+)
+# result["status"] == "BLOCKED"
+# result["error"].startswith("IRR is undefined")
+
+# BLOCKED — all same-sign cash flows, no real IRR exists
+result = client.verify_irr(
+    cash_flows=[100, 200, 300],
+    expected=0.10,
+)
+# result["status"] == "BLOCKED"
+# result["sign_changes"] == 0
+```
+
+<Warning>
+These three methods are behavior changes. Inputs that previously received `VERIFIED` — an ambiguous mode dataset, an under-specified eigenvalue list, or a cash-flow series with multiple sign changes — now return `BLOCKED` or `CORRECTION_NEEDED`. Treat both statuses as unverified and consume the structured diagnostic fields rather than relying on a numeric result.
+</Warning>
+
 ---
 
 ## Trust boundary
@@ -379,6 +556,9 @@ result = client.verify_math("1/(2*(3+1))")
 | Sampling-only identity match | Returns "BLOCKED" — no formal proof established |
 | Ambiguous implicit multiplication | Returns "BLOCKED" — rewrite with explicit operators |
 | Non-equality expression in batch verification | Returns `is_valid: false` with `status: "SIMPLIFIED"` — simplification is not a proof |
+| Ambiguous mode (multimodal data) | Returns "BLOCKED" with `ambiguous_modes` — only a unique mode can verify |
+| Incomplete or over-complete eigenvalue claim | Returns "CORRECTION_NEEDED" with `calculated_count`/`claimed_count` |
+| IRR with multi-root, derivative stall, or non-convergence | Returns "BLOCKED" — no best-effort iterate is returned |
 
 ---
 

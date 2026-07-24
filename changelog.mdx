@@ -7,6 +7,70 @@ All notable changes to the QWED platform, listed by release.
 
 ---
 
+## QWED Math Engine — fail-closed on mode ambiguity, eigenvalue cardinality, and IRR convergence
+
+**Released: July 24, 2026** · [Jump to details](#qwed-math-engine--fail-closed-on-mode-ambiguity-eigenvalue-cardinality-and-irr-convergence) · [PR #217](https://github.com/qwed-ai/qwed-verification/pull/217) · [PR #218](https://github.com/qwed-ai/qwed-verification/pull/218) · [PR #219](https://github.com/qwed-ai/qwed-verification/pull/219)
+
+> Three core-verifier fixes tighten the math engine's fail-closed contract. `verify_statistics(statistic="mode")`, `verify_matrix_operation(operation="eigenvalues")`, and `verify_irr()` no longer produce `VERIFIED` when the underlying claim is ambiguous, under-specified, or numerically unproven. Callers see `BLOCKED` or `CORRECTION_NEEDED` with structured diagnostics instead of a best-effort answer.
+
+<Warning>
+**Behavior change.** Inputs that previously received `VERIFIED` may now receive `BLOCKED` or `CORRECTION_NEEDED` — treat both as unverified. If your code branched on `result.verified` or `result.status == "VERIFIED"` alone, it will continue to work; if you consumed `calculated`/`calculated_irr`/`calculated_eigenvalues` from a `BLOCKED` result as a fallback, those fields are not present on `BLOCKED` responses. They remain available on `CORRECTION_NEEDED` responses for diagnostic use. Consume the new structured fields (`ambiguous_modes`, `calculated_count`/`claimed_count`, `converged`, `iterations_used`) for richer diagnostics.
+</Warning>
+
+### What changed
+
+- **`verify_statistics(statistic="mode")` requires a unique mode.** When two or more values tie for the maximum frequency, the engine returns `BLOCKED` with an `ambiguous_modes` list instead of heuristically picking one. Only a unique mode can produce `VERIFIED`.
+- **`verify_matrix_operation(operation="eigenvalues")` requires cardinality match.** The claimed eigenvalue list length must equal the calculated count (counting algebraic multiplicity). Mismatched lengths return `CORRECTION_NEEDED` with `calculated_count`/`claimed_count`. Previously the value comparison used `zip`, which silently truncated to the shorter list.
+- **`verify_irr()` requires proof of Newton-Raphson convergence.** `BLOCKED` is now returned when cash flows have more than one sign change (multi-root ambiguity per Descartes' rule), zero sign changes (no real IRR), all-zero cash flows (IRR undefined), the Newton derivative stalls at zero, or the method fails to converge within 100 iterations. Successful results include `converged: true` and `iterations_used`.
+
+### Before and after
+
+**Ambiguous mode**
+
+```python
+# Before — heuristically picked one of the tied values and could return VERIFIED
+client.verify_statistics(statistic="mode", data=[1, 1, 2, 2, 3], expected=1)
+# status: "VERIFIED"
+
+# After — BLOCKED with the full list of tied values
+client.verify_statistics(statistic="mode", data=[1, 1, 2, 2, 3], expected=1)
+# status: "BLOCKED"
+# ambiguous_modes: [1, 2]
+```
+
+**Incomplete eigenvalue claim**
+
+```python
+# Before — zip truncated the comparison to length 1 and returned VERIFIED
+client.verify_matrix_operation(operation="eigenvalues", matrix=[[2, 0], [0, 3]], expected=[2])
+# status: "VERIFIED"
+
+# After — CORRECTION_NEEDED with explicit cardinality diagnostics
+client.verify_matrix_operation(operation="eigenvalues", matrix=[[2, 0], [0, 3]], expected=[2])
+# status: "CORRECTION_NEEDED"
+# calculated_count: 2, claimed_count: 1
+# calculated_eigenvalues: [2.0, 3.0]
+```
+
+**IRR with multiple sign changes**
+
+```python
+# Before — Newton-Raphson returned a best-effort iterate that could be VERIFIED
+client.verify_irr(cash_flows=[-100, 230, -132], expected=0.10)
+# status: "VERIFIED"
+
+# After — BLOCKED because two sign changes admit multiple real IRRs
+client.verify_irr(cash_flows=[-100, 230, -132], expected=0.10)
+# status: "BLOCKED"
+# sign_changes: 2
+```
+
+### What this means for you
+
+Existing code that already treated non-`VERIFIED` statuses as unverified continues to work. New policy code should read the structured diagnostic fields on `BLOCKED`/`CORRECTION_NEEDED` results — `ambiguous_modes`, `calculated_count`/`claimed_count`, and `converged`/`iterations_used` — to explain why a claim was rejected and to satisfy audit requirements. See [Math engine — Fail-closed semantics](/engines/math#fail-closed-semantics) for the full state tables and response schemas.
+
+---
+
 ## QWED-Finance — v2.1.0 released
 
 **Released: July 22, 2026** · [GitHub PR #40](https://github.com/QWED-AI/qwed-finance/pull/40)
