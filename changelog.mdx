@@ -14,7 +14,7 @@ All notable changes to the QWED platform, listed by release.
 > Three core-verifier fixes tighten the math engine's fail-closed contract. `verify_statistics(statistic="mode")`, `verify_matrix_operation(operation="eigenvalues")`, and `verify_irr()` no longer produce `VERIFIED` when the underlying claim is ambiguous, under-specified, or numerically unproven. Callers see `BLOCKED` or `CORRECTION_NEEDED` with structured diagnostics instead of a best-effort answer.
 
 <Warning>
-**Behavior change.** Inputs that previously received `VERIFIED` may now receive `BLOCKED` or `CORRECTION_NEEDED` — treat both as unverified. If your code branched on `result.verified` or `result.status == "VERIFIED"` alone, it will continue to work; if you consumed `calculated`/`calculated_irr`/`calculated_eigenvalues` from a non-`VERIFIED` result as a fallback, that path is now closed. Consume the new response fields (`ambiguous_modes`, `calculated_count`/`claimed_count`, `converged`, `iterations_used`) instead.
+**Behavior change.** Inputs that previously received `VERIFIED` may now receive `BLOCKED` or `CORRECTION_NEEDED` — treat both as unverified. If your code branched on `result.verified` or `result.status == "VERIFIED"` alone, it will continue to work; if you consumed `calculated`/`calculated_irr`/`calculated_eigenvalues` from a `BLOCKED` result as a fallback, those fields are not present on `BLOCKED` responses. They remain available on `CORRECTION_NEEDED` responses for diagnostic use. Consume the new structured fields (`ambiguous_modes`, `calculated_count`/`claimed_count`, `converged`, `iterations_used`) for richer diagnostics.
 </Warning>
 
 ### What changed

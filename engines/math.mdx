@@ -196,7 +196,7 @@ Three verification methods require an additional proof step before returning `VE
 | Exactly one value at max frequency, claim matches | `VERIFIED` | Unique mode |
 | Exactly one value at max frequency, claim differs | `CORRECTION_NEEDED` | `calculated` returned |
 | Two or more values tied at max frequency | `BLOCKED` | `ambiguous_modes` returned; result is independent of the claimed value |
-| All values equal | `BLOCKED` | Every value ties for max frequency |
+| All values equal (e.g., [5, 5, 5]) | `VERIFIED` (if claim matches) | Single distinct value at max frequency — unique mode |
 
 Response fields on the `BLOCKED` case:
 
