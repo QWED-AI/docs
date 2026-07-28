@@ -132,8 +132,54 @@ print(token)
 
 ## Verifying an attestation
 
+`verify_attestation()` requires an `AttestationContext` describing the request the token is being presented against. A cryptographically valid signature is not enough — the token must also be **bound** to the current sender, receiver, payload, and (optionally) session. Detached attestations replayed against a different message are rejected.
+
+<Warning>
+**Breaking change in July 2026.** The single-argument form `verify_attestation(token)` has been removed. All callers must now pass an `AttestationContext`. See the [migration snippet](#migrating-to-context-bound-verification) below.
+</Warning>
+
+### The `AttestationContext` dataclass
+
 ```python
-is_valid, claims, error = crypto.verify_attestation(token)
+from qwed_a2a.security.crypto import AttestationContext
+
+context = AttestationContext(
+    sender_agent_id="procurement-agent",
+    receiver_agent_id="treasury-agent",
+    payload={"claimed_total": 150.00, "line_items": [...]},
+    session_id="sess_2026_07_28_001",  # optional
+)
+```
+
+| Field | Type | Required | Compared against |
+|-------|------|----------|------------------|
+| `sender_agent_id` | `str` | yes | `qwed_a2a.sender` claim |
+| `receiver_agent_id` | `str` | yes | `qwed_a2a.receiver` claim |
+| `payload` | `Any` (JSON-serializable) | yes | `sub` claim (SHA-256 hash) |
+| `session_id` | `str \| None` | no | `qwed_a2a.session_id` claim — only enforced when set |
+
+The verifier hashes `payload` internally with the same deterministic method as `sign_verdict()` (`json.dumps(..., sort_keys=True, default=str)`), so callers never handle raw hashes.
+
+### Verification steps
+
+`verify_attestation()` runs these checks in order — the first failure short-circuits and returns a structured error:
+
+1. Cryptographic signature (ES256 / ECDSA P-256).
+2. Expiry (`exp` claim).
+3. Required claims present (`iss`, `sub`, `iat`, `exp`, `jti`).
+4. Structural validation of the `qwed_a2a` claim block.
+5. Deployment context — the `deployment_id` claim matches this instance.
+6. **Context binding** — sender, receiver, payload hash, and (if provided) `session_id` all match the `AttestationContext`.
+7. `jti` replay check — rejects previously seen trace IDs.
+
+<Note>
+The replay check deliberately runs **last**, after context binding. This prevents an out-of-context token — for example one replayed against the wrong receiver — from polluting the `jti` registry and locking out a legitimate future presentation of the same token in its correct context.
+</Note>
+
+### Call signature
+
+```python
+is_valid, claims, error = crypto.verify_attestation(token, context)
 
 if is_valid:
     print(f"Verdict: {claims['qwed_a2a']['verdict']}")
@@ -143,13 +189,43 @@ else:
     print(f"Invalid: {error}")
 ```
 
+`is_valid=True` guarantees the token is cryptographically sound **and** bound to the supplied context — not just that its signature is valid.
+
 ### Verification outcomes
 
 | Result | Meaning |
 |--------|---------|
-| `(True, claims, None)` | Valid attestation — claims are trustworthy |
+| `(True, claims, None)` | Valid attestation, bound to this context — claims are trustworthy |
 | `(False, None, "Attestation has expired")` | Token past its `exp` time |
 | `(False, None, "Invalid token: ...")` | Signature mismatch, tampering, or wrong key |
+| `(False, None, "Deployment context mismatch: ...")` | Token was issued by a different deployment |
+| `(False, None, "Attestation sender mismatch: expected=..., got=...")` | Token's `sender` claim differs from `context.sender_agent_id` |
+| `(False, None, "Attestation receiver mismatch: expected=..., got=...")` | Token's `receiver` claim differs from `context.receiver_agent_id` |
+| `(False, None, "Attestation payload hash mismatch — detached attestation rejected")` | `sub` claim does not match the hash of `context.payload` |
+| `(False, None, "Attestation session mismatch: expected=..., got=...")` | `session_id` was supplied and did not match the token's session claim |
+| `(False, None, "Attestation replay detected: jti already used")` | `jti` was seen in a previous verification |
+
+### Migrating to context-bound verification
+
+If you're upgrading from the pre-context release, update every `verify_attestation()` call site to construct an `AttestationContext` from the same fields you signed with:
+
+```python
+# Before — single-argument form (removed)
+is_valid, claims, error = crypto.verify_attestation(token)
+
+# After — pass the current request context
+from qwed_a2a.security.crypto import AttestationContext
+
+context = AttestationContext(
+    sender_agent_id="procurement-agent",
+    receiver_agent_id="treasury-agent",
+    payload=request_payload,
+    session_id=request_session_id,  # optional
+)
+is_valid, claims, error = crypto.verify_attestation(token, context)
+```
+
+The signing side (`sign_verdict()`) is unchanged.
 
 ---
 
@@ -164,9 +240,9 @@ payload_hash = A2ACryptoService.hash_content(
 # "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
 ```
 
-<Warning>
-If the original payload is modified after signing, the hash will not match the `sub` claim — even though the JWT signature itself is still valid. Always verify **both** the JWT signature and the payload hash.
-</Warning>
+<Note>
+`verify_attestation()` performs this hash comparison internally as part of [context binding](#verification-steps) — as long as you pass the current `payload` in the `AttestationContext`, a modified payload will be rejected with `"Attestation payload hash mismatch — detached attestation rejected"`. You only need to hash content directly when you want the digest for logging or out-of-band comparison.
+</Note>
 
 ---
 
@@ -200,10 +276,22 @@ Because every replica loads the same PEM from `QWED_A2A_SIGNING_KEY_PEM`, they a
 service_a = A2ACryptoService(issuer_id="did:qwed:a2a:production")
 service_b = A2ACryptoService(issuer_id="did:qwed:a2a:production")
 
-token = service_a.sign_verdict(...)
+token = service_a.sign_verdict(
+    trace_id="a2a_audit_042",
+    verdict_status="forwarded",
+    engine="finance_guard",
+    sender_id="procurement-agent",
+    receiver_id="treasury-agent",
+    payload_hash=A2ACryptoService.payload_hash(payload),
+)
 
-is_valid, claims, _ = service_b.verify_attestation(token)
-# is_valid = True — shared key pair
+context = AttestationContext(
+    sender_agent_id="procurement-agent",
+    receiver_agent_id="treasury-agent",
+    payload=payload,
+)
+is_valid, claims, _ = service_b.verify_attestation(token, context)
+# is_valid = True — shared key pair and matching context
 ```
 
 <Tip>
