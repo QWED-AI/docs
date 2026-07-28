@@ -43,15 +43,14 @@ The `trace_id` parameter is **required** and must be provided by the caller. Thi
     - Pair-level block check
     - Allowlist check (in strict mode)
     - Token-bucket rate limiting
-  </Step>
-  <Step title="Trusted Agent Bypass">
-    If the sender is in `config.trusted_agents`, the message is forwarded immediately with a `bypass` engine verdict.
+
+    Any agent IDs in `config.trusted_agents` are pre-added to the trust boundary allowlist at interceptor construction time. There is **no separate bypass step** — trusted agents still flow through engine routing and receive a normal verdict.
   </Step>
   <Step title="Engine Routing">
-    Based on `payload_type`, the message is routed to the appropriate verification engine.
+    Based on `payload_type`, the message is routed to the appropriate verification engine (`finance_guard`, `logic_guard`, `code_guard`). Payload types with no engine (`GENERAL`, `DATA_QUERY`) return an `unverifiable` engine result instead of being silently forwarded.
   </Step>
   <Step title="Verdict & Attestation">
-    The engine result is wrapped in a `VerificationVerdict` with an ES256 JWT attestation proving the verification took place.
+    The engine result is wrapped in a `VerificationVerdict`. `FORWARDED`, `BLOCKED`, and `HEURISTIC_PASS` verdicts are signed with an ES256 JWT attestation. `UNVERIFIABLE` verdicts carry **no JWT** — issuing a signed token for content that was never verified would be a false cryptographic claim.
   </Step>
 </Steps>
 
@@ -89,6 +88,10 @@ verdict = await interceptor.intercept(message, trace_id="fin_001")
 All financial comparisons use `decimal.Decimal` with `ROUND_HALF_UP` quantization to `0.01`. Floating-point arithmetic is **never** used in the verification path.
 </Warning>
 
+<Info>
+**Empty or malformed payloads return `UNVERIFIABLE`, not `FORWARDED`.** If a `FINANCIAL_TRANSACTION` payload is missing `data`, `line_items`, or `claimed_total`, or contains non-numeric amounts, the finance guard returns `status=unverifiable` with no JWT attestation. Earlier releases collapsed these cases to a signed `FORWARDED` verdict, which falsely attested that the math had been checked.
+</Info>
+
 ### Logic guard
 
 Detects **logical contradictions** — claims where the same proposition is both asserted and negated.
@@ -116,20 +119,34 @@ verdict = await interceptor.intercept(message, trace_id="logic_001")
 Contradictions are **sorted** before output, ensuring deterministic results regardless of Python's hash randomization (`PYTHONHASHSEED`).
 </Tip>
 
+<Info>
+**Empty or malformed logic payloads return `UNVERIFIABLE`.** A `LOGIC_ASSERTION` payload with a missing, non-list, or empty `assertions` array — or with malformed assertion entries — returns `status=unverifiable` and no JWT attestation. There is nothing to check, so nothing is attested.
+</Info>
+
 ### Code guard
 
-Scans code payloads for **dangerous patterns** using case-insensitive compiled regex:
+Scans code payloads using a **two-layer approach**. AST structural analysis runs first; regex heuristics only run when the AST layer finds nothing.
 
-| Pattern | Regex | Catches |
-|---------|-------|---------|
-| `eval` | `\beval\s*\(` | `eval(`, `EVAL (`, `eval\n(` |
-| `exec` | `\bexec\s*\(` | `exec(`, `Exec (` |
-| `subprocess` | `subprocess\.\|import subprocess\|from subprocess import` | `subprocess.run`, `import subprocess as sp`, `from subprocess import run` |
-| `os.system` | `\bos\.system\s*\(` | `os.system(`, `OS.SYSTEM (` |
-| `os.popen` | `\bos\.popen\s*\(` | All casing/spacing variants |
-| `__import__` | `__import__\s*\(` | Dynamic imports |
-| `compile` | `\bcompile\s*\(` | Code compilation |
-| `importlib` | `\bimportlib\s*\.` | Runtime module loading |
+**Layer 1 — AST structural analysis (primary).** The code is parsed into an abstract syntax tree and inspected for direct dangerous constructs:
+
+| Threat | Example |
+|--------|---------|
+| Dangerous calls | `eval(`, `exec(`, `compile(`, `__import__(` |
+| Dangerous receiver methods | `subprocess.run(`, `os.system(`, `os.popen(` |
+| Dangerous imports | `import subprocess`, `import importlib`, `import ctypes` |
+
+**Layer 2 — Regex heuristic scan (secondary).** Catches obfuscation patterns that survive AST parsing:
+
+| Pattern | Catches |
+|---------|---------|
+| `getattr_builtin` | `getattr(__builtins__, ...)` |
+| `builtins_dict_access` | `__builtins__.__dict__[` |
+| `base64_exec` | `b64decode(` encoded payloads |
+| `dynamic_import` | `__import__(` dynamic imports |
+| `os_system` | `os.system(` shell execution |
+| `os_popen` | `os.popen(` process spawning |
+
+If either layer finds a threat, the verdict is `BLOCKED` (the reason notes which layer triggered). If both layers are clean, the verdict is `HEURISTIC_PASS` — a signed attestation that no known dangerous constructs were found, **not** a deterministic guarantee that the code is safe to execute.
 
 ```python
 message = AgentMessage(
@@ -141,12 +158,37 @@ message = AgentMessage(
 
 verdict = await interceptor.intercept(message, trace_id="code_001")
 # verdict.status = "blocked"
-# verdict.reason = "Dangerous code patterns detected: subprocess"
+# verdict.reason = "Dangerous code patterns detected (AST): subprocess import"
 ```
 
-### Passthrough
+### Passthrough (unverifiable)
 
-Messages with `payload_type` of `GENERAL` or `DATA_QUERY` are forwarded without verification.
+Messages with `payload_type` of `GENERAL` or `DATA_QUERY` have no verification engine. The interceptor returns an **`UNVERIFIABLE`** verdict with `engine="passthrough"`, **no JWT attestation**, and reason `"No verification engine available for this payload type"`. The message is not silently forwarded — callers must decide whether to route unverified content downstream based on their own policy.
+
+```python
+verdict = await interceptor.intercept(chat_message, trace_id="chat_001")
+# verdict.status = "unverifiable"
+# verdict.engine_used = "passthrough"
+# verdict.attestation_jwt is None
+```
+
+---
+
+## Verdict statuses
+
+Every call to `intercept()` returns a `VerificationVerdict` with one of five statuses. Only statuses backed by a real verification decision carry a signed JWT attestation.
+
+| Status | Meaning | JWT attestation |
+|--------|---------|-----------------|
+| `forwarded` | Engine verified the payload. Forward the message. | Signed |
+| `blocked` | Engine detected a violation (bad math, contradiction, dangerous code). Do not forward. | Signed |
+| `heuristic_pass` | Code guard ran, no known dangerous constructs found. Not a proof of safety. | Signed |
+| `unverifiable` | No engine could evaluate the payload (`GENERAL`/`DATA_QUERY`, empty/malformed finance or logic payload). No attestation is issued. | **None** |
+| `error` | Internal exception during verification. Behavior depends on `block_on_error`. | Signed |
+
+<Warning>
+`UNVERIFIABLE` verdicts have `attestation_jwt=None`. If your downstream code assumes every verdict has a JWT, guard for this — issuing an attestation for content that was never verified would be a false cryptographic claim.
+</Warning>
 
 ---
 
@@ -158,10 +200,10 @@ The `InterceptorConfig` controls which engines are active:
 |-------|------|---------|-------------|
 | `enable_financial_verification` | `bool` | `True` | Route financial payloads to math verification |
 | `enable_logic_verification` | `bool` | `True` | Route logic assertions to contradiction checks |
-| `enable_code_verification` | `bool` | `True` | Route code payloads to regex security scanning |
+| `enable_code_verification` | `bool` | `True` | Route code payloads to the AST + regex heuristic security scanner |
 | `block_on_error` | `bool` | `True` | Block forwarding if verification encounters an internal error |
 | `max_payload_size_bytes` | `int` | `1,048,576` | Maximum payload size (1 KB – 10 MB) |
-| `trusted_agents` | `List[str]?` | `None` | Allowlist of agent IDs that bypass verification |
+| `trusted_agents` | `List[str]?` | `None` | Agent IDs pre-added to the trust boundary allowlist at startup. These agents still run through the appropriate verification engine — they are not bypassed. |
 
 ```python
 from qwed_a2a.protocol.schema import InterceptorConfig
