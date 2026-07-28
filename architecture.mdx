@@ -50,13 +50,16 @@ flowchart TB
 
 ### 3) Verification engines (deterministic)
 
+Verification engines are grouped into three tiers with distinct output guarantees. Only **proof engines** can emit `VERIFIED` (with a `proof_ref`); the deterministic-verification claim above applies to supported proof domains. **Policy enforcement engines** emit `BLOCK` / `UNVERIFIABLE`, and **advisory engines** emit `AdvisoryCheck` records only. See [Verification engines](/engines/overview) for the full 3-tier classification.
+
 | Engine | Purpose |
 |---|---|
-| Math | Symbolic arithmetic and algebra checks |
-| Logic | SAT/SMT verification and constraint solving |
-| Code | AST and symbolic security analysis |
-| SQL | Query safety and structure validation |
-| Schema/Taint/Graph/Stats/Fact/Image/Reasoning | Domain-specific verification paths |
+| Math | Symbolic arithmetic and algebra checks (proof) |
+| Logic | SAT/SMT verification and constraint solving (proof) |
+| Code | AST and symbolic security analysis (proof) |
+| SQL | Query safety and structure validation (proof) |
+| Schema / Stats / Taint | Structural and data-flow proofs |
+| Fact / Graph / Image / Reasoning / Consensus | Advisory analysis (no `VERIFIED`) |
 
 ### 4) Agent security guards
 
