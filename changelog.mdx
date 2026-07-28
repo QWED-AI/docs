@@ -7,6 +7,97 @@ All notable changes to the QWED platform, listed by release.
 
 ---
 
+## v5.3.0 — SymbolicVerifier: `DiagnosticResult` reference implementation
+
+**Released: July 25, 2026** · [GitHub Release](https://github.com/QWED-AI/qwed-verification/releases/tag/v5.3.0) · Minor · [PR #244](https://github.com/QWED-AI/qwed-verification/pull/244)
+
+> QWED-Verification v5.3.0 makes `SymbolicVerifier` the **first fully `DiagnosticResult`-conformant engine**. The unified 3-layer diagnostic model introduced in [v5.2.0](/changelog#v520--structured-verification-diagnostics) is no longer aspirational — the Code engine is the reference implementation the remaining engines will migrate to.
+
+<Warning>
+**Breaking change for the Code engine.** All six `SymbolicVerifier` public methods now return a [`DiagnosticResult`](/advanced/diagnostics) instead of a dict. Callers that read `result["status"]`, `result.verified`, `result["issues"]`, `result["complexity"]`, `result["loop_depth"]`, or `result["recursive"]` must migrate. See the [Code engine migration guide](/engines/code#migrating-from-the-legacy-dict-api) for the field-by-field mapping.
+</Warning>
+
+### What changed
+
+- **Six methods migrated to `DiagnosticResult`** — `verify_code`, `verify_function_contract`, `verify_safety_properties`, `verify_bounded`, `analyze_complexity`, and `get_verification_budget` now return the unified [3-layer diagnostic](/advanced/diagnostics) type. Every result carries `status` (`DiagnosticStatus`), `agent_message` (Layer 1), `developer_fields` (Layer 2), and `proof_ref` (Layer 3, always `None` for this engine).
+- **`verification_mode` on every result** — `developer_fields["verification_mode"]` is `"symbolic"` for standard runs and `"bounded_symbolic"` for `verify_bounded()`, so callers can distinguish the two verification modes without inspecting the call site.
+- **`VERIFIED` is intentionally never emitted** — CrossHair's search is timeout-bounded, not a completeness proof, so a clean run maps to `UNVERIFIABLE` with `constraint_id = "symbolic_verifier.no_counterexample_found"`. The `DiagnosticResult` contract structurally requires a `proof_ref` for `VERIFIED`, and this engine has no proof artifact to bind. Downstream policy gates must reject symbolic-engine output for control flow.
+- **`verify_code()` no longer accepts `check_assertions`** — the parameter was never wired up. The current signature is `verify_code(self, code: str) -> DiagnosticResult`.
+- **Advisory checks throughout** — `verify_safety_properties`, `analyze_complexity`, and `get_verification_budget` attach structured `AdvisoryCheck` entries to `developer_fields["advisory_checks"]`. Advisory checks never influence the verdict.
+
+### Before and after
+
+**Before**
+
+```python
+result = verifier.verify_code(code)
+
+if result["status"] == "verified":
+    admit(payload)
+elif result["status"] == "counterexamples_found":
+    for issue in result["issues"]:
+        log(issue["description"])
+```
+
+**After**
+
+```python
+from qwed_new.core.diagnostics import DiagnosticStatus
+
+result = verifier.verify_code(code)
+
+# This engine never emits VERIFIED — treat every result as unverified for
+# control flow, and use developer_fields for the specific reason.
+reject(payload, reason=result.agent_message)
+
+if result.status is DiagnosticStatus.UNVERIFIABLE:
+    if result.developer_fields["constraint_id"] == "symbolic_verifier.counterexample_found":
+        for issue in result.developer_fields["issues"]:
+            log(issue["description"])
+```
+
+### Field cheat sheet
+
+| Legacy field | Replacement |
+| --- | --- |
+| `result.verified` / `result["verified"]` | `result.is_verified` (always `False` for this engine) |
+| `result["status"]` (string) | `result.status` (`DiagnosticStatus` enum) and `developer_fields["constraint_id"]` |
+| `result["message"]` | `result.agent_message` |
+| `result["issues"]` | `result.developer_fields["issues"]` |
+| `result["complexity"]` / `"loop_depth"` / `"recursive"` | `developer_fields["complexity_score"]`, `"max_loop_depth"`, `"total_recursive_functions"` |
+| `result["is_safe"]` | `result.developer_fields["is_safe"]` |
+| `result["bounds_applied"]` | `result.developer_fields["bounds_applied"]` |
+| n/a | `result.developer_fields["verification_mode"]` — new (`"symbolic"` or `"bounded_symbolic"`) |
+| n/a | `result.proof_ref` — always `None` for this engine |
+
+### Version propagation
+
+| Artifact | Previous | This release |
+| --- | --- | --- |
+| `qwed` (PyPI) | 5.2.0 | 5.3.0 |
+| `qwed_sdk` (Python) | 5.2.0 | 5.3.0 |
+| `@qwed-ai/sdk` (npm) | 5.2.0 | 5.3.0 |
+| `qwed` (Rust crate) | 5.2.0 | 5.3.0 |
+| API version marker | 5.2.0 | 5.3.0 |
+| K8s deployment image | 5.2.0 | 5.3.0 |
+
+### Included PRs
+
+- [#212](https://github.com/QWED-AI/qwed-verification/pull/212) — feat: migrate SymbolicVerifier to DiagnosticResult (Phase 1)
+- [#220](https://github.com/QWED-AI/qwed-verification/pull/220) — fix: remove unused `check_assertions` parameter from `verify_code`
+- [#239](https://github.com/QWED-AI/qwed-verification/pull/239) — feat: add `verification_mode` to SymbolicVerifier DiagnosticResults
+- [#240](https://github.com/QWED-AI/qwed-verification/pull/240) — feat: migrate `verify_bounded` to return `DiagnosticResult`
+- [#241](https://github.com/QWED-AI/qwed-verification/pull/241) — feat: migrate `get_verification_budget` to return `DiagnosticResult`
+- [#242](https://github.com/QWED-AI/qwed-verification/pull/242) — feat: migrate `analyze_complexity` to return `DiagnosticResult`
+- [#243](https://github.com/QWED-AI/qwed-verification/pull/243) — feat: migrate `verify_safety_properties` to return `DiagnosticResult`
+- [#244](https://github.com/QWED-AI/qwed-verification/pull/244) — release: v5.3.0 — SymbolicVerifier: `DiagnosticResult` reference implementation
+
+### What this means for you
+
+If your integration reads any dict-shape field from a `SymbolicVerifier` result, update it before upgrading — the return type has changed and the old keys are gone. The [Code engine reference](/engines/code) documents the new contract, and [Symbolic execution limits](/advanced/symbolic-limits) has been rewritten around `DiagnosticResult`. Callers that gated control flow on `is_verified` for symbolic-engine output must move to `result.proof_ref` (the authority bit) instead — this engine intentionally never sets it, so symbolic results must not admit downstream execution.
+
+---
+
 ## QWED Math Engine — fail-closed on mode ambiguity, eigenvalue cardinality, and IRR convergence
 
 **Released: July 24, 2026** · [Jump to details](#qwed-math-engine--fail-closed-on-mode-ambiguity-eigenvalue-cardinality-and-irr-convergence) · [PR #217](https://github.com/qwed-ai/qwed-verification/pull/217) · [PR #218](https://github.com/qwed-ai/qwed-verification/pull/218) · [PR #219](https://github.com/qwed-ai/qwed-verification/pull/219)

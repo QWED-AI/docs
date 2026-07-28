@@ -4,7 +4,7 @@ description: "CrossHair symbolic execution limitations including path explosion,
 sidebarTitle: "Symbolic limits"
 ---
 
-> **TL;DR:** CrossHair symbolic execution has real-world limitations. QWED addresses these with bounded model checking, depth limits, and graceful fallbacks.
+> **TL;DR:** CrossHair symbolic execution has real-world limitations. QWED addresses these with bounded model checking, depth limits, and graceful fallbacks. Every result is a [`DiagnosticResult`](/advanced/diagnostics) — see the [Code engine reference](/engines/code) for the full field map.
 
 ## The path explosion problem
 
@@ -41,71 +41,94 @@ We implemented depth limits to prevent path explosion:
 
 ```python
 from qwed_new.core.symbolic_verifier import SymbolicVerifier
+from qwed_new.core.diagnostics import DiagnosticStatus
 
 verifier = SymbolicVerifier(
-    max_loop_iterations=100,  # Bound loops
-    max_recursion_depth=50,   # Bound recursion
-    timeout_seconds=30        # Hard timeout
+    timeout_seconds=30,   # Hard timeout per function
+    max_iterations=100,   # Bounded model checking limit
 )
 
 result = verifier.verify_code(code)
 
-if result["status"] == "TIMEOUT":
-    # Fallback to static analysis
-    print("Symbolic execution timed out, using AST analysis")
+if (result.status is DiagnosticStatus.UNVERIFIABLE
+        and result.developer_fields["constraint_id"] == "symbolic_verifier.timeout"):
+    # Fallback to a cheaper check
+    print("Symbolic execution timed out, using static analysis")
 ```
 
 ## Fail-closed verification results
 
-`verify_code()` is fail-closed: absence of proof is never reported as success. `is_verified` is only `True` when at least one function was actually checked, every checked function was proven, and no functions were skipped, unverifiable, or produced counterexamples.
+<Info>
+**Updated in v5.3.0.** `verify_code()` and every other `SymbolicVerifier` public method now return a [`DiagnosticResult`](/advanced/diagnostics). The legacy dict shape (`result["status"]`, `result["is_verified"]`, `result["functions_checked"]`) is gone. See the [Code engine migration guide](/engines/code#migrating-from-the-legacy-dict-api) for the field-by-field mapping.
+</Info>
 
-The result dictionary always includes the following counters:
+`verify_code()` is fail-closed: absence of proof is never reported as success. In fact, this engine **never emits `VERIFIED`** — CrossHair's search is timeout-bounded, not a completeness proof, so a clean run maps to `UNVERIFIABLE` with `constraint_id = "symbolic_verifier.no_counterexample_found"`. Treat symbolic-engine output as a bug hunter, not an authority.
+
+### Result fields
+
+<ResponseField name="status" type="DiagnosticStatus">
+  `DiagnosticStatus.UNVERIFIABLE` for any incomplete or counterexample-producing run, or `DiagnosticStatus.BLOCKED` when verification could not be attempted at all (parse error, no functions, CrossHair missing). Read `developer_fields["constraint_id"]` for the specific reason.
+</ResponseField>
 
 <ResponseField name="is_verified" type="boolean">
-  `True` only if symbolic proof actually succeeded for every discovered function. Defaults to `False` whenever proof was incomplete. The result also exposes `is_safe` and `verified` as aliases for the same boolean.
+  Convenience alias for `status is DiagnosticStatus.VERIFIED`. Always `False` for this engine.
 </ResponseField>
 
-<ResponseField name="status" type="string">
-  One of:
-  - `verified` — all functions were proven symbolically.
-  - `counterexamples_found` — CrossHair produced concrete counterexamples.
-  - `no_verifiable_functions` — code had no functions, or no typed functions could be checked.
-  - `unverifiable` — at least one function was skipped or could not be proven (e.g. missing type annotations).
-  - `verification_error` — verification did not complete cleanly.
-  - `crosshair_not_available` — CrossHair is not installed in the runtime.
-  - `syntax_error` — the submitted code could not be parsed.
+<ResponseField name="agent_message" type="string">
+  Layer 1 agent-safe summary of the outcome. Safe to surface to models — no rule IDs, detection logic, or internals.
 </ResponseField>
 
-<ResponseField name="message" type="string">
-  Human-readable explanation of the status.
+<ResponseField name="proof_ref" type="string | None">
+  Layer 3 proof reference. Always `None` for the Code engine.
 </ResponseField>
 
-<ResponseField name="functions_discovered" type="integer">
+<ResponseField name="developer_fields.constraint_id" type="string">
+  Structured reason code. One of:
+  - `symbolic_verifier.no_counterexample_found` — clean CrossHair run, still `UNVERIFIABLE` because completeness was not proven.
+  - `symbolic_verifier.counterexample_found` — CrossHair disproved a check.
+  - `symbolic_verifier.timeout` — verification did not converge within `timeout_seconds`.
+  - `symbolic_verifier.incomplete_coverage` — at least one function could not be checked.
+  - `symbolic_verifier.no_typed_functions` — no functions carried the type hints CrossHair requires.
+  - `symbolic_verifier.no_verifiable_functions` — the source contained no functions.
+  - `symbolic_verifier.syntax_error` — the code could not be parsed.
+  - `symbolic_verifier.crosshair_not_available` — the CrossHair engine is not installed.
+  - `symbolic_verifier.verification_error` — verification did not complete cleanly.
+</ResponseField>
+
+<ResponseField name="developer_fields.verification_mode" type="string">
+  `"symbolic"` for standard runs, `"bounded_symbolic"` for `verify_bounded()` runs.
+</ResponseField>
+
+<ResponseField name="developer_fields.functions_discovered" type="integer">
   Total functions found in the submitted code.
 </ResponseField>
 
-<ResponseField name="functions_checked" type="integer">
+<ResponseField name="developer_fields.functions_checked" type="integer">
   Functions that were actually run through symbolic execution. A skipped function does not count as checked.
 </ResponseField>
 
-<ResponseField name="functions_verified" type="integer">
+<ResponseField name="developer_fields.functions_verified" type="integer">
   Functions that were proven by CrossHair without counterexamples.
 </ResponseField>
 
-<ResponseField name="functions_skipped" type="integer">
+<ResponseField name="developer_fields.functions_skipped" type="integer">
   Functions skipped because they cannot be analyzed (for example, no type annotations).
 </ResponseField>
 
-<ResponseField name="functions_unverifiable" type="integer">
+<ResponseField name="developer_fields.functions_unverifiable" type="integer">
   Functions that could not be proven, including skipped functions and functions whose verification raised an error.
 </ResponseField>
 
-<ResponseField name="counterexamples_found" type="integer">
+<ResponseField name="developer_fields.counterexamples_found" type="integer">
   Number of concrete counterexamples produced by CrossHair.
 </ResponseField>
 
-<ResponseField name="issues" type="array">
-  List of issue objects with `type` (`unverifiable`, `counterexample`, or `error`), `function` name, and `description`.
+<ResponseField name="developer_fields.timeouts_found" type="integer">
+  Number of per-function timeout issues reported.
+</ResponseField>
+
+<ResponseField name="developer_fields.issues" type="array">
+  Per-function issue records with `type` (`unverifiable`, `counterexample`, `timeout`, or `error`), `function` name, and `description`.
 </ResponseField>
 
 ### Why untyped code fails closed
@@ -113,52 +136,38 @@ The result dictionary always includes the following counters:
 CrossHair requires type annotations to perform symbolic execution. Functions without type hints are reported as `skipped` and `unverifiable`, and the overall result fails closed:
 
 ```python
-code = """
+result = verifier.verify_code("""
 def add(a, b):
     return a + b
-"""
+""")
 
-result = verifier.verify_code(code)
-
-assert result["is_verified"] is False
-assert result["status"] == "no_verifiable_functions"
-assert result["functions_discovered"] == 1
-assert result["functions_checked"] == 0
-assert result["functions_skipped"] == 1
-assert result["functions_unverifiable"] == 1
+assert result.is_verified is False
+assert result.developer_fields["constraint_id"] == "symbolic_verifier.no_typed_functions"
+assert result.developer_fields["functions_discovered"] == 1
+assert result.developer_fields["functions_checked"] == 0
+assert result.developer_fields["functions_skipped"] == 1
+assert result.developer_fields["functions_unverifiable"] == 1
 ```
 
-Mixed code that contains both typed and untyped functions also fails closed — a single skipped function is enough to set `is_verified=False` and `status="unverifiable"`. Code that contains no functions at all returns `status="no_verifiable_functions"` rather than a pass-like result.
+Mixed code that contains both typed and untyped functions also fails closed — a single skipped function is enough to keep `is_verified = False` and produce `constraint_id = "symbolic_verifier.incomplete_coverage"`. Code that contains no functions at all returns `BLOCKED` with `constraint_id = "symbolic_verifier.no_verifiable_functions"`.
 
-Pre-verification exits (`crosshair_not_available`, `syntax_error`) return the same fail-closed shape — `is_verified=False` and zeroed counters — so callers can rely on the same fields regardless of how verification ended.
+Pre-verification exits (`crosshair_not_available`, `syntax_error`) return the same fail-closed shape — `is_verified` is `False` and function counters are absent from `developer_fields` — so callers can rely on `constraint_id` and `agent_message` regardless of how verification ended.
 
 ## Configuration guide
 
 ### Conservative (fast, less coverage)
 ```python
-config = {
-    "max_loop_iterations": 10,
-    "max_recursion_depth": 10,
-    "timeout_seconds": 5
-}
+verifier = SymbolicVerifier(timeout_seconds=5, max_iterations=10)
 ```
 
 ### Balanced (default)
 ```python
-config = {
-    "max_loop_iterations": 100,
-    "max_recursion_depth": 50,
-    "timeout_seconds": 30
-}
+verifier = SymbolicVerifier(timeout_seconds=30, max_iterations=100)
 ```
 
 ### Thorough (slow, more coverage)
 ```python
-config = {
-    "max_loop_iterations": 1000,
-    "max_recursion_depth": 100,
-    "timeout_seconds": 300
-}
+verifier = SymbolicVerifier(timeout_seconds=300, max_iterations=1000)
 ```
 
 ## Fallback strategy
@@ -208,72 +217,54 @@ We tested CrossHair on different code types:
 ```python
 from qwed_new.core.symbolic_verifier import SymbolicVerifier
 
-# Create verifier with custom limits
 verifier = SymbolicVerifier(
-    max_loop_iterations=100,
-    max_recursion_depth=50,
-    timeout_seconds=30
+    timeout_seconds=30,
+    max_iterations=100,
 )
 
-# Check if code is verifiable before executing
-budget = verifier.get_verification_budget(code)
-if budget["estimated_time_seconds"] > 60:
+# Estimate path budget before spending real time on verification.
+budget = verifier.get_verification_budget(code, max_paths=1000)
+if not budget.developer_fields["feasible"]:
     print("Code too complex for symbolic execution")
 
-# Verify with fallback
-result = verifier.verify_code(
-    code=code,
-    fallback_to_ast=True  # Use AST if symbolic fails
-)
+# Run symbolic verification.
+result = verifier.verify_code(code)
 ```
 
 ### Bounded model checking
 
-`verify_bounded()` applies loop and recursion bounds to the code before verification. If the bounds transform itself fails (e.g., the AST cannot be unparsed after transformation), the method returns a `bounds_transform_error` status instead of silently falling back to the original code:
+`verify_bounded()` applies loop and recursion bounds to the code before verification, then delegates to `verify_code()`. Every result sets `developer_fields["verification_mode"] = "bounded_symbolic"` and includes the applied bounds and the underlying complexity analysis. If the bounds transform itself fails (for example, the AST cannot be unparsed after transformation), the method returns `BLOCKED` with `constraint_id = "symbolic_verifier.bounds_transform_error"` instead of silently falling back to the original code:
 
 ```python
 result = verifier.verify_bounded(code, loop_bound=50, recursion_depth=20)
 
-if result["status"] == "bounds_transform_error":
-    print(result["message"])  # Describes why the transform failed
-    print(result["issues"])   # [{"type": "error", "description": "..."}]
+if result.developer_fields.get("constraint_id") == "symbolic_verifier.bounds_transform_error":
+    print(result.agent_message)                      # Describes why the transform failed
+    print(result.developer_fields["transform_error"]) # The underlying error message
 ```
 
 ## Fail-closed result semantics
 
-`SymbolicVerifier.verify_code()` treats absence of proof as failure. A result is only `is_verified: true` when CrossHair actually proved every function it checked. Code that contains no functions, contains untyped functions, or mixes typed and untyped functions cannot pass.
+`SymbolicVerifier.verify_code()` treats absence of proof as failure. The engine never emits `VERIFIED` — a clean CrossHair run is `UNVERIFIABLE` with `constraint_id = "symbolic_verifier.no_counterexample_found"`. Code that contains no functions, contains untyped functions, or mixes typed and untyped functions cannot ever appear as verified.
 
-### Result fields
+### Result reason table
 
-The result dictionary distinguishes how each function was handled, so you can tell the difference between "verified" and "not actually checked":
+| `developer_fields["constraint_id"]`               | When it applies |
+| ------------------------------------------------- | ---------------- |
+| `symbolic_verifier.no_counterexample_found`       | Every checked function ran cleanly. Still `UNVERIFIABLE` because completeness is not proven. |
+| `symbolic_verifier.counterexample_found`          | CrossHair returned at least one counterexample. |
+| `symbolic_verifier.timeout`                       | At least one function timed out. |
+| `symbolic_verifier.incomplete_coverage`           | At least one function was skipped or errored. |
+| `symbolic_verifier.no_typed_functions`            | Every discovered function was skipped (for example, all untyped). |
+| `symbolic_verifier.no_verifiable_functions`       | The source contained no functions. |
+| `symbolic_verifier.syntax_error`                  | The submitted code could not be parsed. |
+| `symbolic_verifier.crosshair_not_available`       | The CrossHair engine is not installed. |
 
-| Field | Meaning |
-|-------|---------|
-| `is_verified` | `true` only if at least one function was checked, all checked functions were proven, no functions were skipped or unverifiable, and no counterexamples were found. |
-| `status` | One of `verified`, `no_verifiable_functions`, `unverifiable`, `counterexamples_found`, or `verification_error`. |
-| `message` | Human-readable explanation of the status. |
-| `functions_discovered` | Total functions found in the source. |
-| `functions_checked` | Functions actually submitted to CrossHair. |
-| `functions_verified` | Functions CrossHair proved. |
-| `functions_skipped` | Functions skipped (for example, missing type annotations). |
-| `functions_unverifiable` | Functions that could not be proven, including skipped functions and verification errors. |
-| `counterexamples_found` | Number of counterexample issues reported. |
-| `issues` | Per-function issue records. Skipped functions appear with `type: "unverifiable"`. |
-
-### Status values
-
-| `status` | When it applies |
-|----------|-----------------|
-| `verified` | At least one function was checked and every checked function was proven. |
-| `no_verifiable_functions` | No functions were found, or every discovered function was skipped (for example, all untyped). |
-| `unverifiable` | At least one function was skipped or could not be proven. Some functions may still have been verified. |
-| `counterexamples_found` | CrossHair returned at least one counterexample. |
-| `verification_error` | Verification did not complete cleanly for another reason. |
-
-### Typed function — passes
+### Typed function — no counterexample found
 
 ```python
 from qwed_new.core.symbolic_verifier import SymbolicVerifier
+from qwed_new.core.diagnostics import DiagnosticStatus
 
 verifier = SymbolicVerifier(timeout_seconds=5)
 
@@ -282,16 +273,16 @@ def add(x: int, y: int) -> int:
     return x + y
 """)
 
-result["is_verified"]            # True
-result["status"]                 # "verified"
-result["functions_checked"]      # 1
-result["functions_verified"]     # 1
-result["functions_unverifiable"] # 0
+result.status                                     # DiagnosticStatus.UNVERIFIABLE
+result.developer_fields["constraint_id"]          # "symbolic_verifier.no_counterexample_found"
+result.developer_fields["functions_checked"]      # 1
+result.developer_fields["functions_verified"]     # 1
+result.developer_fields["functions_unverifiable"] # 0
 ```
 
 ### Untyped function — fails closed
 
-CrossHair requires type hints. Untyped functions are now reported as skipped and unverifiable rather than silently passing:
+CrossHair requires type hints. Untyped functions are reported as skipped and unverifiable rather than silently passing:
 
 ```python
 result = verifier.verify_code("""
@@ -299,13 +290,13 @@ def add(a, b):
     return a + b
 """)
 
-result["is_verified"]              # False
-result["status"]                   # "no_verifiable_functions"
-result["functions_discovered"]     # 1
-result["functions_checked"]        # 0
-result["functions_skipped"]        # 1
-result["functions_unverifiable"]   # 1
-result["issues"][0]["type"]        # "unverifiable"
+result.is_verified                                 # False
+result.developer_fields["constraint_id"]           # "symbolic_verifier.no_typed_functions"
+result.developer_fields["functions_discovered"]    # 1
+result.developer_fields["functions_checked"]       # 0
+result.developer_fields["functions_skipped"]       # 1
+result.developer_fields["functions_unverifiable"]  # 1
+result.developer_fields["issues"][0]["type"]       # "unverifiable"
 ```
 
 ### Mixed typed and untyped — fails closed
@@ -321,27 +312,27 @@ def untyped_add(a, b):
     return a + b
 """)
 
-result["is_verified"]            # False
-result["status"]                 # "unverifiable"
-result["functions_discovered"]   # 2
-result["functions_checked"]      # 1
-result["functions_verified"]     # 1
-result["functions_skipped"]      # 1
+result.is_verified                              # False
+result.developer_fields["constraint_id"]        # "symbolic_verifier.incomplete_coverage"
+result.developer_fields["functions_discovered"] # 2
+result.developer_fields["functions_checked"]    # 1
+result.developer_fields["functions_verified"]   # 1
+result.developer_fields["functions_skipped"]    # 1
 ```
 
 ### Code with no functions — fails closed
 
-Source that contains only top-level statements has nothing to prove and is no longer reported as `is_verified: true`:
+Source that contains only top-level statements has nothing to prove and is reported as `BLOCKED`:
 
 ```python
 result = verifier.verify_code("x = 1 + 2\nprint(x)\n")
 
-result["is_verified"]   # False
-result["status"]        # "no_verifiable_functions"
+result.status                              # DiagnosticStatus.BLOCKED
+result.developer_fields["constraint_id"]   # "symbolic_verifier.no_verifiable_functions"
 ```
 
 <Warning>
-Do not gate downstream behavior on `is_verified` alone without also inspecting `functions_checked`. If `functions_checked == 0`, no symbolic proof was performed regardless of any other field.
+Do not gate downstream behavior on `is_verified` alone — for the Code engine it is always `False`. Downstream authority checks must inspect `result.proof_ref`, which this engine intentionally leaves as `None`. Use `developer_fields["constraint_id"]` for the specific reason and `developer_fields["functions_checked"]` to distinguish "no counterexample found" from "no symbolic proof was performed."
 </Warning>
 
 ## Summary
@@ -352,6 +343,7 @@ Do not gate downstream behavior on `is_verified` alone without also inspecting `
 | How does QWED handle this? | **Bounded model checking + fallbacks.** |
 | What's the typical code size limit? | **~50-100 lines of simple code.** |
 | When should I use it? | **LLM-generated utilities and validation.** |
+| Does this engine ever emit `VERIFIED`? | **No.** CrossHair is timeout-bounded; a clean run is `UNVERIFIABLE`. |
 
 ---
 
