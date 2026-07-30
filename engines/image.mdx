@@ -45,9 +45,21 @@ print(result.methods_used) # ["metadata_extraction", "size_verification"]
 | Text            | OCR required     | ❌ VLM          |
 | Semantic        | Understanding    | ❌ VLM          |
 
-## Multi-VLM consensus
+## Result contract
 
-For semantic claims, use multiple VLMs:
+The Image Engine returns a [`DiagnosticResult`](/advanced/diagnostics) whose status depends on which path handled the claim:
+
+| Path | `DiagnosticResult.status` | Notes |
+|---|---|---|
+| Deterministic evidence supports the claim | `VERIFIED` | Emits a `proof_ref` bound to pixel or metadata evidence. |
+| Deterministic evidence refutes the claim | `BLOCKED` | Fail-closed refutation. |
+| VLM cross-check only | `UNVERIFIABLE` | VLM results are recorded in `advisory_checks`; the engine never emits `VERIFIED` from a VLM alone. |
+
+This mirrors the [3-tier engine classification](/engines/overview): a VLM signal is advisory and cannot promote a claim to `VERIFIED`.
+
+## Multi-VLM consensus (advisory)
+
+For semantic claims, use multiple VLMs. The consensus verdict is stored in `advisory_checks` — it does not change the diagnostic status:
 
 ```python
 result = client.verify_image_consensus(
@@ -56,8 +68,9 @@ result = client.verify_image_consensus(
     min_agreement=2  # At least 2 VLMs must agree
 )
 
-print(result.agreement_count)  # 3/3
-print(result.vlm_results)      # Individual VLM responses
+print(result.status)                          # "UNVERIFIABLE" (VLM-only)
+for check in result.advisory_checks:
+    print(check["name"], check.get("value"))  # vlm_consensus, agreement_count
 ```
 
 ## Supported providers for image verification

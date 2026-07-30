@@ -6,6 +6,8 @@ description: "The QWED Reasoning Engine validates LLM reasoning traces using cha
 
 The Reasoning Engine validates LLM reasoning traces using chain-of-thought parsing and multi-provider verification.
 
+Because reasoning validation depends on LLM providers, this engine is [advisory](/engines/overview#tier-3-advisory-engines): provider-backed and heuristic checks populate `advisory_checks`, and the engine does not emit `VERIFIED` on their basis alone. When no provider is available, the engine returns `UNVERIFIABLE` with `constraint_id: reasoning_verifier.no_provider` — passing `providers=[]` no longer silently defaults to `["anthropic"]`.
+
 ## Features
 
 - **Chain-of-Thought Validation** - Parse and verify reasoning steps

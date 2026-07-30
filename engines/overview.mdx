@@ -92,29 +92,50 @@ Example policy-engine output:
 
 ## Tier 3: Advisory engines
 
-Advisory engines run **structured heuristic analysis** on inputs where a formal proof is not available. They emit `AdvisoryCheck` records only — they can never emit `VERIFIED`, and their signals are carried as `advisory_checks` in the diagnostic result.
+Advisory engines run **structured heuristic analysis** on inputs where a formal proof is not available. Heuristic and model-based paths emit `AdvisoryCheck` records only — they can never emit `VERIFIED`, and their signals are carried as `advisory_checks` in the diagnostic result.
 
-**Guarantee.** Advisory outputs are transparent and inspectable, but not deterministic proofs. Treat them as inputs to audit and human review, not as verification statuses.
+**Guarantee.** Advisory outputs are transparent and inspectable, but not deterministic proofs. Treat them as inputs to audit and human review, not as verification statuses. An LLM or VLM fallback never overwrites a deterministic verdict.
 
 **When to use.** Fact-similarity checks, knowledge-graph triples, reasoning traces, multi-model consensus, and image analysis — signals that inform a decision but should not gate execution on their own.
 
-| Engine | Approach |
-|---|---|
-| [Fact](/engines/fact) | TF-IDF similarity, entity matching, citations |
-| [Graph](/engines/graph) | Knowledge-graph triple checks |
-| [Reasoning](/engines/reasoning) | Multi-LLM chain-of-thought review |
-| [Consensus](/engines/consensus) | Parallel-execution agreement |
-| [Image](/engines/image) | Deterministic metadata + VLM cross-check |
+| Engine | Deterministic path | Advisory-only path |
+|---|---|---|
+| [Fact](/engines/fact) | TF-IDF + entity matching → `VERIFIED` (supported) or `BLOCKED` (refuted) | LLM fallback → `advisory_checks.llm_reasoning` |
+| [Graph](/engines/graph) | Full-support triple match → `VERIFIED` | NLI fallback → `advisory_checks` |
+| [Image](/engines/image) | Pixel/metadata evidence → `VERIFIED` with `proof_ref` | VLM cross-check → `UNVERIFIABLE` with advisory checks |
+| [Reasoning](/engines/reasoning) | — | LLM providers and heuristics are advisory; no provider → `UNVERIFIABLE` |
+| [Consensus](/engines/consensus) | Preserves engine-level `BLOCKED` / `UNVERIFIABLE` / `VERIFIED` | Non-unanimous agreement stays advisory |
 
-Example advisory-engine output:
+Some engines in this tier are **hybrid**: a deterministic sub-path (for example, the Fact TF-IDF verdict or an Image pixel check) can still emit `VERIFIED` with a `proof_ref` or `BLOCKED` on a refutation. Only the heuristic or model fallback path is strictly advisory. Consensus is a status-preserving aggregator: it never invents a `VERIFIED` from disagreement, and math-translation failures fail closed.
+
+Example advisory-only output (LLM fallback path):
 
 ```python
 {
-  "status": "ADVISORY",
+  "status": "UNVERIFIABLE",
   "engine": "Fact",
   "advisory_checks": [
-    {"name": "tfidf_similarity", "score": 0.82, "threshold": 0.75}
-  ]
+    {"name": "tfidf_similarity", "score": 0.62, "threshold": 0.75},
+    {"name": "llm_reasoning", "advisory_only": True, "text": "..."}
+  ],
+  "developer_fields": {"deterministic_confidence": 0.62}
+}
+```
+
+Example hybrid deterministic output (Fact, claim supported by context):
+
+```python
+{
+  "status": "VERIFIED",
+  "engine": "Fact",
+  "proof_ref": "sha256:a1b2...",
+  "developer_fields": {
+    "deterministic_confidence": 0.94,
+    "methods_used": [
+      {"name": "semantic_similarity", "advisory_only": False},
+      {"name": "keyword_overlap", "advisory_only": False}
+    ]
+  }
 }
 ```
 
@@ -126,7 +147,8 @@ Compare engines by the output guarantee they provide, not by a single accuracy n
 |---|---|---|---|---|---|
 | Proof engines | ✅ Yes (with `proof_ref`) | Evidence | ✅ Reproducible | ✅ Full trace + proof | Production AI decisions |
 | Policy enforcement | ❌ No — `BLOCK` / `UNVERIFIABLE` | Decision | ✅ Reproducible | ✅ Decision trace | Runtime agent guards |
-| Advisory | ❌ No — `AdvisoryCheck` only | Analysis | ⚠️ Heuristic | ✅ Structured diagnostics | Audit and review |
+| Advisory (deterministic path) | ✅ Yes, only when a deterministic sub-check produces `proof_ref` | Evidence or Analysis | ✅ Reproducible | ✅ Structured diagnostics | Fact / Image / Graph deterministic checks |
+| Advisory (heuristic path) | ❌ No — `AdvisoryCheck` only | Analysis | ⚠️ Heuristic | ✅ Structured diagnostics | Audit and review |
 
 For comparison to other approaches:
 
@@ -152,8 +174,10 @@ QWED auto-detects the appropriate engine based on content, then routes through t
 | JSON with embedded math | Schema | Proof |
 | Retrieval context | RAGGuard | Policy enforcement |
 | MCP tool definition | MCPPoisonGuard | Policy enforcement |
-| Claim + context | Fact | Advisory |
-| Image bytes + claim | Image | Advisory |
+| Claim + context | Fact | Advisory (hybrid) |
+| Image bytes + claim | Image | Advisory (hybrid) |
+| Reasoning trace | Reasoning | Advisory |
+| Knowledge-graph triples | Graph | Advisory (hybrid) |
 
 Or specify explicitly:
 
