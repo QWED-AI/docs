@@ -215,6 +215,158 @@ if not result.satisfiable:
 
 ---
 
+## `LogicVerifier` returns `DiagnosticResult` (v5.4.0)
+
+<Info>
+**Introduced in v5.4.0.** `LogicVerifier` is the second engine — after `FactVerifier` — to conform to the unified [`DiagnosticResult` contract](/advanced/diagnostics). The legacy `LogicResult` dataclass has been removed. The high-level SDK client (`client.verify_logic()`) and the `/verify/logic` API endpoint still return the same SAT/UNSAT/UNKNOWN shape shown above.
+</Info>
+
+If you call the low-level `LogicVerifier` class directly, every one of its nine public methods now returns a `DiagnosticResult`:
+
+- `verify_logic`
+- `verify_with_quantifiers`
+- `verify_bitvector`
+- `verify_array`
+- `prove_theorem`
+- `check_implication`
+- `check_equivalence`
+- `verify_optimization`
+- `check_vacuity`
+
+### Reading a result
+
+```python
+from qwed_new.core.logic_verifier import LogicVerifier
+
+verifier = LogicVerifier()
+result = verifier.verify_logic(
+    variables={"x": "Int", "y": "Int"},
+    constraints=["x > 0", "y > 0", "x + y == 10"],
+)
+
+result.is_verified                                  # True
+result.status.value                                 # "VERIFIED"
+result.developer_fields["deterministic_verdict"]    # "SAT"
+result.developer_fields["model"]                    # {"x": "5", "y": "5"}
+result.developer_fields["symbol_table"]             # [{"name": "x", "type": "Int"}, {"name": "y", "type": "Int"}]
+result.proof_ref                                    # "sha256:..." (present only when VERIFIED)
+result.agent_message                                # "Logic constraints are satisfiable — model found"
+```
+
+The three [diagnostic layers](/advanced/diagnostics#the-3-layer-model) — `agent_message`, `developer_fields`, and `proof_ref` — are populated on every result. `proof_ref` is computed from the Z3 solver's assertion stack and is present **only** when `status == "VERIFIED"`.
+
+### SAT/UNSAT status matrix
+
+Z3's `sat`/`unsat` outcome has different meanings depending on the method. The engine disambiguates by mapping each per-method outcome to a `DiagnosticResult` status and recording the raw Z3 verdict under `developer_fields.deterministic_verdict`.
+
+| Method | Z3 `sat` | Z3 `unsat` | Z3 `unknown` |
+| --- | --- | --- | --- |
+| `verify_logic` | `VERIFIED` (model found) | `UNVERIFIABLE` (no model) | `UNVERIFIABLE` |
+| `verify_with_quantifiers` | `VERIFIED` | `UNVERIFIABLE` | `UNVERIFIABLE` |
+| `verify_bitvector` | `VERIFIED` | `UNVERIFIABLE` | `UNVERIFIABLE` |
+| `verify_array` | `VERIFIED` | `UNVERIFIABLE` | `UNVERIFIABLE` |
+| `prove_theorem` | `BLOCKED` (counterexample) | `VERIFIED` (theorem proved by contradiction) | `UNVERIFIABLE` |
+| `check_implication` | `BLOCKED` | `VERIFIED` | `UNVERIFIABLE` |
+| `check_equivalence` | `BLOCKED` (counterexample) | `VERIFIED` (equivalent) | `UNVERIFIABLE` |
+| `verify_optimization` | `VERIFIED` (optimal model) | `UNVERIFIABLE` | `UNVERIFIABLE` |
+| `check_vacuity` | `VERIFIED` (non-vacuous) | `UNVERIFIABLE` (vacuously true) | `UNVERIFIABLE` |
+
+<Tip>
+Always branch on `result.is_verified` (or `result.proof_ref is not None`) for control flow. Read `developer_fields["deterministic_verdict"]` for diagnostic context — never for authorization.
+</Tip>
+
+### `symbol_table` on every VERIFIED result
+
+`developer_fields.symbol_table` is a sorted list of every declared variable and its type. It is included on every `VERIFIED` result so audit logs record exactly what was proven:
+
+```python
+result.developer_fields["symbol_table"]
+# [
+#   {"name": "age",  "type": "Int"},
+#   {"name": "seat", "type": "BitVec[8]"},
+# ]
+```
+
+### New `BLOCKED` constraint IDs
+
+Two fail-closed behaviors ship with the migration:
+
+| `constraint_id` | Trigger |
+| --- | --- |
+| `logic_verifier.explicit_declarations_required` | The `variables` dict is empty. The previous `_infer_variables` heuristic has been removed — the engine now refuses to guess types from constraint syntax. |
+| `dsl_compiler.type_validation` | A variable is declared with a malformed type such as `"BitVec"` (missing width), `"BitVec[]"`, or `"BitVec[abc]"`. The engine no longer silently defaults to 32-bit; you must declare a valid `BitVec[N]` with `N ≥ 1`. |
+
+Other `constraint_id`s used by the engine: `logic_verifier.invalid_constraint`, `logic_verifier.unknown_quantifier`, and `logic_verifier.execution_error`.
+
+### Migrating from `LogicResult`
+
+**Status field**
+
+```python
+# Before — LogicResult with a solver-level status string
+result = verifier.verify_logic(variables, constraints)
+if result.status == "SAT":
+    solution = result.model
+elif result.status == "UNSAT":
+    ...
+```
+
+```python
+# After — DiagnosticResult with method-scoped semantics
+result = verifier.verify_logic(variables, constraints)
+if result.is_verified:
+    solution = result.developer_fields["model"]
+elif result.developer_fields.get("deterministic_verdict") == "UNSAT":
+    ...
+```
+
+**Proving a theorem**
+
+```python
+# Before — SAT meant "theorem is valid"
+result = verifier.prove_theorem(variables, premises, conclusion)
+if result.status == "SAT":
+    ...   # theorem valid
+elif result.status == "UNSAT":
+    counterexample = result.model
+```
+
+```python
+# After — VERIFIED means "theorem proved", BLOCKED means "counterexample found"
+result = verifier.prove_theorem(variables, premises, conclusion)
+if result.is_verified:
+    ...   # theorem proved by contradiction
+elif result.status.value == "BLOCKED":
+    counterexample = result.developer_fields["model"]
+```
+
+**Variable declarations are now mandatory**
+
+```python
+# Before — the engine tried to infer types from constraint syntax
+result = verifier.verify_logic({}, ["x > 5", "P and Q"])
+# Types guessed: x -> Int, P/Q -> Bool
+
+# After — empty variables dict fails closed
+result = verifier.verify_logic({}, ["x > 5", "P and Q"])
+result.status.value                              # "BLOCKED"
+result.developer_fields["constraint_id"]         # "logic_verifier.explicit_declarations_required"
+```
+
+**Malformed `BitVec` declarations fail closed**
+
+```python
+# Before — silently defaulted to 32-bit
+result = verifier.verify_bitvector({"x": "BitVec"}, ["x == 0"])
+
+# After — BLOCKED with a type-validation constraint ID
+result = verifier.verify_logic({"x": "BitVec"}, ["x == 0"])
+result.status.value                              # "BLOCKED"
+result.developer_fields["constraint_id"]         # "dsl_compiler.type_validation"
+```
+
+---
+
 ## Performance
 
 | Operation             | Avg Latency |
@@ -228,5 +380,6 @@ if not result.satisfiable:
 ## Next steps
 
 - [DSL reference](/api/dsl-reference) - Complete operator documentation
+- [Verification diagnostics](/advanced/diagnostics) - The 3-layer `DiagnosticResult` model
 - [Code engine](./code) - Verify code correctness
 - [SQL engine](./sql) - Verify SQL queries
