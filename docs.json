@@ -7,7 +7,10 @@
     "light": "#34d399",
     "dark": "#047857"
   },
-  "favicon": "/favicon.svg",
+  "favicon": {
+    "light": "/images/qwed-mark-ink-32.png",
+    "dark": "/images/qwed-mark-ink-32.png"
+  },
   "redirects": [
     {
       "source": "/docs",
@@ -372,7 +375,7 @@
   },
   "logo": {
     "light": "/images/avatar-paper-bg.png",
-    "dark": "/logo/dark.svg",
+    "dark": "/images/avatar-paper-bg.png",
     "href": "https://docs.qwedai.com"
   },
   "navbar": {
