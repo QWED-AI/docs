@@ -374,8 +374,8 @@
     ]
   },
   "logo": {
-    "light": "/images/qwed-ai-lockup-paper-bg.png",
-    "dark": "/images/qwed-ai-lockup-paper-bg.png",
+    "light": "/images/qwed-mark-pine.svg",
+    "dark": "/images/qwed-mark-pine.svg",
     "href": "https://docs.qwedai.com"
   },
   "navbar": {
