@@ -371,7 +371,7 @@
     ]
   },
   "logo": {
-    "light": "/logo/light.svg",
+    "light": "/images/avatar-paper-bg.png",
     "dark": "/logo/dark.svg",
     "href": "https://docs.qwedai.com"
   },
