@@ -133,3 +133,15 @@ Final confidence = weighted average of agreeing engines.
 | `split` | No clear majority among engines |
 | `no_results` | No engines returned a result |
 | `blocked_secure_execution` | The Docker sandbox is unavailable and a required engine cannot run (returns HTTP 503) |
+
+## Status propagation
+
+Consensus is a status-preserving aggregator, not a proof engine. Per the [3-tier engine classification](/engines/overview), consensus never invents a `VERIFIED` status from disagreement:
+
+- All engines return `BLOCKED` → the consensus result is `BLOCKED`.
+- Any single engine returns `BLOCKED` (but not all) → the consensus result is capped at `UNVERIFIABLE` (fail-closed — a partial block prevents `VERIFIED`).
+- Any engine returns `UNVERIFIABLE` → the consensus result is `UNVERIFIABLE`.
+- Only unanimous `VERIFIED` engine outcomes can produce a `VERIFIED` consensus.
+- Math-query translation failures fail closed — the engine raises rather than fabricating a numeric answer from a regex or decimal guess.
+
+Individual engine outcomes are exposed via the `status` field on each `EngineResult` in the aggregated result.
