@@ -1,57 +1,200 @@
 ---
 sidebar_position: 1
-title: "Verification engines"
-description: "QWED provides 11 specialized verification engines for math, logic, code, SQL, and more, each using deterministic methods first and LLMs only as fallback."
+title: "Verification engine tiers: Proof, Policy, Advisory"
+description: "How QWED classifies verification engines into Proof, Policy Enforcement, and Advisory tiers, and which engines can emit VERIFIED with a proof_ref."
 ---
 
-## Engine overview
+QWED verification engines are formally classified into three tiers, each with a distinct output guarantee. This classification defines what an engine can and cannot claim, and constrains the "no hallucinations" property to supported proof domains.
 
-| Engine | Technology | Key features |
-| --- | --- | --- |
-| **Math** | SymPy \+ Decimal | Calculus, matrix ops, NPV/IRR, statistics |
-| **Logic** | Z3 theorem prover | ForAll/Exists quantifiers, BitVectors, arrays |
-| **Reasoning** | Multi-LLM \+ cache | Chain-of-thought validation, result caching |
-| **Stats** | Wasm/Docker sandbox | Secure code execution with AST validation |
-| **Fact** | TF-IDF \+ NLP | Semantic similarity, entity matching, citations |
-| **Graph** | Knowledge graph | Triple verification (subject-predicate-object) |
-| **Code** | Multi-lang AST | Python, JavaScript, Java, Go security analysis |
-| **SQL** | SQLGlot AST | Complexity limits, cost estimation, schema validation |
-| **Taint** | Data flow analysis | Trace untrusted inputs to sensitive sinks (e.g., `exec`, `os.system`, SQL queries) |
-| **Image** | Deterministic \+ VLM | Metadata extraction, size verification, multi-VLM |
-| **Schema** | Pydantic \+ Math | JSON structure \+ embedded calculation checks |
+## The 3-tier engine architecture
 
-## Deterministic-first philosophy
+```mermaid
+flowchart TB
+    P["<b>Proof engines</b><br/>VERIFIED + proof_ref<br/>Deterministic verification<br/><i>Output: Evidence</i>"]
+    E["<b>Policy enforcement engines</b><br/>BLOCK / UNVERIFIABLE<br/>Rule-based deterministic<br/><i>Output: Decision</i>"]
+    A["<b>Advisory engines</b><br/>AdvisoryCheck (heuristic) —<br/>VERIFIED only via deterministic sub-path<br/><i>Output: Analysis</i>"]
 
-All engines follow a **deterministic-first** approach:
+    P --> E --> A
 
-1. **Try deterministic methods first** (100% reproducible)
-2. **Fall back to LLM only when necessary**
-3. **Discount LLM confidence** when used
-
-```python
-# Example: fact verification is deterministic
-result = client.verify_fact(
-    claim="Paris is in France",
-    context="Paris is the capital of France."
-)
-# Uses TF-IDF similarity + entity matching
-# No LLM needed for most claims
+    classDef proof fill:#ecfeff,stroke:#06b6d4,color:#155e75;
+    classDef policy fill:#fef3c7,stroke:#d97706,color:#92400e;
+    classDef advisory fill:#f5f3ff,stroke:#8b5cf6,color:#5b21b6;
+    class P proof;
+    class E policy;
+    class A advisory;
 ```
 
-> **See [Determinism guarantee](/advanced/determinism-guarantee)** for the full engine classification and how to check if a response is `SYMBOLIC` or `HEURISTIC`.
+A single verification request flows through the tiers: proof engines attempt a deterministic proof, policy enforcement engines apply runtime rules, and advisory engines contribute structured diagnostics. Only a deterministic proof — whether from the proof tier or a deterministic sub-path of a hybrid engine — can produce a `VERIFIED` status.
+
+<Info>
+As of **v6.0.0** every trust-boundary path returns the unified `DiagnosticResult` model — agent-safe, developer, and proof layers. See the [Verification Diagnostics guide](/advanced/diagnostics) for the full model.
+</Info>
+
+## Tier 1: Proof engines
+
+Proof engines produce **mathematical evidence** using symbolic solvers and formal methods. They are the only tier whose entire surface emits `VERIFIED`, and `VERIFIED` always requires a `proof_ref`. (Hybrid advisory engines can also emit `VERIFIED`, but only on a deterministic sub-path — see [Tier 3](#tier-3-advisory-engines).)
+
+**Guarantee.** For supported proof domains, hallucinations cannot bypass deterministic verification — an answer either has a reproducible proof or it is not `VERIFIED`.
+
+**When to use.** Any claim that can be reduced to arithmetic, algebra, a constraint system, an AST invariant, a SQL structure, or a schema check.
+
+| Engine | Backend | Domain |
+|---|---|---|
+| [Math](/engines/math) | SymPy + Decimal | Arithmetic, calculus, matrices, NPV/IRR |
+| [Logic](/engines/logic) | Z3 | SAT/SMT, quantifiers, BitVectors |
+| [SQL](/engines/sql) | SQLGlot AST | Query structure, complexity, schema |
+| [Code](/engines/code) | Multi-language AST | Python, JS, Java, Go security analysis |
+| [Schema](/engines/schema) | Pydantic + Math | JSON structure + embedded calculations |
+| [Stats](/engines/stats) | Pandera + Wasm | Data-frame invariants, sandboxed exec |
+| Symbolic | CrossHair | Reference `DiagnosticResult` engine |
+
+Example proof-engine output:
+
+```python
+{
+  "status": "VERIFIED",
+  "engine": "QWED-Math-v2",
+  "proof_ref": "sha256:9f2c...",
+  "evidence": {"expression": "2+2", "value": 4}
+}
+```
+
+## Tier 2: Policy enforcement engines
+
+Policy enforcement engines apply **deterministic policies** to inputs, contexts, and tool calls at runtime. They produce enforcement decisions — `BLOCK` or `UNVERIFIABLE` — but never a mathematical proof.
+
+**Guarantee.** Rule-based, reproducible enforcement. The same input against the same policy produces the same decision, with a full decision trace.
+
+**When to use.** Runtime guardrails on agents, MCP tools, RAG contexts, configs, and processes — anywhere you need a deterministic gate but the underlying question is not a math problem.
+
+| Engine | Purpose |
+|---|---|
+| SystemGuard | System-prompt integrity and policy binding |
+| ConfigGuard | Secret detection and configuration policy |
+| RAGGuard | Retrieval-context injection and poisoning defense |
+| MCPPoisonGuard | MCP tool definition validation |
+| ExfiltrationGuard | Unauthorized data-movement prevention |
+| SelfInitiatedCoTGuard | Reasoning-flow integrity |
+| SovereigntyGuard | Data residency and routing policy |
+| StartupHookGuard | Startup and hook integrity |
+| ProcessVerifier | Milestone-based process validation |
+
+Example policy-engine output:
+
+```python
+{
+  "status": "BLOCK",
+  "engine": "ConfigGuard",
+  "reason": "SECRETS_DETECTED",
+  "decision_trace": ["match:OPENAI_API_KEY@api_key"]
+}
+```
+
+## Tier 3: Advisory engines
+
+Advisory engines run **structured heuristic analysis** on inputs where a formal proof is not available. Heuristic and model-based paths emit `AdvisoryCheck` records only — they can never emit `VERIFIED`, and their signals are carried as `advisory_checks` in the diagnostic result. The exception is a deterministic sub-path inside a hybrid engine (Graph or Image), which can emit `VERIFIED` with a `proof_ref`; a purely heuristic signal never can.
+
+**Guarantee.** Advisory outputs are transparent and inspectable, but not deterministic proofs. Treat them as inputs to audit and human review, not as verification statuses. An LLM or VLM fallback never overwrites a deterministic verdict.
+
+**When to use.** Fact-similarity checks, knowledge-graph triples, reasoning traces, multi-model consensus, and image analysis — signals that inform a decision but should not gate execution on their own.
+
+| Engine | Deterministic path | Advisory-only path |
+|---|---|---|
+| [Fact](/engines/fact) | TF-IDF + entity matching → capped at `UNVERIFIABLE` (heuristic `SUPPORTED` is never `VERIFIED`) or `BLOCKED` (refuted) | LLM fallback → `advisory_checks.llm_reasoning` |
+| [Graph](/engines/graph) | Full-support triple match → `VERIFIED` | NLI fallback → `advisory_checks` |
+| [Image](/engines/image) | Pixel/metadata evidence → `VERIFIED` with `proof_ref` | VLM cross-check → `UNVERIFIABLE` with advisory checks |
+| [Reasoning](/engines/reasoning) | — | LLM providers and heuristics are advisory; no provider → `UNVERIFIABLE` |
+| [Consensus](/engines/consensus) | Preserves engine-level `BLOCKED` / `UNVERIFIABLE` / `VERIFIED` | Non-unanimous agreement stays advisory |
+
+Some engines in this tier are **hybrid**: a deterministic sub-path (for example, an Image pixel check or a Graph full-triple match) can still emit `VERIFIED` with a `proof_ref` or `BLOCKED` on a refutation. Only the heuristic or model fallback path is strictly advisory. The Fact engine is the exception: its deterministic path is heuristic TF-IDF analysis, so even a `SUPPORTED` verdict is capped at `UNVERIFIABLE`. Consensus is a status-preserving aggregator: it never invents a `VERIFIED` from disagreement, and math-translation failures fail closed.
+
+Example advisory-only output (LLM fallback path):
+
+```python
+{
+  "status": "UNVERIFIABLE",
+  "engine": "Fact",
+  "advisory_checks": [
+    {"name": "tfidf_similarity", "score": 0.62, "threshold": 0.75},
+    {"name": "llm_reasoning", "advisory_only": True, "text": "..."}
+  ],
+  "developer_fields": {"deterministic_confidence": 0.62}
+}
+```
+
+Example hybrid deterministic output (Image, claim supported by pixel/metadata evidence):
+
+```python
+{
+  "status": "VERIFIED",
+  "engine": "Image",
+  "proof_ref": "sha256:a1b2...",
+  "developer_fields": {
+    "deterministic_confidence": 0.94,
+    "methods_used": [
+      {"name": "metadata_extraction", "advisory_only": False},
+      {"name": "size_verification", "advisory_only": False}
+    ]
+  }
+}
+```
+
+For comparison, the Fact engine's deterministic verdict stays capped at `UNVERIFIABLE` even when a claim is supported — heuristic TF-IDF support is never a proof:
+
+```python
+{
+  "status": "UNVERIFIABLE",
+  "engine": "Fact",
+  "constraint_id": "fact_verifier.heuristic_supported",
+  "developer_fields": {
+    "deterministic_confidence": 0.94,
+    "methods_used": [
+      {"name": "semantic_similarity", "advisory_only": False},
+      {"name": "keyword_overlap", "advisory_only": False}
+    ]
+  }
+}
+```
+
+## Behavior by engine type
+
+Compare engines by the output guarantee they provide, not by a single accuracy number — different tiers are answering different questions.
+
+| Tier | Emits `VERIFIED`? | Output kind | Determinism | Explainability | Best for |
+|---|---|---|---|---|---|
+| Proof engines | ✅ Yes (with `proof_ref`) | Evidence | ✅ Reproducible | ✅ Full trace + proof | Production AI decisions |
+| Policy enforcement | ❌ No — `BLOCK` / `UNVERIFIABLE` | Decision | ✅ Reproducible | ✅ Decision trace | Runtime agent guards |
+| Advisory (deterministic path) | ✅ Yes, only when a deterministic sub-check produces `proof_ref` | Evidence or Analysis | ✅ Reproducible | ✅ Structured diagnostics | Graph / Image deterministic checks |
+| Advisory (heuristic path) | ❌ No — `AdvisoryCheck` only | Analysis | ⚠️ Heuristic | ✅ Structured diagnostics | Audit and review |
+
+For comparison to other approaches:
+
+| Approach | Emits proof? | Deterministic | Explainable |
+|---|---|---|---|
+| QWED proof engines | ✅ Yes | ✅ Yes | ✅ Full trace + `proof_ref` |
+| QWED policy enforcement | ❌ No | ✅ Yes | ✅ Decision trace |
+| QWED advisory | ❌ No | ⚠️ Heuristic | ✅ Structured diagnostics |
+| Fine-tuning / RLHF | ❌ No | ❌ No | ❌ Black box |
+| RAG (retrieval) | ❌ No | ❌ No | ⚠️ Limited |
+| LLM-as-judge | ❌ No | ❌ No | ❌ Prompt-dependent |
 
 ## Engine selection
 
-QWED auto-detects the appropriate engine:
+QWED auto-detects the appropriate engine based on content, then routes through the tiers:
 
-| Content pattern | Detected engine |
-| --- | --- |
-| `2+2=4`, `sqrt(16)`, `derivative` | Math |
-| `(AND ...)`, `ForAll`, `Exists` | Logic |
-| `SELECT`, `INSERT`, `DROP` | SQL |
-| ````python`, `import`, `function` | Code |
-| Claims with context | Fact |
-| Image bytes \+ claim | Image |
+| Content pattern | Detected engine | Tier |
+|---|---|---|
+| `2+2=4`, `sqrt(16)`, `derivative` | Math | Proof |
+| `(AND ...)`, `ForAll`, `Exists` | Logic | Proof |
+| `SELECT`, `INSERT`, `DROP` | SQL | Proof |
+| ```` ```python ````, `import`, `function` | Code | Proof |
+| JSON with embedded math | Schema | Proof |
+| Retrieval context | RAGGuard | Policy enforcement |
+| MCP tool definition | MCPPoisonGuard | Policy enforcement |
+| Claim + context | Fact | Advisory |
+| Image bytes + claim | Image | Advisory (hybrid) |
+| Reasoning trace | Reasoning | Advisory |
+| Knowledge-graph triples | Graph | Advisory (hybrid) |
 
 Or specify explicitly:
 
@@ -59,28 +202,36 @@ Or specify explicitly:
 result = client.verify(query, type="math")
 ```
 
+## Deterministic-first philosophy
+
+Across all tiers, QWED follows a **deterministic-first** approach:
+
+1. Try deterministic methods first (100% reproducible).
+2. Fall back to advisory signals only when necessary.
+3. Never promote a heuristic signal to `VERIFIED` — advisory outputs stay in `advisory_checks`.
+
+> See [Determinism guarantee](/advanced/determinism-guarantee) for how to inspect whether a response is `SYMBOLIC` or `HEURISTIC`, and the [Verification Diagnostics guide](/advanced/diagnostics) for the full `DiagnosticResult` model.
+
 ## Engine documentation
 
-### Deterministic engines
+### Proof engines
 
 - [Math engine](/engines/math) — calculus, matrix, financial
 - [Logic engine](/engines/logic) — quantifiers, theorem proving
-- [Schema engine](/engines/schema) — JSON structure & math
-
-### Security engines
-
+- [Schema engine](/engines/schema) — JSON structure and math
 - [Code engine](/engines/code) — multi-language security
 - [SQL engine](/engines/sql) — complexity limits
-- [Taint engine](/engines/taint) — data flow analysis
+- [Stats engine](/engines/stats) — Pandera invariants, Wasm sandbox
+- [Taint engine](/engines/taint) — data-flow analysis
 
-### Data verification engines
+### Advisory engines
 
-- [Stats engine](/engines/stats) — Wasm sandbox execution
-- [Fact engine](/engines/fact) — TF-IDF \+ citations
-- [Graph engine](/engines/graph) — knowledge graph triples
-- [Image engine](/engines/image) — deterministic verification
-
-### Orchestration engines
-
-- [Reasoning engine](/engines/reasoning) — multi-LLM validation
+- [Fact engine](/engines/fact) — TF-IDF and citations
+- [Graph engine](/engines/graph) — knowledge-graph triples
+- [Image engine](/engines/image) — metadata and VLM cross-check
+- [Reasoning engine](/engines/reasoning) — multi-LLM review
 - [Consensus engine](/engines/consensus) — parallel execution
+
+### Policy enforcement
+
+Policy enforcement engines ship as [SDK guards](/sdks/guards) — see that page for `SystemGuard`, `ConfigGuard`, `RAGGuard`, `MCPPoisonGuard`, `ExfiltrationGuard`, `SelfInitiatedCoTGuard`, `SovereigntyGuard`, `StartupHookGuard`, and `ProcessVerifier`.
