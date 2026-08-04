@@ -1,7 +1,7 @@
 ---
 sidebar_position: "7"
 title: "Image engine"
-description: "QWED's Image Engine verifies image claims using deterministic metadata extraction first, with multi-VLM consensus fallback for complex semantic claims."
+description: "QWED's Image Engine verifies image claims using deterministic metadata extraction first, with advisory-only VLM fallback for semantic claims."
 ---
 
 The Image Engine verifies claims about images using **deterministic methods first**, with VLM fallback only for complex semantic claims.
@@ -11,7 +11,7 @@ The Image Engine verifies claims about images using **deterministic methods firs
 - **Metadata extraction** — dimensions and format (PNG, JPEG, GIF, WebP)
 - **Size verification** — exact dimension comparison from metadata
 - **Claim classification** — routes claims to the appropriate verifier
-- **Multi-VLM consensus** — cross-validates semantic claims
+- **Advisory VLM cross-check** — optional model fallback for semantic claims
 
 ## Usage
 
@@ -20,19 +20,15 @@ from qwed_sdk import QWEDClient
 
 client = QWEDClient(api_key="qwed_...")
 
-# Read image
-with open("chart.png", "rb") as f:
-    image_bytes = f.read()
-
 # Verify claim
 result = client.verify_image(
-    image=image_bytes,
+    image_path="chart.png",
     claim="The image is 800x600 pixels"
 )
 
-print(result.verdict)      # "SUPPORTED" or "REFUTED"
-print(result.confidence)   # 1.0 (deterministic!)
-print(result.methods_used) # ["metadata_extraction", "size_verification"]
+print(result.status)      # "VERIFIED" (deterministic metadata proof)
+print(result.is_verified) # True
+print(result.result["developer_fields"]["analysis"]["metadata"])  # {"width": 800, "height": 600, "format": "png"}
 ```
 
 ## Claim types
@@ -57,20 +53,18 @@ The Image Engine returns a [`DiagnosticResult`](/advanced/diagnostics) whose sta
 
 This mirrors the [3-tier engine classification](/engines/overview): a VLM signal is advisory and cannot promote a claim to `VERIFIED`.
 
-## Multi-VLM consensus (advisory)
+## VLM cross-check (advisory)
 
-For semantic claims, use multiple VLMs. The consensus verdict is stored in `advisory_checks` — it does not change the diagnostic status:
+Semantic claims (color, text, visual understanding) cannot be proven deterministically. The core `ImageVerifier` supports a VLM fallback for these claims when instantiated with `use_vlm_fallback=True`; the VLM output is recorded in `advisory_checks` and does not change the diagnostic status. The public `/verify/image` endpoint runs with `use_vlm_fallback=False`, so via the SDK a semantic claim resolves to `UNVERIFIABLE` with the VLM path listed as advisory-only:
 
 ```python
-result = client.verify_image_consensus(
-    image=image_bytes,
-    claim="The person is smiling",
-    min_agreement=2  # At least 2 VLMs must agree
+result = client.verify_image(
+    image_path="photo.png",
+    claim="The person is smiling"
 )
 
-print(result.status)                          # "UNVERIFIABLE" (VLM-only)
-for check in result.advisory_checks:
-    print(check["name"], check.get("value"))  # vlm_consensus, agreement_count
+print(result.status)      # "UNVERIFIABLE" (deterministic path cannot verify)
+print(result.result["developer_fields"].get("advisory_checks", []))  # [] for SDK/API path
 ```
 
 ## Supported providers for image verification

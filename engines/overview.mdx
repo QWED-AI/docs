@@ -12,7 +12,7 @@ QWED verification engines are formally classified into three tiers, each with a 
 flowchart TB
     P["<b>Proof engines</b><br/>VERIFIED + proof_ref<br/>Deterministic verification<br/><i>Output: Evidence</i>"]
     E["<b>Policy enforcement engines</b><br/>BLOCK / UNVERIFIABLE<br/>Rule-based deterministic<br/><i>Output: Decision</i>"]
-    A["<b>Advisory engines</b><br/>AdvisoryCheck only<br/>Structured heuristic analysis<br/><i>Output: Analysis</i>"]
+    A["<b>Advisory engines</b><br/>AdvisoryCheck (heuristic) —<br/>VERIFIED only via deterministic sub-path<br/><i>Output: Analysis</i>"]
 
     P --> E --> A
 
@@ -24,15 +24,15 @@ flowchart TB
     class A advisory;
 ```
 
-A single verification request flows through the tiers: proof engines attempt a deterministic proof, policy enforcement engines apply runtime rules, and advisory engines contribute structured diagnostics. Only the proof tier can produce a `VERIFIED` status.
+A single verification request flows through the tiers: proof engines attempt a deterministic proof, policy enforcement engines apply runtime rules, and advisory engines contribute structured diagnostics. Only a deterministic proof — whether from the proof tier or a deterministic sub-path of a hybrid engine — can produce a `VERIFIED` status.
 
 <Info>
-This is the target `DiagnosticResult` architecture. `SymbolicVerifier` is the reference implementation; other engines are being migrated incrementally and some still return legacy types (e.g., `Dict[str, Any]` with a `verified` boolean, or `ImageVerificationResult`).
+As of **v6.0.0** every trust-boundary path returns the unified `DiagnosticResult` model — agent-safe, developer, and proof layers. See the [Verification Diagnostics guide](/advanced/diagnostics) for the full model.
 </Info>
 
 ## Tier 1: Proof engines
 
-Proof engines produce **mathematical evidence** using symbolic solvers and formal methods. They are the only tier that can emit `VERIFIED`, and `VERIFIED` always requires a `proof_ref`.
+Proof engines produce **mathematical evidence** using symbolic solvers and formal methods. They are the only tier whose entire surface emits `VERIFIED`, and `VERIFIED` always requires a `proof_ref`. (Hybrid advisory engines can also emit `VERIFIED`, but only on a deterministic sub-path — see [Tier 3](#tier-3-advisory-engines).)
 
 **Guarantee.** For supported proof domains, hallucinations cannot bypass deterministic verification — an answer either has a reproducible proof or it is not `VERIFIED`.
 
@@ -92,7 +92,7 @@ Example policy-engine output:
 
 ## Tier 3: Advisory engines
 
-Advisory engines run **structured heuristic analysis** on inputs where a formal proof is not available. Heuristic and model-based paths emit `AdvisoryCheck` records only — they can never emit `VERIFIED`, and their signals are carried as `advisory_checks` in the diagnostic result.
+Advisory engines run **structured heuristic analysis** on inputs where a formal proof is not available. Heuristic and model-based paths emit `AdvisoryCheck` records only — they can never emit `VERIFIED`, and their signals are carried as `advisory_checks` in the diagnostic result. The exception is a deterministic sub-path inside a hybrid engine (Graph or Image), which can emit `VERIFIED` with a `proof_ref`; a purely heuristic signal never can.
 
 **Guarantee.** Advisory outputs are transparent and inspectable, but not deterministic proofs. Treat them as inputs to audit and human review, not as verification statuses. An LLM or VLM fallback never overwrites a deterministic verdict.
 
@@ -100,13 +100,13 @@ Advisory engines run **structured heuristic analysis** on inputs where a formal 
 
 | Engine | Deterministic path | Advisory-only path |
 |---|---|---|
-| [Fact](/engines/fact) | TF-IDF + entity matching → `VERIFIED` (supported) or `BLOCKED` (refuted) | LLM fallback → `advisory_checks.llm_reasoning` |
+| [Fact](/engines/fact) | TF-IDF + entity matching → capped at `UNVERIFIABLE` (heuristic `SUPPORTED` is never `VERIFIED`) or `BLOCKED` (refuted) | LLM fallback → `advisory_checks.llm_reasoning` |
 | [Graph](/engines/graph) | Full-support triple match → `VERIFIED` | NLI fallback → `advisory_checks` |
 | [Image](/engines/image) | Pixel/metadata evidence → `VERIFIED` with `proof_ref` | VLM cross-check → `UNVERIFIABLE` with advisory checks |
 | [Reasoning](/engines/reasoning) | — | LLM providers and heuristics are advisory; no provider → `UNVERIFIABLE` |
 | [Consensus](/engines/consensus) | Preserves engine-level `BLOCKED` / `UNVERIFIABLE` / `VERIFIED` | Non-unanimous agreement stays advisory |
 
-Some engines in this tier are **hybrid**: a deterministic sub-path (for example, the Fact TF-IDF verdict or an Image pixel check) can still emit `VERIFIED` with a `proof_ref` or `BLOCKED` on a refutation. Only the heuristic or model fallback path is strictly advisory. Consensus is a status-preserving aggregator: it never invents a `VERIFIED` from disagreement, and math-translation failures fail closed.
+Some engines in this tier are **hybrid**: a deterministic sub-path (for example, an Image pixel check or a Graph full-triple match) can still emit `VERIFIED` with a `proof_ref` or `BLOCKED` on a refutation. Only the heuristic or model fallback path is strictly advisory. The Fact engine is the exception: its deterministic path is heuristic TF-IDF analysis, so even a `SUPPORTED` verdict is capped at `UNVERIFIABLE`. Consensus is a status-preserving aggregator: it never invents a `VERIFIED` from disagreement, and math-translation failures fail closed.
 
 Example advisory-only output (LLM fallback path):
 
@@ -122,13 +122,30 @@ Example advisory-only output (LLM fallback path):
 }
 ```
 
-Example hybrid deterministic output (Fact, claim supported by context):
+Example hybrid deterministic output (Image, claim supported by pixel/metadata evidence):
 
 ```python
 {
   "status": "VERIFIED",
-  "engine": "Fact",
+  "engine": "Image",
   "proof_ref": "sha256:a1b2...",
+  "developer_fields": {
+    "deterministic_confidence": 0.94,
+    "methods_used": [
+      {"name": "metadata_extraction", "advisory_only": False},
+      {"name": "size_verification", "advisory_only": False}
+    ]
+  }
+}
+```
+
+For comparison, the Fact engine's deterministic verdict stays capped at `UNVERIFIABLE` even when a claim is supported — heuristic TF-IDF support is never a proof:
+
+```python
+{
+  "status": "UNVERIFIABLE",
+  "engine": "Fact",
+  "constraint_id": "fact_verifier.heuristic_supported",
   "developer_fields": {
     "deterministic_confidence": 0.94,
     "methods_used": [
@@ -147,7 +164,7 @@ Compare engines by the output guarantee they provide, not by a single accuracy n
 |---|---|---|---|---|---|
 | Proof engines | ✅ Yes (with `proof_ref`) | Evidence | ✅ Reproducible | ✅ Full trace + proof | Production AI decisions |
 | Policy enforcement | ❌ No — `BLOCK` / `UNVERIFIABLE` | Decision | ✅ Reproducible | ✅ Decision trace | Runtime agent guards |
-| Advisory (deterministic path) | ✅ Yes, only when a deterministic sub-check produces `proof_ref` | Evidence or Analysis | ✅ Reproducible | ✅ Structured diagnostics | Fact / Image / Graph deterministic checks |
+| Advisory (deterministic path) | ✅ Yes, only when a deterministic sub-check produces `proof_ref` | Evidence or Analysis | ✅ Reproducible | ✅ Structured diagnostics | Graph / Image deterministic checks |
 | Advisory (heuristic path) | ❌ No — `AdvisoryCheck` only | Analysis | ⚠️ Heuristic | ✅ Structured diagnostics | Audit and review |
 
 For comparison to other approaches:
@@ -174,7 +191,7 @@ QWED auto-detects the appropriate engine based on content, then routes through t
 | JSON with embedded math | Schema | Proof |
 | Retrieval context | RAGGuard | Policy enforcement |
 | MCP tool definition | MCPPoisonGuard | Policy enforcement |
-| Claim + context | Fact | Advisory (hybrid) |
+| Claim + context | Fact | Advisory |
 | Image bytes + claim | Image | Advisory (hybrid) |
 | Reasoning trace | Reasoning | Advisory |
 | Knowledge-graph triples | Graph | Advisory (hybrid) |
