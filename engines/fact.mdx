@@ -4,16 +4,16 @@ title: "Fact engine"
 description: "The QWED Fact Engine verifies textual claims against source documents using TF-IDF similarity, keyword overlap, entity matching, and negation detection."
 ---
 
-The Fact Engine verifies factual claims using **deterministic methods first**, without requiring LLM calls for most claims.
+The Fact Engine verifies factual claims against a supplied context using **deterministic methods first**. The deterministic verdict determines the returned `status`; any LLM fallback is recorded as an [advisory check](/advanced/diagnostics) and can never overwrite the deterministic outcome. Because the deterministic path is heuristic TF-IDF analysis, a supported claim is capped at `UNVERIFIABLE` — see [Result contract](#result-contract).
 
 ## Features
 
-- **TF-IDF semantic similarity** - No LLM needed.
-- **Keyword overlap analysis** - Fast and deterministic.
-- **Entity matching** - Numbers, dates, names.
-- **Citation extraction** - With relevance scoring.
-- **Negation detection** - Catch contradictions.
-- **LLM fallback** - Only when confidence is low.
+- **TF-IDF semantic similarity** — no LLM needed.
+- **Keyword overlap analysis** — fast and deterministic.
+- **Entity matching** — numbers, dates, names.
+- **Citation extraction** — with relevance scoring.
+- **Negation detection** — catch contradictions.
+- **Advisory-only LLM fallback** — invoked only when deterministic confidence is below `min_confidence`, and its result is stored in `advisory_checks`.
 
 ## Usage
 
@@ -27,30 +27,68 @@ result = client.verify_fact(
     context="Acme Corp was founded in 2020 by John Smith in San Francisco."
 )
 
-print(result.verdict)       # "SUPPORTED"
-print(result.confidence)    # 0.95
-print(result.citations)     # [{"sentence": "...", "relevance": 0.98}]
-print(result.methods_used)  # ["semantic_similarity", "entity_matching"]
+print(result.status)                    # "UNVERIFIABLE"
+print(result.is_verified)               # False
+print(result.result["developer_fields"]["deterministic_confidence"])  # 0.94
+print(result.result["developer_fields"]["citations"])                 # [{"sentence": "...", "relevance": 0.98}]
 ```
+
+## Result contract
+
+The Fact Engine returns a [`DiagnosticResult`](/advanced/diagnostics). The deterministic verdict maps to a diagnostic status as follows:
+
+| Deterministic verdict | `DiagnosticResult.status` | Notes |
+|---|---|---|
+| `SUPPORTED` | `UNVERIFIABLE` | Heuristic support is advisory-only — returns `constraint_id: fact_verifier.heuristic_supported` and never a `proof_ref`. |
+| `REFUTED` (via negation) | `BLOCKED` | Fail-closed — refutation is treated as a block. |
+| `NEUTRAL` | `UNVERIFIABLE` | Neither supported nor refuted by the context. |
+| `INSUFFICIENT_EVIDENCE` | `UNVERIFIABLE` | Not enough overlap to decide. |
+| Empty claim or context | `UNVERIFIABLE` | Returns `constraint_id: fact_verifier.empty_input`. |
+| Pipeline error | `BLOCKED` | Unexpected errors fail closed rather than silently pass. |
+
+Confidence is exposed via `developer_fields.deterministic_confidence` and is **never verdict-deciding** — the mapping above is based on the deterministic verdict alone.
 
 ## Scoring methods
 
-| Method              | What it checks           | Weight |
-| ------------------- | ------------------------ | ------ |
-| Semantic similarity | TF-IDF cosine distance   | 0.25   |
-| Keyword overlap     | Shared important words   | 0.20   |
-| Entity match        | Numbers, dates, names    | 0.35   |
-| Negation conflict   | Contradicting statements | 0.20   |
+| Method              | What it checks           | Weight | Advisory only |
+| ------------------- | ------------------------ | ------ | ------------- |
+| Semantic similarity | TF-IDF cosine distance   | 0.25   | No |
+| Keyword overlap     | Shared important words   | 0.20   | No |
+| Entity match        | Numbers, dates, names    | 0.35   | No |
+| Negation conflict   | Contradicting statements | 0.20   | No |
+| LLM fallback        | Model reasoning          | —      | Yes |
 
-## Why deterministic?
+`methods_used` in the result reflects this shape — each entry carries an `advisory_only` flag so callers can tell deterministic contributions from advisory ones.
 
+## Advisory-only LLM fallback
+
+When the deterministic confidence is below `min_confidence` and a provider is configured, the engine calls an LLM for additional analysis. The LLM output is recorded in `advisory_checks` and does not change the returned `status`:
+
+```python
+{
+  "status": "UNVERIFIABLE",
+  "engine": "Fact",
+  "advisory_checks": [
+    {"name": "tfidf_similarity", "score": 0.62, "threshold": 0.75},
+    {"name": "llm_reasoning", "advisory_only": True, "text": "..."},
+    {"name": "llm_confidence", "advisory_only": True, "value": 0.71}
+  ],
+  "developer_fields": {"deterministic_confidence": 0.62}
+}
 ```
-BEFORE (v1): 
-Claim → LLM → "I think this is supported" 😕
 
-AFTER (v2):
-Claim → TF-IDF + Entity Match → SUPPORTED ✅
-       (LLM only if confidence < 0.7)
+This preserves the guarantee from the [3-tier engine classification](/engines/overview): the Fact engine is [advisory](/engines/overview#tier-3-advisory-engines) — even its deterministic heuristic path (`SUPPORTED`) is capped at `UNVERIFIABLE` and never emits `VERIFIED` with a `proof_ref`. Only a deterministic refutation (`BLOCKED`) or an unexpected error fail closed.
+
+## Batch verification
+
+`BatchFactVerifier` summaries are counted by diagnostic status:
+
+```python
+from qwed_new.core.fact_verifier import BatchFactVerifier
+
+batch = BatchFactVerifier()
+summary = batch.verify_batch(claims, context=context)
+print(summary["summary"]["verified"])      # count of VERIFIED items
+print(summary["summary"]["unverifiable"])  # NEUTRAL / INSUFFICIENT / empty
+print(summary["summary"]["blocked"])       # REFUTED or pipeline errors
 ```
-
-No more hallucinated fact checks!

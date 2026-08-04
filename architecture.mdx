@@ -1,7 +1,7 @@
 ---
 sidebar_position: 11
-title: "Architecture overview"
-description: "QWED architecture for deterministic verification of LLM outputs and AI agent actions using formal methods, policy guards, and signed attestations."
+title: "QWED architecture: translation, verification, guards"
+description: "High-level QWED architecture separating untrusted LLM translation from deterministic verification engines, agent security guards, and signed attestations."
 ---
 
 This page gives the high-level architecture.  
@@ -50,13 +50,18 @@ flowchart TB
 
 ### 3) Verification engines (deterministic)
 
+Verification engines are grouped into three tiers with distinct output guarantees. Only a **deterministic proof** — from a proof engine or a deterministic sub-path of a hybrid engine (Graph, Image, Consensus) — can emit `VERIFIED` with a `proof_ref`. **Policy enforcement engines** emit `BLOCK` / `UNVERIFIABLE`, and **advisory engines** (Fact, Reasoning) emit `AdvisoryCheck` records only. See [Verification engines](/engines/overview) for the full 3-tier classification.
+
 | Engine | Purpose |
-|---|---|
-| Math | Symbolic arithmetic and algebra checks |
-| Logic | SAT/SMT verification and constraint solving |
-| Code | AST and symbolic security analysis |
-| SQL | Query safety and structure validation |
-| Schema/Taint/Graph/Stats/Fact/Image/Reasoning | Domain-specific verification paths |
+|---|---|---|
+| Math | Symbolic arithmetic and algebra checks (proof) |
+| Logic | SAT/SMT verification and constraint solving (proof) |
+| Code | AST and symbolic security analysis (proof) |
+| SQL | Query safety and structure validation (proof) |
+| Schema / Stats / Taint | Structural and data-flow proofs |
+| Graph / Image | Hybrid — deterministic paths can emit `VERIFIED` with a `proof_ref`; LLM/VLM fallbacks are advisory |
+| Fact / Reasoning | Advisory analysis (never `VERIFIED`) |
+| Consensus | Status-preserving aggregator — `VERIFIED` only on unanimous engine outcomes |
 
 ### 4) Agent security guards
 
