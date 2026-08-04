@@ -7,6 +7,169 @@ All notable changes to the QWED platform, listed by release.
 
 ---
 
+## v6.0.0 — Trust Boundary Completion
+
+**Released: August 2, 2026** · [GitHub Release ↗](https://github.com/QWED-AI/qwed-verification/releases/tag/v6.0.0) · [GitHub PR #291](https://github.com/QWED-AI/qwed-verification/pull/291)
+
+> v6.0.0 closes the **Trust Boundary Completion** epic (Issue #263, 12/12 sub-issues). Every verification pathway now returns a unified [`DiagnosticResult`](/advanced/diagnostics) and routes through `enforce_trust_decision`. The trust boundary is no longer advisory: the control plane requires and verifies attestation before admitting `VERIFIED` results, and `VERIFIED` is a protocol guarantee backed by a deterministic `proof_ref` — never by execution, agreement, confidence, or provenance.
+
+<Warning>
+**Breaking change.** `/verify/*` API responses now use the unified [`DiagnosticResult`](/advanced/diagnostics) schema (`status` / `agent_message` / `developer_fields` / `proof_ref`). Consumers that parsed the previous ad-hoc dict responses must migrate to the unified 3-layer contract. The high-level SDK clients (`qwed`, `qwed_sdk`, `@qwed-ai/sdk`, and the `qwed` Rust crate) already surface `DiagnosticResult` at v6.0.0 and require no code change beyond the version bump.
+</Warning>
+
+### Architecture: observation vs. admission
+
+The API is the **observation surface** — an honest witness that returns what verification found. The control plane is the **admission authority** — the judge that decides what is admitted as `VERIFIED`. `QWED_RULES.md` now codifies this separation (#13 Separation of Responsibilities, #14 Verification Semantics, #15 Truth Before Policy; rules #7/#8 updated for admission-boundary and deterministic-proof semantics).
+
+- **All `/verify/*` endpoints return `DiagnosticResult`** — unified response contract across every verification surface (PR #276)
+- **Control plane enforces mandatory attestation** — `require_attestation=True`, attestation issued and verified at the admission boundary, and the enforced status drives the HTTP response status (PR #278). See [Cryptographic attestations](/advanced/attestations).
+- **Batch math routes through the trust boundary** — `/verify/batch` results carry `DiagnosticResult`, `proof_ref`, and attestation, and pass through `enforce_trust_decision` (PR #282). See [`POST /verify/batch`](/api/endpoints#post-verifybatch).
+- **Attestation scope alignment** — attestations bind to the translated expression, not the natural-language query, so `query_hash` binds to what was actually verified (PR #285).
+
+### `VERIFIED` is a protocol guarantee
+
+No engine emits `VERIFIED` without a deterministic `proof_ref`. Heuristic and advisory analysis now reports `UNVERIFIABLE` with structured `advisory_checks` instead of masquerading as verified.
+
+- **`ConsensusResult`** uses the `DiagnosticStatus` enum with `proof_ref` and `verified_evidence` (PR #280). See [Consensus engine](/engines/consensus).
+- **`FactVerifier`** heuristic SUPPORTED verdict → `UNVERIFIABLE` with `advisory_checks` (PR #283).
+- **Consensus code execution** advisory-only — `VERIFIED` → `UNVERIFIABLE` (PR #281).
+- **Consensus stats** advisory-only — never `VERIFIED` (PR #277).
+- **`LogicVerifier`** migrated to `DiagnosticResult` (PR #262 — details in the entry below).
+- **`AgentStateGuard`** `proof_ref` is now a real `sha256` of committed bytes, not a static sentence (PR #284). See [Agent state guard](/advanced/agent-state-guard).
+
+### Engineering and security hardening
+
+- **TOCTOU closure in `enforce_trust_decision`** — `developer_fields` snapshotted via recursive rebuild (no `deepcopy` alias window); fail-closed snapshot (PR #290)
+- **Attestation signature verified before claim decode** — silent generic error for every failure mode (PR #287)
+- **Tenant-isolated verification cache** — `VerificationCache` keys namespaced by normalized `tenant_id` (PR #286)
+- **Unicode normalization** in `AgentStateGuard` canonicalization — NFC collisions rejected (PR #288)
+- **Mandatory proof artifact** for `VERIFIED` attestations at both issuance and consumption (PR #248)
+- **Credential / JWT / dockerignore security alerts** resolved (PR #249)
+- **Math whitelist injection bypass** removed (PR #251)
+- **Engine classification docs** — Proof / Policy Enforcement / Advisory (PR #247)
+
+### Version bumps
+
+Every SDK, container, and manifest ships at 6.0.0:
+
+| Surface | From | To |
+|---|---|---|
+| `qwed` (PyPI) | `5.3.0` | `6.0.0` |
+| `qwed_sdk` (Python) | `5.3.0` | `6.0.0` |
+| `@qwed-ai/sdk` (npm) | `5.3.0` | `6.0.0` |
+| `qwed` (crates.io) | `5.3.0` | `6.0.0` |
+| Docker image `qwedai/qwed-verification` | `5.3.0` | `6.0.0` |
+| Kubernetes deployment image tag | `5.3.0` | `6.0.0` |
+| API version marker | `5.3.0` | `6.0.0` |
+
+### Included PRs
+
+The following 21 PRs shipped in the v6.0.0 release:
+
+| PR | Summary |
+|---|---|
+| [#247](https://github.com/QWED-AI/qwed-verification/pull/247) | docs: engine classification — Proof / Policy Enforcement / Advisory |
+| [#248](https://github.com/QWED-AI/qwed-verification/pull/248) | Enforce mandatory proof artifact on `VERIFIED` attestations (issuance + consumption) |
+| [#249](https://github.com/QWED-AI/qwed-verification/pull/249) | Resolve credential / JWT / dockerignore security alerts |
+| [#251](https://github.com/QWED-AI/qwed-verification/pull/251) | Remove math whitelist injection bypass |
+| [#260](https://github.com/QWED-AI/qwed-verification/pull/260) | Hybrid engine advisory-only — never `VERIFIED` without proof |
+| [#261](https://github.com/QWED-AI/qwed-verification/pull/261) | `FactVerifier` advisory-only |
+| [#262](https://github.com/QWED-AI/qwed-verification/pull/262) | `LogicVerifier` migrated to `DiagnosticResult` |
+| [#276](https://github.com/QWED-AI/qwed-verification/pull/276) | Migrate all `/verify/*` endpoints to return `DiagnosticResult` |
+| [#277](https://github.com/QWED-AI/qwed-verification/pull/277) | Consensus stats advisory-only, never `VERIFIED` |
+| [#278](https://github.com/QWED-AI/qwed-verification/pull/278) | Control plane trust enforcement mandatory |
+| [#280](https://github.com/QWED-AI/qwed-verification/pull/280) | `ConsensusResult` `DiagnosticStatus` enum + `proof_ref` + `verified_evidence` |
+| [#281](https://github.com/QWED-AI/qwed-verification/pull/281) | Consensus code execution advisory-only |
+| [#282](https://github.com/QWED-AI/qwed-verification/pull/282) | Batch math `DiagnosticResult` → `proof_ref` + attestation + `enforce_trust_decision` |
+| [#283](https://github.com/QWED-AI/qwed-verification/pull/283) | `FactVerifier` `SUPPORTED` → `UNVERIFIABLE` with heuristic `advisory_checks` |
+| [#284](https://github.com/QWED-AI/qwed-verification/pull/284) | `AgentStateGuard` `proof_ref` real `sha256` |
+| [#285](https://github.com/QWED-AI/qwed-verification/pull/285) | Attest translated expression, not natural-language query |
+| [#286](https://github.com/QWED-AI/qwed-verification/pull/286) | `VerificationCache` tenant isolation |
+| [#287](https://github.com/QWED-AI/qwed-verification/pull/287) | Attestation verify-before-decode + silent generic error |
+| [#288](https://github.com/QWED-AI/qwed-verification/pull/288) | NFC-normalize `AgentStateGuard` canonicalization |
+| [#289](https://github.com/QWED-AI/qwed-verification/pull/289) | Mock network in secret redaction tests (CI) |
+| [#290](https://github.com/QWED-AI/qwed-verification/pull/290) | Close TOCTOU in `enforce_trust_decision` |
+
+### Upgrading
+
+If you are on v5.3.x and only consume the high-level SDK clients or attestations, bump the version and you are done — every engine already returns `DiagnosticResult`. If your code parses raw HTTP responses from `/verify/*`, migrate to the [3-layer `DiagnosticResult`](/advanced/diagnostics) shape before upgrading. Direct callers of `LogicVerifier` should also review the [`LogicVerifier` migration notes](#v6-0-0--logicverifier-conforms-to-diagnosticresult) below.
+
+---
+
+## v6.0.0 — LogicVerifier conforms to `DiagnosticResult`
+
+**Released: August 2, 2026** · [GitHub PR #262](https://github.com/QWED-AI/qwed-verification/pull/262) · part of the [v6.0.0 release](https://github.com/QWED-AI/qwed-verification/releases/tag/v6.0.0)
+
+> `LogicVerifier` is the second engine — after `FactVerifier` — to conform to the unified 3-layer [`DiagnosticResult`](/advanced/diagnostics) contract introduced in v5.2.0. All nine public methods now return a `DiagnosticResult` with `.status`, `.developer_fields`, `.is_verified`, `.agent_message`, and `.proof_ref`. The legacy `LogicResult` dataclass has been removed. Two fail-closed input-strictness fixes ship with it.
+
+<Warning>
+**Breaking change for direct `LogicVerifier` callers.** The `LogicResult` dataclass is gone. Code that reads `result.status == "SAT"`, `result.model`, `result.error`, `result.proof_summary`, or `result.explanation` must migrate to `result.is_verified` and `result.developer_fields`. The high-level SDK client (`client.verify_logic()`) and the `/verify/logic` API endpoint response shape are unchanged.
+</Warning>
+
+### What changed
+
+- **All nine methods return `DiagnosticResult`.** `verify_logic`, `verify_with_quantifiers`, `verify_bitvector`, `verify_array`, `prove_theorem`, `check_implication`, `check_equivalence`, `verify_optimization`, and `check_vacuity` all now return a `DiagnosticResult` with the three diagnostic layers populated.
+- **Per-method SAT/UNSAT disambiguation.** Z3's `sat`/`unsat` outcome is mapped to a `DiagnosticStatus` per method (for example, `verify_logic` `sat` → `VERIFIED`, but `prove_theorem` `sat` → `BLOCKED` with a counterexample; `prove_theorem` `unsat` → `VERIFIED` because the theorem was proved by contradiction). The raw solver verdict is preserved on `developer_fields["deterministic_verdict"]`.
+- **`symbol_table` on every `VERIFIED` result.** `developer_fields["symbol_table"]` is a sorted list of `{"name": ..., "type": ...}` entries for every declared variable, so audit logs capture exactly what was proven.
+- **`proof_ref` from the Z3 assertion stack.** Every `VERIFIED` result carries a deterministic `sha256:...` `proof_ref` computed from the solver's assertions — the [authority bit](/advanced/diagnostics#layer-3--proof-diagnostics) that downstream gates use for admissibility.
+- **Empty `variables` dict now fails closed.** The `_infer_variables` type-guessing heuristic has been removed. Calls with an empty `variables` dict return `BLOCKED` with `constraint_id = "logic_verifier.explicit_declarations_required"`. Declare every variable explicitly.
+- **Malformed `BitVec[N]` declarations now fail closed.** Type strings such as `"BitVec"`, `"BitVec[]"`, or `"BitVec[abc]"` no longer silently default to 32 bits. They return `BLOCKED` with `constraint_id = "dsl_compiler.type_validation"`.
+- **`agent_message` is sanitized.** No raw Z3 output leaks into the agent-facing layer. Structured diagnostic details live under `developer_fields`.
+
+### Before and after
+
+**Reading a satisfiability result**
+
+```python
+# Before — LogicResult with a solver-level status string
+result = verifier.verify_logic({"x": "Int"}, ["x > 0"])
+if result.status == "SAT":
+    solution = result.model
+
+# After — DiagnosticResult
+result = verifier.verify_logic({"x": "Int"}, ["x > 0"])
+if result.is_verified:
+    solution = result.developer_fields["model"]
+    verdict  = result.developer_fields["deterministic_verdict"]  # "SAT"
+```
+
+**Proving a theorem**
+
+```python
+# Before — SAT meant "theorem is valid"
+result = verifier.prove_theorem(variables, premises, conclusion)
+if result.status == "SAT":
+    ...  # theorem valid
+elif result.status == "UNSAT":
+    counterexample = result.model
+
+# After — VERIFIED means "theorem proved", BLOCKED means "counterexample found"
+result = verifier.prove_theorem(variables, premises, conclusion)
+if result.is_verified:
+    ...  # theorem proved by contradiction
+elif result.status.value == "BLOCKED":
+    counterexample = result.developer_fields["model"]
+```
+
+**Empty `variables` dict**
+
+```python
+# Before — types were guessed from constraint syntax
+verifier.verify_logic({}, ["x > 5", "P and Q"])
+# Inferred: x -> Int, P/Q -> Bool
+
+# After — BLOCKED
+result = verifier.verify_logic({}, ["x > 5", "P and Q"])
+result.developer_fields["constraint_id"]
+# "logic_verifier.explicit_declarations_required"
+```
+
+### What this means for you
+
+Callers that already treat non-`VERIFIED` results as unverified continue to work — they just need to migrate the field names (`result.is_verified` in place of `result.status == "SAT"`, `result.developer_fields["model"]` in place of `result.model`). Callers that relied on implicit variable inference or on `"BitVec"` defaulting to 32-bit must now declare every variable explicitly. See [`LogicVerifier` returns `DiagnosticResult`](/engines/logic#logicverifier-returns-diagnosticresult-v6-0-0) for the full status matrix, `constraint_id` list, and migration snippets, and the [Verification Diagnostics guide](/advanced/diagnostics) for the 3-layer model.
+
+---
+
 ## v5.3.0 — SymbolicVerifier: `DiagnosticResult` reference implementation
 
 **Released: July 25, 2026** · [GitHub Release](https://github.com/QWED-AI/qwed-verification/releases/tag/v5.3.0) · Minor · [PR #244](https://github.com/QWED-AI/qwed-verification/pull/244)
@@ -309,169 +472,6 @@ is_valid, claims, error = crypto.verify_attestation(token, context)
 ```
 
 See [Verifying an attestation](/a2a/crypto-attestations#verifying-an-attestation) for the full field-by-field reference, the updated ordered verification steps, and the complete list of rejection messages.
-
----
-
-## v6.0.0 — Trust Boundary Completion
-
-**Released: August 2, 2026** · [GitHub Release ↗](https://github.com/QWED-AI/qwed-verification/releases/tag/v6.0.0) · [GitHub PR #291](https://github.com/QWED-AI/qwed-verification/pull/291)
-
-> v6.0.0 closes the **Trust Boundary Completion** epic (Issue #263, 12/12 sub-issues). Every verification pathway now returns a unified [`DiagnosticResult`](/advanced/diagnostics) and routes through `enforce_trust_decision`. The trust boundary is no longer advisory: the control plane requires and verifies attestation before admitting `VERIFIED` results, and `VERIFIED` is a protocol guarantee backed by a deterministic `proof_ref` — never by execution, agreement, confidence, or provenance.
-
-<Warning>
-**Breaking change.** `/verify/*` API responses now use the unified [`DiagnosticResult`](/advanced/diagnostics) schema (`status` / `agent_message` / `developer_fields` / `proof_ref`). Consumers that parsed the previous ad-hoc dict responses must migrate to the unified 3-layer contract. The high-level SDK clients (`qwed`, `qwed_sdk`, `@qwed-ai/sdk`, and the `qwed` Rust crate) already surface `DiagnosticResult` at v6.0.0 and require no code change beyond the version bump.
-</Warning>
-
-### Architecture: observation vs. admission
-
-The API is the **observation surface** — an honest witness that returns what verification found. The control plane is the **admission authority** — the judge that decides what is admitted as `VERIFIED`. `QWED_RULES.md` now codifies this separation (#13 Separation of Responsibilities, #14 Verification Semantics, #15 Truth Before Policy; rules #7/#8 updated for admission-boundary and deterministic-proof semantics).
-
-- **All `/verify/*` endpoints return `DiagnosticResult`** — unified response contract across every verification surface (PR #276)
-- **Control plane enforces mandatory attestation** — `require_attestation=True`, attestation issued and verified at the admission boundary, and the enforced status drives the HTTP response status (PR #278). See [Cryptographic attestations](/advanced/attestations).
-- **Batch math routes through the trust boundary** — `/verify/batch` results carry `DiagnosticResult`, `proof_ref`, and attestation, and pass through `enforce_trust_decision` (PR #282). See [`POST /verify/batch`](/api/endpoints#post-verifybatch).
-- **Attestation scope alignment** — attestations bind to the translated expression, not the natural-language query, so `query_hash` binds to what was actually verified (PR #285).
-
-### `VERIFIED` is a protocol guarantee
-
-No engine emits `VERIFIED` without a deterministic `proof_ref`. Heuristic and advisory analysis now reports `UNVERIFIABLE` with structured `advisory_checks` instead of masquerading as verified.
-
-- **`ConsensusResult`** uses the `DiagnosticStatus` enum with `proof_ref` and `verified_evidence` (PR #280). See [Consensus engine](/engines/consensus).
-- **`FactVerifier`** heuristic SUPPORTED verdict → `UNVERIFIABLE` with `advisory_checks` (PR #283).
-- **Consensus code execution** advisory-only — `VERIFIED` → `UNVERIFIABLE` (PR #281).
-- **Consensus stats** advisory-only — never `VERIFIED` (PR #277).
-- **`LogicVerifier`** migrated to `DiagnosticResult` (PR #262 — details in the entry below).
-- **`AgentStateGuard`** `proof_ref` is now a real `sha256` of committed bytes, not a static sentence (PR #284). See [Agent state guard](/advanced/agent-state-guard).
-
-### Engineering and security hardening
-
-- **TOCTOU closure in `enforce_trust_decision`** — `developer_fields` snapshotted via recursive rebuild (no `deepcopy` alias window); fail-closed snapshot (PR #290)
-- **Attestation signature verified before claim decode** — silent generic error for every failure mode (PR #287)
-- **Tenant-isolated verification cache** — `VerificationCache` keys namespaced by normalized `tenant_id` (PR #286)
-- **Unicode normalization** in `AgentStateGuard` canonicalization — NFC collisions rejected (PR #288)
-- **Mandatory proof artifact** for `VERIFIED` attestations at both issuance and consumption (PR #248)
-- **Credential / JWT / dockerignore security alerts** resolved (PR #249)
-- **Math whitelist injection bypass** removed (PR #251)
-- **Engine classification docs** — Proof / Policy Enforcement / Advisory (PR #247)
-
-### Version bumps
-
-Every SDK, container, and manifest ships at 6.0.0:
-
-| Surface | From | To |
-|---|---|---|
-| `qwed` (PyPI) | `5.3.0` | `6.0.0` |
-| `qwed_sdk` (Python) | `5.3.0` | `6.0.0` |
-| `@qwed-ai/sdk` (npm) | `5.3.0` | `6.0.0` |
-| `qwed` (crates.io) | `5.3.0` | `6.0.0` |
-| Docker image `qwedai/qwed-verification` | `5.3.0` | `6.0.0` |
-| Kubernetes deployment image tag | `5.3.0` | `6.0.0` |
-| API version marker | `5.3.0` | `6.0.0` |
-
-### Included PRs
-
-The following 21 PRs shipped in the v6.0.0 release:
-
-| PR | Summary |
-|---|---|
-| [#247](https://github.com/QWED-AI/qwed-verification/pull/247) | docs: engine classification — Proof / Policy Enforcement / Advisory |
-| [#248](https://github.com/QWED-AI/qwed-verification/pull/248) | Enforce mandatory proof artifact on `VERIFIED` attestations (issuance + consumption) |
-| [#249](https://github.com/QWED-AI/qwed-verification/pull/249) | Resolve credential / JWT / dockerignore security alerts |
-| [#251](https://github.com/QWED-AI/qwed-verification/pull/251) | Remove math whitelist injection bypass |
-| [#260](https://github.com/QWED-AI/qwed-verification/pull/260) | Hybrid engine advisory-only — never `VERIFIED` without proof |
-| [#261](https://github.com/QWED-AI/qwed-verification/pull/261) | `FactVerifier` advisory-only |
-| [#262](https://github.com/QWED-AI/qwed-verification/pull/262) | `LogicVerifier` migrated to `DiagnosticResult` |
-| [#276](https://github.com/QWED-AI/qwed-verification/pull/276) | Migrate all `/verify/*` endpoints to return `DiagnosticResult` |
-| [#277](https://github.com/QWED-AI/qwed-verification/pull/277) | Consensus stats advisory-only, never `VERIFIED` |
-| [#278](https://github.com/QWED-AI/qwed-verification/pull/278) | Control plane trust enforcement mandatory |
-| [#280](https://github.com/QWED-AI/qwed-verification/pull/280) | `ConsensusResult` `DiagnosticStatus` enum + `proof_ref` + `verified_evidence` |
-| [#281](https://github.com/QWED-AI/qwed-verification/pull/281) | Consensus code execution advisory-only |
-| [#282](https://github.com/QWED-AI/qwed-verification/pull/282) | Batch math `DiagnosticResult` → `proof_ref` + attestation + `enforce_trust_decision` |
-| [#283](https://github.com/QWED-AI/qwed-verification/pull/283) | `FactVerifier` `SUPPORTED` → `UNVERIFIABLE` with heuristic `advisory_checks` |
-| [#284](https://github.com/QWED-AI/qwed-verification/pull/284) | `AgentStateGuard` `proof_ref` real `sha256` |
-| [#285](https://github.com/QWED-AI/qwed-verification/pull/285) | Attest translated expression, not natural-language query |
-| [#286](https://github.com/QWED-AI/qwed-verification/pull/286) | `VerificationCache` tenant isolation |
-| [#287](https://github.com/QWED-AI/qwed-verification/pull/287) | Attestation verify-before-decode + silent generic error |
-| [#288](https://github.com/QWED-AI/qwed-verification/pull/288) | NFC-normalize `AgentStateGuard` canonicalization |
-| [#289](https://github.com/QWED-AI/qwed-verification/pull/289) | Mock network in secret redaction tests (CI) |
-| [#290](https://github.com/QWED-AI/qwed-verification/pull/290) | Close TOCTOU in `enforce_trust_decision` |
-
-### Upgrading
-
-If you are on v5.3.x and only consume the high-level SDK clients or attestations, bump the version and you are done — every engine already returns `DiagnosticResult`. If your code parses raw HTTP responses from `/verify/*`, migrate to the [3-layer `DiagnosticResult`](/advanced/diagnostics) shape before upgrading. Direct callers of `LogicVerifier` should also review the [`LogicVerifier` migration notes](#v6-0-0--logicverifier-conforms-to-diagnosticresult) below.
-
----
-
-## v6.0.0 — LogicVerifier conforms to `DiagnosticResult`
-
-**Released: August 2, 2026** · [GitHub PR #262](https://github.com/QWED-AI/qwed-verification/pull/262) · part of the [v6.0.0 release](https://github.com/QWED-AI/qwed-verification/releases/tag/v6.0.0)
-
-> `LogicVerifier` is the second engine — after `FactVerifier` — to conform to the unified 3-layer [`DiagnosticResult`](/advanced/diagnostics) contract introduced in v5.2.0. All nine public methods now return a `DiagnosticResult` with `.status`, `.developer_fields`, `.is_verified`, `.agent_message`, and `.proof_ref`. The legacy `LogicResult` dataclass has been removed. Two fail-closed input-strictness fixes ship with it.
-
-<Warning>
-**Breaking change for direct `LogicVerifier` callers.** The `LogicResult` dataclass is gone. Code that reads `result.status == "SAT"`, `result.model`, `result.error`, `result.proof_summary`, or `result.explanation` must migrate to `result.is_verified` and `result.developer_fields`. The high-level SDK client (`client.verify_logic()`) and the `/verify/logic` API endpoint response shape are unchanged.
-</Warning>
-
-### What changed
-
-- **All nine methods return `DiagnosticResult`.** `verify_logic`, `verify_with_quantifiers`, `verify_bitvector`, `verify_array`, `prove_theorem`, `check_implication`, `check_equivalence`, `verify_optimization`, and `check_vacuity` all now return a `DiagnosticResult` with the three diagnostic layers populated.
-- **Per-method SAT/UNSAT disambiguation.** Z3's `sat`/`unsat` outcome is mapped to a `DiagnosticStatus` per method (for example, `verify_logic` `sat` → `VERIFIED`, but `prove_theorem` `sat` → `BLOCKED` with a counterexample; `prove_theorem` `unsat` → `VERIFIED` because the theorem was proved by contradiction). The raw solver verdict is preserved on `developer_fields["deterministic_verdict"]`.
-- **`symbol_table` on every `VERIFIED` result.** `developer_fields["symbol_table"]` is a sorted list of `{"name": ..., "type": ...}` entries for every declared variable, so audit logs capture exactly what was proven.
-- **`proof_ref` from the Z3 assertion stack.** Every `VERIFIED` result carries a deterministic `sha256:...` `proof_ref` computed from the solver's assertions — the [authority bit](/advanced/diagnostics#layer-3--proof-diagnostics) that downstream gates use for admissibility.
-- **Empty `variables` dict now fails closed.** The `_infer_variables` type-guessing heuristic has been removed. Calls with an empty `variables` dict return `BLOCKED` with `constraint_id = "logic_verifier.explicit_declarations_required"`. Declare every variable explicitly.
-- **Malformed `BitVec[N]` declarations now fail closed.** Type strings such as `"BitVec"`, `"BitVec[]"`, or `"BitVec[abc]"` no longer silently default to 32 bits. They return `BLOCKED` with `constraint_id = "dsl_compiler.type_validation"`.
-- **`agent_message` is sanitized.** No raw Z3 output leaks into the agent-facing layer. Structured diagnostic details live under `developer_fields`.
-
-### Before and after
-
-**Reading a satisfiability result**
-
-```python
-# Before — LogicResult with a solver-level status string
-result = verifier.verify_logic({"x": "Int"}, ["x > 0"])
-if result.status == "SAT":
-    solution = result.model
-
-# After — DiagnosticResult
-result = verifier.verify_logic({"x": "Int"}, ["x > 0"])
-if result.is_verified:
-    solution = result.developer_fields["model"]
-    verdict  = result.developer_fields["deterministic_verdict"]  # "SAT"
-```
-
-**Proving a theorem**
-
-```python
-# Before — SAT meant "theorem is valid"
-result = verifier.prove_theorem(variables, premises, conclusion)
-if result.status == "SAT":
-    ...  # theorem valid
-elif result.status == "UNSAT":
-    counterexample = result.model
-
-# After — VERIFIED means "theorem proved", BLOCKED means "counterexample found"
-result = verifier.prove_theorem(variables, premises, conclusion)
-if result.is_verified:
-    ...  # theorem proved by contradiction
-elif result.status.value == "BLOCKED":
-    counterexample = result.developer_fields["model"]
-```
-
-**Empty `variables` dict**
-
-```python
-# Before — types were guessed from constraint syntax
-verifier.verify_logic({}, ["x > 5", "P and Q"])
-# Inferred: x -> Int, P/Q -> Bool
-
-# After — BLOCKED
-result = verifier.verify_logic({}, ["x > 5", "P and Q"])
-result.developer_fields["constraint_id"]
-# "logic_verifier.explicit_declarations_required"
-```
-
-### What this means for you
-
-Callers that already treat non-`VERIFIED` results as unverified continue to work — they just need to migrate the field names (`result.is_verified` in place of `result.status == "SAT"`, `result.developer_fields["model"]` in place of `result.model`). Callers that relied on implicit variable inference or on `"BitVec"` defaulting to 32-bit must now declare every variable explicitly. See [`LogicVerifier` returns `DiagnosticResult`](/engines/logic#logicverifier-returns-diagnosticresult-v6-0-0) for the full status matrix, `constraint_id` list, and migration snippets, and the [Verification Diagnostics guide](/advanced/diagnostics) for the 3-layer model.
 
 ---
 
