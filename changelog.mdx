@@ -151,6 +151,117 @@ If you call `create_verification_attestation()` directly, always pass `proof_dat
 
 ---
 
+## QWED-A2A — `verify_attestation()` now requires an `AttestationContext` (breaking)
+
+**Released: July 26, 2026** · [GitHub PR #41](https://github.com/qwed-ai/qwed-a2a/pull/41)
+
+> `A2ACryptoService.verify_attestation()` used to accept a token on its own — a cryptographically valid signature was treated as sufficient proof. A detached attestation could therefore be lifted from one exchange and replayed against a different sender, receiver, or payload without detection. The method now requires a second argument, an `AttestationContext` describing the current request, and rejects the token if the sender, receiver, payload hash, or session claim does not match.
+
+<Warning>
+**Breaking change.** The single-argument form `verify_attestation(token)` has been removed — there is no context-free overload. Every call site must construct an `AttestationContext` and pass it as the second positional argument, or the call raises `TypeError`. See [Migrating to context-bound verification](/a2a/crypto-attestations#migrating-to-context-bound-verification) for the exact before/after.
+</Warning>
+
+### What changed
+
+- **New `AttestationContext` dataclass** in `qwed_a2a.security.crypto` with fields `sender_agent_id: str`, `receiver_agent_id: str`, `payload: Any`, and optional `session_id: str | None`. The payload is hashed internally with the same deterministic method as `sign_verdict()`, so callers never handle raw hashes.
+- **New context-binding verification step** — sender, receiver, payload hash, and (when supplied) `session_id` are compared against the token's `qwed_a2a` claims and `sub` claim. Any mismatch returns a structured rejection: `"Attestation sender mismatch: expected=..., got=..."`, `"Attestation receiver mismatch: ..."`, `"Attestation payload hash mismatch — detached attestation rejected"`, or `"Attestation session mismatch: ..."`.
+- **Verification order updated.** Context binding now runs **after** the deployment-context check but **before** the `jti` replay check. This is deliberate: an out-of-context token no longer pollutes the `jti` registry, so a legitimate future presentation of the same token in its correct context is not locked out.
+- **Signing is unchanged.** `sign_verdict()` still takes the same arguments — only the verify side gained a parameter.
+
+### What this means for you
+
+Every caller of `verify_attestation()` must be updated. Build an `AttestationContext` from the same identifiers and payload the receiving side is about to act on, then pass it as the second argument:
+
+```python
+from qwed_a2a.security.crypto import AttestationContext
+
+context = AttestationContext(
+    sender_agent_id="procurement-agent",
+    receiver_agent_id="treasury-agent",
+    payload=request_payload,
+    session_id=request_session_id,  # optional
+)
+is_valid, claims, error = crypto.verify_attestation(token, context)
+```
+
+See [Verifying an attestation](/a2a/crypto-attestations#verifying-an-attestation) for the full field-by-field reference, the updated ordered verification steps, and the complete list of rejection messages.
+
+---
+
+## v6.0.0 — LogicVerifier conforms to `DiagnosticResult`
+
+**Released: August 2, 2026** · [GitHub PR #262](https://github.com/QWED-AI/qwed-verification/pull/262) · part of the [v6.0.0 release](https://github.com/QWED-AI/qwed-verification/releases/tag/v6.0.0)
+
+> `LogicVerifier` is the second engine — after `FactVerifier` — to conform to the unified 3-layer [`DiagnosticResult`](/advanced/diagnostics) contract introduced in v5.2.0. All nine public methods now return a `DiagnosticResult` with `.status`, `.developer_fields`, `.is_verified`, `.agent_message`, and `.proof_ref`. The legacy `LogicResult` dataclass has been removed. Two fail-closed input-strictness fixes ship with it.
+
+<Warning>
+**Breaking change for direct `LogicVerifier` callers.** The `LogicResult` dataclass is gone. Code that reads `result.status == "SAT"`, `result.model`, `result.error`, `result.proof_summary`, or `result.explanation` must migrate to `result.is_verified` and `result.developer_fields`. The high-level SDK client (`client.verify_logic()`) and the `/verify/logic` API endpoint response shape are unchanged.
+</Warning>
+
+### What changed
+
+- **All nine methods return `DiagnosticResult`.** `verify_logic`, `verify_with_quantifiers`, `verify_bitvector`, `verify_array`, `prove_theorem`, `check_implication`, `check_equivalence`, `verify_optimization`, and `check_vacuity` all now return a `DiagnosticResult` with the three diagnostic layers populated.
+- **Per-method SAT/UNSAT disambiguation.** Z3's `sat`/`unsat` outcome is mapped to a `DiagnosticStatus` per method (for example, `verify_logic` `sat` → `VERIFIED`, but `prove_theorem` `sat` → `BLOCKED` with a counterexample; `prove_theorem` `unsat` → `VERIFIED` because the theorem was proved by contradiction). The raw solver verdict is preserved on `developer_fields["deterministic_verdict"]`.
+- **`symbol_table` on every `VERIFIED` result.** `developer_fields["symbol_table"]` is a sorted list of `{"name": ..., "type": ...}` entries for every declared variable, so audit logs capture exactly what was proven.
+- **`proof_ref` from the Z3 assertion stack.** Every `VERIFIED` result carries a deterministic `sha256:...` `proof_ref` computed from the solver's assertions — the [authority bit](/advanced/diagnostics#layer-3--proof-diagnostics) that downstream gates use for admissibility.
+- **Empty `variables` dict now fails closed.** The `_infer_variables` type-guessing heuristic has been removed. Calls with an empty `variables` dict return `BLOCKED` with `constraint_id = "logic_verifier.explicit_declarations_required"`. Declare every variable explicitly.
+- **Malformed `BitVec[N]` declarations now fail closed.** Type strings such as `"BitVec"`, `"BitVec[]"`, or `"BitVec[abc]"` no longer silently default to 32 bits. They return `BLOCKED` with `constraint_id = "dsl_compiler.type_validation"`.
+- **`agent_message` is sanitized.** No raw Z3 output leaks into the agent-facing layer. Structured diagnostic details live under `developer_fields`.
+
+### Before and after
+
+**Reading a satisfiability result**
+
+```python
+# Before — LogicResult with a solver-level status string
+result = verifier.verify_logic({"x": "Int"}, ["x > 0"])
+if result.status == "SAT":
+    solution = result.model
+
+# After — DiagnosticResult
+result = verifier.verify_logic({"x": "Int"}, ["x > 0"])
+if result.is_verified:
+    solution = result.developer_fields["model"]
+    verdict  = result.developer_fields["deterministic_verdict"]  # "SAT"
+```
+
+**Proving a theorem**
+
+```python
+# Before — SAT meant "theorem is valid"
+result = verifier.prove_theorem(variables, premises, conclusion)
+if result.status == "SAT":
+    ...  # theorem valid
+elif result.status == "UNSAT":
+    counterexample = result.model
+
+# After — VERIFIED means "theorem proved", BLOCKED means "counterexample found"
+result = verifier.prove_theorem(variables, premises, conclusion)
+if result.is_verified:
+    ...  # theorem proved by contradiction
+elif result.status.value == "BLOCKED":
+    counterexample = result.developer_fields["model"]
+```
+
+**Empty `variables` dict**
+
+```python
+# Before — types were guessed from constraint syntax
+verifier.verify_logic({}, ["x > 5", "P and Q"])
+# Inferred: x -> Int, P/Q -> Bool
+
+# After — BLOCKED
+result = verifier.verify_logic({}, ["x > 5", "P and Q"])
+result.developer_fields["constraint_id"]
+# "logic_verifier.explicit_declarations_required"
+```
+
+### What this means for you
+
+Callers that already treat non-`VERIFIED` results as unverified continue to work — they just need to migrate the field names (`result.is_verified` in place of `result.status == "SAT"`, `result.developer_fields["model"]` in place of `result.model`). Callers that relied on implicit variable inference or on `"BitVec"` defaulting to 32-bit must now declare every variable explicitly. See [`LogicVerifier` returns `DiagnosticResult`](/engines/logic#logicverifier-returns-diagnosticresult-v6-0-0) for the full status matrix, `constraint_id` list, and migration snippets, and the [Verification Diagnostics guide](/advanced/diagnostics) for the 3-layer model.
+
+---
+
 ## QWED Math Engine — fail-closed on mode ambiguity, eigenvalue cardinality, and IRR convergence
 
 **Released: July 24, 2026** · [Jump to details](#qwed-math-engine--fail-closed-on-mode-ambiguity-eigenvalue-cardinality-and-irr-convergence) · [PR #217](https://github.com/qwed-ai/qwed-verification/pull/217) · [PR #218](https://github.com/qwed-ai/qwed-verification/pull/218) · [PR #219](https://github.com/qwed-ai/qwed-verification/pull/219)

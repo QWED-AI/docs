@@ -146,7 +146,7 @@ diag = TaxDiagnosticResult.blocked(
 **Rule:** If you control _how_ they work and _pay_ their expenses, they are an Employee (W-2), even if the AI says "1099".
 
 ```python
-from qwed_tax.guards.classification_guard import ClassificationGuard
+from qwed_tax import ClassificationGuard
 
 guard = ClassificationGuard()
 
@@ -165,9 +165,11 @@ result = guard.verify_classification_claim(
   **Fails closed on ambiguous facts.** `verify_worker_status` returns `WorkerType.CONTRACTOR` only when **no** employee indicators are present. When some — but not all — of `behavioral_control`, `financial_control`, and `relationship_permanence` are true, it returns `None`, and `verify_classification_claim` then returns `{"verified": False, "error": "Ambiguous classification: facts contain mixed employee/contractor indicators. Cannot deterministically classify — manual review required."}`. The previous default-to-contractor path on mixed signals has been removed.
 </Note>
 
-### ClassificationGuard (ABC Test / Z3)
+### ABCClassificationGuard (ABC Test / Z3)
 
 **Goal:** Formal verification of worker classification under state-specific ABC Test laws (CA AB5, NJ, MA). Uses the **Z3 theorem prover** to prove classification correctness.
+
+`ABCClassificationGuard` is separate from the federal IRS Common Law `ClassificationGuard` above. Use the federal guard for the three-factor IRS test; use `ABCClassificationGuard` when the worker is engaged in a state that applies the stricter ABC test (currently CA, NJ, and MA).
 
 **Rule:** A worker is a contractor only if **all three** criteria are met:
 - **A:** Free from control and direction
@@ -175,10 +177,9 @@ result = guard.verify_classification_claim(
 - **C:** Customarily engaged in an independent trade
 
 ```python
-from qwed_tax.jurisdictions.us.classification_guard import ClassificationGuard
-from qwed_tax.models import WorkerClassificationParams, State
+from qwed_tax import ABCClassificationGuard, WorkerClassificationParams, State
 
-guard = ClassificationGuard()
+guard = ABCClassificationGuard()
 
 params = WorkerClassificationParams(
     worker_id="W001",

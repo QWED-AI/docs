@@ -30,7 +30,7 @@ QWED-Tax ships with **20+ deterministic guards** across three jurisdictions:
 | Category | Guards | Jurisdiction |
 | :-- | :-- | :-- |
 | **Payroll** | PayrollGuard, WithholdingGuard, ReciprocityGuard | US |
-| **Worker classification** | ClassificationGuard (IRS Common Law + ABC Test) | US |
+| **Worker classification** | ClassificationGuard (IRS Common Law), ABCClassificationGuard (ABC Test) | US |
 | **Sales tax** | NexusGuard | US |
 | **1099 filing** | Form1099Guard | US |
 | **Crypto/VDA** | CryptoTaxGuard | India |
@@ -93,7 +93,7 @@ The system supports two entry points:
 Several guards use the **Z3 SMT solver** for formal verification instead of heuristic rules:
 
 - **WithholdingGuard** — Proves W-4 exempt status validity against IRS Pub 505 rules.
-- **ClassificationGuard (ABC Test)** — Proves worker classification under CA AB5 / NJ / MA laws.
+- **ABCClassificationGuard** — Proves worker classification under CA AB5 / NJ / MA laws.
 - **InvestmentGuard** — Proves correct tax head classification for stock market transactions.
 
 `ReciprocityGuard` is a deterministic lookup against a fixed reciprocity-pair table — it does not use Z3. See the [ReciprocityGuard reference](/tax/guards#reciprocityguard-state-tax) for the current contract.
