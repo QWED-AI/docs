@@ -156,17 +156,24 @@ result = client.verify_image(
 
 ### verify_batch(items)
 
-Verify multiple items at once.
+Verify multiple items at once. Each entry in `results` is a per-item [`DiagnosticResult`](/advanced/diagnostics) — check `status` and `proof_ref` per item rather than relying on an aggregate.
 
 ```python
-results = client.verify_batch([
+response = client.verify_batch([
     {"query": "2+2=4", "type": "math"},
-    {"query": "3*3=9", "type": "math"},
+    {"query": "x + x", "type": "math"},
 ])
-print(results.summary.success_rate)
+
+for item in response.results:
+    if item["status"] == "VERIFIED" and item["proof_ref"]:
+        # Authoritative — admissible for control flow
+        print("verified:", item["agent_message"], item["proof_ref"])
+    else:
+        # UNVERIFIABLE or BLOCKED — must reject
+        print("rejected:", item["status"], item["agent_message"])
 ```
 
-For `math` items, supply equality claims (e.g., `"x + x = 2*x"`) to receive proof results. Non-equality expressions (e.g., `"x + x"`) are returned as simplification-only results with `is_valid: false` and `status: "SIMPLIFIED"` — they are not reported as verified.
+For `math` items, supply equality claims (e.g., `"x + x = 2*x"`) to receive proof results. Bare expressions without an `=` return `status: "UNVERIFIABLE"` with the simplified form in `developer_fields.simplified` — they are never reported as verified. The legacy `is_valid` flag is preserved inside `developer_fields.is_valid` for backward compatibility.
 
 ## Verification cache
 
