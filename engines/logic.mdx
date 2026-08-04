@@ -33,8 +33,8 @@ client = QWEDClient()
 
 # Check if constraints are satisfiable
 result = client.verify_logic("(AND (GT x 5) (LT x 10))")
-print(result.satisfiable)  # True
-print(result.model)        # {"x": 7}
+print(result.status)            # "SAT"
+print(result.result["model"])   # {"x": "7"}
 ```
 
 ---
@@ -82,22 +82,31 @@ Comparison and arithmetic operators accept multiple aliases for convenience. For
 ```python
 # Satisfiable - has solution
 result = client.verify_logic("(AND (GT x 0) (LT x 100))")
-print(result.satisfiable)  # True
-print(result.model)        # {"x": 50}
+print(result.status)            # "SAT"
+print(result.result["model"])   # {"x": "50"}
 
 # Unsatisfiable - no solution
 result = client.verify_logic("(AND (GT x 10) (LT x 5))")
-print(result.satisfiable)  # False (x can't be > 10 AND < 5)
+print(result.status)            # "UNSAT" (x can't be > 10 AND < 5)
 ```
 
 ### Finding all solutions
 
+The SDK client's `verify_logic()` returns a single SAT/UNSAT/UNKNOWN verdict with one model. For all-solutions enumeration, iterate with a low-level solver (e.g. `z3`) or use the `LogicVerifier` low-level API and extend constraints yourself:
+
 ```python
-result = client.find_all_models(
-    "(AND (GTE x 1) (LTE x 3))",
-    max_models=10
-)
-# [{"x": 1}, {"x": 2}, {"x": 3}]
+from z3 import Int, Solver
+
+x = Int("x")
+solver = Solver()
+solver.add(x >= 1, x <= 3)
+while solver.check() == sat:
+    m = solver.model()
+    print(m[x])
+    solver.add(x != m[x])
+# 1
+# 2
+# 3
 ```
 
 ---
@@ -207,18 +216,18 @@ This field also appears in error responses, which helps you debug provider-relat
 ```python
 result = client.verify_logic("(AND (GT x 5) (LT x 0))")
 
-if not result.satisfiable:
+if result.status == "UNSAT":
     print("No solution exists")
-    print(f"Reason: {result.reason}")
+    print(f"Reason: {result.result.get('error')}")
     # "Constraints are contradictory: x > 5 conflicts with x < 0"
 ```
 
 ---
 
-## `LogicVerifier` returns `DiagnosticResult` (v5.4.0)
+## `LogicVerifier` returns `DiagnosticResult` (v6.0.0)
 
 <Info>
-**Introduced in v5.4.0.** `LogicVerifier` is the second engine — after `FactVerifier` — to conform to the unified [`DiagnosticResult` contract](/advanced/diagnostics). The legacy `LogicResult` dataclass has been removed. The high-level SDK client (`client.verify_logic()`) and the `/verify/logic` API endpoint still return the same SAT/UNSAT/UNKNOWN shape shown above.
+**Introduced in v6.0.0.** `LogicVerifier` is the second engine — after `FactVerifier` — to conform to the unified [`DiagnosticResult` contract](/advanced/diagnostics). The legacy `LogicResult` dataclass has been removed from the verifier's return surface. The high-level SDK client (`client.verify_logic()`) and the `/verify/logic` API endpoint still return the same SAT/UNSAT/UNKNOWN shape shown above.
 </Info>
 
 If you call the low-level `LogicVerifier` class directly, every one of its nine public methods now returns a `DiagnosticResult`:

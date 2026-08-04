@@ -7,9 +7,46 @@ All notable changes to the QWED platform, listed by release.
 
 ---
 
-## v5.4.0 — LogicVerifier conforms to `DiagnosticResult`
+## QWED-A2A — `verify_attestation()` now requires an `AttestationContext` (breaking)
 
-**Released: July 29, 2026** · [GitHub PR #262](https://github.com/QWED-AI/qwed-verification/pull/262)
+**Released: July 26, 2026** · [GitHub PR #41](https://github.com/qwed-ai/qwed-a2a/pull/41)
+
+> `A2ACryptoService.verify_attestation()` used to accept a token on its own — a cryptographically valid signature was treated as sufficient proof. A detached attestation could therefore be lifted from one exchange and replayed against a different sender, receiver, or payload without detection. The method now requires a second argument, an `AttestationContext` describing the current request, and rejects the token if the sender, receiver, payload hash, or session claim does not match.
+
+<Warning>
+**Breaking change.** The single-argument form `verify_attestation(token)` has been removed — there is no context-free overload. Every call site must construct an `AttestationContext` and pass it as the second positional argument, or the call raises `TypeError`. See [Migrating to context-bound verification](/a2a/crypto-attestations#migrating-to-context-bound-verification) for the exact before/after.
+</Warning>
+
+### What changed
+
+- **New `AttestationContext` dataclass** in `qwed_a2a.security.crypto` with fields `sender_agent_id: str`, `receiver_agent_id: str`, `payload: Any`, and optional `session_id: str | None`. The payload is hashed internally with the same deterministic method as `sign_verdict()`, so callers never handle raw hashes.
+- **New context-binding verification step** — sender, receiver, payload hash, and (when supplied) `session_id` are compared against the token's `qwed_a2a` claims and `sub` claim. Any mismatch returns a structured rejection: `"Attestation sender mismatch: expected=..., got=..."`, `"Attestation receiver mismatch: ..."`, `"Attestation payload hash mismatch — detached attestation rejected"`, or `"Attestation session mismatch: ..."`.
+- **Verification order updated.** Context binding now runs **after** the deployment-context check but **before** the `jti` replay check. This is deliberate: an out-of-context token no longer pollutes the `jti` registry, so a legitimate future presentation of the same token in its correct context is not locked out.
+- **Signing is unchanged.** `sign_verdict()` still takes the same arguments — only the verify side gained a parameter.
+
+### What this means for you
+
+Every caller of `verify_attestation()` must be updated. Build an `AttestationContext` from the same identifiers and payload the receiving side is about to act on, then pass it as the second argument:
+
+```python
+from qwed_a2a.security.crypto import AttestationContext
+
+context = AttestationContext(
+    sender_agent_id="procurement-agent",
+    receiver_agent_id="treasury-agent",
+    payload=request_payload,
+    session_id=request_session_id,  # optional
+)
+is_valid, claims, error = crypto.verify_attestation(token, context)
+```
+
+See [Verifying an attestation](/a2a/crypto-attestations#verifying-an-attestation) for the full field-by-field reference, the updated ordered verification steps, and the complete list of rejection messages.
+
+---
+
+## v6.0.0 — LogicVerifier conforms to `DiagnosticResult`
+
+**Released: August 2, 2026** · [GitHub PR #262](https://github.com/QWED-AI/qwed-verification/pull/262) · part of the [v6.0.0 release](https://github.com/QWED-AI/qwed-verification/releases/tag/v6.0.0)
 
 > `LogicVerifier` is the second engine — after `FactVerifier` — to conform to the unified 3-layer [`DiagnosticResult`](/advanced/diagnostics) contract introduced in v5.2.0. All nine public methods now return a `DiagnosticResult` with `.status`, `.developer_fields`, `.is_verified`, `.agent_message`, and `.proof_ref`. The legacy `LogicResult` dataclass has been removed. Two fail-closed input-strictness fixes ship with it.
 
@@ -77,7 +114,7 @@ result.developer_fields["constraint_id"]
 
 ### What this means for you
 
-Callers that already treat non-`VERIFIED` results as unverified continue to work — they just need to migrate the field names (`result.is_verified` in place of `result.status == "SAT"`, `result.developer_fields["model"]` in place of `result.model`). Callers that relied on implicit variable inference or on `"BitVec"` defaulting to 32-bit must now declare every variable explicitly. See [`LogicVerifier` returns `DiagnosticResult`](/engines/logic#logicverifier-returns-diagnosticresult-v5-4-0) for the full status matrix, `constraint_id` list, and migration snippets, and the [Verification Diagnostics guide](/advanced/diagnostics) for the 3-layer model.
+Callers that already treat non-`VERIFIED` results as unverified continue to work — they just need to migrate the field names (`result.is_verified` in place of `result.status == "SAT"`, `result.developer_fields["model"]` in place of `result.model`). Callers that relied on implicit variable inference or on `"BitVec"` defaulting to 32-bit must now declare every variable explicitly. See [`LogicVerifier` returns `DiagnosticResult`](/engines/logic#logicverifier-returns-diagnosticresult-v6-0-0) for the full status matrix, `constraint_id` list, and migration snippets, and the [Verification Diagnostics guide](/advanced/diagnostics) for the 3-layer model.
 
 ---
 
