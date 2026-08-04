@@ -1,5 +1,5 @@
 ---
-title: "QWED A2A protocol"
+title: "QWED A2A zero-trust protocol for agent-to-agent verification"
 sidebarTitle: "Overview"
 description: "QWED A2A is a zero-trust interceptor for agent-to-agent communication that verifies every payload with cryptographic attestations before forwarding."
 icon: "network-wired"
@@ -58,7 +58,7 @@ sequenceDiagram
     Every verdict is signed with an ES256 JWT attestation — tamper-proof, auditable, and verifiable by any party in the chain.
   </Card>
   <Card title="Deterministic Engines" icon="microchip" href="/a2a/interceptor#verification-engines">
-    Financial verification uses `Decimal` arithmetic. Logic uses set-based contradiction detection. Code uses regex-hardened pattern scanning.
+    Financial verification uses `Decimal` arithmetic. Logic uses set-based contradiction detection. Code uses AST structural analysis backed by regex heuristics.
   </Card>
 </CardGroup>
 
@@ -118,7 +118,7 @@ flowchart TB
         subgraph Engines["Verification Engines"]
             FG["Finance Guard<br/>(Decimal math)"]
             LG["Logic Guard<br/>(contradiction detection)"]
-            CG["Code Guard<br/>(regex security scan)"]
+            CG["Code Guard<br/>(AST + regex heuristics)"]
         end
         CR["Crypto Service<br/>(ES256 JWT attestation)"]
         TL["Telemetry<br/>(Sentry + metrics)"]

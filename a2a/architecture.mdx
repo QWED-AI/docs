@@ -25,9 +25,9 @@ flowchart LR
 |-------|-----------|-------------|
 | **1. Schema** | Pydantic `AgentMessage` | Validates sender/receiver IDs, payload type, timestamp, optional signature |
 | **2. Trust** | `TrustBoundary` | Checks blocklists, allowlists, pair blocks, rate limits — deny-all by default |
-| **3. Engine** | `_route_to_engine()` | Routes to `finance_guard`, `logic_guard`, `code_guard`, or `passthrough` |
-| **4. Attestation** | `A2ACryptoService` | Signs the verdict with ES256 JWT — includes payload hash, trace ID, engine used |
-| **5. Verdict** | `VerificationVerdict` | Returns `forwarded` or `blocked` with reason, attestation, and audit trace |
+| **3. Engine** | `_route_to_engine()` | Routes to `finance_guard`, `logic_guard`, or `code_guard`. `GENERAL` and `DATA_QUERY` payload types have no engine and return an `unverifiable` result. |
+| **4. Attestation** | `A2ACryptoService` | Signs `forwarded`, `blocked`, and `heuristic_pass` verdicts with an ES256 JWT (payload hash, trace ID, engine used). `unverifiable` verdicts carry **no JWT**. |
+| **5. Verdict** | `VerificationVerdict` | Returns `forwarded`, `blocked`, `heuristic_pass`, `unverifiable`, or `error` with reason, attestation (when present), and audit trace |
 
 ---
 
@@ -153,8 +153,8 @@ The interceptor routes payloads based on `payload_type`:
 |------------|--------|-------------|-----------|
 | `financial_transaction` | `finance_guard` | Decimal arithmetic — recomputes totals from line items | `Decimal("0.01")` tolerance |
 | `logic_assertion` | `logic_guard` | Set-based contradiction detection (P AND NOT P) | Deterministic, sorted output |
-| `code_execution` | `code_guard` | Case-insensitive regex for `eval`, `exec`, `subprocess`, `os.system`, etc. | Import/alias detection |
-| `general` / `data_query` | `passthrough` | No verification — forwarded immediately | N/A |
+| `code_execution` | `code_guard` | AST structural analysis first, then regex heuristics — returns `blocked` or `heuristic_pass` | Import/alias and obfuscation detection |
+| `general` / `data_query` | `passthrough` | No verification engine — returns `unverifiable` with no JWT attestation | N/A |
 
 ---
 

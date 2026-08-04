@@ -23,6 +23,17 @@ response = client.verify_graph(
 )
 ```
 
+## Result contract
+
+The Graph Fact Engine returns a [`DiagnosticResult`](/advanced/diagnostics). A claim only resolves to `VERIFIED` when **every** material triple has full graph support — partial matches do not verify:
+
+| Path | `DiagnosticResult.status` | Notes |
+|---|---|---|
+| All triples fully supported | `VERIFIED` | Emits a `proof_ref` bound to the matching graph paths. |
+| One or more triples unsupported | `UNVERIFIABLE` | NLI fallback results are recorded in `advisory_checks` only. |
+
+The NLI fallback is [advisory only](/engines/overview#tier-3-advisory-engines) — it can never promote an unsupported claim to `VERIFIED`.
+
 ## When to use
 
 - **Complex relationships:** Family trees, corporate hierarchies, supply chains.

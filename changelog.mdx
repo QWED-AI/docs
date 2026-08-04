@@ -97,6 +97,7 @@ if result.status is DiagnosticStatus.UNVERIFIABLE:
 If your integration reads any dict-shape field from a `SymbolicVerifier` result, update it before upgrading — the return type has changed and the old keys are gone. The [Code engine reference](/engines/code) documents the new contract, and [Symbolic execution limits](/advanced/symbolic-limits) has been rewritten around `DiagnosticResult`. Callers that gated control flow on `is_verified` for symbolic-engine output must move to `result.proof_ref` (the authority bit) instead — this engine intentionally never sets it, so symbolic results must not admit downstream execution.
 
 ---
+
 ## QWED-A2A — `UNVERIFIABLE` verdicts carry no JWT, and five README behaviors realigned with the code
 
 **Released: July 27, 2026** · [GitHub PR #40](https://github.com/QWED-AI/qwed-a2a/pull/40) · [GitHub PR #57](https://github.com/QWED-AI/qwed-a2a/pull/57)

@@ -42,13 +42,17 @@ Verify logical constraints using Z3 SAT solver:
 ```python
 # QWED-Logic DSL
 result = client.verify_logic("(AND (GT x 5) (LT y 10))")
-print(result.status)  # "SAT"
-print(result.model)   # {"x": 6, "y": 9}
+print(result.status)             # "SAT"
+print(result.result["model"])    # {"x": "6", "y": "9"}
 
-# Unsatisfiable constraints
+# Unsatisfiable constraints — no model exists
 result = client.verify_logic("(AND (GT x 10) (LT x 5))")
-print(result.status)  # "UNSAT"
+print(result.status)             # "UNSAT"
 ```
+
+<Note>
+The high-level SDK client (`client.verify_logic()`) and the `/verify/logic` API endpoint return the SAT/UNSAT/UNKNOWN shape shown above. The low-level `LogicVerifier` class in `qwed_new` returns the unified [`DiagnosticResult`](/advanced/diagnostics) with `status`, `developer_fields`, `agent_message`, and `proof_ref`. See [`LogicVerifier` returns `DiagnosticResult`](/engines/logic#logicverifier-returns-diagnosticresult-v6-0-0) for the full status matrix and migration snippets.
+</Note>
 
 ## 4. Code security
 
