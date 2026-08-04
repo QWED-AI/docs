@@ -76,7 +76,7 @@ The `kid` is derived from a SHA-256 fingerprint of the public key, so it stays s
 | `iss` | DID-based issuer identity of the signing service |
 | `sub` | SHA-256 hash of the original payload (tamper detection) |
 | `iat` | Token issued-at timestamp |
-| `exp` | Token expiration (default: 24 hours) |
+| `exp` | Token expiration (default: 300 seconds / 5 minutes — one A2A hop) |
 | `jti` | Trace ID linking to the verification event |
 | `qwed_a2a` | QWED-specific claims: verdict, engine, sender/receiver |
 
@@ -112,7 +112,7 @@ from qwed_a2a.security.crypto import A2ACryptoService
 # Key is loaded from QWED_A2A_SIGNING_KEY_PEM
 crypto = A2ACryptoService(
     issuer_id="did:qwed:a2a:production",
-    validity_seconds=86400,  # 24 hours
+    validity_seconds=300,  # 5 minutes (default) — one A2A hop
 )
 
 token = crypto.sign_verdict(

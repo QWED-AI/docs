@@ -7,6 +7,54 @@ description: "Verify AI-generated payroll, tax, and withholding payloads with QW
 
 The primary usage patterns for QWED-Tax are the **TaxPreFlight** auditor for intent-based checks and the **QWEDTaxMiddleware** for intercepting AI-generated payroll payloads.
 
+## Public imports
+
+The entry points, diagnostic models, and every guard are re-exported from the top-level `qwed_tax` package, so most integrations can pull what they need from a single import:
+
+```python
+from qwed_tax import (
+    TaxPreFlight,
+    TaxVerifier,
+    QWEDTaxMiddleware,
+    # Diagnostics
+    TaxDiagnosticResult,
+    TaxDiagnosticStatus,
+    TaxAdvisoryCheck,
+    # US guards
+    ClassificationGuard,        # Federal IRS Common Law
+    ABCClassificationGuard,     # State ABC Test (CA / NJ / MA)
+    PayrollGuard,
+    WithholdingGuard,
+    ReciprocityGuard,
+    Form1099Guard,
+    # India guards
+    GSTGuard,
+    CryptoTaxGuard,
+    InvestmentGuard,
+    InterHeadAdjustmentGuard,
+    DepositRateGuard,
+    # Domain guards
+    TDSGuard,
+    InputCreditGuard,
+    RemittanceGuard,
+    DTAAGuard,
+    TransferPricingGuard,
+    PoEMGuard,
+    NexusGuard,
+    CapitalGainsGuard,
+    SpeculationGuard,
+    RelatedPartyGuard,
+    ValuationGuard,
+    AddressGuard,
+)
+```
+
+The submodule paths under `qwed_tax.verifier`, `qwed_tax.guards.*`, `qwed_tax.jurisdictions.*`, `qwed_tax.middleware.*`, and `qwed_tax.diagnostics` continue to work; the top-level exports are the recommended surface.
+
+<Note>
+  `ClassificationGuard` at the top level is the federal IRS Common Law guard. The state-level ABC Test guard is exported as `ABCClassificationGuard` — it was renamed from `ClassificationGuard` to disambiguate the two. If you previously imported it from `qwed_tax.jurisdictions.us.classification_guard`, rename the class and switch to the top-level import: `from qwed_tax import ABCClassificationGuard`.
+</Note>
+
 ## TaxPreFlight
 
 The `TaxPreFlight` class routes a transaction intent to the guards required for its `action`. Every intent must declare a supported action and include a complete, verifiable claim for that action. `TaxPreFlight` **fails closed**: it blocks execution whenever the payload is missing required fields, contains non-numeric or non-finite values, or references an unsupported action.
@@ -16,7 +64,7 @@ The `TaxPreFlight` class routes a transaction intent to the guards required for 
 </Note>
 
 ```python
-from qwed_tax.verifier import TaxPreFlight
+from qwed_tax import TaxPreFlight
 
 # 1. Initialize
 preflight = TaxPreFlight()
@@ -296,7 +344,7 @@ report = preflight.audit_transaction({"action": "do_everything"})
 The `TaxVerifier` class provides jurisdiction-scoped access to guards. Initialize with `"US"` or `"INDIA"` to load the appropriate guard set.
 
 ```python
-from qwed_tax.verifier import TaxVerifier
+from qwed_tax import TaxVerifier
 
 # US jurisdiction
 us_verifier = TaxVerifier(jurisdiction="US")
@@ -337,7 +385,7 @@ The `QWEDTaxMiddleware` intercepts AI-generated payroll payloads before they rea
 </Note>
 
 ```python
-from qwed_tax.middleware.gusto_interceptor import QWEDTaxMiddleware
+from qwed_tax import QWEDTaxMiddleware
 
 middleware = QWEDTaxMiddleware()
 
