@@ -514,7 +514,7 @@ When math verification runs through the natural language pipeline (`POST /verify
 | `provider_used` | string | The LLM provider used for translation |
 | `trust_enforced` | string | Status returned by the mandatory trust-boundary enforcement step. Always matches `overall_status`. |
 | `attestation_policy` | string | Always `"mandatory"` — the control plane requires a signed attestation before returning a `VERIFIED` result |
-| `attestation_error` | string | Present only if attestation signing failed. Machine-readable code (e.g. `SIGNING_FAILURE`, `CRYPTO_UNAVAILABLE`) that caused the downgrade to `UNVERIFIABLE`. |
+| `attestation_error` | string | Present only if attestation signing failed. Machine-readable code (e.g. `SIGNING_FAILURE`, `CRYPTO_UNAVAILABLE`) that caused the downgrade to `BLOCKED`. |
 | `overall_status` | string | The top-level response status after trust boundary enforcement — always sourced from the enforced decision, never from the raw verifier verdict |
 
 <Note>
@@ -526,7 +526,7 @@ Because the LLM translation step is non-deterministic, the natural language pipe
 The control plane runs every math response through `enforce_trust_decision(..., require_attestation=True)`. Attestation is now an admission gate — a `VERIFIED` result is only returned once the signing step succeeds:
 
 - **On success:** the verifier evidence (translated expression, calculated value, claimed value, diff, precision mode) is passed to `create_verification_attestation()`. If the returned `AttestationResult` has `status == ISSUED`, `enforce_trust_decision` accepts the signed token and sets `overall_status = "VERIFIED"`.
-- **On signing failure:** the response is downgraded to `UNVERIFIABLE` and `trust_boundary.attestation_error` records the error code from the [`AttestationResult`](/advanced/attestations#attestationresult) (for example `SIGNING_FAILURE` or `CRYPTO_UNAVAILABLE`). No token is returned. This is a fail-closed guarantee: signing outages never surface as `VERIFIED`.
+- **On signing failure:** the response is downgraded to `BLOCKED` and `trust_boundary.attestation_error` records the error code from the [`AttestationResult`](/advanced/attestations#attestationresult) (for example `SIGNING_FAILURE` or `CRYPTO_UNAVAILABLE`). No token is returned. This is a fail-closed guarantee: signing outages never surface as `VERIFIED`.
 - **`overall_status` is post-attestation.** It is always sourced from the enforced decision, never from the raw verifier verdict. If you need to reason about the raw verifier output separately, inspect `verification.is_correct` and `deterministic_expression_evaluation`.
 
 ### Attestation scope: translated expression, not natural-language query

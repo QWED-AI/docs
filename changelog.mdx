@@ -16,14 +16,14 @@ All notable changes to the QWED platform, listed by release.
 ### What changed
 
 - `enforce_trust_decision(..., require_attestation=True)` is now the single source of truth for the math response `status` and `trust_boundary.overall_status`. Both fields are set from the enforced decision after attestation is issued, never from the raw verifier verdict.
-- A `VERIFIED` math result is only surfaced once `create_verification_attestation()` returns `ISSUED`. Any attestation signing failure downgrades the response to `UNVERIFIABLE` — the error code is echoed under `trust_boundary.attestation_error` and no token is returned.
+- A `VERIFIED` math result is only surfaced once `create_verification_attestation()` returns `ISSUED`. Any attestation signing failure downgrades the response to `BLOCKED` — the error code is echoed under `trust_boundary.attestation_error` and no token is returned.
 - `trust_boundary.attestation_policy` is now always `"mandatory"`. The previous advisory mode has been removed.
 - The attestation `qwed.query_hash` binds to the **translated expression** the engine actually evaluated, not to the natural-language query. The natural-language query is still returned in `response.user_query` for display, and `trust_boundary.verification_scope = "translated_expression_only"` continues to disclose the narrowed scope.
 
 ### What this means for you
 
 - Downstream consumers verifying a QWED attestation must hash the translated expression when re-checking `qwed.query_hash`. Hashing `user_query` will not match — that is intentional, because QWED does not attest to the LLM translation step.
-- If your integration branched on `trust_boundary.overall_status`, it now reflects the post-attestation decision. Signing outages surface as `UNVERIFIABLE` with `attestation_error`, not as a raw `VERIFIED` verdict.
+- If your integration branched on `trust_boundary.overall_status`, it now reflects the post-attestation decision. Signing outages surface as `BLOCKED` with `attestation_error`, not as a raw `VERIFIED` verdict.
 - See [Trust boundary](/engines/math#trust-boundary) and [`POST /verify/natural_language`](/api/endpoints#post-verify-natural-language) for the full response contract, and [Cryptographic attestations](/advanced/attestations) for the `AttestationResult` fail-closed contract.
 
 ---

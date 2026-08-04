@@ -114,7 +114,7 @@ Previous versions set the `status` field to the inner engine result (e.g., `VERI
 | `provider_used` | string | LLM provider used for translation |
 | `trust_enforced` | string | Status returned by the mandatory trust-boundary enforcement step. Matches `overall_status`. |
 | `attestation_policy` | string | Always `"mandatory"` — attestation admission is always required, never advisory |
-| `attestation_error` | string | Present only when the underlying attestation failed to sign. Machine-readable code (e.g. `SIGNING_FAILURE`, `CRYPTO_UNAVAILABLE`) explaining why the response was downgraded to `UNVERIFIABLE`. |
+| `attestation_error` | string | Present only when the underlying attestation failed to sign. Machine-readable code (e.g. `SIGNING_FAILURE`, `CRYPTO_UNAVAILABLE`) explaining why the response was downgraded to `BLOCKED`. |
 | `overall_status` | string | Final status set from the enforced decision — never from the raw verifier verdict. Mirrors the top-level `status` field. |
 
 #### Mandatory attestation admission
@@ -122,7 +122,7 @@ Previous versions set the `status` field to the inner engine result (e.g., `VERI
 The control plane treats attestation as an admission gate, not a decoration:
 
 - The final `status` and `trust_boundary.overall_status` are set by `enforce_trust_decision(..., require_attestation=True)` after signing, not by the raw verifier verdict. A `VERIFIED` math result is only surfaced once `create_verification_attestation()` returns `ISSUED`.
-- If attestation signing fails for any reason, the response is downgraded to `UNVERIFIABLE` (fail-closed). The attestation error code is echoed under `trust_boundary.attestation_error` and the top-level response omits the attestation token.
+- If attestation signing fails for any reason, the response is downgraded to `BLOCKED` (fail-closed). The attestation error code is echoed under `trust_boundary.attestation_error` and the top-level response omits the attestation token.
 - The attestation `qwed.query_hash` binds to the translated expression that the deterministic engine actually evaluated — not to the natural-language `user_query`. This matches the disclosed `verification_scope: "translated_expression_only"`: the natural-language query still appears in `response.user_query` for display, but downstream consumers verifying the attestation should hash the translated expression, not the user prose.
 
 See [Cryptographic attestations](/advanced/attestations) for the full `AttestationResult` contract and [Trust boundary](/engines/math#trust-boundary) for the math-engine discussion.
