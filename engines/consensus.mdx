@@ -145,3 +145,51 @@ Consensus is a status-preserving aggregator, not a proof engine. Per the [3-tier
 - Math-query translation failures fail closed — the engine raises rather than fabricating a numeric answer from a regex or decimal guess.
 
 Individual engine outcomes are exposed via the `status` field on each `EngineResult` in the aggregated result.
+
+### Sub-engine status contract
+
+Not every sub-engine that runs under consensus can emit `VERIFIED`. The table below makes the fail-closed contract explicit — these engines never contribute a `VERIFIED` vote, even on a successful computation, so their output stays advisory:
+
+| Sub-engine | Success outcome | Rationale |
+| ---------- | --------------- | --------- |
+| Stats (mean, median, variance) | `UNVERIFIABLE` — computed value stays on the result as advisory | Calculating a statistic is not verifying a claim. Only comparison against a claimed value with proof of correctness can produce `VERIFIED`. |
+| Python code execution | `UNVERIFIABLE` — captured output stays on the result as advisory | Runtime success only disproves by crashing; executing an expression is not proving its result matches the query's semantics. |
+
+This mirrors the existing [Fact engine](/engines/fact) heuristic contract: a TF-IDF `SUPPORTED` verdict is capped at `UNVERIFIABLE` because heuristic support is not a proof. Because a `VERIFIED` consensus requires **every** contributing engine to have emitted `VERIFIED`, a query answered only by Stats or code execution can never reach `VERIFIED` — it stops at `UNVERIFIABLE` with the computed value carried through as advisory data.
+
+## ConsensusResult
+
+Async and sync consensus verification both return a `ConsensusResult` dataclass that carries the aggregated verdict along with per-engine detail:
+
+| Field | Type | Description |
+| ----- | ---- | ----------- |
+| `final_answer` | `Any` | Best-supported answer across engines |
+| `confidence` | `float` | Weighted confidence, `0.0`–`1.0` |
+| `agreement_status` | `str` | `unanimous`, `majority`, `split`, `no_results`, `all_failed`, or `blocked_secure_execution` |
+| `engines_used` | `int` | Number of engines that returned a result |
+| `verification_chain` | `List[EngineResult]` | Per-engine outcomes, including each engine's `status` |
+| `total_latency_ms` | `float` | End-to-end latency for the aggregation |
+| `parallel_execution` | `bool` | True when engines ran concurrently |
+| `status` | `Optional[DiagnosticStatus]` | Trust-boundary status — `VERIFIED`, `UNVERIFIABLE`, or `BLOCKED` (enum, not a bare string) |
+| `proof_ref` | `Optional[str]` | Populated only on `VERIFIED` consensus — the sha256 hash of the canonical evidence |
+| `verified_evidence` | `Optional[Dict[str, Any]]` | Populated only on `VERIFIED` consensus — the exact evidence bound to `proof_ref` (agreement status, contributing engines, and the winning chain) |
+
+<Info>
+`status` is now a [`DiagnosticStatus`](/advanced/diagnostics) enum rather than a bare string. Code that compared `result.status == "VERIFIED"` should use `result.status is DiagnosticStatus.VERIFIED` or check `result.status.value` for the string form.
+</Info>
+
+### `.to_diagnostic_result()`
+
+`ConsensusResult` converts cleanly to a [`DiagnosticResult`](/advanced/diagnostics) using the stored `verified_evidence`, so downstream attestation hashes bind to the exact evidence used to reach agreement:
+
+```python
+result = client.verify_with_consensus(query="2 + 2 = 4", mode="high")
+
+dr = result.to_diagnostic_result()
+
+dr.is_verified          # True only if consensus was VERIFIED
+dr.proof_ref            # sha256:... bound to result.verified_evidence
+dr.developer_fields     # {'agreement_status': 'unanimous', 'confidence': 0.99, 'engines_used': 2}
+```
+
+The conversion is fail-closed: a `VERIFIED` `ConsensusResult` that is missing `verified_evidence` is downgraded to `UNVERIFIABLE` rather than emitting a weaker proof. This is why the `/verify/consensus` endpoint's `meets_requirement` flag is true only when consensus is `VERIFIED` at the trust boundary **and** confidence meets the requested threshold — confidence alone is never sufficient.
