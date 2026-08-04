@@ -206,7 +206,7 @@ else:
 ### Parameters
 
 <ParamField path="result" type="DiagnosticResult" required>
-  The verification result returned by the engine. `enforce_trust_decision` will pass through any already-fail-closed status (`BLOCKED`, `UNVERIFIABLE`, `CORRECTION_NEEDED`) unchanged, and only apply attestation checks to `VERIFIED`.
+  The verification result returned by the engine. `enforce_trust_decision` will pass through any already-fail-closed status (`BLOCKED`, `UNVERIFIABLE`) unchanged, and only apply attestation checks to `VERIFIED`.
 </ParamField>
 
 <ParamField path="attestation_token" type="string | None">
@@ -261,7 +261,7 @@ Every block decision is logged at `WARNING` with a structured `trust_gate.blocke
 | `VERIFIED` | Valid, but claims disagree with result | Either | **BLOCKED** (`trust_gate.claims_status_mismatch` / `claims_query_mismatch` / `claims_proof_mismatch`). |
 | Any | Any | Either | **BLOCKED** (`trust_gate.diagnostic_snapshot_failed`) when `developer_fields` cannot be snapshotted (unsupported value type, uncopyable object). |
 | `VERIFIED` | Valid and claims match | Either | Passes through as `VERIFIED` on a detached snapshot. |
-| `UNVERIFIABLE` / `BLOCKED` / `CORRECTION_NEEDED` | Any | Either | Pass through unchanged (on a detached snapshot) — attestation checks do not apply. |
+| `UNVERIFIABLE` / `BLOCKED` | Any | Either | Pass through unchanged (on a detached snapshot) — attestation checks do not apply. |
 
 <Tip>
 Start with `require_attestation=False` during the rollout window while engines are still being migrated to emit `proof_data`, then flip it to `True` once every code path that emits `VERIFIED` is signing with a proof artifact. That gives you the audit trail without breaking existing gates on day one.
