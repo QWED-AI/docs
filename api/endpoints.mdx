@@ -412,7 +412,8 @@ Mathematical expressions are parsed and compared using `Decimal` arithmetic inte
       "result": "12",
       "confidence": 99.0,
       "latency_ms": 12.5,
-      "success": true
+      "success": true,
+      "status": "VERIFIED"
     }
   ],
   "total_latency_ms": 45.2,
@@ -424,7 +425,12 @@ Mathematical expressions are parsed and compared using `Decimal` arithmetic inte
 |-------|------|-------------|
 | `confidence` | float | Confidence as a percentage (0–100) |
 | `verification_chain` | array | Detailed results from each engine |
-| `meets_requirement` | boolean | Whether confidence meets `min_confidence` |
+| `verification_chain[].status` | string | Trust-boundary status from that engine — `VERIFIED`, `UNVERIFIABLE`, or `BLOCKED` |
+| `meets_requirement` | boolean | True only when consensus is `VERIFIED` at the trust boundary **and** `confidence` meets `min_confidence`. Confidence alone is never sufficient. |
+
+<Note>
+Only unanimous `VERIFIED` engine outcomes can produce a `VERIFIED` consensus. Advisory-only sub-engines (statistical computation, code execution) always return `UNVERIFIABLE`, so a query answered solely by those paths never satisfies `meets_requirement`. See the [Consensus engine](/engines/consensus#sub-engine-status-contract) page for the full sub-engine contract.
+</Note>
 
 | Status | Description |
 |--------|-------------|
