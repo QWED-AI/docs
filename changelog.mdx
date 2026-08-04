@@ -7,9 +7,189 @@ All notable changes to the QWED platform, listed by release.
 
 ---
 
+## v6.0.0 — Trust Boundary Completion
+
+**Released: August 2, 2026** · [GitHub Release ↗](https://github.com/QWED-AI/qwed-verification/releases/tag/v6.0.0) · [GitHub PR #291](https://github.com/QWED-AI/qwed-verification/pull/291)
+
+> v6.0.0 closes the **Trust Boundary Completion** epic (Issue #263, 12/12 sub-issues). Every verification pathway now returns a unified [`DiagnosticResult`](/advanced/diagnostics) and routes through `enforce_trust_decision`. The trust boundary is no longer advisory: the control plane requires and verifies attestation before admitting `VERIFIED` results, and `VERIFIED` is a protocol guarantee backed by a deterministic `proof_ref` — never by execution, agreement, confidence, or provenance.
+
+<Warning>
+**Breaking change.** `/verify/*` API responses now use the unified [`DiagnosticResult`](/advanced/diagnostics) schema (`status` / `agent_message` / `developer_fields` / `proof_ref`). Consumers that parsed the previous ad-hoc dict responses must migrate to the unified 3-layer contract. The high-level SDK clients (`qwed`, `qwed_sdk`, `@qwed-ai/sdk`, and the `qwed` Rust crate) already surface `DiagnosticResult` at v6.0.0 and require no code change beyond the version bump.
+</Warning>
+
+### Architecture: observation vs. admission
+
+The API is the **observation surface** — an honest witness that returns what verification found. The control plane is the **admission authority** — the judge that decides what is admitted as `VERIFIED`. `QWED_RULES.md` now codifies this separation (#13 Separation of Responsibilities, #14 Verification Semantics, #15 Truth Before Policy; rules #7/#8 updated for admission-boundary and deterministic-proof semantics).
+
+- **All `/verify/*` endpoints return `DiagnosticResult`** — unified response contract across every verification surface (PR #276)
+- **Control plane enforces mandatory attestation** — `require_attestation=True`, attestation issued and verified at the admission boundary, and the enforced status drives the HTTP response status (PR #278). See [Cryptographic attestations](/advanced/attestations).
+- **Batch math routes through the trust boundary** — `/verify/batch` results carry `DiagnosticResult`, `proof_ref`, and attestation, and pass through `enforce_trust_decision` (PR #282). See [`POST /verify/batch`](/api/endpoints#post-verifybatch).
+- **Attestation scope alignment** — attestations bind to the translated expression, not the natural-language query, so `query_hash` binds to what was actually verified (PR #285).
+
+### `VERIFIED` is a protocol guarantee
+
+No engine emits `VERIFIED` without a deterministic `proof_ref`. Heuristic and advisory analysis now reports `UNVERIFIABLE` with structured `advisory_checks` instead of masquerading as verified.
+
+- **`ConsensusResult`** uses the `DiagnosticStatus` enum with `proof_ref` and `verified_evidence` (PR #280). See [Consensus engine](/engines/consensus).
+- **`FactVerifier`** heuristic SUPPORTED verdict → `UNVERIFIABLE` with `advisory_checks` (PR #283).
+- **Consensus code execution** advisory-only — `VERIFIED` → `UNVERIFIABLE` (PR #281).
+- **Consensus stats** advisory-only — never `VERIFIED` (PR #277).
+- **`LogicVerifier`** migrated to `DiagnosticResult` (PR #262 — details in the entry below).
+- **`AgentStateGuard`** `proof_ref` is now a real `sha256` of committed bytes, not a static sentence (PR #284). See [Agent state guard](/advanced/agent-state-guard).
+
+### Engineering and security hardening
+
+- **TOCTOU closure in `enforce_trust_decision`** — `developer_fields` snapshotted via recursive rebuild (no `deepcopy` alias window); fail-closed snapshot (PR #290)
+- **Attestation signature verified before claim decode** — silent generic error for every failure mode (PR #287)
+- **Tenant-isolated verification cache** — `VerificationCache` keys namespaced by normalized `tenant_id` (PR #286)
+- **Unicode normalization** in `AgentStateGuard` canonicalization — NFC collisions rejected (PR #288)
+- **Mandatory proof artifact** for `VERIFIED` attestations at both issuance and consumption (PR #248)
+- **Credential / JWT / dockerignore security alerts** resolved (PR #249)
+- **Math whitelist injection bypass** removed (PR #251)
+- **Engine classification docs** — Proof / Policy Enforcement / Advisory (PR #247)
+
+### Version bumps
+
+Every SDK, container, and manifest ships at 6.0.0:
+
+| Surface | From | To |
+|---|---|---|
+| `qwed` (PyPI) | `5.3.0` | `6.0.0` |
+| `qwed_sdk` (Python) | `5.3.0` | `6.0.0` |
+| `@qwed-ai/sdk` (npm) | `5.3.0` | `6.0.0` |
+| `qwed` (crates.io) | `5.3.0` | `6.0.0` |
+| Docker image `qwedai/qwed-verification` | `5.3.0` | `6.0.0` |
+| Kubernetes deployment image tag | `5.3.0` | `6.0.0` |
+| API version marker | `5.3.0` | `6.0.0` |
+
+### Included PRs
+
+The following 21 PRs shipped in the v6.0.0 release:
+
+| PR | Summary |
+|---|---|
+| [#247](https://github.com/QWED-AI/qwed-verification/pull/247) | docs: engine classification — Proof / Policy Enforcement / Advisory |
+| [#248](https://github.com/QWED-AI/qwed-verification/pull/248) | Enforce mandatory proof artifact on `VERIFIED` attestations (issuance + consumption) |
+| [#249](https://github.com/QWED-AI/qwed-verification/pull/249) | Resolve credential / JWT / dockerignore security alerts |
+| [#251](https://github.com/QWED-AI/qwed-verification/pull/251) | Remove math whitelist injection bypass |
+| [#260](https://github.com/QWED-AI/qwed-verification/pull/260) | Hybrid engine advisory-only — never `VERIFIED` without proof |
+| [#261](https://github.com/QWED-AI/qwed-verification/pull/261) | `FactVerifier` advisory-only |
+| [#262](https://github.com/QWED-AI/qwed-verification/pull/262) | `LogicVerifier` migrated to `DiagnosticResult` |
+| [#276](https://github.com/QWED-AI/qwed-verification/pull/276) | Migrate all `/verify/*` endpoints to return `DiagnosticResult` |
+| [#277](https://github.com/QWED-AI/qwed-verification/pull/277) | Consensus stats advisory-only, never `VERIFIED` |
+| [#278](https://github.com/QWED-AI/qwed-verification/pull/278) | Control plane trust enforcement mandatory |
+| [#280](https://github.com/QWED-AI/qwed-verification/pull/280) | `ConsensusResult` `DiagnosticStatus` enum + `proof_ref` + `verified_evidence` |
+| [#281](https://github.com/QWED-AI/qwed-verification/pull/281) | Consensus code execution advisory-only |
+| [#282](https://github.com/QWED-AI/qwed-verification/pull/282) | Batch math `DiagnosticResult` → `proof_ref` + attestation + `enforce_trust_decision` |
+| [#283](https://github.com/QWED-AI/qwed-verification/pull/283) | `FactVerifier` `SUPPORTED` → `UNVERIFIABLE` with heuristic `advisory_checks` |
+| [#284](https://github.com/QWED-AI/qwed-verification/pull/284) | `AgentStateGuard` `proof_ref` real `sha256` |
+| [#285](https://github.com/QWED-AI/qwed-verification/pull/285) | Attest translated expression, not natural-language query |
+| [#286](https://github.com/QWED-AI/qwed-verification/pull/286) | `VerificationCache` tenant isolation |
+| [#287](https://github.com/QWED-AI/qwed-verification/pull/287) | Attestation verify-before-decode + silent generic error |
+| [#288](https://github.com/QWED-AI/qwed-verification/pull/288) | NFC-normalize `AgentStateGuard` canonicalization |
+| [#289](https://github.com/QWED-AI/qwed-verification/pull/289) | Mock network in secret redaction tests (CI) |
+| [#290](https://github.com/QWED-AI/qwed-verification/pull/290) | Close TOCTOU in `enforce_trust_decision` |
+
+### Upgrading
+
+If you are on v5.3.x and only consume the high-level SDK clients or attestations, bump the version and you are done — every engine already returns `DiagnosticResult`. If your code parses raw HTTP responses from `/verify/*`, migrate to the [3-layer `DiagnosticResult`](/advanced/diagnostics) shape before upgrading. Direct callers of `LogicVerifier` should also review the [`LogicVerifier` migration notes](#v6-0-0--logicverifier-conforms-to-diagnosticresult) below.
+
+---
+
+## v6.0.0 — LogicVerifier conforms to `DiagnosticResult`
+
+**Released: August 2, 2026** · [GitHub PR #262](https://github.com/QWED-AI/qwed-verification/pull/262) · part of the [v6.0.0 release](https://github.com/QWED-AI/qwed-verification/releases/tag/v6.0.0)
+
+> `LogicVerifier` is the second engine — after `FactVerifier` — to conform to the unified 3-layer [`DiagnosticResult`](/advanced/diagnostics) contract introduced in v5.2.0. All nine public methods now return a `DiagnosticResult` with `.status`, `.developer_fields`, `.is_verified`, `.agent_message`, and `.proof_ref`. The legacy `LogicResult` dataclass has been removed. Two fail-closed input-strictness fixes ship with it.
+
+<Warning>
+**Breaking change for direct `LogicVerifier` callers.** The `LogicResult` dataclass is gone. Code that reads `result.status == "SAT"`, `result.model`, `result.error`, `result.proof_summary`, or `result.explanation` must migrate to `result.is_verified` and `result.developer_fields`. The high-level SDK client (`client.verify_logic()`) and the `/verify/logic` API endpoint response shape are unchanged.
+</Warning>
+
+### What changed
+
+- **All nine methods return `DiagnosticResult`.** `verify_logic`, `verify_with_quantifiers`, `verify_bitvector`, `verify_array`, `prove_theorem`, `check_implication`, `check_equivalence`, `verify_optimization`, and `check_vacuity` all now return a `DiagnosticResult` with the three diagnostic layers populated.
+- **Per-method SAT/UNSAT disambiguation.** Z3's `sat`/`unsat` outcome is mapped to a `DiagnosticStatus` per method (for example, `verify_logic` `sat` → `VERIFIED`, but `prove_theorem` `sat` → `BLOCKED` with a counterexample; `prove_theorem` `unsat` → `VERIFIED` because the theorem was proved by contradiction). The raw solver verdict is preserved on `developer_fields["deterministic_verdict"]`.
+- **`symbol_table` on every `VERIFIED` result.** `developer_fields["symbol_table"]` is a sorted list of `{"name": ..., "type": ...}` entries for every declared variable, so audit logs capture exactly what was proven.
+- **`proof_ref` from the Z3 assertion stack.** Every `VERIFIED` result carries a deterministic `sha256:...` `proof_ref` computed from the solver's assertions — the [authority bit](/advanced/diagnostics#layer-3--proof-diagnostics) that downstream gates use for admissibility.
+- **Empty `variables` dict now fails closed.** The `_infer_variables` type-guessing heuristic has been removed. Calls with an empty `variables` dict return `BLOCKED` with `constraint_id = "logic_verifier.explicit_declarations_required"`. Declare every variable explicitly.
+- **Malformed `BitVec[N]` declarations now fail closed.** Type strings such as `"BitVec"`, `"BitVec[]"`, or `"BitVec[abc]"` no longer silently default to 32 bits. They return `BLOCKED` with `constraint_id = "dsl_compiler.type_validation"`.
+- **`agent_message` is sanitized.** No raw Z3 output leaks into the agent-facing layer. Structured diagnostic details live under `developer_fields`.
+
+### Before and after
+
+**Reading a satisfiability result**
+
+```python
+# Before — LogicResult with a solver-level status string
+result = verifier.verify_logic({"x": "Int"}, ["x > 0"])
+if result.status == "SAT":
+    solution = result.model
+
+# After — DiagnosticResult
+result = verifier.verify_logic({"x": "Int"}, ["x > 0"])
+if result.is_verified:
+    solution = result.developer_fields["model"]
+    verdict  = result.developer_fields["deterministic_verdict"]  # "SAT"
+```
+
+**Proving a theorem**
+
+```python
+# Before — SAT meant "theorem is valid"
+result = verifier.prove_theorem(variables, premises, conclusion)
+if result.status == "SAT":
+    ...  # theorem valid
+elif result.status == "UNSAT":
+    counterexample = result.model
+
+# After — VERIFIED means "theorem proved", BLOCKED means "counterexample found"
+result = verifier.prove_theorem(variables, premises, conclusion)
+if result.is_verified:
+    ...  # theorem proved by contradiction
+elif result.status.value == "BLOCKED":
+    counterexample = result.developer_fields["model"]
+```
+
+**Empty `variables` dict**
+
+```python
+# Before — types were guessed from constraint syntax
+verifier.verify_logic({}, ["x > 5", "P and Q"])
+# Inferred: x -> Int, P/Q -> Bool
+
+# After — BLOCKED
+result = verifier.verify_logic({}, ["x > 5", "P and Q"])
+result.developer_fields["constraint_id"]
+# "logic_verifier.explicit_declarations_required"
+```
+
+### What this means for you
+
+Callers that already treat non-`VERIFIED` results as unverified continue to work — they just need to migrate the field names (`result.is_verified` in place of `result.status == "SAT"`, `result.developer_fields["model"]` in place of `result.model`). Callers that relied on implicit variable inference or on `"BitVec"` defaulting to 32-bit must now declare every variable explicitly. See [`LogicVerifier` returns `DiagnosticResult`](/engines/logic#logicverifier-returns-diagnosticresult-v6-0-0) for the full status matrix, `constraint_id` list, and migration snippets, and the [Verification Diagnostics guide](/advanced/diagnostics) for the 3-layer model.
+
+---
+
 ## QWED Control Plane â€” mandatory attestation admission on `/verify/math`, translated-expression attestation scope
 
 ---
+
+**Released: July 31, 2026** Â· [GitHub PR #278](https://github.com/QWED-AI/qwed-verification/pull/278) Â· [GitHub PR #285](https://github.com/QWED-AI/qwed-verification/pull/285)
+
+> The control plane now treats attestation as an admission gate on the math verification path â€” the final response status is set by the enforcement step after signing, not by the raw verifier verdict. In the same release, the attestation `qwed.query_hash` now binds to the translated deterministic expression, not to the user's natural-language query.
+
+### What changed
+
+- `enforce_trust_decision(..., require_attestation=True)` is now the single source of truth for the math response `status` and `trust_boundary.overall_status`. Both fields are set from the enforced decision after attestation is issued, never from the raw verifier verdict.
+- A `VERIFIED` math result is only surfaced once `create_verification_attestation()` returns `ISSUED`. Any attestation signing failure downgrades the response to `BLOCKED` â€” the error code is echoed under `trust_boundary.attestation_error` and no token is returned.
+- `trust_boundary.attestation_policy` is now always `"mandatory"`. The previous advisory mode has been removed.
+- The attestation `qwed.query_hash` binds to the **translated expression** the engine actually evaluated, not to the natural-language query. The natural-language query is still returned in `response.user_query` for display, and `trust_boundary.verification_scope = "translated_expression_only"` continues to disclose the narrowed scope.
+
+### What this means for you
+
+- Downstream consumers verifying a QWED attestation must hash the translated expression when re-checking `qwed.query_hash`. Hashing `user_query` will not match â€” that is intentional, because QWED does not attest to the LLM translation step.
+- If your integration branched on `trust_boundary.overall_status`, it now reflects the post-attestation decision. Signing outages surface as `BLOCKED` with `attestation_error`, not as a raw `VERIFIED` verdict.
+- See [Trust boundary](/engines/math#trust-boundary) and [`POST /verify/natural_language`](/api/endpoints#post-verify-natural-language) for the full response contract, and [Cryptographic attestations](/advanced/attestations) for the `AttestationResult` fail-closed contract.
 
 ## v5.3.0 — SymbolicVerifier: `DiagnosticResult` reference implementation
 
@@ -104,38 +284,17 @@ If your integration reads any dict-shape field from a `SymbolicVerifier` result,
 
 ## QWED-A2A — `UNVERIFIABLE` verdicts carry no JWT, and five README behaviors realigned with the code
 
-**Released: July 31, 2026** Â· [GitHub PR #278](https://github.com/QWED-AI/qwed-verification/pull/278) Â· [GitHub PR #285](https://github.com/QWED-AI/qwed-verification/pull/285)
+**Released: July 27, 2026** · [GitHub PR #40](https://github.com/QWED-AI/qwed-a2a/pull/40) · [GitHub PR #57](https://github.com/QWED-AI/qwed-a2a/pull/57)
 
-> The control plane now treats attestation as an admission gate on the math verification path â€” the final response status is set by the enforcement step after signing, not by the raw verifier verdict. In the same release, the attestation `qwed.query_hash` now binds to the translated deterministic expression, not to the user's natural-language query.
-
-### What changed
-
-- `enforce_trust_decision(..., require_attestation=True)` is now the single source of truth for the math response `status` and `trust_boundary.overall_status`. Both fields are set from the enforced decision after attestation is issued, never from the raw verifier verdict.
-- A `VERIFIED` math result is only surfaced once `create_verification_attestation()` returns `ISSUED`. Any attestation signing failure downgrades the response to `BLOCKED` â€” the error code is echoed under `trust_boundary.attestation_error` and no token is returned.
-- `trust_boundary.attestation_policy` is now always `"mandatory"`. The previous advisory mode has been removed.
-- The attestation `qwed.query_hash` binds to the **translated expression** the engine actually evaluated, not to the natural-language query. The natural-language query is still returned in `response.user_query` for display, and `trust_boundary.verification_scope = "translated_expression_only"` continues to disclose the narrowed scope.
-
-### What this means for you
-
-- Downstream consumers verifying a QWED attestation must hash the translated expression when re-checking `qwed.query_hash`. Hashing `user_query` will not match â€” that is intentional, because QWED does not attest to the LLM translation step.
-- If your integration branched on `trust_boundary.overall_status`, it now reflects the post-attestation decision. Signing outages surface as `BLOCKED` with `attestation_error`, not as a raw `VERIFIED` verdict.
-- See [Trust boundary](/engines/math#trust-boundary) and [`POST /verify/natural_language`](/api/endpoints#post-verify-natural-language) for the full response contract, and [Cryptographic attestations](/advanced/attestations) for the `AttestationResult` fail-closed contract.
-
----
-
-## QWED-A2A â€” `UNVERIFIABLE` verdicts carry no JWT, and five README behaviors realigned with the code
-
-**Released: July 27, 2026** Â· [GitHub PR #40](https://github.com/QWED-AI/qwed-a2a/pull/40) Â· [GitHub PR #57](https://github.com/QWED-AI/qwed-a2a/pull/57)
-
-> The interceptor no longer produces a signed `FORWARDED` verdict for empty or malformed `FINANCIAL_TRANSACTION` and `LOGIC_ASSERTION` payloads, and no longer silently forwards `GENERAL` / `DATA_QUERY` messages. Both cases now return `verdict.status = "unverifiable"` with `attestation_jwt = None` â€” signing a token for content that was never verified would be a false cryptographic claim. The A2A docs are updated to match the shipping behavior on five points that previously overstated what the interceptor does.
+> The interceptor no longer produces a signed `FORWARDED` verdict for empty or malformed `FINANCIAL_TRANSACTION` and `LOGIC_ASSERTION` payloads, and no longer silently forwards `GENERAL` / `DATA_QUERY` messages. Both cases now return `verdict.status = "unverifiable"` with `attestation_jwt = None` — signing a token for content that was never verified would be a false cryptographic claim. The A2A docs are updated to match the shipping behavior on five points that previously overstated what the interceptor does.
 
 ### What changed
 
-- **Empty/malformed finance and logic payloads â†’ `UNVERIFIABLE`, no JWT.** A `FINANCIAL_TRANSACTION` missing `data`, `line_items`, or `claimed_total`, or with non-numeric amounts, now returns `status=unverifiable` from `finance_guard`. A `LOGIC_ASSERTION` with a missing, non-list, or empty `assertions` array, or malformed entries, returns `status=unverifiable` from `logic_guard`. Earlier releases collapsed these cases to `verified=True` + a signed `FORWARDED` verdict.
+- **Empty/malformed finance and logic payloads → `UNVERIFIABLE`, no JWT.** A `FINANCIAL_TRANSACTION` missing `data`, `line_items`, or `claimed_total`, or with non-numeric amounts, now returns `status=unverifiable` from `finance_guard`. A `LOGIC_ASSERTION` with a missing, non-list, or empty `assertions` array, or malformed entries, returns `status=unverifiable` from `logic_guard`. Earlier releases collapsed these cases to `verified=True` + a signed `FORWARDED` verdict.
 - **`GENERAL` and `DATA_QUERY` are no longer silently forwarded.** The passthrough branch now returns an `unverifiable` verdict with `engine_used="passthrough"`, `attestation_jwt=None`, and reason `"No verification engine available for this payload type"`. Callers must decide their own downstream policy for unverified traffic.
-- **No `Bypass` verification stage.** The pipeline has four stages, not five. `config.trusted_agents` is pre-added to the `TrustBoundary` allowlist at interceptor construction time â€” trusted agents still flow through engine routing and receive a normal verdict. The [Verification interceptor](/a2a/interceptor#verification-pipeline) and [Architecture](/a2a/architecture) pages have been corrected.
-- **`CodeGuard` is AST-first, regex-second.** Code payloads are first parsed into an AST and inspected for direct dangerous constructs (`eval(`, `exec(`, `subprocess.run(`, `import subprocess`, etc.). Only if the AST layer is clean does a regex heuristic scan run to catch obfuscation patterns (`getattr(__builtins__, ...)`, base64-encoded exec, dynamic `__import__`). The verdict is `BLOCKED` if either layer triggers, or `HEURISTIC_PASS` if both are clean â€” not a proof of safety.
-- **JWT attestation expiry is 300 seconds (5 minutes), not 24 hours.** The default `validity_seconds` on `A2ACryptoService` is `300` â€” one A2A hop lifetime. The [Crypto attestations](/a2a/crypto-attestations) page and its signing example were updated.
+- **No `Bypass` verification stage.** The pipeline has four stages, not five. `config.trusted_agents` is pre-added to the `TrustBoundary` allowlist at interceptor construction time — trusted agents still flow through engine routing and receive a normal verdict. The [Verification interceptor](/a2a/interceptor#verification-pipeline) and [Architecture](/a2a/architecture) pages have been corrected.
+- **`CodeGuard` is AST-first, regex-second.** Code payloads are first parsed into an AST and inspected for direct dangerous constructs (`eval(`, `exec(`, `subprocess.run(`, `import subprocess`, etc.). Only if the AST layer is clean does a regex heuristic scan run to catch obfuscation patterns (`getattr(__builtins__, ...)`, base64-encoded exec, dynamic `__import__`). The verdict is `BLOCKED` if either layer triggers, or `HEURISTIC_PASS` if both are clean — not a proof of safety.
+- **JWT attestation expiry is 300 seconds (5 minutes), not 24 hours.** The default `validity_seconds` on `A2ACryptoService` is `300` — one A2A hop lifetime. The [Crypto attestations](/a2a/crypto-attestations) page and its signing example were updated.
 
 ### New verdict-status contract
 
@@ -147,32 +306,32 @@ If your integration reads any dict-shape field from a `SymbolicVerifier` result,
 | `unverifiable` | No engine could evaluate the payload (`GENERAL`/`DATA_QUERY`, empty or malformed finance/logic payload). | **None** |
 
 <Warning>
-**Behavior change.** Downstream code that assumed every `VerificationVerdict` carries an `attestation_jwt` will see `None` on `UNVERIFIABLE` verdicts and must handle it. Callers that treated a signed `FORWARDED` verdict as proof that finance/logic content had been checked should also branch on `verdict.status` â€” an empty payload no longer produces a signed `FORWARDED`, and a `GENERAL`/`DATA_QUERY` message no longer produces one at all. Note that `VerdictStatus.ERROR` exists in the public enum but is not emitted by `intercept()` â€” internal exceptions surface as `BLOCKED` (or `FORWARDED` when `block_on_error=False`), never as an `error` verdict.
+**Behavior change.** Downstream code that assumed every `VerificationVerdict` carries an `attestation_jwt` will see `None` on `UNVERIFIABLE` verdicts and must handle it. Callers that treated a signed `FORWARDED` verdict as proof that finance/logic content had been checked should also branch on `verdict.status` — an empty payload no longer produces a signed `FORWARDED`, and a `GENERAL`/`DATA_QUERY` message no longer produces one at all. Note that `VerdictStatus.ERROR` exists in the public enum but is not emitted by `intercept()` — internal exceptions surface as `BLOCKED` (or `FORWARDED` when `block_on_error=False`), never as an `error` verdict.
 </Warning>
 
 ### What this means for you
 
-If you integrate QWED-A2A: audit any caller that reads `attestation_jwt` or trusts `status == "forwarded"` without also checking `engine_used`. Legitimate agent traffic on unsupported payload types is not blocked â€” it is marked `unverifiable` so your policy layer can decide whether to route it. See the updated [Verification interceptor](/a2a/interceptor) and [Quick start](/a2a/quickstart) pages for the full verdict contract and example payload shapes.
+If you integrate QWED-A2A: audit any caller that reads `attestation_jwt` or trusts `status == "forwarded"` without also checking `engine_used`. Legitimate agent traffic on unsupported payload types is not blocked — it is marked `unverifiable` so your policy layer can decide whether to route it. See the updated [Verification interceptor](/a2a/interceptor) and [Quick start](/a2a/quickstart) pages for the full verdict contract and example payload shapes.
 
 ---
 
-## QWED verification â€” signature-first attestation validation, uniform rejection error, and TOCTOU-safe trust-boundary snapshot
+## QWED verification — signature-first attestation validation, uniform rejection error, and TOCTOU-safe trust-boundary snapshot
 
-**Released: August 1, 2026** Â· [PR #287](https://github.com/qwed-ai/qwed-verification/pull/287) Â· [PR #290](https://github.com/qwed-ai/qwed-verification/pull/290)
+**Released: August 1, 2026** · [PR #287](https://github.com/qwed-ai/qwed-verification/pull/287) · [PR #290](https://github.com/qwed-ai/qwed-verification/pull/290)
 
 > Two follow-ups harden the attestation trust boundary introduced last week. `verify_attestation()` now verifies the JWT signature before applying any issuer authorization or revocation checks, and every rejection path returns the same generic `"Invalid token"` error so callers cannot enumerate trusted issuers, probe token expiry, or confirm revocation state through response text. `enforce_trust_decision()` now returns a fully detached `DiagnosticResult` snapshot, closing a TOCTOU window where a concurrent caller could mutate `developer_fields` between the validation read and the admission decision.
 
 ### What changed
 
 - **Signature-first verification order.** `verify_attestation()` cryptographically verifies the JWT (signature + expiration + required claims) before it applies the trusted-issuer authorization check or the revocation check. An unknown-issuer token that is not correctly signed is rejected on signature grounds and the trust-list check never runs.
-- **Uniform `"Invalid token"` rejection.** Every failure mode â€” expired, revoked, untrusted issuer, unsupported external issuer, malformed, oversized, malformed base64 â€” returns the same `(is_valid=False, claims=None, error="Invalid token")` triple. Detailed reasons are still recorded in the server-side `attestation.rejected` audit log; only the caller-facing error is generic. This closes the trusted-issuer enumeration side channel.
+- **Uniform `"Invalid token"` rejection.** Every failure mode — expired, revoked, untrusted issuer, unsupported external issuer, malformed, oversized, malformed base64 — returns the same `(is_valid=False, claims=None, error="Invalid token")` triple. Detailed reasons are still recorded in the server-side `attestation.rejected` audit log; only the caller-facing error is generic. This closes the trusted-issuer enumeration side channel.
 - **Detached-result snapshot in `enforce_trust_decision()`.** Before validation, `developer_fields` is recursively rebuilt into an isolated snapshot that admits only immutable scalars, `AdvisoryCheck`, and JSON-safe containers. The value you validate is the value you return, so a concurrent mutation of the caller's `DiagnosticResult` can neither skew the decision nor leak into the returned result.
-- **Fail-closed snapshot failure.** When `developer_fields` contains an unsupported value type (custom class instance, generator, open file handle) or an object that resists copying, `enforce_trust_decision()` returns a `BLOCKED` result with `constraint_id="trust_gate.diagnostic_snapshot_failed"`. Only the exception type is logged â€” never the exception message, which could embed caller data.
+- **Fail-closed snapshot failure.** When `developer_fields` contains an unsupported value type (custom class instance, generator, open file handle) or an object that resists copying, `enforce_trust_decision()` returns a `BLOCKED` result with `constraint_id="trust_gate.diagnostic_snapshot_failed"`. Only the exception type is logged — never the exception message, which could embed caller data.
 - **Runtime dependency.** `cryptography` is now a runtime dependency (previously an optional extra), so ES256 signature verification runs by default.
 
 ### Before and after
 
-**Rejection error â€” before**
+**Rejection error — before**
 
 ```python
 # Distinct messages leaked expiration, revocation, and trusted-issuer identity.
@@ -183,7 +342,7 @@ is_valid, claims, error = client.verify_attestation(bad_jwt)
 # error = "External issuer key resolution not implemented"
 ```
 
-**Rejection error â€” after**
+**Rejection error — after**
 
 ```python
 # Every rejection path returns the same string.
@@ -191,20 +350,20 @@ is_valid, claims, error = client.verify_attestation(bad_jwt)
 # is_valid = False, claims = None, error = "Invalid token"
 ```
 
-**Trust-boundary snapshot â€” before**
+**Trust-boundary snapshot — before**
 
 ```python
 result = engine.verify(query)  # DiagnosticResult(developer_fields={"score": 0.9})
 decision = enforce_trust_decision(result, attestation_token=token, ...)
 
 # Concurrent code holding `result` could mutate developer_fields AFTER
-# validation but BEFORE the caller admitted the decision â€” the returned
+# validation but BEFORE the caller admitted the decision — the returned
 # reference aliased the input.
 result.developer_fields["score"] = -1.0
 assert decision.developer_fields["score"] == -1.0  # TOCTOU: mutation leaked in
 ```
 
-**Trust-boundary snapshot â€” after**
+**Trust-boundary snapshot — after**
 
 ```python
 result = engine.verify(query)
@@ -218,29 +377,29 @@ assert decision.developer_fields["score"] == 0.9  # unchanged
 
 ### What this means for you
 
-Callers of `verify_attestation()` must not branch on the `error` string any more â€” treat any `is_valid=False` result as a hard block and rely on the server-side audit log for the actual reason. Callers of `enforce_trust_decision()` should keep `developer_fields` values to JSON-safe types (strings, numbers, booleans, `None`, lists, dicts) plus `AdvisoryCheck`; anything else will be rejected by the snapshotter and blocked at the trust boundary with `trust_gate.diagnostic_snapshot_failed`. See [Uniform rejection error](/advanced/attestations#uniform-rejection-error) and [Detached result snapshot](/advanced/attestations#detached-result-snapshot) for the full behavior.
+Callers of `verify_attestation()` must not branch on the `error` string any more — treat any `is_valid=False` result as a hard block and rely on the server-side audit log for the actual reason. Callers of `enforce_trust_decision()` should keep `developer_fields` values to JSON-safe types (strings, numbers, booleans, `None`, lists, dicts) plus `AdvisoryCheck`; anything else will be rejected by the snapshotter and blocked at the trust boundary with `trust_gate.diagnostic_snapshot_failed`. See [Uniform rejection error](/advanced/attestations#uniform-rejection-error) and [Detached result snapshot](/advanced/attestations#detached-result-snapshot) for the full behavior.
 
 ---
 
-## QWED verification â€” mandatory proof artifact for VERIFIED attestations and a single trust-boundary entry point
+## QWED verification — mandatory proof artifact for VERIFIED attestations and a single trust-boundary entry point
 
-**Released: July 28, 2026** Â· [PR #248](https://github.com/qwed-ai/qwed-verification/pull/248)
+**Released: July 28, 2026** · [PR #248](https://github.com/qwed-ai/qwed-verification/pull/248)
 
-> Two related enforcement-boundary changes ship together. Issuance side, the crypto layer now refuses to sign a `VERIFIED` verdict that has no proof artifact. Consumption side, a new `enforce_trust_decision()` function is the single trust-boundary entry point that release gates route through â€” it verifies the attestation JWT, binds its claims to the result (status, query hash, proof hash), and fails closed on any mismatch.
+> Two related enforcement-boundary changes ship together. Issuance side, the crypto layer now refuses to sign a `VERIFIED` verdict that has no proof artifact. Consumption side, a new `enforce_trust_decision()` function is the single trust-boundary entry point that release gates route through — it verifies the attestation JWT, binds its claims to the result (status, query hash, proof hash), and fails closed on any mismatch.
 
 ### What changed
 
 - **`create_verification_attestation()` blocks VERIFIED without proof.** Calling with `verified=True` (or `status="VERIFIED"`) and an empty or missing `proof_data` now returns `AttestationResult(status=BLOCKED, token=None, error_code="VERIFIED_WITHOUT_PROOF", error=...)`. The crypto layer will not sign a `VERIFIED` result that has no evidence to hash into the token's `proof_hash` claim. `UNVERIFIABLE` and `BLOCKED` verdicts are unaffected.
 - **New `enforce_trust_decision()` trust-boundary gate.** Exported from `qwed_new.core`, this is the single consumption-side entry point every release gate must route through. It takes the engine's `DiagnosticResult` plus the attestation token, verifies the JWT (signature, expiry, trusted issuer), and blocks the decision when the token's `qwed.result.status`, `qwed.query_hash`, or `qwed.proof_hash` claims do not match the result. `UNVERIFIABLE`/`BLOCKED` results pass through unchanged.
-- **`require_attestation` policy toggle.** `enforce_trust_decision(result, require_attestation=True, ...)` (default) is the mandatory policy â€” `VERIFIED` without a valid token is downgraded to `BLOCKED`. `require_attestation=False` is the advisory policy for staged rollouts: a missing token still passes as `VERIFIED`, but a present-and-invalid token still blocks. Both modes emit structured `trust_gate.blocked` audit logs on rejection.
+- **`require_attestation` policy toggle.** `enforce_trust_decision(result, require_attestation=True, ...)` (default) is the mandatory policy — `VERIFIED` without a valid token is downgraded to `BLOCKED`. `require_attestation=False` is the advisory policy for staged rollouts: a missing token still passes as `VERIFIED`, but a present-and-invalid token still blocks. Both modes emit structured `trust_gate.blocked` audit logs on rejection.
 - **Control plane integration.** The math control plane now routes every verification through `enforce_trust_decision()` and records the outcome and policy on the trust boundary (`trust_enforced`, `attestation_policy`) so operators can watch the mandatory rollout from telemetry before flipping the switch.
 
 ### Before and after
 
-**Issuance â€” `VERIFIED` without a proof artifact**
+**Issuance — `VERIFIED` without a proof artifact**
 
 ```python
-# Before â€” the crypto layer signed a VERIFIED verdict even with no proof_data,
+# Before — the crypto layer signed a VERIFIED verdict even with no proof_data,
 # emitting an attestation whose proof_hash pointed at an empty artifact.
 create_verification_attestation(
     status="VERIFIED",
@@ -250,7 +409,7 @@ create_verification_attestation(
 )
 # AttestationResult(status=ISSUED, token="eyJ...", error_code=None)
 
-# After â€” issuance is refused; there is no way to obtain a signed
+# After — issuance is refused; there is no way to obtain a signed
 # attestation for a VERIFIED claim without evidence.
 create_verification_attestation(
     status="VERIFIED",
@@ -262,20 +421,20 @@ create_verification_attestation(
 #     status=BLOCKED,
 #     token=None,
 #     error_code="VERIFIED_WITHOUT_PROOF",
-#     error="VERIFIED status requires proof_data â€” cannot sign attestation without proof artifact",
+#     error="VERIFIED status requires proof_data — cannot sign attestation without proof artifact",
 # )
 ```
 
-**Consumption â€” release gate on a VERIFIED result**
+**Consumption — release gate on a VERIFIED result**
 
 ```python
-# Before â€” release gates inspected result.status directly and could admit
+# Before — release gates inspected result.status directly and could admit
 # a VERIFIED result whose attestation was missing, invalid, or bound to a
 # different query. There was no single enforcement point.
 if result.status == "VERIFIED":
     proceed()
 
-# After â€” one call gates the boundary. Missing/invalid tokens or
+# After — one call gates the boundary. Missing/invalid tokens or
 # mismatched claims downgrade the decision to BLOCKED with a
 # structured audit event.
 from qwed_new.core import enforce_trust_decision
@@ -296,26 +455,26 @@ else:
 
 ### What this means for you
 
-If you call `create_verification_attestation()` directly, always pass `proof_data` (typically `json.dumps(evidence, sort_keys=True)`) when signing a `VERIFIED` verdict, and check `result.is_issued` before treating the token as valid. If you consume verification results in a release gate, route them through `enforce_trust_decision()` â€” start in advisory mode (`require_attestation=False`) while your engines are being migrated to emit proof artifacts, watch the `trust_boundary.trust_enforced` telemetry, then flip to mandatory once every `VERIFIED` path is signing with proof. See [Fail-closed contract](/advanced/attestations#fail-closed-contract) and [Enforce the trust boundary](/advanced/attestations#enforce-the-trust-boundary) for the full parameter reference and fail-closed matrix.
+If you call `create_verification_attestation()` directly, always pass `proof_data` (typically `json.dumps(evidence, sort_keys=True)`) when signing a `VERIFIED` verdict, and check `result.is_issued` before treating the token as valid. If you consume verification results in a release gate, route them through `enforce_trust_decision()` — start in advisory mode (`require_attestation=False`) while your engines are being migrated to emit proof artifacts, watch the `trust_boundary.trust_enforced` telemetry, then flip to mandatory once every `VERIFIED` path is signing with proof. See [Fail-closed contract](/advanced/attestations#fail-closed-contract) and [Enforce the trust boundary](/advanced/attestations#enforce-the-trust-boundary) for the full parameter reference and fail-closed matrix.
 
 ---
 
-## QWED-A2A â€” `verify_attestation()` now requires an `AttestationContext` (breaking)
+## QWED-A2A — `verify_attestation()` now requires an `AttestationContext` (breaking)
 
-**Released: July 26, 2026** Â· [GitHub PR #41](https://github.com/qwed-ai/qwed-a2a/pull/41)
+**Released: July 26, 2026** · [GitHub PR #41](https://github.com/qwed-ai/qwed-a2a/pull/41)
 
-> `A2ACryptoService.verify_attestation()` used to accept a token on its own â€” a cryptographically valid signature was treated as sufficient proof. A detached attestation could therefore be lifted from one exchange and replayed against a different sender, receiver, or payload without detection. The method now requires a second argument, an `AttestationContext` describing the current request, and rejects the token if the sender, receiver, payload hash, or session claim does not match.
+> `A2ACryptoService.verify_attestation()` used to accept a token on its own — a cryptographically valid signature was treated as sufficient proof. A detached attestation could therefore be lifted from one exchange and replayed against a different sender, receiver, or payload without detection. The method now requires a second argument, an `AttestationContext` describing the current request, and rejects the token if the sender, receiver, payload hash, or session claim does not match.
 
 <Warning>
-**Breaking change.** The single-argument form `verify_attestation(token)` has been removed â€” there is no context-free overload. Every call site must construct an `AttestationContext` and pass it as the second positional argument, or the call raises `TypeError`. See [Migrating to context-bound verification](/a2a/crypto-attestations#migrating-to-context-bound-verification) for the exact before/after.
+**Breaking change.** The single-argument form `verify_attestation(token)` has been removed — there is no context-free overload. Every call site must construct an `AttestationContext` and pass it as the second positional argument, or the call raises `TypeError`. See [Migrating to context-bound verification](/a2a/crypto-attestations#migrating-to-context-bound-verification) for the exact before/after.
 </Warning>
 
 ### What changed
 
 - **New `AttestationContext` dataclass** in `qwed_a2a.security.crypto` with fields `sender_agent_id: str`, `receiver_agent_id: str`, `payload: Any`, and optional `session_id: str | None`. The payload is hashed internally with the same deterministic method as `sign_verdict()`, so callers never handle raw hashes.
-- **New context-binding verification step** â€” sender, receiver, payload hash, and (when supplied) `session_id` are compared against the token's `qwed_a2a` claims and `sub` claim. Any mismatch returns a structured rejection: `"Attestation sender mismatch: expected=..., got=..."`, `"Attestation receiver mismatch: ..."`, `"Attestation payload hash mismatch â€” detached attestation rejected"`, or `"Attestation session mismatch: ..."`.
+- **New context-binding verification step** — sender, receiver, payload hash, and (when supplied) `session_id` are compared against the token's `qwed_a2a` claims and `sub` claim. Any mismatch returns a structured rejection: `"Attestation sender mismatch: expected=..., got=..."`, `"Attestation receiver mismatch: ..."`, `"Attestation payload hash mismatch — detached attestation rejected"`, or `"Attestation session mismatch: ..."`.
 - **Verification order updated.** Context binding now runs **after** the deployment-context check but **before** the `jti` replay check. This is deliberate: an out-of-context token no longer pollutes the `jti` registry, so a legitimate future presentation of the same token in its correct context is not locked out.
-- **Signing is unchanged.** `sign_verdict()` still takes the same arguments â€” only the verify side gained a parameter.
+- **Signing is unchanged.** `sign_verdict()` still takes the same arguments — only the verify side gained a parameter.
 
 ### What this means for you
 
@@ -337,88 +496,14 @@ See [Verifying an attestation](/a2a/crypto-attestations#verifying-an-attestation
 
 ---
 
-## v6.0.0 â€” LogicVerifier conforms to `DiagnosticResult`
+## QWED Math Engine — fail-closed on mode ambiguity, eigenvalue cardinality, and IRR convergence
 
-**Released: August 2, 2026** Â· [GitHub PR #262](https://github.com/QWED-AI/qwed-verification/pull/262) Â· part of the [v6.0.0 release](https://github.com/QWED-AI/qwed-verification/releases/tag/v6.0.0)
-
-> `LogicVerifier` is the second engine â€” after `FactVerifier` â€” to conform to the unified 3-layer [`DiagnosticResult`](/advanced/diagnostics) contract introduced in v5.2.0. All nine public methods now return a `DiagnosticResult` with `.status`, `.developer_fields`, `.is_verified`, `.agent_message`, and `.proof_ref`. The legacy `LogicResult` dataclass has been removed. Two fail-closed input-strictness fixes ship with it.
-
-<Warning>
-**Breaking change for direct `LogicVerifier` callers.** The `LogicResult` dataclass is gone. Code that reads `result.status == "SAT"`, `result.model`, `result.error`, `result.proof_summary`, or `result.explanation` must migrate to `result.is_verified` and `result.developer_fields`. The high-level SDK client (`client.verify_logic()`) and the `/verify/logic` API endpoint response shape are unchanged.
-</Warning>
-
-### What changed
-
-- **All nine methods return `DiagnosticResult`.** `verify_logic`, `verify_with_quantifiers`, `verify_bitvector`, `verify_array`, `prove_theorem`, `check_implication`, `check_equivalence`, `verify_optimization`, and `check_vacuity` all now return a `DiagnosticResult` with the three diagnostic layers populated.
-- **Per-method SAT/UNSAT disambiguation.** Z3's `sat`/`unsat` outcome is mapped to a `DiagnosticStatus` per method (for example, `verify_logic` `sat` â†’ `VERIFIED`, but `prove_theorem` `sat` â†’ `BLOCKED` with a counterexample; `prove_theorem` `unsat` â†’ `VERIFIED` because the theorem was proved by contradiction). The raw solver verdict is preserved on `developer_fields["deterministic_verdict"]`.
-- **`symbol_table` on every `VERIFIED` result.** `developer_fields["symbol_table"]` is a sorted list of `{"name": ..., "type": ...}` entries for every declared variable, so audit logs capture exactly what was proven.
-- **`proof_ref` from the Z3 assertion stack.** Every `VERIFIED` result carries a deterministic `sha256:...` `proof_ref` computed from the solver's assertions â€” the [authority bit](/advanced/diagnostics#layer-3--proof-diagnostics) that downstream gates use for admissibility.
-- **Empty `variables` dict now fails closed.** The `_infer_variables` type-guessing heuristic has been removed. Calls with an empty `variables` dict return `BLOCKED` with `constraint_id = "logic_verifier.explicit_declarations_required"`. Declare every variable explicitly.
-- **Malformed `BitVec[N]` declarations now fail closed.** Type strings such as `"BitVec"`, `"BitVec[]"`, or `"BitVec[abc]"` no longer silently default to 32 bits. They return `BLOCKED` with `constraint_id = "dsl_compiler.type_validation"`.
-- **`agent_message` is sanitized.** No raw Z3 output leaks into the agent-facing layer. Structured diagnostic details live under `developer_fields`.
-
-### Before and after
-
-**Reading a satisfiability result**
-
-```python
-# Before â€” LogicResult with a solver-level status string
-result = verifier.verify_logic({"x": "Int"}, ["x > 0"])
-if result.status == "SAT":
-    solution = result.model
-
-# After â€” DiagnosticResult
-result = verifier.verify_logic({"x": "Int"}, ["x > 0"])
-if result.is_verified:
-    solution = result.developer_fields["model"]
-    verdict  = result.developer_fields["deterministic_verdict"]  # "SAT"
-```
-
-**Proving a theorem**
-
-```python
-# Before â€” SAT meant "theorem is valid"
-result = verifier.prove_theorem(variables, premises, conclusion)
-if result.status == "SAT":
-    ...  # theorem valid
-elif result.status == "UNSAT":
-    counterexample = result.model
-
-# After â€” VERIFIED means "theorem proved", BLOCKED means "counterexample found"
-result = verifier.prove_theorem(variables, premises, conclusion)
-if result.is_verified:
-    ...  # theorem proved by contradiction
-elif result.status.value == "BLOCKED":
-    counterexample = result.developer_fields["model"]
-```
-
-**Empty `variables` dict**
-
-```python
-# Before â€” types were guessed from constraint syntax
-verifier.verify_logic({}, ["x > 5", "P and Q"])
-# Inferred: x -> Int, P/Q -> Bool
-
-# After â€” BLOCKED
-result = verifier.verify_logic({}, ["x > 5", "P and Q"])
-result.developer_fields["constraint_id"]
-# "logic_verifier.explicit_declarations_required"
-```
-
-### What this means for you
-
-Callers that already treat non-`VERIFIED` results as unverified continue to work â€” they just need to migrate the field names (`result.is_verified` in place of `result.status == "SAT"`, `result.developer_fields["model"]` in place of `result.model`). Callers that relied on implicit variable inference or on `"BitVec"` defaulting to 32-bit must now declare every variable explicitly. See [`LogicVerifier` returns `DiagnosticResult`](/engines/logic#logicverifier-returns-diagnosticresult-v6-0-0) for the full status matrix, `constraint_id` list, and migration snippets, and the [Verification Diagnostics guide](/advanced/diagnostics) for the 3-layer model.
-
----
-
-## QWED Math Engine â€” fail-closed on mode ambiguity, eigenvalue cardinality, and IRR convergence
-
-**Released: July 24, 2026** Â· [Jump to details](#qwed-math-engine--fail-closed-on-mode-ambiguity-eigenvalue-cardinality-and-irr-convergence) Â· [PR #217](https://github.com/qwed-ai/qwed-verification/pull/217) Â· [PR #218](https://github.com/qwed-ai/qwed-verification/pull/218) Â· [PR #219](https://github.com/qwed-ai/qwed-verification/pull/219)
+**Released: July 24, 2026** · [Jump to details](#qwed-math-engine--fail-closed-on-mode-ambiguity-eigenvalue-cardinality-and-irr-convergence) · [PR #217](https://github.com/qwed-ai/qwed-verification/pull/217) · [PR #218](https://github.com/qwed-ai/qwed-verification/pull/218) · [PR #219](https://github.com/qwed-ai/qwed-verification/pull/219)
 
 > Three core-verifier fixes tighten the math engine's fail-closed contract. `verify_statistics(statistic="mode")`, `verify_matrix_operation(operation="eigenvalues")`, and `verify_irr()` no longer produce `VERIFIED` when the underlying claim is ambiguous, under-specified, or numerically unproven. Callers see `BLOCKED` or `CORRECTION_NEEDED` with structured diagnostics instead of a best-effort answer.
 
 <Warning>
-**Behavior change.** Inputs that previously received `VERIFIED` may now receive `BLOCKED` or `CORRECTION_NEEDED` â€” treat both as unverified. If your code branched on `result.verified` or `result.status == "VERIFIED"` alone, it will continue to work; if you consumed `calculated`/`calculated_irr`/`calculated_eigenvalues` from a `BLOCKED` result as a fallback, those fields are not present on `BLOCKED` responses. They remain available on `CORRECTION_NEEDED` responses for diagnostic use. Consume the new structured fields (`ambiguous_modes`, `calculated_count`/`claimed_count`, `converged`, `iterations_used`) for richer diagnostics.
+**Behavior change.** Inputs that previously received `VERIFIED` may now receive `BLOCKED` or `CORRECTION_NEEDED` — treat both as unverified. If your code branched on `result.verified` or `result.status == "VERIFIED"` alone, it will continue to work; if you consumed `calculated`/`calculated_irr`/`calculated_eigenvalues` from a `BLOCKED` result as a fallback, those fields are not present on `BLOCKED` responses. They remain available on `CORRECTION_NEEDED` responses for diagnostic use. Consume the new structured fields (`ambiguous_modes`, `calculated_count`/`claimed_count`, `converged`, `iterations_used`) for richer diagnostics.
 </Warning>
 
 ### What changed
@@ -432,11 +517,11 @@ Callers that already treat non-`VERIFIED` results as unverified continue to work
 **Ambiguous mode**
 
 ```python
-# Before â€” heuristically picked one of the tied values and could return VERIFIED
+# Before — heuristically picked one of the tied values and could return VERIFIED
 client.verify_statistics(statistic="mode", data=[1, 1, 2, 2, 3], expected=1)
 # status: "VERIFIED"
 
-# After â€” BLOCKED with the full list of tied values
+# After — BLOCKED with the full list of tied values
 client.verify_statistics(statistic="mode", data=[1, 1, 2, 2, 3], expected=1)
 # status: "BLOCKED"
 # ambiguous_modes: [1, 2]
@@ -445,11 +530,11 @@ client.verify_statistics(statistic="mode", data=[1, 1, 2, 2, 3], expected=1)
 **Incomplete eigenvalue claim**
 
 ```python
-# Before â€” zip truncated the comparison to length 1 and returned VERIFIED
+# Before — zip truncated the comparison to length 1 and returned VERIFIED
 client.verify_matrix_operation(operation="eigenvalues", matrix=[[2, 0], [0, 3]], expected=[2])
 # status: "VERIFIED"
 
-# After â€” CORRECTION_NEEDED with explicit cardinality diagnostics
+# After — CORRECTION_NEEDED with explicit cardinality diagnostics
 client.verify_matrix_operation(operation="eigenvalues", matrix=[[2, 0], [0, 3]], expected=[2])
 # status: "CORRECTION_NEEDED"
 # calculated_count: 2, claimed_count: 1
@@ -459,11 +544,11 @@ client.verify_matrix_operation(operation="eigenvalues", matrix=[[2, 0], [0, 3]],
 **IRR with multiple sign changes**
 
 ```python
-# Before â€” Newton-Raphson returned a best-effort iterate that could be VERIFIED
+# Before — Newton-Raphson returned a best-effort iterate that could be VERIFIED
 client.verify_irr(cash_flows=[-100, 230, -132], expected=0.10)
 # status: "VERIFIED"
 
-# After â€” BLOCKED because two sign changes admit multiple real IRRs
+# After — BLOCKED because two sign changes admit multiple real IRRs
 client.verify_irr(cash_flows=[-100, 230, -132], expected=0.10)
 # status: "BLOCKED"
 # sign_changes: 2
@@ -471,13 +556,13 @@ client.verify_irr(cash_flows=[-100, 230, -132], expected=0.10)
 
 ### What this means for you
 
-Existing code that already treated non-`VERIFIED` statuses as unverified continues to work. New policy code should read the structured diagnostic fields on `BLOCKED`/`CORRECTION_NEEDED` results â€” `ambiguous_modes`, `calculated_count`/`claimed_count`, and `converged`/`iterations_used` â€” to explain why a claim was rejected and to satisfy audit requirements. See [Math engine â€” Fail-closed semantics](/engines/math#fail-closed-semantics) for the full state tables and response schemas.
+Existing code that already treated non-`VERIFIED` statuses as unverified continues to work. New policy code should read the structured diagnostic fields on `BLOCKED`/`CORRECTION_NEEDED` results — `ambiguous_modes`, `calculated_count`/`claimed_count`, and `converged`/`iterations_used` — to explain why a claim was rejected and to satisfy audit requirements. See [Math engine — Fail-closed semantics](/engines/math#fail-closed-semantics) for the full state tables and response schemas.
 
 ---
 
-## QWED-Finance â€” v2.1.0 released
+## QWED-Finance — v2.1.0 released
 
-**Released: July 22, 2026** Â· [GitHub PR #40](https://github.com/QWED-AI/qwed-finance/pull/40)
+**Released: July 22, 2026** · [GitHub PR #40](https://github.com/QWED-AI/qwed-finance/pull/40)
 
 > `qwed-finance` v2.1.0 is now the current release. This is a version-sync release: the Python package, npm wrapper, GitHub Action, and quickstart workflow reference are all realigned so `QWED Finance Guard` reports a single consistent version across PyPI, npm, and SARIF output in GitHub Advanced Security.
 
@@ -485,7 +570,7 @@ Existing code that already treated non-`VERIFIED` statuses as unverified continu
 
 - **`qwed-finance` Python package is now v2.1.0** on PyPI (`qwed_finance.__version__ == "2.1.0"`).
 - **`@qwed-ai/finance` npm package** version bumped to 2.1.0 to match.
-- **GitHub Action** auto-syncs its reported version from the installed package â€” the `QWED Finance Guard` name in workflow logs and the `version` field on SARIF uploads to the GitHub Security tab now both read `2.1.0` instead of a hardcoded `v2.0`.
+- **GitHub Action** auto-syncs its reported version from the installed package — the `QWED Finance Guard` name in workflow logs and the `version` field on SARIF uploads to the GitHub Security tab now both read `2.1.0` instead of a hardcoded `v2.0`.
 - **Quickstart `qwed-verify.yml` workflow** is re-pinned from the stale v1.1.4 SHA to the v2.1.0 SHA (`QWED-AI/qwed-finance@19ce969f21d1fc2019da4d89fff23bc108e15a98 # v2.1.0`).
 
 ### What this means for you
@@ -507,9 +592,9 @@ This is a version-sync patch for the existing v2.1.0 release (May 2026). It cont
 
 ---
 
-## QWED-UCP â€” v0.3.0 released
+## QWED-UCP — v0.3.0 released
 
-**Released: July 20, 2026** Â· [GitHub PR #38](https://github.com/qwed-ai/qwed-ucp/pull/38)
+**Released: July 20, 2026** · [GitHub PR #38](https://github.com/qwed-ai/qwed-ucp/pull/38)
 
 > `qwed-ucp` v0.3.0 is now the current release. This version ships the typed `TrustStatus` enum on every verification result, alongside the fail-closed middleware and internal-error handling delivered over the v0.2.x series.
 
@@ -517,7 +602,7 @@ This is a version-sync patch for the existing v2.1.0 release (May 2026). It cont
 
 - **`qwed-ucp` Python package is now v0.3.0** on PyPI.
 - **Express middleware `qwed-ucp-middleware`** package version bumped to match.
-- **`TrustStatus` enum** is confirmed as available from v0.3.0 onward â€” see [Trust status](/ucp/guards#trust-status) for the full state table and usage.
+- **`TrustStatus` enum** is confirmed as available from v0.3.0 onward — see [Trust status](/ucp/guards#trust-status) for the full state table and usage.
 - **GitHub Action** should now be pinned to `QWED-AI/qwed-ucp@v0.3.0`.
 
 ### What this means for you
@@ -539,11 +624,11 @@ Existing code that branches on `result.verified` continues to work unchanged. Ne
 
 ---
 
-## QWED-UCP â€” Express middleware fails closed on internal verification errors
+## QWED-UCP — Express middleware fails closed on internal verification errors
 
-**Released: July 18, 2026** Â· [GitHub PR #36](https://github.com/qwed-ai/qwed-ucp/pull/36)
+**Released: July 18, 2026** · [GitHub PR #36](https://github.com/qwed-ai/qwed-ucp/pull/36)
 
-> When a guard raised an unexpected exception, the Express middleware previously logged the error and called `next()` â€” letting an unverified checkout through to the downstream handler. That defeated the trust boundary. The `catch` block now short-circuits with `HTTP 500`, `X-QWED-Verified: false`, and `code: "INTERNAL_VERIFICATION_ERROR"` so an internal crash can no longer be mistaken for a passing verification.
+> When a guard raised an unexpected exception, the Express middleware previously logged the error and called `next()` — letting an unverified checkout through to the downstream handler. That defeated the trust boundary. The `catch` block now short-circuits with `HTTP 500`, `X-QWED-Verified: false`, and `code: "INTERNAL_VERIFICATION_ERROR"` so an internal crash can no longer be mistaken for a passing verification.
 
 ### What changed
 
@@ -555,51 +640,51 @@ Existing code that branches on `result.verified` continues to work unchanged. Ne
     "code": "INTERNAL_VERIFICATION_ERROR"
   }
   ```
-  The underlying exception is logged server-side via `console.error` but is **not** included in the response body â€” raw stack traces, file paths, and internal messages stay out of client-visible output.
+  The underlying exception is logged server-side via `console.error` but is **not** included in the response body — raw stack traces, file paths, and internal messages stay out of client-visible output.
 - **`X-QWED-Verified: false`** is set on the 500 response so upstream policy layers can treat it the same as a 422 failure.
 - **npm package fix.** `qwed-ucp-middleware.js` is now included in the published `files` array. Previous versions installed via npm were missing the entrypoint that `index.js` required at runtime.
 
 <Warning>
-**Behavior change.** Any client code that treated an Express middleware error as a soft pass (e.g. retrying without checking the status, or relying on `next()` being called) will now see a `500`. Treat `500 INTERNAL_VERIFICATION_ERROR` the same as `422 VERIFICATION_FAILED` â€” the request has **not** been verified and must not be settled.
+**Behavior change.** Any client code that treated an Express middleware error as a soft pass (e.g. retrying without checking the status, or relying on `next()` being called) will now see a `500`. Treat `500 INTERNAL_VERIFICATION_ERROR` the same as `422 VERIFICATION_FAILED` — the request has **not** been verified and must not be settled.
 </Warning>
 
 ### What this means for you
 
-Existing integrations that already branched on `X-QWED-Verified` or on the response status keep working â€” they just start seeing a new `500` path that was previously invisible. New integrations should treat both `4xx` and `5xx` responses from the middleware as an unverified request. See [Express.js middleware â€” Fail-closed on internal verification errors](/ucp/middleware-express#fail-closed-on-internal-verification-errors) for the full response contract.
+Existing integrations that already branched on `X-QWED-Verified` or on the response status keep working — they just start seeing a new `500` path that was previously invisible. New integrations should treat both `4xx` and `5xx` responses from the middleware as an unverified request. See [Express.js middleware — Fail-closed on internal verification errors](/ucp/middleware-express#fail-closed-on-internal-verification-errors) for the full response contract.
 
 ---
 
-## QWED-UCP â€” typed `TrustStatus` enum on every verification result
+## QWED-UCP — typed `TrustStatus` enum on every verification result
 
-**Released: July 15, 2026** Â· [GitHub PR #33](https://github.com/qwed-ai/qwed-ucp/pull/33)
+**Released: July 15, 2026** · [GitHub PR #33](https://github.com/qwed-ai/qwed-ucp/pull/33)
 
 > Verification results previously exposed a single `verified: bool` that collapsed "proof disproved," "proof could not be established," "input outside supported semantics," and "verifier engine crashed" into the same `False` bucket. Every result dataclass now also carries a typed `status: TrustStatus` field so downstream policy code can make trust-aware decisions without parsing error strings.
 
 ### What changed
 
 - **New `TrustStatus` enum** exported from `qwed_ucp` with seven states: `VERIFIED`, `FAILED`, `UNVERIFIABLE`, `UNSUPPORTED`, `PARTIAL`, `ENGINE_ERROR`, and `QUARANTINED` (reserved).
-- **`status` field on every result** â€” `GuardResult`, `UCPVerificationResult`, and each per-guard result type (`MoneyGuardResult`, `StateGuardResult`, `SchemaGuardResult`, `LineItemsGuardResult`, `DiscountGuardResult`, `CurrencyGuardResult`, `RefundGuardResult`, `TipGuardResult`, `FeeGuardResult`, `AttestationResult`).
+- **`status` field on every result** — `GuardResult`, `UCPVerificationResult`, and each per-guard result type (`MoneyGuardResult`, `StateGuardResult`, `SchemaGuardResult`, `LineItemsGuardResult`, `DiscountGuardResult`, `CurrencyGuardResult`, `RefundGuardResult`, `TipGuardResult`, `FeeGuardResult`, `AttestationResult`).
 - **`UCPVerifier.verify_checkout()` now surfaces `ENGINE_ERROR`** when any guard raises an exception, instead of silently collapsing to `verified=False`.
 - **`verified: bool` is preserved** as a backward-compatible derived field: `result.verified` is `True` only when `result.status == TrustStatus.VERIFIED`. Existing constructors that pass `verified=True`/`verified=False` continue to produce the corresponding `VERIFIED`/`FAILED` status.
 
 ### What this means for you
 
-Existing code that reads `result.verified` or constructs results with `verified=...` keeps working unchanged. New policy code should branch on `result.status` to distinguish a disproved proof from a crashed verifier â€” see [Trust status](/ucp/guards#trust-status) for the full state table and an example.
+Existing code that reads `result.verified` or constructs results with `verified=...` keeps working unchanged. New policy code should branch on `result.status` to distinguish a disproved proof from a crashed verifier — see [Trust status](/ucp/guards#trust-status) for the full state table and an example.
 
 ---
 
-## QWED-UCP â€” middleware fails closed on empty and non-JSON request bodies
+## QWED-UCP — middleware fails closed on empty and non-JSON request bodies
 
-**Released: July 14, 2026** Â· [GitHub PR #32](https://github.com/QWED-AI/qwed-ucp/pull/32)
+**Released: July 14, 2026** · [GitHub PR #32](https://github.com/QWED-AI/qwed-ucp/pull/32)
 
-> The FastAPI and Express middleware previously forwarded requests with an empty body, malformed JSON, or a non-object JSON payload to the downstream handler without running any guards. On a `/checkout-sessions` route that defeated the trust boundary â€” an attacker could send `{}`'s worth of nothing and skip verification. Both middlewares now reject those requests with `HTTP 422`, `X-QWED-Verified: false`, and `code: "UNPARSEABLE_REQUEST"` before the handler runs.
+> The FastAPI and Express middleware previously forwarded requests with an empty body, malformed JSON, or a non-object JSON payload to the downstream handler without running any guards. On a `/checkout-sessions` route that defeated the trust boundary — an attacker could send `{}`'s worth of nothing and skip verification. Both middlewares now reject those requests with `HTTP 422`, `X-QWED-Verified: false`, and `code: "UNPARSEABLE_REQUEST"` before the handler runs.
 
 ### What changed
 
 - **FastAPI:** returns a distinct message per case:
-  - Empty body â†’ `"Empty request body: cannot verify empty payload"`
-  - Malformed or non-UTF-8 body â†’ `"Malformed request body: expected JSON"`
-  - Top-level non-object JSON â†’ `"Invalid request body: expected JSON object"`
+  - Empty body → `"Empty request body: cannot verify empty payload"`
+  - Malformed or non-UTF-8 body → `"Malformed request body: expected JSON"`
+  - Top-level non-object JSON → `"Invalid request body: expected JSON object"`
 - **Express:** all three cases return `"Empty or non-JSON request body: cannot verify unparseable payload"`.
 - **Non-protected methods and paths** (for example, `GET /health` or a `POST` to a route outside `verify_paths`) still pass through untouched.
 
@@ -613,18 +698,18 @@ If you deploy QWED-UCP as middleware in front of a UCP merchant server, unparsea
 
 ---
 
-## QWED-A2A â€” persistent signing key and JWKS discovery endpoint
+## QWED-A2A — persistent signing key and JWKS discovery endpoint
 
-**Released: July 10, 2026** Â· [GitHub PR #29](https://github.com/QWED-AI/qwed-a2a/pull/29)
+**Released: July 10, 2026** · [GitHub PR #29](https://github.com/QWED-AI/qwed-a2a/pull/29)
 
 > `A2ACryptoService` no longer generates an ephemeral ECDSA P-256 key per process. The signing key is now loaded from the `QWED_A2A_SIGNING_KEY_PEM` environment variable (or the `pem_key` constructor argument) so attestation JWTs issued before a restart remain verifiable afterwards. A new `/.well-known/jwks.json` endpoint publishes the current public key for external consumers.
 
 ### What changed
 
-- **Persistent signing key** â€” `A2ACryptoService` reads an unencrypted PKCS#8 P-256 PEM from `QWED_A2A_SIGNING_KEY_PEM` on first use. The derived `key_id` is a SHA-256 fingerprint of the public key, so it stays stable as long as the PEM does.
-- **Fail-closed on missing key** â€” `sign_verdict`, `verify_attestation`, `get_public_key_jwk`, and `A2AVerificationInterceptor.intercept()` all raise `RuntimeError` when the PEM is missing, malformed, or uses a curve other than `SECP256R1`. The FastAPI gateway surfaces this as `HTTP 503 Signing key unavailable`.
-- **JWKS endpoint** â€” A new `wellknown_router` exposes `GET /.well-known/jwks.json` for downstream services and auditors to fetch the current public key without an out-of-band exchange.
-- **`get_public_key_jwk()`** â€” Returns the current public key as a JWK (`kty`, `crv`, `x`, `y`, `kid`, `use`, `alg`).
+- **Persistent signing key** — `A2ACryptoService` reads an unencrypted PKCS#8 P-256 PEM from `QWED_A2A_SIGNING_KEY_PEM` on first use. The derived `key_id` is a SHA-256 fingerprint of the public key, so it stays stable as long as the PEM does.
+- **Fail-closed on missing key** — `sign_verdict`, `verify_attestation`, `get_public_key_jwk`, and `A2AVerificationInterceptor.intercept()` all raise `RuntimeError` when the PEM is missing, malformed, or uses a curve other than `SECP256R1`. The FastAPI gateway surfaces this as `HTTP 503 Signing key unavailable`.
+- **JWKS endpoint** — A new `wellknown_router` exposes `GET /.well-known/jwks.json` for downstream services and auditors to fetch the current public key without an out-of-band exchange.
+- **`get_public_key_jwk()`** — Returns the current public key as a JWK (`kty`, `crv`, `x`, `y`, `kid`, `use`, `alg`).
 
 ### Breaking changes
 
@@ -642,45 +727,45 @@ Load the PEM into `QWED_A2A_SIGNING_KEY_PEM` from your secrets manager, and make
 
 ### What this means for you
 
-If you deploy the QWED-A2A gateway, you now get audit continuity across restarts and rolling deployments â€” a JWT signed by an earlier process is still verifiable by the next one, provided the PEM is unchanged. External services can also verify attestations by fetching `/.well-known/jwks.json` directly. See [Crypto attestations](/a2a/crypto-attestations) and [Deployment](/a2a/deployment) for the full setup, JWKS shape, and key rotation guidance.
+If you deploy the QWED-A2A gateway, you now get audit continuity across restarts and rolling deployments — a JWT signed by an earlier process is still verifiable by the next one, provided the PEM is unchanged. External services can also verify attestations by fetching `/.well-known/jwks.json` directly. See [Crypto attestations](/a2a/crypto-attestations) and [Deployment](/a2a/deployment) for the full setup, JWKS shape, and key rotation guidance.
 
 ---
 
-## QWED-Tax â€” structured 3-layer diagnostics for TDS, ITC, and GST-RCM
+## QWED-Tax — structured 3-layer diagnostics for TDS, ITC, and GST-RCM
 
-**Released: June 21, 2026** Â· [GitHub PR #45](https://github.com/QWED-AI/qwed-tax/pull/45)
+**Released: June 21, 2026** · [GitHub PR #45](https://github.com/QWED-AI/qwed-tax/pull/45)
 
-> QWED-Tax adopts the same 3-layer `DiagnosticResult` contract introduced in [QWED-Verification v5.2.0](/changelog#v520--structured-verification-diagnostics) â€” as an independent model, no cross-package dependency. The first three guards (TDS, Input Tax Credit, GST reverse-charge) now expose a structured diagnostic in addition to their existing dict response.
+> QWED-Tax adopts the same 3-layer `DiagnosticResult` contract introduced in [QWED-Verification v5.2.0](/changelog#v520--structured-verification-diagnostics) — as an independent model, no cross-package dependency. The first three guards (TDS, Input Tax Credit, GST reverse-charge) now expose a structured diagnostic in addition to their existing dict response.
 
 ### What's new
 
-- **Tri-state status** â€” Every diagnostic resolves to `VERIFIED`, `UNVERIFIABLE`, or `BLOCKED`. No `HEURISTIC` or `AMBIGUOUS` middle ground.
-- **Three disclosure layers** â€” A short agent-safe summary (no statute IDs or detection logic), a structured developer evidence block (constraint ID, statute, jurisdiction, audit trace, deduction, net payable), and an optional proof reference.
-- **Proof reference is the authority bit** â€” A deterministic sha256 hash of the audit trace, present only when a result is `VERIFIED`. Absent on `UNVERIFIABLE` and `BLOCKED`.
-- **First migrations** â€” `TDSGuard`, `InputCreditGuard`, and `GSTGuard` (reverse-charge) each expose the new diagnostic format alongside their existing return shape.
+- **Tri-state status** — Every diagnostic resolves to `VERIFIED`, `UNVERIFIABLE`, or `BLOCKED`. No `HEURISTIC` or `AMBIGUOUS` middle ground.
+- **Three disclosure layers** — A short agent-safe summary (no statute IDs or detection logic), a structured developer evidence block (constraint ID, statute, jurisdiction, audit trace, deduction, net payable), and an optional proof reference.
+- **Proof reference is the authority bit** — A deterministic sha256 hash of the audit trace, present only when a result is `VERIFIED`. Absent on `UNVERIFIABLE` and `BLOCKED`.
+- **First migrations** — `TDSGuard`, `InputCreditGuard`, and `GSTGuard` (reverse-charge) each expose the new diagnostic format alongside their existing return shape.
 
 ### Compatibility
 
-**Additive release.** The legacy dict API on every guard is unchanged â€” the diagnostic format is opt-in. Existing integrations continue to work without modification. The remaining nine QWED-Tax guards (CapitalGains, Classification, Speculation, Setoff, Crypto, Valuation, Remittance, PoEM, Withholding) will migrate in follow-up releases.
+**Additive release.** The legacy dict API on every guard is unchanged — the diagnostic format is opt-in. Existing integrations continue to work without modification. The remaining nine QWED-Tax guards (CapitalGains, Classification, Speculation, Setoff, Crypto, Valuation, Remittance, PoEM, Withholding) will migrate in follow-up releases.
 
 ### What this means for you
 
-If you've already adopted the QWED-Verification diagnostic contract, the same response shape now applies to TDS, ITC, and GST-RCM checks â€” including the proof-reference authority bit you can gate execution on. See the [Verification Diagnostics guide](/advanced/diagnostics) for the response shape and the [tax guards reference](/tax/guards) for guard-by-guard coverage.
+If you've already adopted the QWED-Verification diagnostic contract, the same response shape now applies to TDS, ITC, and GST-RCM checks — including the proof-reference authority bit you can gate execution on. See the [Verification Diagnostics guide](/advanced/diagnostics) for the response shape and the [tax guards reference](/tax/guards) for guard-by-guard coverage.
 
 ---
 
-## QWED-Tax â€” exact paise comparison, edge-case input rejection, and strict payload schemas
+## QWED-Tax — exact paise comparison, edge-case input rejection, and strict payload schemas
 
-**Released: June 21, 2026** Â· [GitHub PR #44](https://github.com/QWED-AI/qwed-tax/pull/44)
+**Released: June 21, 2026** · [GitHub PR #44](https://github.com/QWED-AI/qwed-tax/pull/44)
 
 > Three input-strictness fixes ship together. `CryptoTaxGuard.verify_flat_tax_rate` now compares quantized paise values exactly instead of within a 0.1 tolerance, `ValuationGuard` and `RemittanceGuard` reject the edge-case numeric inputs that previously slipped through, and every QWED-Tax Pydantic input model now forbids unexpected fields.
 
 ### What changed
 
-- **`CryptoTaxGuard.verify_flat_tax_rate`** â€” The `Decimal("0.1")` tolerance was removed. Both the computed `expected_tax` and the caller's `claimed_tax` are now quantized to two decimal places using `ROUND_HALF_UP` and compared with an exact `==`. A 1-paise (`0.01`) deviation correctly returns `verified=False`.
-- **`ValuationGuard.verify_conversion`** â€” Added explicit range checks: `discount` must be in `[0, 1)`, and `cap`, `next_round_price`, and `investment` must all be strictly positive. `DivisionByZero` is now caught alongside `InvalidOperation` so a degenerate `cap = 0` or `discount = 1` no longer crashes â€” it fails closed with a structured `{"verified": False, "error": "..."}` response. The previous behavior allowed a `discount > 1` to produce a negative share count.
-- **`RemittanceGuard.verify_lrs_limit`** â€” After numeric parsing, `amount_usd` and `financial_year_usage` are now checked for negativity. Negative inputs return `{"verified": False, "error": "BLOCKED: ..."}` instead of being summed into the limit check, where a negative usage could mask a transaction that exceeds the \$250,000 LRS cap.
-- **Input models** â€” `Address`, `WorkArrangement`, `WorkerClassificationParams`, `ContractorPayment`, `TaxEntry`, `DeductionEntry`, `PayrollEntry`, and `VerificationResult` are now configured with `model_config = ConfigDict(extra="forbid")`. Any payload with an unexpected key raises a Pydantic `ValidationError` at the boundary. `QWEDTaxMiddleware` already surfaces this as `status: "BLOCKED"` with `risk: "INVALID_PAYLOAD"`.
+- **`CryptoTaxGuard.verify_flat_tax_rate`** — The `Decimal("0.1")` tolerance was removed. Both the computed `expected_tax` and the caller's `claimed_tax` are now quantized to two decimal places using `ROUND_HALF_UP` and compared with an exact `==`. A 1-paise (`0.01`) deviation correctly returns `verified=False`.
+- **`ValuationGuard.verify_conversion`** — Added explicit range checks: `discount` must be in `[0, 1)`, and `cap`, `next_round_price`, and `investment` must all be strictly positive. `DivisionByZero` is now caught alongside `InvalidOperation` so a degenerate `cap = 0` or `discount = 1` no longer crashes — it fails closed with a structured `{"verified": False, "error": "..."}` response. The previous behavior allowed a `discount > 1` to produce a negative share count.
+- **`RemittanceGuard.verify_lrs_limit`** — After numeric parsing, `amount_usd` and `financial_year_usage` are now checked for negativity. Negative inputs return `{"verified": False, "error": "BLOCKED: ..."}` instead of being summed into the limit check, where a negative usage could mask a transaction that exceeds the \$250,000 LRS cap.
+- **Input models** — `Address`, `WorkArrangement`, `WorkerClassificationParams`, `ContractorPayment`, `TaxEntry`, `DeductionEntry`, `PayrollEntry`, and `VerificationResult` are now configured with `model_config = ConfigDict(extra="forbid")`. Any payload with an unexpected key raises a Pydantic `ValidationError` at the boundary. `QWEDTaxMiddleware` already surfaces this as `status: "BLOCKED"` with `risk: "INVALID_PAYLOAD"`.
 
 ### Breaking changes
 
@@ -695,7 +780,7 @@ If you've already adopted the QWED-Verification diagnostic contract, the same re
 </Warning>
 
 <Warning>
-  Payloads sent through `QWEDTaxMiddleware` (or constructed directly with the QWED-Tax input models) that include keys outside the declared schema now raise `ValidationError`. Strip unknown fields from AI-generated output â€” including typos and speculative overrides like `"override_verification": true` â€” before invoking the middleware.
+  Payloads sent through `QWEDTaxMiddleware` (or constructed directly with the QWED-Tax input models) that include keys outside the declared schema now raise `ValidationError`. Strip unknown fields from AI-generated output — including typos and speculative overrides like `"override_verification": true` — before invoking the middleware.
 </Warning>
 
 <Warning>
@@ -716,24 +801,24 @@ If your agent forwards Indian VDA tax claims, startup conversion math, or LRS re
 
 ---
 
-## QWED-Tax â€” middleware never returns full "verified" and ReciprocityGuard no longer always-passes
+## QWED-Tax — middleware never returns full "verified" and ReciprocityGuard no longer always-passes
 
-**Released: June 21, 2026** Â· [GitHub PR #43](https://github.com/QWED-AI/qwed-tax/pull/43)
+**Released: June 21, 2026** · [GitHub PR #43](https://github.com/QWED-AI/qwed-tax/pull/43)
 
 > Two fail-closed fixes ship together. The Gusto interceptor middleware no longer overstates a gross-to-net arithmetic pass as full tax verification, and `ReciprocityGuard` no longer returns `verified=True` for arrangements with no reciprocity agreement.
 
 <Note>
-  `ARITHMETIC_VERIFIED` is a **pre-conformance middleware-layer status**, not part of the `DiagnosticResult` tri-state vocabulary (`VERIFIED` / `UNVERIFIABLE` / `BLOCKED`) introduced in v5.2.0. The middleware will migrate to `DiagnosticResult` when engine-conformance work lands. Until then, treat `ARITHMETIC_VERIFIED` as a distinct middleware signal â€” it is not equivalent to `VERIFIED`.
+  `ARITHMETIC_VERIFIED` is a **pre-conformance middleware-layer status**, not part of the `DiagnosticResult` tri-state vocabulary (`VERIFIED` / `UNVERIFIABLE` / `BLOCKED`) introduced in v5.2.0. The middleware will migrate to `DiagnosticResult` when engine-conformance work lands. Until then, treat `ARITHMETIC_VERIFIED` as a distinct middleware signal — it is not equivalent to `VERIFIED`.
 </Note>
 
 ### What changed
 
-- **`QWEDTaxMiddleware.process_ai_payroll_request`** â€” The success response is now `status: "ARITHMETIC_VERIFIED"` with `execution_permitted: false`. The middleware only verifies gross-to-net math; classification, withholding legality, reciprocity, and filing checks are still required before execution. The response includes `checks_run` (what was verified) and `checks_not_run` (what is still required) so callers can decide what to run next.
-- **`TaxPreFlight` report** â€” Every report now includes a `checks_not_run` list covering both unselected guards and **known gaps** (checks not yet implemented for the action). For example, `action="hire"` reports `payroll_arithmetic`, `withholding_legality`, `reciprocity`, and `filing_obligations` as known gaps.
-- **`ReciprocityGuard`** â€” The Z3 solver was removed (the prior expression was tautologically satisfiable and ignored the `same_state` parameter). The guard is now a deterministic lookup against the reciprocity-pair table with explicit fail-closed paths: same state â†’ verified, known pair â†’ verified, no agreement â†’ `verified=False`, unknown state â†’ `verified=False`. A new `verify_reciprocity(residence_state, work_state, same_state=None)` method takes string inputs; `determine_withholding_state(arrangement)` is kept for backwards compatibility.
+- **`QWEDTaxMiddleware.process_ai_payroll_request`** — The success response is now `status: "ARITHMETIC_VERIFIED"` with `execution_permitted: false`. The middleware only verifies gross-to-net math; classification, withholding legality, reciprocity, and filing checks are still required before execution. The response includes `checks_run` (what was verified) and `checks_not_run` (what is still required) so callers can decide what to run next.
+- **`TaxPreFlight` report** — Every report now includes a `checks_not_run` list covering both unselected guards and **known gaps** (checks not yet implemented for the action). For example, `action="hire"` reports `payroll_arithmetic`, `withholding_legality`, `reciprocity`, and `filing_obligations` as known gaps.
+- **`ReciprocityGuard`** — The Z3 solver was removed (the prior expression was tautologically satisfiable and ignored the `same_state` parameter). The guard is now a deterministic lookup against the reciprocity-pair table with explicit fail-closed paths: same state → verified, known pair → verified, no agreement → `verified=False`, unknown state → `verified=False`. A new `verify_reciprocity(residence_state, work_state, same_state=None)` method takes string inputs; `determine_withholding_state(arrangement)` is kept for backwards compatibility.
 
 <Note>
-  The reciprocity-pair table covers only the pairs modeled within the `State` enum's 8-state scope (NJ, PA, MD, VA). Pennsylvania has additional reciprocity agreements (with IN, MI, OH, VA, WV, WI) that are not modeled here because those states are not in the enum. VA-PA in particular is a known gap â€” callers will receive `verified=False` for that pair until the enum and table are extended.
+  The reciprocity-pair table covers only the pairs modeled within the `State` enum's 8-state scope (NJ, PA, MD, VA). Pennsylvania has additional reciprocity agreements (with IN, MI, OH, VA, WV, WI) that are not modeled here because those states are not in the enum. VA-PA in particular is a known gap — callers will receive `verified=False` for that pair until the enum and table are extended.
 </Note>
 
 ### Breaking changes
@@ -743,7 +828,7 @@ If your agent forwards Indian VDA tax claims, startup conversion math, or LRS re
 </Warning>
 
 <Warning>
-  `ReciprocityGuard` no longer returns `verified=True` for state pairs without a reciprocity agreement. Callers that previously relied on a Z3-backed "always sat" result for, e.g., NJ â†’ NY will now correctly receive `verified=False`. Route these to your withholding logic for the work state or to human review.
+  `ReciprocityGuard` no longer returns `verified=True` for state pairs without a reciprocity agreement. Callers that previously relied on a Z3-backed "always sat" result for, e.g., NJ → NY will now correctly receive `verified=False`. Route these to your withholding logic for the work state or to human review.
 </Warning>
 
 ### What this means for you
@@ -759,30 +844,30 @@ If your agent forwards payroll payloads to Gusto/Avalara based on a `VERIFIED` s
 
 ---
 
-## QWED-Tax â€” fail-closed on ambiguous classification and unverified claims
+## QWED-Tax — fail-closed on ambiguous classification and unverified claims
 
-**Released: June 21, 2026** Â· [GitHub PR #42](https://github.com/QWED-AI/qwed-tax/pull/42)
+**Released: June 21, 2026** · [GitHub PR #42](https://github.com/QWED-AI/qwed-tax/pull/42)
 
 > Six more QWED-Tax guards now refuse to sign off when they can't independently prove a result. Ambiguous worker classifications, unparseable trade dates, unknown set-off heads, and reverse-charge inputs the guard doesn't recognize all return `verified=False` with a structured error instead of a quiet pass.
 
 ### Bug fixes
 
-- **CapitalGainsGuard** â€” Unparseable acquisition or disposal dates and unknown asset types now block instead of being coerced into a sentinel value that flowed through to `verified=True`. SLAB-rate verification can no longer succeed without an income bracket â€” slab rates can't be proven from the claim alone.
-- **ClassificationGuard** â€” Mixed employee/contractor signals now return `verified=False` with an "ambiguous classification" error. The guard only returns `CONTRACTOR` when no employee indicators are present.
-- **SpeculationGuard** â€” Set-off verification now requires a known income source (`intraday`, `f&o`, `futures`, `options`, `delivery`, `business`, `capital_gains`). Unrecognized sources are blocked instead of silently treated as non-speculative.
-- **InterHeadAdjustmentGuard** â€” Set-off eligibility now runs against an explicit allowlist of heads. Salary loss set-off is added to the prohibition matrix, and unknown heads are blocked rather than defaulting to allow.
-- **GSTGuard (RCM)** â€” Unrecognized service or entity types in reverse-charge checks now surface as a `verified=False` error naming the unknown value, instead of being coerced to `OTHER` or `INDIVIDUAL` and potentially suppressing a statutory RCM obligation. The verifier also gained an optional claim parameter â€” when you pass a `claimed_is_rcm` value, the guard compares it to the computed result and only returns `verified=True` on an exact match. Calls without the claim get a `computed_only=True` flag so calculation and verification are no longer conflated.
-- **CryptoTaxGuard** â€” Zero VDA income now verifies a claimed tax of zero, instead of returning `verified=True` regardless of claim. Negative VDA income (a loss) returns `verified=False` with a message directing the caller to use `verify_set_off` for loss treatment â€” the method does not internally invoke `verify_set_off`, so callers must handle the `verified=False` branch explicitly.
+- **CapitalGainsGuard** — Unparseable acquisition or disposal dates and unknown asset types now block instead of being coerced into a sentinel value that flowed through to `verified=True`. SLAB-rate verification can no longer succeed without an income bracket — slab rates can't be proven from the claim alone.
+- **ClassificationGuard** — Mixed employee/contractor signals now return `verified=False` with an "ambiguous classification" error. The guard only returns `CONTRACTOR` when no employee indicators are present.
+- **SpeculationGuard** — Set-off verification now requires a known income source (`intraday`, `f&o`, `futures`, `options`, `delivery`, `business`, `capital_gains`). Unrecognized sources are blocked instead of silently treated as non-speculative.
+- **InterHeadAdjustmentGuard** — Set-off eligibility now runs against an explicit allowlist of heads. Salary loss set-off is added to the prohibition matrix, and unknown heads are blocked rather than defaulting to allow.
+- **GSTGuard (RCM)** — Unrecognized service or entity types in reverse-charge checks now surface as a `verified=False` error naming the unknown value, instead of being coerced to `OTHER` or `INDIVIDUAL` and potentially suppressing a statutory RCM obligation. The verifier also gained an optional claim parameter — when you pass a `claimed_is_rcm` value, the guard compares it to the computed result and only returns `verified=True` on an exact match. Calls without the claim get a `computed_only=True` flag so calculation and verification are no longer conflated.
+- **CryptoTaxGuard** — Zero VDA income now verifies a claimed tax of zero, instead of returning `verified=True` regardless of claim. Negative VDA income (a loss) returns `verified=False` with a message directing the caller to use `verify_set_off` for loss treatment — the method does not internally invoke `verify_set_off`, so callers must handle the `verified=False` branch explicitly.
 
 ### What this means for you
 
-If your agent relied on any of these guards returning `verified=True` for inputs they don't model â€” ambiguous worker status, unknown set-off heads, unrecognized RCM service types, or capital-gains transactions with malformed dates â€” those calls now block. Surface the error to a human reviewer or extend the guard's configured rules before re-running.
+If your agent relied on any of these guards returning `verified=True` for inputs they don't model — ambiguous worker status, unknown set-off heads, unrecognized RCM service types, or capital-gains transactions with malformed dates — those calls now block. Surface the error to a human reviewer or extend the guard's configured rules before re-running.
 
 See the [QWED-Tax guards reference](/tax/guards) for the updated contracts on each guard.
 
 ---
 
-## QWED-Tax â€” fail-closed on unknown tax rules
+## QWED-Tax — fail-closed on unknown tax rules
 
 **Released: June 19, 2026**
 
@@ -790,12 +875,12 @@ See the [QWED-Tax guards reference](/tax/guards) for the updated contracts on ea
 
 ### What changed
 
-- **TDSGuard** â€” unrecognized payment categories no longer return "verified, zero deduction." This closes a path where an agent could classify a payment into an unknown bucket and have it execute with no withholding. `TaxPreFlight` now blocks these payments.
-- **CapitalGainsGuard** â€” unknown asset class or holding term fails closed instead of returning "no hard constraint."
-- **NexusGuard** â€” states not in the configured risk list now require manual review instead of being treated as low-risk.
-- **AddressGuard** â€” unknown state codes fail closed with "manual review required" instead of "assumed valid."
-- **Form1099Guard (US)** â€” unmodeled payment types return `filing_required=None` with a manual-determination flag, instead of defaulting to "no filing required."
-- **InputCreditGuard (GST)** â€” `verified=True` remains the legal default (ITC is allowed unless specifically blocked), but unknown categories now carry an explicit `unverified_category=True` flag in the result and an `audit_trace` entry of `category_match: "default_allow"` so downstream consumers can distinguish known-eligible from default-allowed.
+- **TDSGuard** — unrecognized payment categories no longer return "verified, zero deduction." This closes a path where an agent could classify a payment into an unknown bucket and have it execute with no withholding. `TaxPreFlight` now blocks these payments.
+- **CapitalGainsGuard** — unknown asset class or holding term fails closed instead of returning "no hard constraint."
+- **NexusGuard** — states not in the configured risk list now require manual review instead of being treated as low-risk.
+- **AddressGuard** — unknown state codes fail closed with "manual review required" instead of "assumed valid."
+- **Form1099Guard (US)** — unmodeled payment types return `filing_required=None` with a manual-determination flag, instead of defaulting to "no filing required."
+- **InputCreditGuard (GST)** — `verified=True` remains the legal default (ITC is allowed unless specifically blocked), but unknown categories now carry an explicit `unverified_category=True` flag in the result and an `audit_trace` entry of `category_match: "default_allow"` so downstream consumers can distinguish known-eligible from default-allowed.
 
 ### What this means for you
 
@@ -805,7 +890,7 @@ See the [tax guards reference](/tax/guards) and [tax integration guide](/tax/int
 
 ---
 
-## QWED-Infra â€” ecosystem policy framework adopted
+## QWED-Infra — ecosystem policy framework adopted
 
 **Released: June 17, 2026**
 
@@ -815,7 +900,7 @@ No runtime behavior changes. Affects contributors and anyone consuming the repos
 
 ---
 
-## QWED-MCP â€” boundary-check parity with QWED-Infra
+## QWED-MCP — boundary-check parity with QWED-Infra
 
 **Released: June 18, 2026**
 
@@ -829,7 +914,7 @@ See the [MCP tools reference](/mcp/tools) for the current rule set.
 
 ---
 
-## QWED Open Responses v0.3.0 â€” version sync and dependency fix
+## QWED Open Responses v0.3.0 — version sync and dependency fix
 
 **Released: June 12, 2026**
 
@@ -839,29 +924,29 @@ No API changes. Upgrade to pick up the dependency fix.
 
 ---
 
-## v5.2.0 â€” Structured Verification Diagnostics
+## v5.2.0 — Structured Verification Diagnostics
 
-**Released: June 19, 2026** Â· [GitHub Release](https://github.com/QWED-AI/qwed-verification/releases/tag/v5.2.0) Â· Minor
+**Released: June 19, 2026** · [GitHub Release](https://github.com/QWED-AI/qwed-verification/releases/tag/v5.2.0) · Minor
 
-> Introduces the unified 3-layer `DiagnosticResult` model â€” the diagnostic contract that all QWED verification engines will conform to. This is an **additive** release: no existing engine return types are changed. Engine conformance is tracked in blocked issues (#129, #130, #131, #133, #134, #162, #163, #164, #190, #205).
+> Introduces the unified 3-layer `DiagnosticResult` model — the diagnostic contract that all QWED verification engines will conform to. This is an **additive** release: no existing engine return types are changed. Engine conformance is tracked in blocked issues (#129, #130, #131, #133, #134, #162, #163, #164, #190, #205).
 
 ### New: `DiagnosticResult` model
 
 Three disclosure layers:
 
-- **Layer 1 â€” Agent-Safe**: `agent_message: str` â€” agent/model-facing summary, no internals leaked
-- **Layer 2 â€” Developer**: `developer_fields: dict` â€” structured evidence (`constraint_id`, `advisory_checks`, `methods_used`, evidence)
-- **Layer 3 â€” Proof**: `proof_ref: Optional[str]` â€” sha256 hash of retained proof artifact; the authority bit
+- **Layer 1 — Agent-Safe**: `agent_message: str` — agent/model-facing summary, no internals leaked
+- **Layer 2 — Developer**: `developer_fields: dict` — structured evidence (`constraint_id`, `advisory_checks`, `methods_used`, evidence)
+- **Layer 3 — Proof**: `proof_ref: Optional[str]` — sha256 hash of retained proof artifact; the authority bit
 
 ### Key design
 
-- **Tri-state status** â€” `VERIFIED` / `UNVERIFIABLE` / `BLOCKED` only. No `HEURISTIC` or `AMBIGUOUS` proliferation; richer distinctions live in `developer_fields.constraint_id`
-- **`proof_ref` is the authority bit** â€” present = admissible for control flow, None = reject. No separate `authoritative` boolean needed (resolves #190 design debate)
-- **VERIFIED requires proof** â€” structurally enforced in `__post_init__`; "VERIFIED without proof" is impossible to construct
-- **Frozen dataclasses** â€” `DiagnosticResult` and `AdvisoryCheck` are `frozen=True`; post-construction mutation blocked
-- **Advisory checks never influence verdicts** â€” `AdvisoryCheck.advisory_only=True` enforced via `__post_init__`
-- **`compute_proof_ref()`** â€” deterministic sha256 hashing of JSON-serialized evidence
-- **`from_legacy_dict()`** â€” migration helper for ad-hoc engine dicts (fail-closed states only; raises for legacy VERIFIED)
+- **Tri-state status** — `VERIFIED` / `UNVERIFIABLE` / `BLOCKED` only. No `HEURISTIC` or `AMBIGUOUS` proliferation; richer distinctions live in `developer_fields.constraint_id`
+- **`proof_ref` is the authority bit** — present = admissible for control flow, None = reject. No separate `authoritative` boolean needed (resolves #190 design debate)
+- **VERIFIED requires proof** — structurally enforced in `__post_init__`; "VERIFIED without proof" is impossible to construct
+- **Frozen dataclasses** — `DiagnosticResult` and `AdvisoryCheck` are `frozen=True`; post-construction mutation blocked
+- **Advisory checks never influence verdicts** — `AdvisoryCheck.advisory_only=True` enforced via `__post_init__`
+- **`compute_proof_ref()`** — deterministic sha256 hashing of JSON-serialized evidence
+- **`from_legacy_dict()`** — migration helper for ad-hoc engine dicts (fail-closed states only; raises for legacy VERIFIED)
 
 ### Version propagation
 
@@ -880,12 +965,12 @@ Three disclosure layers:
 
 ### Compatibility
 
-**Additive release.** No breaking changes. Existing `VerificationResult` dataclasses and ad-hoc engine dicts continue to work. `DiagnosticResult` is opt-in â€” engines migrate incrementally.
+**Additive release.** No breaking changes. Existing `VerificationResult` dataclasses and ad-hoc engine dicts continue to work. `DiagnosticResult` is opt-in — engines migrate incrementally.
 
 ### Included PRs
 
-- [#206](https://github.com/QWED-AI/qwed-verification/pull/206) â€” feat(diagnostics): unified 3-layer DiagnosticResult model (#204)
-- [#207](https://github.com/QWED-AI/qwed-verification/pull/207) â€” release: v5.2.0 version propagation
+- [#206](https://github.com/QWED-AI/qwed-verification/pull/206) — feat(diagnostics): unified 3-layer DiagnosticResult model (#204)
+- [#207](https://github.com/QWED-AI/qwed-verification/pull/207) — release: v5.2.0 version propagation
 
 See the [Verification Diagnostics guide](/advanced/diagnostics) for full API documentation.
 
