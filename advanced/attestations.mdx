@@ -164,6 +164,23 @@ is_valid = verify_attestation(
 )
 ```
 
+### Uniform rejection error
+
+All rejection paths return the same `"Invalid token"` message — the response never discloses *why* a token was rejected. Expired, revoked, malformed, oversized, untrusted-issuer, and unsupported-external-issuer tokens all look identical from the outside:
+
+```python
+is_valid, claims, error = client.verify_attestation(bad_jwt)
+# is_valid = False
+# claims   = None
+# error    = "Invalid token"
+```
+
+This is deliberate: distinguishing between `"Attestation has expired"`, `"Untrusted issuer: did:...:X"`, and `"Attestation has been revoked"` would let an attacker enumerate the trusted-issuer registry, probe token expiry, and confirm revocation state through response text alone. The detailed reason is preserved in the server-side audit log (`attestation.rejected` with a structured `reason` field) so operators can still triage failures.
+
+<Warning>
+The signature is verified **before** the issuer is checked against the trusted-issuer list. This means an unknown-issuer token that is not correctly signed by the caller's own key is rejected on signature grounds first, and the trust-list check never runs — closing the enumeration side channel at every layer. Order your own custom validation the same way if you extend `verify_attestation`.
+</Warning>
+
 ## Enforce the trust boundary
 
 Release gates and any code path that admits a `VERIFIED` result MUST route through `enforce_trust_decision()` before acting on it. It is the single consumption-side entry point that binds a verification result to its attestation token and fails closed on any mismatch — you should not consume `DiagnosticResult.status == VERIFIED` directly.
@@ -208,6 +225,19 @@ else:
   Optional original query string. When provided, the token's `qwed.query_hash` claim must equal `sha256(query)`, otherwise the decision is blocked. Without it, query binding is not checked.
 </ParamField>
 
+### Detached result snapshot
+
+`enforce_trust_decision()` always returns a **new** `DiagnosticResult` — never the reference you passed in. Before running any validation, it takes an isolated snapshot of `developer_fields` (recursive rebuild admitting only immutable scalars, `AdvisoryCheck`, and JSON-safe containers), so:
+
+- **The value you validate is the value you return.** Concurrent code holding the original `result` reference cannot mutate `developer_fields` between the enforcement check and your admission decision, closing a TOCTOU window that `frozen=True` alone did not cover.
+- **The returned result does not alias caller data.** Downstream code can safely add breadcrumbs to `decision.developer_fields` without leaking into the original object.
+
+If snapshotting fails — for example, when `developer_fields` contains an unsupported value type or an object whose `__deepcopy__` refuses to copy — `enforce_trust_decision()` fails closed with a `BLOCKED` result carrying `constraint_id="trust_gate.diagnostic_snapshot_failed"`. Only the exception type is recorded in the audit log; caller-supplied error text is never surfaced.
+
+<Tip>
+Keep `developer_fields` values to JSON-safe types (strings, numbers, booleans, `None`, lists, dicts) plus `AdvisoryCheck`. Anything else — custom class instances, generators, open file handles — will be rejected by the snapshotter and blocked at the trust boundary.
+</Tip>
+
 ### Claims binding
 
 When a token is present, `enforce_trust_decision` verifies three bindings against the result before admitting it:
@@ -227,10 +257,11 @@ Every block decision is logged at `WARNING` with a structured `trust_gate.blocke
 | `VERIFIED` | Missing `proof_data` on issuance | — | Issuance returns `BLOCKED` with `VERIFIED_WITHOUT_PROOF` — no token exists. |
 | `VERIFIED` | None | `require_attestation=True` | **BLOCKED** (`trust_gate.mandatory_attestation_missing`). |
 | `VERIFIED` | None | `require_attestation=False` | Passes through as `VERIFIED` (advisory mode). |
-| `VERIFIED` | Invalid (bad signature, expired, untrusted issuer) | Either | **BLOCKED** (`trust_gate.invalid_attestation_token`). |
+| `VERIFIED` | Invalid (bad signature, expired, revoked, untrusted issuer, malformed) | Either | **BLOCKED** (`trust_gate.invalid_attestation_token`, generic `"Invalid token"` surface). |
 | `VERIFIED` | Valid, but claims disagree with result | Either | **BLOCKED** (`trust_gate.claims_status_mismatch` / `claims_query_mismatch` / `claims_proof_mismatch`). |
-| `VERIFIED` | Valid and claims match | Either | Passes through as `VERIFIED`. |
-| `UNVERIFIABLE` / `BLOCKED` / `CORRECTION_NEEDED` | Any | Either | Pass through unchanged — attestation checks do not apply. |
+| Any | Any | Either | **BLOCKED** (`trust_gate.diagnostic_snapshot_failed`) when `developer_fields` cannot be snapshotted (unsupported value type, uncopyable object). |
+| `VERIFIED` | Valid and claims match | Either | Passes through as `VERIFIED` on a detached snapshot. |
+| `UNVERIFIABLE` / `BLOCKED` / `CORRECTION_NEEDED` | Any | Either | Pass through unchanged (on a detached snapshot) — attestation checks do not apply. |
 
 <Tip>
 Start with `require_attestation=False` during the rollout window while engines are still being migrated to emit `proof_data`, then flip it to `True` once every code path that emits `VERIFIED` is signing with a proof artifact. That gives you the audit trail without breaking existing gates on day one.
