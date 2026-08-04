@@ -42,7 +42,7 @@ print(result.attestation)
 </ParamField>
 
 <ParamField path="error_code" type="string | None">
-  Machine-readable failure code: `"SIGNING_FAILURE"` when signing failed, `"CRYPTO_UNAVAILABLE"` when the `cryptography` / `PyJWT` package is not installed, `None` on success.
+  Machine-readable failure code: `"SIGNING_FAILURE"` when signing failed, `"CRYPTO_UNAVAILABLE"` when the `cryptography` / `PyJWT` package is not installed, `"VERIFIED_WITHOUT_PROOF"` when the caller asked to sign a `VERIFIED` result without a `proof_data` artifact, `None` on success.
 </ParamField>
 
 <ParamField path="error" type="string | None">
@@ -59,6 +59,7 @@ print(result.attestation)
 | --- | --- | --- | --- |
 | `ISSUED` | QWED signed the attestation. | JWT string | `None` |
 | `BLOCKED` | Crypto is available but signing failed (key error, JWT error). Hard block. | `None` | `SIGNING_FAILURE` |
+| `BLOCKED` | Caller passed `verified=True` without a `proof_data` artifact. The crypto layer refuses to sign. | `None` | `VERIFIED_WITHOUT_PROOF` |
 | `UNVERIFIABLE` | `cryptography` / `PyJWT` not installed. QWED did not attempt signing. | `None` | `CRYPTO_UNAVAILABLE` |
 | `VALID` / `EXPIRED` / `REVOKED` | Lifecycle states for previously issued attestations during verification. | — | — |
 
@@ -72,6 +73,7 @@ result = create_verification_attestation(
     verified=True,
     engine="math",
     query="2+2=4",
+    proof_data=json.dumps(evidence, sort_keys=True),
 )
 
 if not result.is_issued:
@@ -80,6 +82,21 @@ if not result.is_issued:
 
 use(result.token)
 ```
+
+### Issuance-side proof enforcement
+
+`create_verification_attestation()` will not sign a `VERIFIED` verdict that has no proof artifact. If you pass `verified=True` (or `status="VERIFIED"`) with `proof_data` empty or omitted, the crypto layer short-circuits and returns:
+
+```python
+AttestationResult(
+    status=AttestationStatus.BLOCKED,
+    token=None,
+    error_code="VERIFIED_WITHOUT_PROOF",
+    error="VERIFIED status requires proof_data — cannot sign attestation without proof artifact",
+)
+```
+
+This closes the "trusted VERIFIED without evidence" issuance path: a caller cannot obtain a signed attestation for a claim it has no proof of. `UNVERIFIABLE` and `BLOCKED` verdicts are unaffected — only `VERIFIED` requires a `proof_data` artifact. Pass the same JSON string (typically `json.dumps(evidence, sort_keys=True)`) that your engine used to derive the diagnostic's `proof_ref`, so the token's `qwed.proof_hash` claim matches the result on the consuming side.
 
 ### Key lifecycle auditability
 
@@ -146,6 +163,109 @@ is_valid = verify_attestation(
     trusted_issuers=["did:qwed:node:production"]
 )
 ```
+
+### Uniform rejection error
+
+All rejection paths return the same `"Invalid token"` message — the response never discloses *why* a token was rejected. Expired, revoked, malformed, oversized, untrusted-issuer, and unsupported-external-issuer tokens all look identical from the outside:
+
+```python
+is_valid, claims, error = client.verify_attestation(bad_jwt)
+# is_valid = False
+# claims   = None
+# error    = "Invalid token"
+```
+
+This is deliberate: distinguishing between `"Attestation has expired"`, `"Untrusted issuer: did:...:X"`, and `"Attestation has been revoked"` would let an attacker enumerate the trusted-issuer registry, probe token expiry, and confirm revocation state through response text alone. The detailed reason is preserved in the server-side audit log (`attestation.rejected` with a structured `reason` field) so operators can still triage failures.
+
+<Warning>
+The signature is verified **before** the issuer is checked against the trusted-issuer list. This means an unknown-issuer token that is not correctly signed by the caller's own key is rejected on signature grounds first, and the trust-list check never runs — closing the enumeration side channel at every layer. Order your own custom validation the same way if you extend `verify_attestation`.
+</Warning>
+
+## Enforce the trust boundary
+
+Release gates and any code path that admits a `VERIFIED` result MUST route through `enforce_trust_decision()` before acting on it. It is the single consumption-side entry point that binds a verification result to its attestation token and fails closed on any mismatch — you should not consume `DiagnosticResult.status == VERIFIED` directly.
+
+```python
+from qwed_new.core import enforce_trust_decision
+
+decision = enforce_trust_decision(
+    result,                              # DiagnosticResult from the engine
+    attestation_token=token,             # JWT from create_verification_attestation
+    require_attestation=True,            # mandatory policy
+    trusted_issuers=["did:qwed:node:production"],
+    query="2+2=4",                       # original query, for query_hash binding
+)
+
+if decision.status.name == "VERIFIED":
+    proceed()
+else:
+    # BLOCKED / UNVERIFIABLE — do not admit the result
+    reject(decision)
+```
+
+### Parameters
+
+<ParamField path="result" type="DiagnosticResult" required>
+  The verification result returned by the engine. `enforce_trust_decision` will pass through any already-fail-closed status (`BLOCKED`, `UNVERIFIABLE`) unchanged, and only apply attestation checks to `VERIFIED`.
+</ParamField>
+
+<ParamField path="attestation_token" type="string | None">
+  The JWT emitted by `create_verification_attestation()`. May be `None` — but if `require_attestation=True` and the result is `VERIFIED`, a missing token blocks the decision.
+</ParamField>
+
+<ParamField path="require_attestation" type="bool" default="True">
+  When `True` (default, mandatory policy), a `VERIFIED` result without a valid token is downgraded to `BLOCKED`. When `False` (advisory policy), attestation is best-effort — a missing token still passes, but a present-and-invalid token still blocks.
+</ParamField>
+
+<ParamField path="trusted_issuers" type="list[str] | None">
+  Optional list of trusted issuer DIDs. When set, only tokens signed by an issuer in this list are accepted. Defaults to the `AttestationService`'s trust anchors.
+</ParamField>
+
+<ParamField path="query" type="string | None">
+  Optional original query string. When provided, the token's `qwed.query_hash` claim must equal `sha256(query)`, otherwise the decision is blocked. Without it, query binding is not checked.
+</ParamField>
+
+### Detached result snapshot
+
+`enforce_trust_decision()` always returns a **new** `DiagnosticResult` — never the reference you passed in. Before running any validation, it takes an isolated snapshot of `developer_fields` (recursive rebuild admitting only immutable scalars, `AdvisoryCheck`, and JSON-safe containers), so:
+
+- **The value you validate is the value you return.** Concurrent code holding the original `result` reference cannot mutate `developer_fields` between the enforcement check and your admission decision, closing a TOCTOU window that `frozen=True` alone did not cover.
+- **The returned result does not alias caller data.** Downstream code can safely add breadcrumbs to `decision.developer_fields` without leaking into the original object.
+
+If snapshotting fails — for example, when `developer_fields` contains an unsupported value type or an object whose `__deepcopy__` refuses to copy — `enforce_trust_decision()` fails closed with a `BLOCKED` result carrying `constraint_id="trust_gate.diagnostic_snapshot_failed"`. Only the exception type is recorded in the audit log; caller-supplied error text is never surfaced.
+
+<Tip>
+Keep `developer_fields` values to JSON-safe types (strings, numbers, booleans, `None`, lists, dicts) plus `AdvisoryCheck`. Anything else — custom class instances, generators, open file handles — will be rejected by the snapshotter and blocked at the trust boundary.
+</Tip>
+
+### Claims binding
+
+When a token is present, `enforce_trust_decision` verifies three bindings against the result before admitting it:
+
+| Claim | Bound to | Blocked when |
+|-------|----------|--------------|
+| `qwed.result.status` | `result.status.value` | Token status does not match the engine's status. |
+| `qwed.query_hash` | `sha256(query)` | `query` is provided and does not match the token's query hash. |
+| `qwed.proof_hash` | `result.proof_ref` | Token proof hash does not match the diagnostic's proof reference. |
+
+Every block decision is logged at `WARNING` with a structured `trust_gate.blocked` event (`constraint_id`, `reason`, `policy`) so auditors can replay the enforcement trail.
+
+### Fail-closed matrix
+
+| Result status | Attestation token | Policy | Decision |
+|---------------|-------------------|--------|----------|
+| `VERIFIED` | Missing `proof_data` on issuance | — | Issuance returns `BLOCKED` with `VERIFIED_WITHOUT_PROOF` — no token exists. |
+| `VERIFIED` | None | `require_attestation=True` | **BLOCKED** (`trust_gate.mandatory_attestation_missing`). |
+| `VERIFIED` | None | `require_attestation=False` | Passes through as `VERIFIED` (advisory mode). |
+| `VERIFIED` | Invalid (bad signature, expired, revoked, untrusted issuer, malformed) | Either | **BLOCKED** (`trust_gate.invalid_attestation_token`, generic `"Invalid token"` surface). |
+| `VERIFIED` | Valid, but claims disagree with result | Either | **BLOCKED** (`trust_gate.claims_status_mismatch` / `claims_query_mismatch` / `claims_proof_mismatch`). |
+| Any | Any | Either | **BLOCKED** (`trust_gate.diagnostic_snapshot_failed`) when `developer_fields` cannot be snapshotted (unsupported value type, uncopyable object). |
+| `VERIFIED` | Valid and claims match | Either | Passes through as `VERIFIED` on a detached snapshot. |
+| `UNVERIFIABLE` / `BLOCKED` | Any | Either | Pass through unchanged (on a detached snapshot) — attestation checks do not apply. |
+
+<Tip>
+Start with `require_attestation=False` during the rollout window while engines are still being migrated to emit `proof_data`, then flip it to `True` once every code path that emits `VERIFIED` is signing with a proof artifact. That gives you the audit trail without breaking existing gates on day one.
+</Tip>
 
 ## Trust anchors
 
