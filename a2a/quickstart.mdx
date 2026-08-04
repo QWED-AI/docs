@@ -211,12 +211,15 @@ Response:
 
 ```json
 {
-  "status": "forwarded",
+  "status": "unverifiable",
   "audit_trace_id": "a2a_7f3c2a1b9e4d",
   "engine_used": "passthrough",
-  "attestation_jwt": "eyJhbGciOiJFUzI1NiIs..."
+  "attestation_jwt": null,
+  "reason": "No verification engine available for this payload type"
 }
 ```
+
+`GENERAL` and `DATA_QUERY` payloads have no verification engine, so the interceptor returns an `unverifiable` verdict with **no JWT attestation** — signing a token for content that was never verified would be a false cryptographic claim. Callers must decide how to handle unverified traffic. To see a signed `forwarded` verdict, send a `financial_transaction`, `logic_assertion`, or `code_execution` payload instead. See the [verdict status table](/a2a/interceptor#verdict-statuses) for the full contract.
 
 ---
 

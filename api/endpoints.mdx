@@ -647,52 +647,83 @@ Verify multiple items in a single request. Processes all items concurrently and 
 
 **Response:**
 
+Each entry in `items` is a per-item response. For math items the verdict is the [`DiagnosticResult`](/advanced/diagnostics) record nested under the item's `result` — the same three-layer verdict shape used by `POST /verify/math` — so batch and single-item math verifications share one contract:
+
+- `result.status` — `VERIFIED`, `UNVERIFIABLE`, or `BLOCKED`.
+- `result.agent_message` — short human-readable summary safe to surface to the caller.
+- `result.developer_fields` — engine detail (including the legacy `is_valid` flag for backward compatibility).
+- `result.proof_ref` — cryptographic hash of the retained proof artifact. Present only when `result.status == VERIFIED`; `null` otherwise. **This is the authority bit** — downstream gates must reject any item whose `proof_ref` is `null`.
+
 ```json
 {
   "job_id": "batch_abc123",
   "status": "completed",
-  "results": [...],
-  "summary": {
-    "total": 3,
-    "verified": 3,
-    "failed": 0,
-    "success_rate": 100.0
-  }
+  "progress_percent": 100.0,
+  "total_items": 2,
+  "completed_items": 2,
+  "failed_items": 0,
+  "items": [
+    {
+      "id": "batch_abc123-0",
+      "query": "x**2 + 2*x + 1 = (x+1)**2",
+      "type": "math",
+      "status": "completed",
+      "result": {
+        "status": "VERIFIED",
+        "agent_message": "Identity verified",
+        "developer_fields": {
+          "query": "x**2 + 2*x + 1 = (x+1)**2",
+          "type": "math",
+          "is_valid": true,
+          "diff": "0"
+        },
+        "proof_ref": "sha256:9f2c…",
+        "is_authoritative": true
+      },
+      "latency_ms": 12.3
+    },
+    {
+      "id": "batch_abc123-1",
+      "query": "x + x",
+      "type": "math",
+      "status": "completed",
+      "result": {
+        "status": "UNVERIFIABLE",
+        "agent_message": "Expression simplified, but no equality or proof claim was provided",
+        "developer_fields": {
+          "query": "x + x",
+          "type": "math",
+          "is_valid": false,
+          "simplified": "2*x"
+        },
+        "proof_ref": null,
+        "is_authoritative": false
+      },
+      "latency_ms": 8.1
+    }
+  ]
 }
 ```
 
 #### Math items: proof vs. simplification
 
-Math items are split into two distinct outcomes so that symbolic transformation is never mistaken for a verified claim:
+Math items are routed through the trust boundary (`enforce_trust_decision(require_attestation=True)` on VERIFIED, with a signed attestation issued via `create_verification_attestation`). Three outcomes are possible:
 
-- **Equality or proof claims** (e.g., `x**2 + 2*x + 1 = (x+1)**2`) take the proof path. Verified identities return `is_valid: true` with `message: "Identity verified"`. Non-identities return `is_valid: false` with `message: "Not equal"`.
-- **Non-equality expressions** (e.g., `x + x`) are simplified only. They are returned as explicit simplification results, not as valid proofs.
+| Result | `status` | `proof_ref` | When |
+|--------|----------|-------------|------|
+| Verified identity | `VERIFIED` | `sha256:...` | Equality claim (e.g., `x**2 + 2*x + 1 = (x+1)**2`) simplifies to `0` **and** attestation signing succeeds. |
+| Not equal | `UNVERIFIABLE` | `null` | Equality claim where the two sides do not simplify to the same expression. `developer_fields.is_valid` is `false` and `developer_fields.diff` shows the non-zero difference. |
+| Simplification only | `UNVERIFIABLE` | `null` | Expression without an equality (e.g., `x + x`). `developer_fields.simplified` contains the simplified form. |
 
-Simplification-only results include:
-
-| Field | Value |
-|-------|-------|
-| `is_valid` | `false` |
-| `status` | `"SIMPLIFIED"` |
-| `simplified` | The simplified expression as a string |
-| `type` | `"math"` |
-| `message` | `"Expression simplified, but no equality or proof claim was provided"` |
-
-**Example response for `"x + x"`:**
-
-```json
-{
-  "is_valid": false,
-  "status": "SIMPLIFIED",
-  "simplified": "2*x",
-  "type": "math",
-  "message": "Expression simplified, but no equality or proof claim was provided"
-}
-```
+If attestation signing fails on an otherwise-verified identity, the item is downgraded to `UNVERIFIABLE` with `developer_fields.constraint_id = "api.attestation.signing_error"` — a math result is never returned as `VERIFIED` without a signed proof.
 
 <Warning>
-A successfully simplified expression is not a verified claim. Treat `status: "SIMPLIFIED"` results as transformed input, not as proof. To get a `VERIFIED` outcome from a math item, submit an equality (e.g., `x + x = 2*x`).
+Bare expressions (no `=`) always return `UNVERIFIABLE`. A successful symbolic simplification is not a verified claim. To get a `VERIFIED` outcome from a math item, submit an equality (e.g., `x + x = 2*x`).
 </Warning>
+
+<Info>
+The pre-v6.0 top-level `is_valid` field is preserved inside `developer_fields.is_valid` for backward compatibility, but new code should gate on `result.status == "VERIFIED"` and the presence of `result.proof_ref`. The batch response does not include a pass/fail aggregate because a boolean cannot represent the three-status verdict — count `items[].result.status == "VERIFIED"` entries directly if you need a success ratio.
+</Info>
 
 ### GET /verify/batch/{job_id}
 
@@ -704,7 +735,7 @@ Get the status and results of a batch verification job. Use this to poll results
 {
   "job_id": "batch_abc123",
   "status": "completed",
-  "results": [...]
+  "items": [...]
 }
 ```
 
