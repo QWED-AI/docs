@@ -424,14 +424,17 @@ result = guard.verify_state_transition(
     proposed_state_json=json.dumps({"agent_id": "a1", "status": "running", "step_count": 2}),
 )
 
-print(result["verified"])  # True
-print(result["status"])    # "VERIFIED"
+print(result["verified"])   # True
+print(result["status"])     # "VERIFIED"
+print(result["proof_ref"])  # sha256(json(evidence)) — reproducible from canonical state
 ```
+
+<Note>Equivalent Unicode text produces identical verification results. Payloads are canonicalized to Unicode Normalization Form C (NFC), so precomposed characters like `"\u00C9"` and their decomposed equivalents like `"E\u0301"` yield the same `normalized_state` and the same `proof_ref`.</Note>
 
 ### Parameters
 
 <ParamField path="required_schema" type="dict" required>
-  A strict JSON schema definition with `type`, `properties`, `required`, and `additionalProperties` fields. Supports nested objects, arrays, strings, integers, numbers, booleans, and null types.
+  A strict JSON schema definition with `type`, `properties`, `required`, and `additionalProperties` fields. Supports nested objects, arrays, strings, integers, numbers, booleans, and null types. Property names, `required` lists, and `enum` values are canonicalized to NFC at construction time.
 </ParamField>
 
 <ParamField path="transition_rules" type="dict | None" default="None">
@@ -444,11 +447,13 @@ print(result["status"])    # "VERIFIED"
 
 ### Methods
 
-**`verify_state_payload(proposed_state_json)`** — Validates a JSON string against the configured schema. Returns a decision object with `verified`, `status`, and `normalized_state`.
+Every VERIFIED result includes `proof_ref` (SHA-256 hex digest of the canonical evidence payload) and `developer_fields.proof_reason` (a human-readable summary for logs). The `verified` bool and method signatures are unchanged.
 
-**`verify_state_transition(current_state_json, proposed_state_json)`** — Validates a state transition against structural and semantic rules. Returns decision with `normalized_previous_state` and `normalized_state`.
+**`verify_state_payload(proposed_state_json)`** — Validates a JSON string against the configured schema. Returns a decision object with `verified`, `status`, `proof_ref`, and `normalized_state`.
 
-**`verify_transition_and_commit_state(current_state_json, proposed_state_json, target_path)`** — Verifies the transition and atomically writes the normalized state to disk. Returns decision with `committed_path` and `committed_bytes`.
+**`verify_state_transition(current_state_json, proposed_state_json)`** — Validates a state transition against structural and semantic rules. Returns a decision with `proof_ref`, `normalized_previous_state`, and `normalized_state`.
+
+**`verify_transition_and_commit_state(current_state_json, proposed_state_json, target_path)`** — Verifies the transition and atomically writes the normalized state to disk. Returns a decision with `committed_path`, `committed_bytes`, `transition_proof_ref`, and a top-level `proof_ref` bound to the exact bytes written to disk — recomputable directly from the committed file.
 
 See the [AgentStateGuard guide](/advanced/agent-state-guard) for full API reference, transition rule details, and error codes.
 

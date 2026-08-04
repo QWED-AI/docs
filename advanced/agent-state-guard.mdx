@@ -28,6 +28,24 @@ AgentStateGuard uses a three-phase approach:
 
 All three phases are fail-closed — if any check fails, no side effects occur.
 
+### Canonicalization and Unicode normalization
+
+Before validation, AgentStateGuard canonicalizes every parsed payload: dict keys are sorted and all string keys and values are normalized to Unicode Normalization Form C (NFC). Precomposed and decomposed spellings of the same text (for example `"\u00C9"` vs `"E\u0301"`) therefore reduce to the same canonical bytes.
+
+<Note>Equivalent Unicode text produces identical verification results. The same payload written with precomposed or decomposed characters yields the same `normalized_state` and the same `proof_ref`.</Note>
+
+Schema property names, `required` lists, and `enum` values are canonicalized the same way at construction time, so a payload key spelled `"café"` matches a schema property spelled `"cafe\u0301"`. If two distinct keys in the same object collide under NFC, construction (or verification) is rejected with `QWED-AGENT-STATE-102` rather than silently dropping data.
+
+### Proof references
+
+Every VERIFIED result includes a `proof_ref` — the SHA-256 hex digest of the canonical evidence payload produced during verification. Because the digest is computed from the canonicalized (NFC-normalized, key-sorted) form, it is stable across equivalent inputs and reproducible by any consumer that recanonicalizes the same data.
+
+- `verify_state_payload` — `proof_ref` covers `{"normalized_state": ...}`.
+- `verify_state_transition` — `proof_ref` covers `{"normalized_previous_state": ..., "normalized_state": ...}`.
+- `verify_transition_and_commit_state` — `proof_ref` is bound to the exact bytes written to disk (the canonical serialization of `normalized_state`), so it can be recomputed from the committed file. The separate `transition_proof_ref` covers the transition evidence.
+
+The human-readable sentence that older releases returned as `proof` now lives in `developer_fields.proof_reason` and is intended for logs and dashboards. The `verified` boolean and all method signatures are unchanged.
+
 ## Usage
 
 ### Phase 1: structural verification
@@ -68,9 +86,11 @@ result = guard.verify_state_payload(json.dumps({
     "tasks": [{"id": "task-1", "done": False}]
 }))
 
-print(result["verified"])          # True
-print(result["status"])            # "VERIFIED"
-print(result["normalized_state"])  # Keys sorted deterministically
+print(result["verified"])                       # True
+print(result["status"])                         # "VERIFIED"
+print(result["proof_ref"])                      # "3f8c…" sha256 of canonical evidence
+print(result["developer_fields"]["proof_reason"])  # Human-readable summary
+print(result["normalized_state"])               # Keys sorted, strings NFC-normalized
 ```
 
 ### Phase 2: transition verification
@@ -147,8 +167,10 @@ result = guard.verify_transition_and_commit_state(
 )
 
 if result["verified"]:
-    print(result["committed_path"])   # "/var/agent-state/agent_a1.json"
-    print(result["committed_bytes"])  # Number of bytes written
+    print(result["committed_path"])       # "/var/agent-state/agent_a1.json"
+    print(result["committed_bytes"])      # Number of bytes written
+    print(result["proof_ref"])            # sha256 of the bytes on disk
+    print(result["transition_proof_ref"]) # sha256 covering the transition evidence
 ```
 
 <Warning>The `target_path` must be an absolute path ending in `.json`, and its parent directory must already exist. The path must fall within one of the configured `allowed_commit_roots`.</Warning>
@@ -185,8 +207,9 @@ Validates a proposed state payload against the configured schema.
 |-----|------|-------------|
 | `verified` | `bool` | `True` if the payload passed all structural checks |
 | `status` | `str` | `"VERIFIED"` or `"BLOCKED"` |
-| `proof` | `str` | Explanation of the verification result (on success) |
-| `normalized_state` | `dict` | The payload with keys sorted deterministically (on success) |
+| `proof_ref` | `str` | SHA-256 hex digest of the canonical evidence payload (on success) |
+| `developer_fields` | `dict` | Human-readable diagnostics (`proof_reason`) intended for logs and dashboards (on success) |
+| `normalized_state` | `dict` | The canonicalized payload — dict keys sorted, string keys and values NFC-normalized (on success) |
 | `error_code` | `str` | Error code (on failure) |
 | `message` | `str` | Human-readable error description (on failure) |
 
@@ -230,6 +253,9 @@ Verifies the transition and atomically writes the normalized state to disk if ve
 |-----|------|-------------|
 | `committed_path` | `str` | Absolute path where the state was written (on success) |
 | `committed_bytes` | `int` | Number of bytes written (on success) |
+| `transition_proof_ref` | `str` | SHA-256 hex digest covering the transition evidence (`normalized_previous_state` + `normalized_state`) (on success) |
+
+The top-level `proof_ref` on this method is bound to the exact bytes written to disk — the SHA-256 of the canonical serialization of `normalized_state`. Any consumer with access to the committed file can recompute and verify it without replaying the transition.
 
 ## Transition rules
 
@@ -288,7 +314,7 @@ Existing items must preserve their order and cannot be removed. All non-boolean 
 | Code | Phase | Description |
 |------|-------|-------------|
 | `QWED-AGENT-STATE-101` | 1 | Input is not a non-empty JSON string |
-| `QWED-AGENT-STATE-102` | 1 | Invalid JSON (syntax error, duplicate keys, or non-standard constants) |
+| `QWED-AGENT-STATE-102` | 1 | Invalid JSON (syntax error, duplicate keys, non-standard constants, or two keys that collide under Unicode NFC normalization) |
 | `QWED-AGENT-STATE-103` | 1 | Schema validation failed (missing keys, wrong types, unexpected fields) |
 | `QWED-AGENT-STATE-104` | 2 | Transition rules not configured or all rules are empty |
 | `QWED-AGENT-STATE-105` | 2 | Current state failed structural verification |
@@ -299,6 +325,8 @@ Existing items must preserve their order and cannot be removed. All non-boolean 
 ## Security considerations
 
 - **Strict JSON parsing**: Duplicate keys and non-standard constants (`NaN`, `Infinity`, `-Infinity`) are rejected. Numbers are parsed as `Decimal` to avoid floating-point non-determinism.
+- **Unicode canonicalization**: All string keys and values are normalized to NFC before validation, so precomposed and decomposed spellings of the same text cannot smuggle divergent hashes past the guard. Objects containing two keys that collide under NFC are rejected rather than silently merged.
+- **Reproducible proof references**: `proof_ref` is a SHA-256 over the canonical evidence payload, so any consumer can independently recompute and verify it. For committed state, `proof_ref` is bound to the exact bytes on disk.
 - **Frozen configuration**: Schemas and transition rules are deeply frozen on construction using `MappingProxyType` and tuples. Callers cannot mutate the guard's configuration after initialization.
 - **Fail-closed design**: Every method returns a `BLOCKED` decision object on failure — no exceptions leak past the public API unless the constructor arguments themselves are invalid.
 - **Path traversal prevention**: Commit targets are resolved to absolute paths and validated against the `allowed_commit_roots` allowlist. Only `.json` file extensions are permitted.
