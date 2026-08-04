@@ -1,9 +1,186 @@
 ---
-title: "QWED changelog — releases, breaking changes, and fixes"
+title: "Changelog"
 description: "Release notes for the QWED Protocol: version history, new guards, breaking changes, security fixes, and hardening across QWED engines."
 ---
 
 All notable changes to the QWED platform, listed by release.
+
+---
+
+## QWED-A2A — `UNVERIFIABLE` verdicts carry no JWT, and five README behaviors realigned with the code
+
+**Released: July 27, 2026** · [GitHub PR #40](https://github.com/QWED-AI/qwed-a2a/pull/40) · [GitHub PR #57](https://github.com/QWED-AI/qwed-a2a/pull/57)
+
+> The interceptor no longer produces a signed `FORWARDED` verdict for empty or malformed `FINANCIAL_TRANSACTION` and `LOGIC_ASSERTION` payloads, and no longer silently forwards `GENERAL` / `DATA_QUERY` messages. Both cases now return `verdict.status = "unverifiable"` with `attestation_jwt = None` — signing a token for content that was never verified would be a false cryptographic claim. The A2A docs are updated to match the shipping behavior on five points that previously overstated what the interceptor does.
+
+### What changed
+
+- **Empty/malformed finance and logic payloads → `UNVERIFIABLE`, no JWT.** A `FINANCIAL_TRANSACTION` missing `data`, `line_items`, or `claimed_total`, or with non-numeric amounts, now returns `status=unverifiable` from `finance_guard`. A `LOGIC_ASSERTION` with a missing, non-list, or empty `assertions` array, or malformed entries, returns `status=unverifiable` from `logic_guard`. Earlier releases collapsed these cases to `verified=True` + a signed `FORWARDED` verdict.
+- **`GENERAL` and `DATA_QUERY` are no longer silently forwarded.** The passthrough branch now returns an `unverifiable` verdict with `engine_used="passthrough"`, `attestation_jwt=None`, and reason `"No verification engine available for this payload type"`. Callers must decide their own downstream policy for unverified traffic.
+- **No `Bypass` verification stage.** The pipeline has four stages, not five. `config.trusted_agents` is pre-added to the `TrustBoundary` allowlist at interceptor construction time — trusted agents still flow through engine routing and receive a normal verdict. The [Verification interceptor](/a2a/interceptor#verification-pipeline) and [Architecture](/a2a/architecture) pages have been corrected.
+- **`CodeGuard` is AST-first, regex-second.** Code payloads are first parsed into an AST and inspected for direct dangerous constructs (`eval(`, `exec(`, `subprocess.run(`, `import subprocess`, etc.). Only if the AST layer is clean does a regex heuristic scan run to catch obfuscation patterns (`getattr(__builtins__, ...)`, base64-encoded exec, dynamic `__import__`). The verdict is `BLOCKED` if either layer triggers, or `HEURISTIC_PASS` if both are clean — not a proof of safety.
+- **JWT attestation expiry is 300 seconds (5 minutes), not 24 hours.** The default `validity_seconds` on `A2ACryptoService` is `300` — one A2A hop lifetime. The [Crypto attestations](/a2a/crypto-attestations) page and its signing example were updated.
+
+### New verdict-status contract
+
+| Status | Meaning | JWT attestation |
+|--------|---------|-----------------|
+| `forwarded` | Engine verified the payload. | Signed |
+| `blocked` | Engine detected a violation. | Signed |
+| `heuristic_pass` | Code guard found no known dangerous constructs. Not a proof of safety. | Signed |
+| `unverifiable` | No engine could evaluate the payload (`GENERAL`/`DATA_QUERY`, empty or malformed finance/logic payload). | **None** |
+
+<Warning>
+**Behavior change.** Downstream code that assumed every `VerificationVerdict` carries an `attestation_jwt` will see `None` on `UNVERIFIABLE` verdicts and must handle it. Callers that treated a signed `FORWARDED` verdict as proof that finance/logic content had been checked should also branch on `verdict.status` — an empty payload no longer produces a signed `FORWARDED`, and a `GENERAL`/`DATA_QUERY` message no longer produces one at all. Note that `VerdictStatus.ERROR` exists in the public enum but is not emitted by `intercept()` — internal exceptions surface as `BLOCKED` (or `FORWARDED` when `block_on_error=False`), never as an `error` verdict.
+</Warning>
+
+### What this means for you
+
+If you integrate QWED-A2A: audit any caller that reads `attestation_jwt` or trusts `status == "forwarded"` without also checking `engine_used`. Legitimate agent traffic on unsupported payload types is not blocked — it is marked `unverifiable` so your policy layer can decide whether to route it. See the updated [Verification interceptor](/a2a/interceptor) and [Quick start](/a2a/quickstart) pages for the full verdict contract and example payload shapes.
+
+---
+
+## QWED verification — signature-first attestation validation, uniform rejection error, and TOCTOU-safe trust-boundary snapshot
+
+**Released: August 1, 2026** · [PR #287](https://github.com/qwed-ai/qwed-verification/pull/287) · [PR #290](https://github.com/qwed-ai/qwed-verification/pull/290)
+
+> Two follow-ups harden the attestation trust boundary introduced last week. `verify_attestation()` now verifies the JWT signature before applying any issuer authorization or revocation checks, and every rejection path returns the same generic `"Invalid token"` error so callers cannot enumerate trusted issuers, probe token expiry, or confirm revocation state through response text. `enforce_trust_decision()` now returns a fully detached `DiagnosticResult` snapshot, closing a TOCTOU window where a concurrent caller could mutate `developer_fields` between the validation read and the admission decision.
+
+### What changed
+
+- **Signature-first verification order.** `verify_attestation()` cryptographically verifies the JWT (signature + expiration + required claims) before it applies the trusted-issuer authorization check or the revocation check. An unknown-issuer token that is not correctly signed is rejected on signature grounds and the trust-list check never runs.
+- **Uniform `"Invalid token"` rejection.** Every failure mode — expired, revoked, untrusted issuer, unsupported external issuer, malformed, oversized, malformed base64 — returns the same `(is_valid=False, claims=None, error="Invalid token")` triple. Detailed reasons are still recorded in the server-side `attestation.rejected` audit log; only the caller-facing error is generic. This closes the trusted-issuer enumeration side channel.
+- **Detached-result snapshot in `enforce_trust_decision()`.** Before validation, `developer_fields` is recursively rebuilt into an isolated snapshot that admits only immutable scalars, `AdvisoryCheck`, and JSON-safe containers. The value you validate is the value you return, so a concurrent mutation of the caller's `DiagnosticResult` can neither skew the decision nor leak into the returned result.
+- **Fail-closed snapshot failure.** When `developer_fields` contains an unsupported value type (custom class instance, generator, open file handle) or an object that resists copying, `enforce_trust_decision()` returns a `BLOCKED` result with `constraint_id="trust_gate.diagnostic_snapshot_failed"`. Only the exception type is logged — never the exception message, which could embed caller data.
+- **Runtime dependency.** `cryptography` is now a runtime dependency (previously an optional extra), so ES256 signature verification runs by default.
+
+### Before and after
+
+**Rejection error — before**
+
+```python
+# Distinct messages leaked expiration, revocation, and trusted-issuer identity.
+is_valid, claims, error = client.verify_attestation(bad_jwt)
+# error = "Untrusted issuer: did:qwed:node:staging"
+# error = "Attestation has expired"
+# error = "Attestation has been revoked"
+# error = "External issuer key resolution not implemented"
+```
+
+**Rejection error — after**
+
+```python
+# Every rejection path returns the same string.
+is_valid, claims, error = client.verify_attestation(bad_jwt)
+# is_valid = False, claims = None, error = "Invalid token"
+```
+
+**Trust-boundary snapshot — before**
+
+```python
+result = engine.verify(query)  # DiagnosticResult(developer_fields={"score": 0.9})
+decision = enforce_trust_decision(result, attestation_token=token, ...)
+
+# Concurrent code holding `result` could mutate developer_fields AFTER
+# validation but BEFORE the caller admitted the decision — the returned
+# reference aliased the input.
+result.developer_fields["score"] = -1.0
+assert decision.developer_fields["score"] == -1.0  # TOCTOU: mutation leaked in
+```
+
+**Trust-boundary snapshot — after**
+
+```python
+result = engine.verify(query)
+decision = enforce_trust_decision(result, attestation_token=token, ...)
+
+# `decision.developer_fields` is a detached snapshot. Mutations to the
+# original never reach the enforced result.
+result.developer_fields["score"] = -1.0
+assert decision.developer_fields["score"] == 0.9  # unchanged
+```
+
+### What this means for you
+
+Callers of `verify_attestation()` must not branch on the `error` string any more — treat any `is_valid=False` result as a hard block and rely on the server-side audit log for the actual reason. Callers of `enforce_trust_decision()` should keep `developer_fields` values to JSON-safe types (strings, numbers, booleans, `None`, lists, dicts) plus `AdvisoryCheck`; anything else will be rejected by the snapshotter and blocked at the trust boundary with `trust_gate.diagnostic_snapshot_failed`. See [Uniform rejection error](/advanced/attestations#uniform-rejection-error) and [Detached result snapshot](/advanced/attestations#detached-result-snapshot) for the full behavior.
+
+---
+
+## QWED verification — mandatory proof artifact for VERIFIED attestations and a single trust-boundary entry point
+
+**Released: July 28, 2026** · [PR #248](https://github.com/qwed-ai/qwed-verification/pull/248)
+
+> Two related enforcement-boundary changes ship together. Issuance side, the crypto layer now refuses to sign a `VERIFIED` verdict that has no proof artifact. Consumption side, a new `enforce_trust_decision()` function is the single trust-boundary entry point that release gates route through — it verifies the attestation JWT, binds its claims to the result (status, query hash, proof hash), and fails closed on any mismatch.
+
+### What changed
+
+- **`create_verification_attestation()` blocks VERIFIED without proof.** Calling with `verified=True` (or `status="VERIFIED"`) and an empty or missing `proof_data` now returns `AttestationResult(status=BLOCKED, token=None, error_code="VERIFIED_WITHOUT_PROOF", error=...)`. The crypto layer will not sign a `VERIFIED` result that has no evidence to hash into the token's `proof_hash` claim. `UNVERIFIABLE` and `BLOCKED` verdicts are unaffected.
+- **New `enforce_trust_decision()` trust-boundary gate.** Exported from `qwed_new.core`, this is the single consumption-side entry point every release gate must route through. It takes the engine's `DiagnosticResult` plus the attestation token, verifies the JWT (signature, expiry, trusted issuer), and blocks the decision when the token's `qwed.result.status`, `qwed.query_hash`, or `qwed.proof_hash` claims do not match the result. `UNVERIFIABLE`/`BLOCKED` results pass through unchanged.
+- **`require_attestation` policy toggle.** `enforce_trust_decision(result, require_attestation=True, ...)` (default) is the mandatory policy — `VERIFIED` without a valid token is downgraded to `BLOCKED`. `require_attestation=False` is the advisory policy for staged rollouts: a missing token still passes as `VERIFIED`, but a present-and-invalid token still blocks. Both modes emit structured `trust_gate.blocked` audit logs on rejection.
+- **Control plane integration.** The math control plane now routes every verification through `enforce_trust_decision()` and records the outcome and policy on the trust boundary (`trust_enforced`, `attestation_policy`) so operators can watch the mandatory rollout from telemetry before flipping the switch.
+
+### Before and after
+
+**Issuance — `VERIFIED` without a proof artifact**
+
+```python
+# Before — the crypto layer signed a VERIFIED verdict even with no proof_data,
+# emitting an attestation whose proof_hash pointed at an empty artifact.
+create_verification_attestation(
+    status="VERIFIED",
+    verified=True,
+    engine="math",
+    query="2+2=4",
+)
+# AttestationResult(status=ISSUED, token="eyJ...", error_code=None)
+
+# After — issuance is refused; there is no way to obtain a signed
+# attestation for a VERIFIED claim without evidence.
+create_verification_attestation(
+    status="VERIFIED",
+    verified=True,
+    engine="math",
+    query="2+2=4",
+)
+# AttestationResult(
+#     status=BLOCKED,
+#     token=None,
+#     error_code="VERIFIED_WITHOUT_PROOF",
+#     error="VERIFIED status requires proof_data — cannot sign attestation without proof artifact",
+# )
+```
+
+**Consumption — release gate on a VERIFIED result**
+
+```python
+# Before — release gates inspected result.status directly and could admit
+# a VERIFIED result whose attestation was missing, invalid, or bound to a
+# different query. There was no single enforcement point.
+if result.status == "VERIFIED":
+    proceed()
+
+# After — one call gates the boundary. Missing/invalid tokens or
+# mismatched claims downgrade the decision to BLOCKED with a
+# structured audit event.
+from qwed_new.core import enforce_trust_decision
+
+decision = enforce_trust_decision(
+    result,
+    attestation_token=token,
+    require_attestation=True,
+    trusted_issuers=["did:qwed:node:production"],
+    query="2+2=4",
+)
+
+if decision.status.name == "VERIFIED":
+    proceed()
+else:
+    reject(decision)
+```
+
+### What this means for you
+
+If you call `create_verification_attestation()` directly, always pass `proof_data` (typically `json.dumps(evidence, sort_keys=True)`) when signing a `VERIFIED` verdict, and check `result.is_issued` before treating the token as valid. If you consume verification results in a release gate, route them through `enforce_trust_decision()` — start in advisory mode (`require_attestation=False`) while your engines are being migrated to emit proof artifacts, watch the `trust_boundary.trust_enforced` telemetry, then flip to mandatory once every `VERIFIED` path is signing with proof. See [Fail-closed contract](/advanced/attestations#fail-closed-contract) and [Enforce the trust boundary](/advanced/attestations#enforce-the-trust-boundary) for the full parameter reference and fail-closed matrix.
 
 ---
 
