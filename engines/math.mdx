@@ -196,7 +196,7 @@ Three verification methods require an additional proof step before returning `VE
 | Exactly one value at max frequency, claim matches | `VERIFIED` | Unique mode |
 | Exactly one value at max frequency, claim differs | `CORRECTION_NEEDED` | `calculated` returned |
 | Two or more values tied at max frequency | `BLOCKED` | `ambiguous_modes` returned; result is independent of the claimed value |
-| All values equal (e.g., [5, 5, 5]) | `VERIFIED` (if claim matches) | Single distinct value at max frequency � unique mode |
+| All values equal (e.g., [5, 5, 5]) | `VERIFIED` (if claim matches) | Single distinct value at max frequency � unique mode |
 
 Response fields on the `BLOCKED` case:
 
@@ -484,7 +484,7 @@ The engine also rejects invalid tolerance values (negative numbers, `NaN`, `Infi
 
 ## Trust boundary
 
-When math verification runs through the natural language pipeline (`POST /verify/natural_language`), the response now includes a `trust_boundary` object. This object describes exactly what the pipeline proved and what it did not, separating deterministic expression evaluation from the non-deterministic LLM translation step.
+When math verification runs through the natural language pipeline (`POST /verify/natural_language`), the response includes a `trust_boundary` object. This object describes exactly what the pipeline proved and what it did not, separating deterministic expression evaluation from the non-deterministic LLM translation step — and records the mandatory attestation admission decision.
 
 ```json
 {
@@ -496,6 +496,8 @@ When math verification runs through the natural language pipeline (`POST /verify
     "formal_proof": false,
     "translation_claim_self_consistent": true,
     "provider_used": "openai",
+    "trust_enforced": "INCONCLUSIVE",
+    "attestation_policy": "mandatory",
     "overall_status": "INCONCLUSIVE"
   }
 }
@@ -505,16 +507,51 @@ When math verification runs through the natural language pipeline (`POST /verify
 |-------|------|-------------|
 | `query_interpretation_source` | string | Always `"llm_translation"` — indicates the query was interpreted by an LLM |
 | `query_semantics_verified` | boolean | Always `false` — QWED cannot verify that the LLM correctly interpreted the user's intent |
-| `verification_scope` | string | Always `"translated_expression_only"` — only the translated expression was verified |
+| `verification_scope` | string | Always `"translated_expression_only"` — the attestation `qwed.query_hash` also binds to this translated expression, not the natural-language query |
 | `deterministic_expression_evaluation` | boolean | `true` when the inner engine status was `VERIFIED` or `CORRECTION_NEEDED` |
 | `formal_proof` | boolean | Always `false` — SymPy evaluation is deterministic but not a formal proof of the original query |
 | `translation_claim_self_consistent` | boolean | Whether the translated expression matched its own claimed answer |
 | `provider_used` | string | The LLM provider used for translation |
-| `overall_status` | string | The top-level response status after trust boundary alignment |
+| `trust_enforced` | string | Status returned by the mandatory trust-boundary enforcement step. Always matches `overall_status`. |
+| `attestation_policy` | string | Always `"mandatory"` — the control plane requires a signed attestation before returning a `VERIFIED` result |
+| `attestation_error` | string | Present only if attestation signing failed. Machine-readable code (e.g. `SIGNING_FAILURE`, `CRYPTO_UNAVAILABLE`) that caused the downgrade to `BLOCKED`. |
+| `overall_status` | string | The top-level response status after trust boundary enforcement — always sourced from the enforced decision, never from the raw verifier verdict |
 
 <Note>
-Because the LLM translation step is non-deterministic, the natural language pipeline now returns `INCONCLUSIVE` instead of `VERIFIED` even when the underlying expression evaluation succeeds. This prevents over-representing a translated-query evaluation as a proven user-query verdict. Use the direct `POST /verify/math` endpoint if you need a fully deterministic result without the LLM translation layer.
+Because the LLM translation step is non-deterministic, the natural language pipeline returns `INCONCLUSIVE` instead of `VERIFIED` even when the underlying expression evaluation succeeds. This prevents over-representing a translated-query evaluation as a proven user-query verdict. Use the direct `POST /verify/math` endpoint if you need a fully deterministic result without the LLM translation layer.
 </Note>
+
+### Mandatory attestation admission
+
+The control plane runs every math response through `enforce_trust_decision(..., require_attestation=True)`. Attestation is now an admission gate — a `VERIFIED` result is only returned once the signing step succeeds:
+
+- **On success:** the verifier evidence (translated expression, calculated value, claimed value, diff, precision mode) is passed to `create_verification_attestation()`. If the returned `AttestationResult` has `status == ISSUED`, `enforce_trust_decision` accepts the signed token and sets `overall_status = "VERIFIED"`.
+- **On signing failure:** the response is downgraded to `BLOCKED` and `trust_boundary.attestation_error` records the error code from the [`AttestationResult`](/advanced/attestations#attestationresult) (for example `SIGNING_FAILURE` or `CRYPTO_UNAVAILABLE`). No token is returned. This is a fail-closed guarantee: signing outages never surface as `VERIFIED`.
+- **`overall_status` is post-attestation.** It is always sourced from the enforced decision, never from the raw verifier verdict. If you need to reason about the raw verifier output separately, inspect `verification.is_correct` and `deterministic_expression_evaluation`.
+
+### Attestation scope: translated expression, not natural-language query
+
+The attestation `qwed.query_hash` binds to the **translated expression** that the deterministic engine actually evaluated (`task.expression`), not to the user's natural-language `query`. This matches the disclosed `verification_scope: "translated_expression_only"` and prevents the attestation from over-claiming that the user's prose was verified.
+
+- **`response.user_query`** — the original natural-language query, kept for display and audit correlation.
+- **Attestation `qwed.query_hash`** — SHA-256 of the translated deterministic expression (e.g. `0.15 * 200`), which is the exact input the engine executed.
+- **Downstream verifiers** should hash the translated expression when re-checking `qwed.query_hash`. Hashing `user_query` will not match — that is intentional, because QWED does not attest to the LLM translation step.
+
+```json
+{
+  "user_query": "What is 15% of 200?",
+  "translation": {
+    "expression": "0.15 * 200",
+    "claimed_answer": 30.0
+  },
+  "trust_boundary": {
+    "verification_scope": "translated_expression_only",
+    "attestation_policy": "mandatory"
+  },
+  "attestation": "eyJhbGciOiJFUzI1NiIs..."
+  // qwed.query_hash inside the JWT = sha256("0.15 * 200")
+}
+```
 
 ---
 
