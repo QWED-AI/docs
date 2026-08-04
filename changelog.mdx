@@ -7,6 +7,27 @@ All notable changes to the QWED platform, listed by release.
 
 ---
 
+## QWED Control Plane — mandatory attestation admission on `/verify/math`, translated-expression attestation scope
+
+**Released: July 31, 2026** · [GitHub PR #278](https://github.com/QWED-AI/qwed-verification/pull/278) · [GitHub PR #285](https://github.com/QWED-AI/qwed-verification/pull/285)
+
+> The control plane now treats attestation as an admission gate on the math verification path — the final response status is set by the enforcement step after signing, not by the raw verifier verdict. In the same release, the attestation `qwed.query_hash` now binds to the translated deterministic expression, not to the user's natural-language query.
+
+### What changed
+
+- `enforce_trust_decision(..., require_attestation=True)` is now the single source of truth for the math response `status` and `trust_boundary.overall_status`. Both fields are set from the enforced decision after attestation is issued, never from the raw verifier verdict.
+- A `VERIFIED` math result is only surfaced once `create_verification_attestation()` returns `ISSUED`. Any attestation signing failure downgrades the response to `UNVERIFIABLE` — the error code is echoed under `trust_boundary.attestation_error` and no token is returned.
+- `trust_boundary.attestation_policy` is now always `"mandatory"`. The previous advisory mode has been removed.
+- The attestation `qwed.query_hash` binds to the **translated expression** the engine actually evaluated, not to the natural-language query. The natural-language query is still returned in `response.user_query` for display, and `trust_boundary.verification_scope = "translated_expression_only"` continues to disclose the narrowed scope.
+
+### What this means for you
+
+- Downstream consumers verifying a QWED attestation must hash the translated expression when re-checking `qwed.query_hash`. Hashing `user_query` will not match — that is intentional, because QWED does not attest to the LLM translation step.
+- If your integration branched on `trust_boundary.overall_status`, it now reflects the post-attestation decision. Signing outages surface as `UNVERIFIABLE` with `attestation_error`, not as a raw `VERIFIED` verdict.
+- See [Trust boundary](/engines/math#trust-boundary) and [`POST /verify/natural_language`](/api/endpoints#post-verify-natural-language) for the full response contract, and [Cryptographic attestations](/advanced/attestations) for the `AttestationResult` fail-closed contract.
+
+---
+
 ## QWED-A2A — `verify_attestation()` now requires an `AttestationContext` (breaking)
 
 **Released: July 26, 2026** · [GitHub PR #41](https://github.com/qwed-ai/qwed-a2a/pull/41)
