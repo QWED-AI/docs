@@ -158,7 +158,7 @@ message = AgentMessage(
 
 verdict = await interceptor.intercept(message, trace_id="code_001")
 # verdict.status = "blocked"
-# verdict.reason = "Dangerous code patterns detected (AST): subprocess import"
+# verdict.reason = "Dangerous constructs detected via AST analysis: import:subprocess"
 ```
 
 ### Passthrough (unverifiable)
@@ -176,7 +176,7 @@ verdict = await interceptor.intercept(chat_message, trace_id="chat_001")
 
 ## Verdict statuses
 
-Every call to `intercept()` returns a `VerificationVerdict` with one of five statuses. Only statuses backed by a real verification decision carry a signed JWT attestation.
+Every call to `intercept()` returns a `VerificationVerdict` with one of four emitted statuses. Only statuses backed by a real verification decision carry a signed JWT attestation. (`VerdictStatus.ERROR` exists in the public enum but is not emitted by `intercept()` — see [Error handling](#error-handling).)
 
 | Status | Meaning | JWT attestation |
 |--------|---------|-----------------|
@@ -184,7 +184,6 @@ Every call to `intercept()` returns a `VerificationVerdict` with one of five sta
 | `blocked` | Engine detected a violation (bad math, contradiction, dangerous code). Do not forward. | Signed |
 | `heuristic_pass` | Code guard ran, no known dangerous constructs found. Not a proof of safety. | Signed |
 | `unverifiable` | No engine could evaluate the payload (`GENERAL`/`DATA_QUERY`, empty/malformed finance or logic payload). No attestation is issued. | **None** |
-| `error` | Internal exception during verification. Behavior depends on `block_on_error`. | Signed |
 
 <Warning>
 `UNVERIFIABLE` verdicts have `attestation_jwt=None`. If your downstream code assumes every verdict has a JWT, guard for this — issuing an attestation for content that was never verified would be a false cryptographic claim.

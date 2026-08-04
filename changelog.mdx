@@ -29,10 +29,9 @@ All notable changes to the QWED platform, listed by release.
 | `blocked` | Engine detected a violation. | Signed |
 | `heuristic_pass` | Code guard found no known dangerous constructs. Not a proof of safety. | Signed |
 | `unverifiable` | No engine could evaluate the payload (`GENERAL`/`DATA_QUERY`, empty or malformed finance/logic payload). | **None** |
-| `error` | Internal exception during verification. | Signed |
 
 <Warning>
-**Behavior change.** Downstream code that assumed every `VerificationVerdict` carries an `attestation_jwt` will see `None` on `UNVERIFIABLE` verdicts and must handle it. Callers that treated a signed `FORWARDED` verdict as proof that finance/logic content had been checked should also branch on `verdict.status` — an empty payload no longer produces a signed `FORWARDED`, and a `GENERAL`/`DATA_QUERY` message no longer produces one at all.
+**Behavior change.** Downstream code that assumed every `VerificationVerdict` carries an `attestation_jwt` will see `None` on `UNVERIFIABLE` verdicts and must handle it. Callers that treated a signed `FORWARDED` verdict as proof that finance/logic content had been checked should also branch on `verdict.status` — an empty payload no longer produces a signed `FORWARDED`, and a `GENERAL`/`DATA_QUERY` message no longer produces one at all. Note that `VerdictStatus.ERROR` exists in the public enum but is not emitted by `intercept()` — internal exceptions surface as `BLOCKED` (or `FORWARDED` when `block_on_error=False`), never as an `error` verdict.
 </Warning>
 
 ### What this means for you
