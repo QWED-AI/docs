@@ -172,15 +172,27 @@ console.log(result.result?.mismatched_count); // 1
 
 ### verifyBatch(items)
 
-Verify multiple items at once.
+Verify multiple items at once. The response is a `BatchResponse` whose `items` are per-item records — for math items the verdict is a [`DiagnosticResult`](/advanced/diagnostics) nested under each item's `result`, so inspect `result.status`, `result.agent_message`, `result.developer_fields`, and `result.proof_ref` individually instead of relying on an aggregate success rate.
 
 ```typescript
-const results = await client.verifyBatch([
+const response = await client.verifyBatch([
   { query: '2+2=4', type: VerificationType.Math },
-  { query: '3*3=9', type: VerificationType.Math },
+  { query: 'x + x', type: VerificationType.Math },
 ]);
-console.log(results.summary.success_rate);
+
+for (const item of response.items) {
+  const result = item.result ?? {};
+  if (result.status === 'VERIFIED' && result.proof_ref) {
+    // Authoritative — admissible for control flow
+    console.log('verified:', result.agent_message, result.proof_ref);
+  } else {
+    // UNVERIFIABLE or BLOCKED — must reject
+    console.log('rejected:', result.status, result.agent_message);
+  }
+}
 ```
+
+For `math` items, supply equality claims (e.g., `'x + x = 2*x'`) to receive proof results. Expressions without an `=` return `status: 'UNVERIFIABLE'` with the simplified form in `developer_fields.simplified`. The legacy `is_valid` boolean is preserved inside `developer_fields.is_valid` for backward compatibility.
 
 ## Agent verification
 
