@@ -3,9 +3,9 @@
   "theme": "aspen",
   "name": "QWED Documentation",
   "colors": {
-    "primary": "#10b981",
-    "light": "#34d399",
-    "dark": "#047857"
+    "primary": "#26463C",
+    "light": "#8FBBA6",
+    "dark": "#1E3830"
   },
   "favicon": {
     "light": "/images/qwed-mark-ink-32.png",
@@ -522,7 +522,8 @@
   },
   "background": {
     "color": {
-      "dark": "#020408"
+      "dark": "#0B0E13",
+      "light": "#E7E4DA"
     },
     "decoration": "windows"
   }

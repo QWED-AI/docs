@@ -34,7 +34,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Verify Calculation
-        uses: QWED-AI/qwed-verification@v5.0.0
+        uses: QWED-AI/qwed-verification@v6.0.0
         with:
           api_key: ${{ secrets.QWED_API_KEY }}
           action: verify
@@ -84,7 +84,7 @@ You can now specify which LLM provider and model the action uses. When you pass 
 
 ```yaml
 - name: Verify with Claude
-  uses: QWED-AI/qwed-verification@v5.0.0
+  uses: QWED-AI/qwed-verification@v6.0.0
   with:
     api_key: ${{ secrets.ANTHROPIC_API_KEY }}
     provider: anthropic
@@ -100,7 +100,7 @@ Set `mask_pii: "true"` to automatically redact personally identifiable informati
 
 ```yaml
 - name: Verify with PII masking
-  uses: QWED-AI/qwed-verification@v5.0.0
+  uses: QWED-AI/qwed-verification@v6.0.0
   with:
     api_key: ${{ secrets.QWED_API_KEY }}
     mask_pii: "true"
@@ -125,7 +125,7 @@ Set `mask_pii: "true"` to automatically redact personally identifiable informati
 
 ```yaml
 - name: Check Math
-  uses: QWED-AI/qwed-verification@v5.0.0
+  uses: QWED-AI/qwed-verification@v6.0.0
   with:
     api_key: ${{ secrets.QWED_API_KEY }}
     action: verify
@@ -137,7 +137,7 @@ Set `mask_pii: "true"` to automatically redact personally identifiable informati
 
 ```yaml
 - name: Check Logic
-  uses: QWED-AI/qwed-verification@v5.0.0
+  uses: QWED-AI/qwed-verification@v6.0.0
   with:
     api_key: ${{ secrets.QWED_API_KEY }}
     action: verify
@@ -149,7 +149,7 @@ Set `mask_pii: "true"` to automatically redact personally identifiable informati
 
 ```yaml
 - name: Security Check
-  uses: QWED-AI/qwed-verification@v5.0.0
+  uses: QWED-AI/qwed-verification@v6.0.0
   with:
     api_key: ${{ secrets.QWED_API_KEY }}
     action: verify
@@ -161,7 +161,7 @@ Set `mask_pii: "true"` to automatically redact personally identifiable informati
 
 ```yaml
 - name: Scan Code
-  uses: QWED-AI/qwed-verification@v5.0.0
+  uses: QWED-AI/qwed-verification@v6.0.0
   with:
     api_key: ${{ secrets.QWED_API_KEY }}
     action: scan-code
