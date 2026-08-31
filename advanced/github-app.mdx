@@ -46,7 +46,7 @@ Check Run conclusion + full VC published as a PR comment
 
 When the QWED Security check passes and you have it configured as a required check, a mergeable PR proves:
 
-- **Full scan** — every file in the PR was scanned by the complete engine set (subject to the [300-file cap](#operational-limits), which is always disclosed in the report when hit)
+- **Full scan** — every file in the PR was scanned by the complete engine set. If the PR exceeds the [300-file cap](#operational-limits), the scan is demoted to `UNVERIFIABLE (DENY)` — a capped scan can never be ADMIT (fail-closed)
 - **Zero new blocking findings** — admission is computed from **new** findings only; a PR that introduces no new `BLOCK`/`WARNING` findings gets `VERIFIED (ADMIT)`
 - **Pre-existing debt never blocks** — findings that already exist on the base branch are reported (and listed in the PR comment) but do not affect admission. QWED blocks only what the PR introduces
 - **Rule-set bound in proof** — the rule-set version is part of the SHA-256 `proof_ref`, so the bound under which the verdict was computed is part of the proof
@@ -60,7 +60,7 @@ When the QWED Security check passes and you have it configured as a required che
 
 | Area | Engines | Examples |
 | --- | --- | --- |
-| **Code security** | `python_ast`, `python_deep_ast`, `taint_analysis`, `cross_file_taint`, `js_patterns`, `go_patterns`, `rust_patterns` | `eval`/`exec`, unsafe deserialization, source→sink flows with sanitizer tracking, cross-module taint, XSS, prototype pollution, `unsafe` blocks, TLS skip-verify |
+| **Code security** | `pattern_scan`, `python_ast`, `python_deep_ast`, `taint_analysis`, `cross_file_taint`, `js_patterns`, `go_patterns`, `rust_patterns` | Dangerous execution primitives; `eval`/`exec`, unsafe deserialization, source→sink flows with sanitizer tracking, cross-module taint, XSS, prototype pollution, `unsafe` blocks, TLS skip-verify |
 | **Secrets** | `secret_scan`, `entropy_scan` | Provider-shaped credentials (OpenAI, GitHub, AWS, Stripe…), high-entropy assignments keyword rules miss |
 | **Shell & obfuscation** | `shell_safety`, `codeguard` | `rm -rf /`, pipe-to-shell, setuid; base64 payloads and builtins tampering that survive AST analysis |
 | **Supply chain** | `dependency_scan`, `lockfile_scan` | Unpinned/floating deps, rogue index URLs, missing hashes, `http://` sources, unknown registries |
@@ -125,7 +125,7 @@ treat_unknown_as_block: true
 diff_aware: true
 allowed_test_patterns: []
 suppressions:
-  - pattern=some-rule-id reason=false-positive path=src/legacy/*
+  - pattern=some-rule-id reason=false-positive path=src/legacy/**
 ```
 
 - **`diff_aware`** (default `true`) — admission gating considers new findings only; release-boundary findings always apply
@@ -138,7 +138,7 @@ suppressions:
 | Limit | Value | Behavior at the limit |
 | --- | --- | --- |
 | Webhook payload | 10 MB | Oversized payloads rejected (fail-closed) |
-| Files per scan | 300 | Scan truncates; the report states the cap was hit |
+| Files per scan | 300 | Scan demotes to `UNVERIFIABLE (DENY)` — a capped scan is never admitted; the report discloses the cap and advises splitting the PR |
 | Webhook redeliveries | deduplicated | A redelivered webhook is not scanned twice |
 | Scan events per installation | rate-windowed | Bounded intake; scans stay claim-deduplicated |
 | Coordination state persistence | fail-closed for claims | A claim that cannot be persisted returns HTTP 500 so GitHub redelivers — an instance-local claim is never granted |
@@ -167,7 +167,7 @@ The app never writes to your code, branches, or settings.
 
 | Plan | Scope | Price |
 | --- | --- | --- |
-| **Basic** | Open source & personal repositories | \$0 |
+| **Basic** | Open-source & personal repositories | \$0 |
 | **Pro** | Private repositories, priority scanning | Coming soon |
 
 Install from the [GitHub Marketplace listing](https://github.com/marketplace/qwed-security).
