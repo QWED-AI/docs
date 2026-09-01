@@ -219,6 +219,56 @@ result = guard.verify_classification(params, claimed_status_contractor=True)
 | OH | \$100,000 | 200 |
 | GA | \$100,000 | 200 |
 
+`check_nexus_liability` computes whether the state's threshold is crossed and compares that against an **explicit boolean claim** from the caller:
+
+```python
+from qwed_tax import NexusGuard
+
+guard = NexusGuard()
+
+result = guard.check_nexus_liability(
+    state="NY",
+    ytd_sales="600000",
+    transaction_count=10,
+    claimed_collects_tax=False,  # AI claimed "no tax needed"
+)
+# {"verified": False, "has_nexus": True, "claimed_collects_tax": False,
+#  "error": "Nexus Violation: NY threshold exceeded (YTD Sales $600000 >= $500000). Tax collection is mandatory."}
+
+if not result["verified"]:
+    # Fail closed — never act on an unverified nexus claim
+    raise RuntimeError(f"Nexus verification rejected: {result['error']}")
+```
+
+| Parameter | Type | Required | Description |
+| --- | --- | --- | --- |
+| `state` | `str` | Yes | Two-letter state code. Must be in the threshold table |
+| `ytd_sales` | `Decimal \| str \| int \| float` | Yes | Year-to-date sales into the state. Must parse as a finite Decimal |
+| `transaction_count` | `int` | Yes | Year-to-date transaction count into the state |
+| `llm_decision` | `str` | No | **Deprecated.** Retained for positional compatibility only — no longer interpreted |
+| `claimed_collects_tax` | `bool` | No (keyword-only) | The explicit claim to verify: `True` if the AI says tax must be collected, `False` if not. Omitting it yields a computed-only, non-verified result |
+
+<Warning>
+  **Free-form `llm_decision` text is no longer interpreted.** Earlier versions parsed the `llm_decision` string (e.g. `"No tax needed"`) to infer the AI's claim. Free-form model output cannot be a verification substrate, so the guard now requires the keyword-only boolean `claimed_collects_tax`:
+
+  - **`claimed_collects_tax` omitted (`None`)** — returns `{"verified": False, "computed_only": True, "has_nexus": <bool>, "error": "Computed nexus liability only. Provide claimed_collects_tax as a boolean for deterministic verification."}`. The nexus computation is returned, but nothing was verified.
+  - **`claimed_collects_tax` is not a `bool`** — returns `{"verified": False, "has_nexus": <bool>, "error": "Invalid claimed_collects_tax. Expected a boolean true/false for deterministic verification."}`. Truthy strings like `"yes"` are rejected.
+  - **`claimed_collects_tax` is a `bool`** — the guard verifies the claim against the computed nexus. `verified=True` only when the claim matches.
+
+  Migrate by translating the AI's decision into an explicit boolean before calling the guard:
+
+  ```python
+  # Before — free-form text was interpreted as the claim
+  guard.check_nexus_liability("NY", 600000, 10, llm_decision="No tax needed")
+
+  # After — pass the claim as an explicit keyword-only boolean
+  guard.check_nexus_liability(
+      "NY", 600000, 10,
+      claimed_collects_tax=False,
+  )
+  ```
+</Warning>
+
 <Note>
   **Fails closed on unmodeled states.** A call with a `state` code that is not in the threshold table returns `{"verified": False, "error": "State <CODE> not in configured nexus threshold table. Cannot verify nexus liability — block pending rule configuration."}`. The guard never falls back to "not high-risk → no tax" for jurisdictions it has not been configured for.
 </Note>
