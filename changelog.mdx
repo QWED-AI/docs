@@ -17,10 +17,10 @@ All notable changes to the QWED platform, listed by release.
 
 The math expression sandbox in `qwed-mcp` now applies layered validation before an expression reaches SymPy's `parse_expr`:
 
-- **AST node allowlist.** Only arithmetic node types survive (binary and unary operations, calls, names, numeric constants). Attribute access, subscripts, lambdas, and comprehensions are rejected before parsing. Every sandbox-escape traversal needs an attribute or subscript node; legitimate math never does.
-- **String and bytes literals rejected.** Expressions containing string or bytes constants fail with `SafeParserError`, closing the concatenation-gadget class (for example `'__glo'+'bals'+'__'`).
-- **NFKC normalization before validation.** CPython NFKC-normalizes identifiers at compile time, so Unicode look-alike characters (mathematical bold letters, fullwidth forms) could previously bypass the ASCII denylist. Input is now normalized first, so the checks see exactly what the compiler sees.
-- **Implicit-multiplication charset guard.** Inputs that are not valid Python (such as `2x` or `sin x`) cannot be AST-checked, so their character set is restricted instead: quotes, brackets, and separators are banned, and `.` is only allowed as a decimal point. `2x`, `sin x`, `x^2`, `2.5x`, and `2(x+1)` still parse; `2x.__class__` is blocked.
+- **AST node allowlist.** Only arithmetic node types survive (binary and unary operations, calls, names, numeric constants). The allowlist rejects attribute access, subscripts, lambdas, and comprehensions before parsing. Every sandbox-escape traversal needs an attribute or subscript node; legitimate math never does.
+- **String and bytes literals rejected.** The validator fails expressions containing string or bytes constants with `SafeParserError`, closing the concatenation-gadget class (for example `'__glo'+'bals'+'__'`).
+- **NFKC normalization before validation.** CPython NFKC-normalizes identifiers at compile time, so Unicode look-alike characters (mathematical bold letters, fullwidth forms) could previously bypass the ASCII denylist. The sandbox now normalizes input first, so the checks see exactly what the compiler sees.
+- **Implicit-multiplication charset guard.** Inputs that are not valid Python (such as `2x` or `sin x`) cannot pass AST checks, so the guard restricts their character set instead: it bans quotes, brackets, and separators, and allows `.` only as a decimal point. `2x`, `sin x`, `x^2`, `2.5x`, and `2(x+1)` still parse; the guard blocks `2x.__class__`.
 - **Regex denylist retained** as defense in depth.
 
 ### What this means for you
