@@ -7,6 +7,31 @@ All notable changes to the QWED platform, listed by release.
 
 ---
 
+## QWED Open Responses — fail-closed verification and expanded guard coverage
+
+**Released: August 30, 2026** · [GitHub PR #33](https://github.com/QWED-AI/qwed-open-responses/pull/33)
+
+> `verify()` now fails closed when no guards are configured, ToolGuard recognizes and polices more tool-call envelope shapes, and SafetyGuard scans nested content. All three changes ship in both the Python and TypeScript packages.
+
+<Warning>
+**Breaking behavior change.** `verify()` with zero guards now returns `verified=False` with the guard result message "No guards configured", and `blocked=True` in strict mode. Previously it returned `verified=True` because no guard failed. If you use `ResponseVerifier()` or `VerifiedOpenAI` without configuring guards, those calls now block: set `default_guards` (Python) / `defaultGuards` (TypeScript) or pass guards per call.
+</Warning>
+
+### What changed
+
+- **Zero-guard verify fails closed.** Absence of verification is not success. A `verify()` call with no guards returns a `ResponseVerifier` guard result with `severity="error"` and the block reason "No guards configured — fail-closed (zero-guard verify)."
+- **ToolGuard envelope coverage.** ToolGuard now extracts tool calls from Anthropic `content[].type=tool_use` blocks and matches `type` values case-insensitively, so a `Tool_Use` block is policed instead of ignored. OpenAI `function` wrappers and JSON-encoded argument strings are normalized before blocklist and dangerous-pattern checks.
+- **ToolGuard fail-closed rejections.** Tool-like content in an unrecognized shape, non-object entries in `tool_calls`/`choices`/`content`, hybrid envelopes that mix a direct tool call with a sibling collection, nameless tool calls, and argument payloads over 10,000 characters or 128 nesting levels are all blocked instead of passing silently.
+- **SafetyGuard recursive extraction.** SafetyGuard scans string content nested up to 12 levels deep, including the canonical `choices[].message.content` shape, so PII, injection, and harmful patterns inside nested structures are detected.
+
+### What this means for you
+
+If your agent relied on `verify()` passing with no guards, or on responses in unrecognized tool-call shapes passing as "no tool calls", those calls now block. Configure the guards you need and emit tool calls in a recognized envelope.
+
+See the [guards reference](/open-responses/guards) and [troubleshooting](/open-responses/troubleshooting) for the updated contracts.
+
+---
+
 ## QWED-Tax — explicit boolean claim required for economic nexus verification
 
 **Released: August 31, 2026** · [GitHub PR #62](https://github.com/QWED-AI/qwed-tax/pull/62)

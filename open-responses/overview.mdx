@@ -122,6 +122,10 @@ pip install qwed-open-responses[all]
 
 ## Quick start
 
+<Warning>
+Calling `verify()` with no guards configured fails closed. `ResponseVerifier()` without `default_guards` (or `VerifiedOpenAI` without `guards`) returns `verified=False` with the reason "No guards configured", and blocks the response in strict mode. Earlier versions returned `verified=True` in this case. Always configure at least one guard.
+</Warning>
+
 ### Basic verification
 
 ```python

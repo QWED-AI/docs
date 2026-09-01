@@ -44,6 +44,26 @@ pip install langchain langchain-openai
 
 ## Guard failures
 
+### "No guards configured"
+
+**Cause:** `verify()` was called with zero guards. Verification fails closed: `verified=False`, and `blocked=True` in strict mode. Earlier versions returned `verified=True` here.
+
+**Solution:** Configure at least one guard.
+
+```python
+# Wrong - no guards, always fails closed
+verifier = ResponseVerifier()
+result = verifier.verify(response)  # verified=False
+
+# Right - set default guards
+verifier = ResponseVerifier(default_guards=[ToolGuard(), SafetyGuard()])
+
+# Or pass guards per call
+result = verifier.verify(response, guards=[ToolGuard()])
+```
+
+---
+
 ### "SchemaGuard: Missing required field"
 
 **Cause:** Output doesn't match expected schema
@@ -88,6 +108,24 @@ tool_guard = ToolGuard(
     allow_unknown=False
 )
 ```
+
+---
+
+### "ToolGuard: tool-like content in an unrecognized format"
+
+**Cause:** The response contains something that looks like a tool call, but it matches none of the recognized envelope shapes. ToolGuard blocks it rather than passing with "No tool calls".
+
+**Recognized shapes:** `type=tool_call`, `type=function_call`, `tool_calls[]`, `choices[].message.tool_calls[]`, `content[].type=tool_use`.
+
+**Fix:** Emit tool calls in one of the recognized shapes. This block also fires when a call's JSON-encoded arguments cannot be parsed, exceed 10,000 characters, or nest deeper than 128 levels.
+
+---
+
+### "ToolGuard: malformed tool-call entry"
+
+**Cause:** A `tool_calls`, `choices`, or `content` collection contains a non-object item, or the response mixes a direct tool call (`type=tool_call`/`function_call`) with a sibling collection. Ambiguous envelopes are blocked because validating one side would let the other escape policy checks.
+
+**Fix:** Every entry in a tool-call collection must be an object with a non-blank string tool name, and a response must carry its tool calls in exactly one place.
 
 ---
 
@@ -277,8 +315,11 @@ math_guard = MathGuard(tolerance=0.01)  # Allow 1 cent difference
 
 | Error | Guard | Cause | Fix |
 |-------|-------|-------|-----|
+| "No guards configured" | Verifier | Zero guards passed | Configure at least one guard |
 | "Missing required field" | Schema | Output missing field | Check schema |
 | "Tool in blocklist" | Tool | Dangerous tool called | Review blocklist |
+| "Unrecognized format" | Tool | Tool-like content in unknown shape | Use a recognized envelope |
+| "Malformed tool-call entry" | Tool | Non-object entry or hybrid envelope | Fix response structure |
 | "Calculation mismatch" | Math | LLM math wrong | This is intentional! |
 | "PII detected" | Safety | SSN/email in output | Redact or edit prompt |
 | "Invalid transition" | State | Bad state flow | Fix state machine |
