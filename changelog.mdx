@@ -7,6 +7,35 @@ All notable changes to the QWED platform, listed by release.
 
 ---
 
+## QWED-Infra v0.3.0 — Verification Context v1.0 and attestation trust boundary
+
+**Released: August 24, 2026**
+
+> Every `qwed-infra` guard now emits a portable [Verification Context v1.0 document](/infra/guards#verification-context-documents) via `to_verification_context()`, and `ADMIT` decisions now require a cryptographically valid ES256 attestation bound to the exact claim and evidence.
+
+### Added
+
+- **`to_verification_context()` on all four guards** — [IamGuard (#45)](https://github.com/QWED-AI/qwed-infra/pull/45), [NetworkGuard (#46)](https://github.com/QWED-AI/qwed-infra/pull/46), [CostGuard (#48)](https://github.com/QWED-AI/qwed-infra/pull/48), and [ArtifactBoundaryGuard (#50)](https://github.com/QWED-AI/qwed-infra/pull/50) each produce a schema-valid, tamper-evident VC document with claim, verifier identity, `sha256`-bound evidence, and an `ADMIT`/`DENY` admission decision, built on the shared bridge module from [PR #44](https://github.com/QWED-AI/qwed-infra/pull/44).
+- **Attestation trust boundary** ([PR #54](https://github.com/QWED-AI/qwed-infra/pull/54)) — ES256 (ECDSA P-256) JWT attestation service with a never-`None` fail-closed `AttestationResult` contract, revocation registry, and a single consumption-side gate validating signature, issuer, expiry, and revocation plus claim bindings (status match, `query_hash == sha256(formal_statement)`, `proof_hash == proof_ref`).
+- **`mint_diagnostic_attestation()`** — issues a token bound to a `VERIFIED` diagnostic's own evidence commitment.
+
+### Breaking changes
+
+<Warning>
+**Signature migration (pre-1.0 API).** Guard adapters no longer accept pre-computed result objects. `to_verification_context()` takes raw verification inputs and runs the guard's own deterministic solver internally. A result-accepting signature is forgeable, so it was removed before release. Pass raw inputs: `NetworkGuard.to_verification_context(resources, source, destination, port, ...)`, `IamGuard.to_verification_context(policy, action, resource, context=None, ...)`, `CostGuard.to_verification_context(resources, budget_monthly, ...)`, `ArtifactBoundaryGuard.to_verification_context(package_dir, ...)`.
+</Warning>
+
+- **Admission semantics** — `VERIFIED` results admit only with a cryptographically valid attestation bound to the exact claim and evidence. Arbitrary non-empty attestation strings are rejected as forged tokens and produce `BLOCKED`. A missing token demotes `VERIFIED` to `UNVERIFIABLE`/`DENY`. Callers previously passing placeholder tokens must mint via `create_verification_attestation()` or `mint_diagnostic_attestation()`.
+- **New runtime dependencies** — `pyjwt` and `cryptography` for attestation signing and validation.
+
+### Fixed
+
+- **Fail-closed on malformed inputs at every VC boundary** ([PR #51](https://github.com/QWED-AI/qwed-infra/pull/51) and follow-ups) — undecimal budgets, non-string build backends, malformed topology, policy, or package inputs, symlink escapes and loops, and wheel entries outside the scanned boundary all map to `BLOCKED`/`DENY` documents instead of exceptions or guessed approval.
+
+See the [guards reference](/infra/guards) and [usage examples](/infra/examples) for the updated contracts.
+
+---
+
 ## v6.0.0 — Trust Boundary Completion
 
 **Released: August 2, 2026** · [GitHub Release ↗](https://github.com/QWED-AI/qwed-verification/releases/tag/v6.0.0) · [GitHub PR #291](https://github.com/QWED-AI/qwed-verification/pull/291)

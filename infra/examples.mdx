@@ -167,3 +167,74 @@ trace = build_trace(
 ref = trace_proof_ref(trace)
 print(ref)  # sha256:abc123...
 ```
+
+## 8. Emitting Verification Context Documents
+
+Every guard's `to_verification_context()` runs the verification from raw inputs and emits a portable [Verification Context v1.0 document](/infra/guards#verification-context-documents). To get an `ADMIT` decision, mint an attestation bound to the same claim and evidence:
+
+```python
+from qwed_infra import NetworkGuard
+from qwed_infra.attestation import mint_diagnostic_attestation
+
+net = NetworkGuard()
+infra = {
+    "subnets": [{"id": "public-subnet", "security_groups": ["sg-web"]}],
+    "route_tables": [
+        {"subnet_id": "public-subnet", "routes": {"0.0.0.0/0": "igw-main"}}
+    ],
+    "security_groups": {
+        "sg-web": {"ingress": [{"port": 80, "cidr": "0.0.0.0/0"}]}
+    },
+}
+
+statement = "Traffic from internet to public-subnet on port 80 is safe"
+
+# Mint an attestation bound to this claim + evidence
+diagnostic = NetworkGuard.to_diagnostic(
+    net.verify_reachability(infra, "internet", "public-subnet", 80)
+)
+attestation = mint_diagnostic_attestation(
+    diagnostic, engine="NetworkGuard", query=statement
+)
+if not attestation.is_issued:
+    raise RuntimeError(f"Attestation unavailable [{attestation.error_code}]")
+
+# The guard re-runs the reachability check internally — you pass raw inputs,
+# never a pre-computed result object
+doc = net.to_verification_context(
+    infra,
+    "internet",
+    "public-subnet",
+    80,
+    formal_statement=statement,
+    attestation_token=attestation.token,
+)
+
+print(doc.verdict.value)                     # VERIFIED
+print(doc.context.decision.admission.value)  # ADMIT
+```
+
+Without `attestation_token`, a `VERIFIED` result demotes to `UNVERIFIABLE`/`DENY`. A forged, expired, revoked, or non-matching token produces `BLOCKED`/`DENY`.
+
+## 9. Consuming VC Documents Downstream
+
+```python
+from qwed_infra.verification_context import is_valid_document, resolve_document_proof_ref
+
+document = doc.to_dict()  # JSON-serializable dict
+
+if not is_valid_document(document):
+    raise ValueError("Invalid VC document — reject")
+
+admission = document["context"]["decision"]["admission"]  # ADMIT or DENY
+
+if admission == "ADMIT":
+    # VERIFIED documents carry a proof_ref bound to the exact evidence
+    if not resolve_document_proof_ref(document):
+        raise ValueError("VC document proof_ref does not resolve — reject")
+    # ... proceed with the gated operation ...
+else:
+    raise PermissionError(f"Verification denied ({document['verdict']}) — reject")
+```
+
+VC evidence can contain sensitive infrastructure, policy, or cost data. Apply your own access control, redaction, and retention rules when storing or forwarding documents.

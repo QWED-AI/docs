@@ -10,7 +10,7 @@ description: "QWED Infra applies formal verification to infrastructure as code â
 ![Verified by QWED](https://img.shields.io/badge/Verified_by-QWED-00C853?style=flat&logo=checkmarx)
 ![PyPI](https://img.shields.io/pypi/v/qwed-infra?color=blue)
 
-`qwed-infra` is a Python library (v0.2.0) that mathematically proves the security and compliance of infrastructure definitions (Terraform, AWS IAM, Kubernetes). It uses **formal methods (Z3 solver)**, **graph theory**, and **deterministic arithmetic** to do so without ML, heuristics, or confidence scores.
+`qwed-infra` is a Python library (v0.3.0) that mathematically proves the security and compliance of infrastructure definitions (Terraform, AWS IAM, Kubernetes). It uses **formal methods (Z3 solver)**, **graph theory**, and **deterministic arithmetic** to do so without ML, heuristics, or confidence scores.
 
 It prevents AI agents (like Devin or Copilot Workspace) from deploying insecure, non-compliant, or expensive infrastructure by verifying configuration *before* deployment.
 
@@ -62,10 +62,18 @@ Every guard produces an `InfraDiagnosticResult` â€” a 3-layer diagnostic with:
 
 Each result also carries a canonical **`RuleRef`** audit trace (`build_trace()`) referencing the specific statute or policy rule that drove the verdict.
 
+## Verification Context v1.0
+
+Every guard exposes a `to_verification_context()` method that runs the verification from raw inputs and emits a **Verification Context (VC) document**: a portable, schema-validated, JSON-serializable trust artifact carrying the claim, verifier identity, hash-bound evidence, and an `ADMIT`/`DENY` admission decision.
+
+The document is fail-closed by construction. `ADMIT` requires a `VERIFIED` result plus a cryptographically valid ES256 attestation bound to the exact claim and evidence. Everything else is `DENY`. See [Verification Context documents](/infra/guards#verification-context-documents).
+
 ## Installation
 
 Install with a minimum version:
 
 ```bash
-pip install "qwed-infra>=0.2.0"
+pip install "qwed-infra>=0.3.0"
 ```
+
+v0.3.0 adds runtime dependencies `pyjwt` and `cryptography` for attestation signing and validation.
