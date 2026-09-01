@@ -1,0 +1,158 @@
+---
+sidebar_position: 2
+title: "Verification Context specification"
+description: "QWED Verification Context v1.0 spec: the atomic JSON record of a verification with four context layers, verdict invariants, proof_ref, and admission."
+---
+
+# QWED Verification Context specification v1.0
+
+> **Status:** Draft
+> **Version:** 1.0
+> **Introduced in:** QWED v7.1.0
+
+The Verification Context is the atomic record of a QWED verification. It standardizes *what is being verified*, *what it means*, *how it was proven*, *on what evidence*, and *what decision followed*, so that every QWED engine, SDK, API, CLI, and client speaks one protocol.
+
+A Verification Context document is a single JSON object that validates against the machine-readable JSON Schema shipped with the spec ([`spec/v1.0/schemas/verification-context.schema.json`](https://github.com/QWED-AI/qwed-verification/blob/main/spec/v1.0/schemas/verification-context.schema.json)).
+
+## Design goals
+
+- **One protocol.** Every verification surface emits the same document shape.
+- **Fail-closed.** Anything not proven is `UNVERIFIABLE` or `BLOCKED`, never `VERIFIED`.
+- **Truth ≠ admission.** A proven verdict and a safe-to-run decision are separate fields.
+- **Honesty.** QWED never claims to have verified intent. It verifies a formal statement and shows exactly what was proven.
+
+## The verified object
+
+The object of verification is a **formal statement** (for example, `x**2 + 2*x + 1 = (x+1)**2`), captured in `object.formal_statement`.
+
+Two rules govern the object:
+
+- **The theory is required interpretation context.** A formal statement is only meaningful relative to a theory. `x² = 4` over the reals and over integers mod 5 are different propositions. The theory lives in the Interpretation layer (below), not in the object.
+- **The formalization is exposed but never verified.** The mapping from natural language to the formal statement is surfaced in `object.formalization` for confirmation, but `object.formalization.verified` is always `false`. QWED claims "we verified THIS formal statement," never "we verified your intent."
+
+## The four context layers
+
+`context` captures all information required to correctly interpret, reproduce, and trust a verification:
+
+| Layer | Field | Contents | Role |
+|-------|-------|----------|------|
+| Interpretation | `context.interpretation` | theory / logic / dialect / algebra domain | Gives the object meaning |
+| Proof | `context.proof` | verifier + version + configuration + theory scope + trusted dependencies | How the object was discharged; sets proof strength |
+| Evidence | `context.evidence` | retained evidence + `proof_ref` | What was checked; evidence integrity |
+| Decision | `context.decision` | admission | The safe-to-run outcome |
+
+### Interpretation layer
+
+Each engine exposes only the interpretation it needs: a theorem prover records theory and logic, SQL records dialect and parser version, code records language and policy version, symbolic math records the algebra domain.
+
+### Proof layer
+
+The verifier is the trusted computing base (TCB). A proof discharged by SymPy (large TCB) is a different-strength guarantee than one checked by a small trusted kernel. The Proof layer records the full trust boundary:
+
+- `verifier` and `verifier_version` — the exact engine and release.
+- `configuration` — solver flags, timeouts, resource limits.
+- `theory_scope` — the logic or axiom set the discharge is relative to.
+- `trusted_dependencies` — libraries and components inside the TCB.
+- `outcome_treatment` — how `unknown`/`timeout`/`error` outcomes are treated. These never resolve to `VERIFIED`; they resolve to `UNVERIFIABLE` or `BLOCKED` (fail-closed).
+
+### Evidence layer and `proof_ref`
+
+`context.evidence.evidence` is the retained evidence. `context.evidence.proof_ref` is the **evidence commitment**: an immutable commitment to the verification evidence. It provides evidence integrity and reproducibility. It is not itself the mathematical proof.
+
+**How it is computed:**
+
+1. **Bound payload:** the JSON object `{"formal_statement": <object.formal_statement>, "context": <context>}`, with `context.evidence.proof_ref` removed before serialization. `object.formalization` is deliberately excluded: the commitment binds the formal statement, not how it was derived.
+2. **Canonical encoding:** RFC 8785 (JSON Canonicalization Scheme). UTF-8 with no ASCII-escaping, object keys sorted by UTF-16 big-endian byte order, compact separators, and RFC 8785 §3.2.2 number serialization. `NaN` and `Infinity` are rejected, and integers that are not exactly representable as IEEE-754 doubles are rejected (fail-closed).
+3. **Commitment algorithm:** SHA-256 over the canonical bytes, expressed as `sha256:<64-lowercase-hex>`.
+
+**Resolution:** a consumer resolves `proof_ref` by removing the stored value, re-deriving the commitment from the supplied document, and comparing. A resolver must reject a mismatch before any `ADMIT` decision. Missing, malformed, or mismatched evidence is treated as unverified (fail-closed). A `proof_ref` that cannot be resolved confers no authority.
+
+## Verdict
+
+`verdict` is the truth judgment:
+
+| Verdict | Meaning | `proof_ref` |
+|---------|---------|-------------|
+| `VERIFIED` | The claim was checked and proven. | Non-null (`sha256:<64-hex>`) |
+| `UNVERIFIABLE` | Not proven (fail-closed). | `null` |
+| `BLOCKED` | Verification could not be attempted or completed (fail-closed). | `null` |
+
+The schema enforces two invariants:
+
+- `verdict == VERIFIED` ⟹ `context.evidence.proof_ref` is present and matches `^sha256:[a-f0-9]{64}$`.
+- `verdict ∈ {UNVERIFIABLE, BLOCKED}` ⟹ `context.evidence.proof_ref` is `null`.
+
+## Admission (truth ≠ admission)
+
+`VERIFIED` is a truth guarantee, not an admission guarantee. `context.decision.admission` is the separate safe-to-run decision, one of `ADMIT` or `DENY`, computed from the verdict plus policy.
+
+The critical case: a **proven-unsafe** artifact is `VERIFIED` (QWED proved it is unsafe) with admission `DENY`.
+
+| Verdict | Truth | Admission (typical) |
+|---------|-------|---------------------|
+| `VERIFIED`, valid | Proven safe | `ADMIT` |
+| `VERIFIED`, unsafe | Proven unsafe | **`DENY`** |
+| `UNVERIFIABLE` | Not proven | `DENY` (fail-closed) |
+| `BLOCKED` | Verification failed | `DENY` (fail-closed) |
+
+<Warning>
+Execution and shipping consumers gate **exclusively** on `admission == "ADMIT"`. `is_valid` contributes to the admission decision but is not an alternative authorization gate. A valid statement can still be denied by policy.
+</Warning>
+
+## Conformance
+
+An implementation conforms to this specification if it:
+
+1. Emits documents that validate against the v1.0 JSON Schema.
+2. Upholds the verdict invariants: `VERIFIED` ⟹ non-null `proof_ref`; `UNVERIFIABLE`/`BLOCKED` ⟹ `null` `proof_ref`.
+3. Treats `proof_ref` as an evidence commitment, not a proof of truth.
+4. Separates truth from admission and gates execution on `admission == "ADMIT"` only.
+5. Exposes the formalization but never marks it verified.
+6. Treats `unknown`/`timeout`/`error` outcomes as fail-closed.
+
+## Working with Verification Context documents
+
+Verification Context v1.0 is exposed across every QWED surface as of v7.1.0:
+
+- **API** — [`POST /verification-context/from-diagnostic`, `/validate`, and `/resolve`](/api/endpoints#verification-context-endpoints).
+- **Python SDK** — client methods and re-exported types on `qwed_sdk`, plus `to_verification_context()` on all 13 verifiers. See the [Python SDK](/sdks/python#verification-context).
+- **CLI** — the [`qwed context`](/advanced/cli#qwed-context---verification-context-utilities) command group.
+- **GitHub Action** — `verdict`, `admission`, `proof_ref`, and `verification_context` [outputs](/advanced/github-action#outputs).
+
+## Example document
+
+```json
+{
+  "spec_version": "1.0",
+  "object": {
+    "formal_statement": "x**2 + 2*x + 1 = (x+1)**2",
+    "formalization": {
+      "source_query": "Is x squared plus 2x plus 1 the same as (x+1) squared?",
+      "translator": "MathVerifier",
+      "verified": false
+    }
+  },
+  "context": {
+    "interpretation": {
+      "theory": "real arithmetic",
+      "logic": "symbolic simplification"
+    },
+    "proof": {
+      "verifier": "MathVerifier",
+      "verifier_version": "7.1.0",
+      "configuration": {"domain": "real"},
+      "theory_scope": "real arithmetic",
+      "trusted_dependencies": ["sympy"],
+      "outcome_treatment": "unknown/timeout/error resolve to UNVERIFIABLE or BLOCKED"
+    },
+    "evidence": {
+      "evidence": {"simplified_difference": "0"},
+      "proof_ref": "sha256:9f2c4a8e1b7d3f6a0c5e9b2d8f1a4c7e3b6d9f2a5c8e1b4d7f0a3c6e9b2d5f81"
+    },
+    "decision": {
+      "admission": "ADMIT"
+    }
+  },
+  "verdict": "VERIFIED"
+}
+```

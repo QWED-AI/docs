@@ -176,6 +176,108 @@ for item in response.items:
 
 For `math` items, supply equality claims (e.g., `"x + x = 2*x"`) to receive proof results. Bare expressions without an `=` return `status: "UNVERIFIABLE"` with the simplified form in `developer_fields.simplified` — they are never reported as verified. The legacy `is_valid` flag is preserved inside `developer_fields.is_valid` for backward compatibility.
 
+## Verification Context
+
+<Info>New in v7.1.0</Info>
+
+The SDK exposes [Verification Context v1.0](/specs/verification-context) — the standardized JSON record of a verification — as client methods, re-exported types, and a `to_verification_context()` method on every verifier.
+
+### Client methods
+
+All three methods are available on both `QWEDClient` and `QWEDAsyncClient` and call the corresponding [Verification Context endpoints](/api/endpoints#verification-context-endpoints).
+
+#### create_verification_context_from_diagnostic(diagnostic, query, verifier)
+
+Create a schema-valid Verification Context document from a [`DiagnosticResult`](/advanced/diagnostics) dict. Optional keyword arguments: `verifier_version` and `attestation_token`. A `VERIFIED` diagnostic without a valid attestation token is demoted to `UNVERIFIABLE` (fail-closed).
+
+```python
+document = client.create_verification_context_from_diagnostic(
+    diagnostic={
+        "status": "VERIFIED",
+        "agent_message": "Identity verified",
+        "developer_fields": {"is_valid": True},
+        "proof_ref": "sha256:9f2c…",
+    },
+    query="x**2 + 2*x + 1 = (x+1)**2",
+    verifier="MathVerifier",
+    attestation_token=token,
+)
+print(document["verdict"])                             # "VERIFIED"
+print(document["context"]["decision"]["admission"])    # "ADMIT"
+```
+
+#### validate_verification_context(document)
+
+Validate a document against the v1.0 JSON Schema.
+
+```python
+result = client.validate_verification_context(document)
+print(result["valid"])  # True or False
+```
+
+#### resolve_verification_context(document)
+
+Resolve the document's `proof_ref` evidence commitment.
+
+```python
+result = client.resolve_verification_context(document)
+print(result["resolved"])  # True only if the stored proof_ref matches
+```
+
+### Re-exported types and helpers
+
+`qwed_sdk` re-exports the Verification Context v1.0 model, so you can build, validate, and resolve documents locally without an API round trip:
+
+```python
+from qwed_sdk import (
+    # Enums and model types
+    Verdict,
+    Admission,
+    VerificationContext,
+    VerificationContextDocument,
+    VerificationContextValidationError,
+    Formalization,
+    VerifiedObject,
+    Interpretation,
+    Proof,
+    Evidence,
+    Decision,
+    # proof_ref helpers
+    compute_document_proof_ref,
+    resolve_document_proof_ref,
+    compute_context_proof_ref,
+    resolve_context_proof_ref,
+    # Schema validation helpers
+    validate_document,
+    is_valid_document,
+)
+
+# Validate a document dict (raises VerificationContextValidationError on failure)
+validate_document(document)
+
+# Boolean variant
+if is_valid_document(document):
+    ...
+
+# Recompute and check the evidence commitment locally
+assert resolve_document_proof_ref(document)
+```
+
+- `compute_document_proof_ref(document)` derives the canonical `sha256:<64-hex>` commitment for a document.
+- `resolve_document_proof_ref(document)` returns `True` only when the document is `VERIFIED`, schema-valid, and the stored `proof_ref` matches the re-derived commitment. Everything else returns `False` (fail-closed).
+
+### to_verification_context() on verifiers
+
+Every verification engine (all 13 verifiers, including Math, Logic, Symbolic, SQL, Code, Schema, Fact, Image, Graph, Reasoning, Stats, and Consensus) exposes `to_verification_context()`, which maps the engine's `DiagnosticResult` to a Verification Context document:
+
+```python
+document = verifier.to_verification_context(result, query="x**2 + 2*x + 1 = (x+1)**2")
+document.validate()
+print(document.to_dict()["verdict"])
+```
+
+The mapping preserves the fail-closed invariants: `VERIFIED` documents carry a `sha256` `proof_ref`, while `UNVERIFIABLE` and `BLOCKED` documents carry `proof_ref: null` with admission `DENY`.
+
 ## Verification cache
 
 `qwed_sdk.cache.VerificationCache` is the persistent SQLite-backed cache for verification results. It reduces LLM cost on repeated queries.
@@ -260,7 +362,15 @@ qwed verify-code -f script.py
 
 # Batch verify
 qwed batch -f queries.json
+
+# Verification Context v1.0 utilities (v7.1.0)
+qwed context validate document.json
+qwed context resolve document.json
+qwed context from-diagnostic --diagnostic-file diag.json \
+  --query "x + x = 2*x" --verifier MathVerifier
 ```
+
+See the [CLI reference](/advanced/cli#qwed-context---verification-context-utilities) for details on the `qwed context` command group.
 
 ## Verification cache
 

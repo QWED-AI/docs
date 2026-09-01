@@ -7,6 +7,214 @@ All notable changes to the QWED platform, listed by release.
 
 ---
 
+## QWED-Tax — explicit boolean claim required for economic nexus verification
+
+**Released: August 31, 2026** · [GitHub PR #62](https://github.com/QWED-AI/qwed-tax/pull/62)
+
+> Economic nexus verification now fails closed unless the caller provides an explicit `claimed_collects_tax` boolean. Free-form `tax_decision` / `llm_decision` text is no longer interpreted as a verification claim — free-form model output cannot be a verification substrate.
+
+### What changed
+
+- **`NexusGuard.check_nexus_liability`** — Gains a keyword-only `claimed_collects_tax: bool` parameter. The guard computes the state's threshold independently and verifies the boolean against the computed nexus. When the parameter is omitted, the guard returns `{"verified": False, "computed_only": True, "has_nexus": <bool>, "error": "Computed nexus liability only. Provide claimed_collects_tax as a boolean for deterministic verification."}`. Non-boolean values (including truthy strings) return `verified=False` with an invalid-claim error.
+- **`llm_decision` deprecated** — The parameter is retained for positional compatibility but is never parsed. Passing it has no effect on the verdict.
+- **`TaxPreFlight` `economic_nexus` intents** — The required claim field changed from `tax_decision` (string) to `claimed_collects_tax` (boolean). Intents that still send `tax_decision` are blocked as incomplete claims before `NexusGuard` runs.
+
+### Breaking changes
+
+<Warning>
+  Callers that previously passed a free-form decision string — `check_nexus_liability(state, sales, count, llm_decision="No tax needed")` or a `TaxPreFlight` intent with `"tax_decision": "No tax needed"` — now receive a fail-closed result instead of a verified verdict. Translate the AI's decision into an explicit boolean before calling:
+
+  ```python
+  # Before
+  guard.check_nexus_liability("NY", 600000, 10, llm_decision="No tax needed")
+
+  # After
+  guard.check_nexus_liability("NY", 600000, 10, claimed_collects_tax=False)
+  ```
+</Warning>
+
+### What this means for you
+
+An LLM can no longer "verify" its own nexus decision by phrasing it in text — the claim must be a machine-checkable boolean that the guard compares against the deterministically computed threshold. See [NexusGuard](/tax/guards#nexusguard-economic-nexus) for the full parameter contract and [TaxPreFlight integration](/tax/integration#economic-nexus-requires-an-explicit-boolean-claim) for the intent migration.
+
+---
+
+
+---
+
+## QWED Open Responses — fail-closed verification and expanded guard coverage
+
+**Released: August 30, 2026** · [GitHub PR #33](https://github.com/QWED-AI/qwed-open-responses/pull/33)
+
+> `verify()` now fails closed when no guards are configured, ToolGuard recognizes and polices more tool-call envelope shapes, and SafetyGuard scans nested content. All three changes ship in both the Python and TypeScript packages.
+
+<Warning>
+**Breaking behavior change.** `verify()` with zero guards now returns `verified=False` with the guard result message "No guards configured", and `blocked=True` in strict mode. Previously it returned `verified=True` because no guard failed. If you use `ResponseVerifier()` or `VerifiedOpenAI` without configuring guards, those calls now block: set `default_guards` (Python) / `defaultGuards` (TypeScript) or pass guards per call.
+</Warning>
+
+### What changed
+
+- **Zero-guard verify fails closed.** Absence of verification is not success. A `verify()` call with no guards returns a `ResponseVerifier` guard result with `severity="error"` and the block reason "No guards configured — fail-closed (zero-guard verify)."
+- **ToolGuard envelope coverage.** ToolGuard now extracts tool calls from Anthropic `content[].type=tool_use` blocks and matches `type` values case-insensitively, so a `Tool_Use` block is policed instead of ignored. OpenAI `function` wrappers and JSON-encoded argument strings are normalized before blocklist and dangerous-pattern checks.
+- **ToolGuard fail-closed rejections.** Tool-like content in an unrecognized shape, non-object entries in `tool_calls`/`choices`/`content`, hybrid envelopes that mix a direct tool call with a sibling collection, nameless tool calls, and argument payloads over 10,000 characters or 128 nesting levels are all blocked instead of passing silently.
+- **SafetyGuard recursive extraction.** SafetyGuard scans string content nested up to 12 levels deep, including the canonical `choices[].message.content` shape, so PII, injection, and harmful patterns inside nested structures are detected.
+
+### What this means for you
+
+If your agent relied on `verify()` passing with no guards, or on responses in unrecognized tool-call shapes passing as "no tool calls", those calls now block. Configure the guards you need and emit tool calls in a recognized envelope.
+
+See the [guards reference](/open-responses/guards) and [troubleshooting](/open-responses/troubleshooting) for the updated contracts.
+
+---
+
+**Released: August 31, 2026** · [GitHub PR #62](https://github.com/QWED-AI/qwed-tax/pull/62)
+
+> Economic nexus verification now fails closed unless the caller provides an explicit `claimed_collects_tax` boolean. Free-form `tax_decision` / `llm_decision` text is no longer interpreted as a verification claim — free-form model output cannot be a verification substrate.
+
+### What changed
+
+- **`NexusGuard.check_nexus_liability`** — Gains a keyword-only `claimed_collects_tax: bool` parameter. The guard computes the state's threshold independently and verifies the boolean against the computed nexus. When the parameter is omitted, the guard returns `{"verified": False, "computed_only": True, "has_nexus": <bool>, "error": "Computed nexus liability only. Provide claimed_collects_tax as a boolean for deterministic verification."}`. Non-boolean values (including truthy strings) return `verified=False` with an invalid-claim error.
+- **`llm_decision` deprecated** — The parameter is retained for positional compatibility but is never parsed. Passing it has no effect on the verdict.
+- **`TaxPreFlight` `economic_nexus` intents** — The required claim field changed from `tax_decision` (string) to `claimed_collects_tax` (boolean). Intents that still send `tax_decision` are blocked as incomplete claims before `NexusGuard` runs.
+
+### Breaking changes
+
+<Warning>
+  Callers that previously passed a free-form decision string — `check_nexus_liability(state, sales, count, llm_decision="No tax needed")` or a `TaxPreFlight` intent with `"tax_decision": "No tax needed"` — now receive a fail-closed result instead of a verified verdict. Translate the AI's decision into an explicit boolean before calling:
+
+  ```python
+  # Before
+  guard.check_nexus_liability("NY", 600000, 10, llm_decision="No tax needed")
+
+  # After
+  guard.check_nexus_liability("NY", 600000, 10, claimed_collects_tax=False)
+  ```
+</Warning>
+
+### What this means for you
+
+An LLM can no longer "verify" its own nexus decision by phrasing it in text — the claim must be a machine-checkable boolean that the guard compares against the deterministically computed threshold. See [NexusGuard](/tax/guards#nexusguard-economic-nexus) for the full parameter contract and [TaxPreFlight integration](/tax/integration#economic-nexus-requires-an-explicit-boolean-claim) for the intent migration.
+
+---
+
+## QWED-MCP v0.2.2 — hardened math expression sandbox (security release)
+
+**Released: August 27, 2026** · [GitHub PR #48](https://github.com/QWED-AI/qwed-mcp/pull/48) · [GHSA-2p69-jpm6-jrxh ↗](https://github.com/QWED-AI/qwed-mcp/security/advisories/GHSA-2p69-jpm6-jrxh)
+
+> `qwed-mcp` v0.2.2 fixes **GHSA-2p69-jpm6-jrxh** (CWE-94), a residual sandbox-escape bypass in the math expression parser. The previous regex denylist could be evaded through unlisted dunder names, string-literal splitting, and NFKC-equivalent Unicode identifiers. The parser now validates expressions structurally before any evaluation.
+
+### What changed
+
+The math expression sandbox in `qwed-mcp` now applies layered validation before an expression reaches SymPy's `parse_expr`:
+
+- **AST node allowlist.** Only arithmetic node types survive (binary and unary operations, calls, names, numeric constants). The allowlist rejects attribute access, subscripts, lambdas, and comprehensions before parsing. Every sandbox-escape traversal needs an attribute or subscript node; legitimate math never does.
+- **String and bytes literals rejected.** The validator fails expressions containing string or bytes constants with `SafeParserError`, closing the concatenation-gadget class (for example `'__glo'+'bals'+'__'`).
+- **NFKC normalization before validation.** CPython NFKC-normalizes identifiers at compile time, so Unicode look-alike characters (mathematical bold letters, fullwidth forms) could previously bypass the ASCII denylist. The sandbox now normalizes input first, so the checks see exactly what the compiler sees.
+- **Implicit-multiplication charset guard.** Inputs that are not valid Python (such as `2x` or `sin x`) cannot pass AST checks, so the guard restricts their character set instead: it bans quotes, brackets, and separators, and allows `.` only as a decimal point. `2x`, `sin x`, `x^2`, `2.5x`, and `2(x+1)` still parse; the guard blocks `2x.__class__`.
+- **Regex denylist retained** as defense in depth.
+
+### What this means for you
+
+Upgrade to `qwed-mcp` 0.2.2 or later:
+
+```bash
+pip install --upgrade qwed-mcp
+```
+
+No API changes. Legitimate mathematical expressions parse exactly as before. Expressions containing attribute access, subscripts, string literals, or other non-arithmetic syntax now fail with a `SafeParserError` instead of reaching the evaluator.
+
+See the [MCP tools reference](/mcp/tools) for the current tool surface.
+
+---
+
+## QWED-Infra v0.3.0 — Verification Context v1.0 and attestation trust boundary
+
+**Released: August 24, 2026**
+
+> Every `qwed-infra` guard now emits a portable [Verification Context v1.0 document](/infra/guards#verification-context-documents) via `to_verification_context()`, and `ADMIT` decisions now require a cryptographically valid ES256 attestation bound to the exact claim and evidence.
+
+### Added
+
+- **`to_verification_context()` on all four guards** — [IamGuard (#45)](https://github.com/QWED-AI/qwed-infra/pull/45), [NetworkGuard (#46)](https://github.com/QWED-AI/qwed-infra/pull/46), [CostGuard (#48)](https://github.com/QWED-AI/qwed-infra/pull/48), and [ArtifactBoundaryGuard (#50)](https://github.com/QWED-AI/qwed-infra/pull/50) each produce a schema-valid, tamper-evident VC document with claim, verifier identity, `sha256`-bound evidence, and an `ADMIT`/`DENY` admission decision, built on the shared bridge module from [PR #44](https://github.com/QWED-AI/qwed-infra/pull/44).
+- **Attestation trust boundary** ([PR #54](https://github.com/QWED-AI/qwed-infra/pull/54)) — ES256 (ECDSA P-256) JWT attestation service with a never-`None` fail-closed `AttestationResult` contract, revocation registry, and a single consumption-side gate validating signature, issuer, expiry, and revocation plus claim bindings (status match, `query_hash == sha256(formal_statement)`, `proof_hash == proof_ref`).
+- **`mint_diagnostic_attestation()`** — issues a token bound to a `VERIFIED` diagnostic's own evidence commitment.
+
+### Breaking changes
+
+<Warning>
+**Signature migration (pre-1.0 API).** Guard adapters no longer accept pre-computed result objects. `to_verification_context()` takes raw verification inputs and runs the guard's own deterministic solver internally. A result-accepting signature is forgeable, so it was removed before release. Pass raw inputs: `NetworkGuard.to_verification_context(resources, source, destination, port, ...)`, `IamGuard.to_verification_context(policy, action, resource, context=None, ...)`, `CostGuard.to_verification_context(resources, budget_monthly, ...)`, `ArtifactBoundaryGuard.to_verification_context(package_dir, ...)`.
+</Warning>
+
+- **Admission semantics** — `VERIFIED` results admit only with a cryptographically valid attestation bound to the exact claim and evidence. Arbitrary non-empty attestation strings are rejected as forged tokens and produce `BLOCKED`. A missing token demotes `VERIFIED` to `UNVERIFIABLE`/`DENY`. Callers previously passing placeholder tokens must mint via `create_verification_attestation()` or `mint_diagnostic_attestation()`.
+- **New runtime dependencies** — `pyjwt` and `cryptography` for attestation signing and validation.
+
+### Fixed
+
+- **Fail-closed on malformed inputs at every VC boundary** ([PR #51](https://github.com/QWED-AI/qwed-infra/pull/51) and follow-ups) — undecimal budgets, non-string build backends, malformed topology, policy, or package inputs, symlink escapes and loops, and wheel entries outside the scanned boundary all map to `BLOCKED`/`DENY` documents instead of exceptions or guessed approval.
+
+See the [guards reference](/infra/guards) and [usage examples](/infra/examples) for the updated contracts.
+
+---
+
+## v7.1.0 — Verification Context v1.0 Rollout
+
+**Released: August 16, 2026** · [GitHub Release ↗](https://github.com/QWED-AI/qwed-verification/releases/tag/v7.1.0) · [GitHub PR #317](https://github.com/QWED-AI/qwed-verification/pull/317)
+
+> v7.1.0 ships [Verification Context v1.0](/specs/verification-context) end-to-end: a formal specification with a machine-readable JSON Schema, a typed document model with fail-closed invariants, public `proof_ref` generation and resolution, and exposure across the API, Python SDK, CLI, verifiers, and the Docker GitHub Action. The release is additive — a semver minor with no breaking wire changes.
+
+### Spec and core model
+
+- **Verification Context v1.0 specification** — the atomic JSON record of a verification: verified object, four context layers (interpretation / proof / evidence / decision), verdict, and admission, with canonical RFC 8785 encoding for the `proof_ref` evidence commitment (PR #302). See the [Verification Context specification](/specs/verification-context).
+- **`VerificationContextDocument` model + schema validation** — typed `VerificationContext`, `VerificationContextDocument`, `Verdict`, `Admission`, and nested layer types with fail-closed invariants enforced at construction: `VERIFIED` requires a `sha256:<64-hex>` `proof_ref`; `UNVERIFIABLE`/`BLOCKED` require `proof_ref: null` with admission `DENY` (PR #308).
+- **Public `proof_ref` generation and resolution** — `compute_document_proof_ref()` and `resolve_document_proof_ref()` derive and verify the content-bound SHA-256 commitment over the canonical document. Resolution fails closed: a `proof_ref` that cannot be resolved confers no authority (PR #309).
+
+### Surface exposure
+
+- **API endpoints** — [`POST /verification-context/from-diagnostic`, `/validate`, and `/resolve`](/api/endpoints#verification-context-endpoints) convert `DiagnosticResult` records into VC documents, validate documents against the schema, and resolve `proof_ref` commitments (PR #311).
+- **CLI commands** — the [`qwed context`](/advanced/cli#qwed-context---verification-context-utilities) group: `validate`, `resolve`, and `from-diagnostic` (PR #311).
+- **SDK re-exports** — all VC v1.0 types and helpers importable directly from `qwed_sdk`, plus `create_verification_context_from_diagnostic()`, `validate_verification_context()`, and `resolve_verification_context()` on both sync and async clients. See the [Python SDK](/sdks/python#verification-context) (PRs #311, #315).
+- **`to_verification_context()` on all 13 verifiers** — complete engine coverage (Math, Logic, Symbolic, SQL, Code, Schema, Fact, Image, Graph, Reasoning, Stats, Consensus, and the secure code executor) maps each engine's `DiagnosticResult` to a VC document (PRs #310, #316).
+- **Docker action VC outputs** — the GitHub Action emits `verdict`, `admission`, `proof_ref`, and `verification_context` [outputs](/advanced/github-action#verification-context-outputs) in every mode (PR #313).
+
+### Fail-closed behavior
+
+- A `VERIFIED` diagnostic without a valid attestation token is demoted to `UNVERIFIABLE` when converted to a VC document — attestation is enforced through the same trust boundary as `/verify/*`.
+- Malformed diagnostic payloads convert to `BLOCKED` documents instead of crashing, so the audit trail records the failure.
+- `resolve` returns `true` only for a schema-valid `VERIFIED` document whose stored `proof_ref` matches the re-derived commitment.
+
+### Version bumps
+
+| Surface | From | To |
+|---|---|---|
+| `qwed` (PyPI) | `7.0.0` | `7.1.0` |
+| `qwed_sdk` (Python) | `7.0.0` | `7.1.0` |
+| `@qwed-ai/sdk` (npm) | `7.0.0` | `7.1.0` |
+| `qwed` (crates.io) | `7.0.0` | `7.1.0` |
+| API version marker | `7.0.0` | `7.1.0` |
+
+### Included PRs
+
+| PR | Summary |
+|---|---|
+| [#302](https://github.com/QWED-AI/qwed-verification/pull/302) | Verification Context Specification v1.0 + JSON Schema |
+| [#308](https://github.com/QWED-AI/qwed-verification/pull/308) | `VerificationContext` model and schema validation helpers |
+| [#309](https://github.com/QWED-AI/qwed-verification/pull/309) | Public `proof_ref` generation and resolution |
+| [#310](https://github.com/QWED-AI/qwed-verification/pull/310) | `StatsVerifier` `DiagnosticResult` → Verification Context mapping |
+| [#311](https://github.com/QWED-AI/qwed-verification/pull/311) | Verification Context exposed across SDK, API, and CLI |
+| [#313](https://github.com/QWED-AI/qwed-verification/pull/313) | Docker action emits VC v1.0 outputs |
+| [#315](https://github.com/QWED-AI/qwed-verification/pull/315) | VC v1.0 types re-exported from `qwed_sdk` |
+| [#316](https://github.com/QWED-AI/qwed-verification/pull/316) | `to_verification_context()` on all remaining verifiers |
+| [#317](https://github.com/QWED-AI/qwed-verification/pull/317) | v7.1.0 release preparation |
+
+### Upgrading
+
+No action required. Every change is additive: existing `/verify/*` responses, SDK methods, CLI commands, and action outputs are unchanged. Adopt Verification Context by calling the new endpoints, importing the new types from `qwed_sdk`, or reading the new action outputs.
+
+---
+
+
+---
+
 ## v7.0.0 — Full DiagnosticResult engine conformance
 
 **Released: August 8, 2026** · [GitHub Release ↗](https://github.com/QWED-AI/qwed-verification/releases/tag/v7.0.0) · [GitHub PR #300](https://github.com/QWED-AI/qwed-verification/pull/300)
