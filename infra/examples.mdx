@@ -168,7 +168,7 @@ ref = trace_proof_ref(trace)
 print(ref)  # sha256:abc123...
 ```
 
-## 8. Emitting Verification Context Documents
+## 8. Emitting Verification Context documents
 
 Every guard's `to_verification_context()` runs the verification from raw inputs and emits a portable [Verification Context v1.0 document](/infra/guards#verification-context-documents). To get an `ADMIT` decision, mint an attestation bound to the same claim and evidence:
 
@@ -216,12 +216,14 @@ print(doc.context.decision.admission.value)  # ADMIT
 
 Without `attestation_token`, a `VERIFIED` result demotes to `UNVERIFIABLE`/`DENY`. A forged, expired, revoked, or non-matching token produces `BLOCKED`/`DENY`.
 
-## 9. Consuming VC Documents Downstream
+## 9. Consuming VC documents downstream
 
 ```python
+from qwed_infra.attestation import get_attestation_service
 from qwed_infra.verification_context import is_valid_document, resolve_document_proof_ref
 
 document = doc.to_dict()  # JSON-serializable dict
+token = attestation.token  # the attestation minted alongside the document
 
 if not is_valid_document(document):
     raise ValueError("Invalid VC document — reject")
@@ -232,6 +234,16 @@ if admission == "ADMIT":
     # VERIFIED documents carry a proof_ref bound to the exact evidence
     if not resolve_document_proof_ref(document):
         raise ValueError("VC document proof_ref does not resolve — reject")
+
+    # ADMIT is only trustworthy with a valid attestation bound to the same
+    # claim and evidence. Verify the token's signature, issuer, expiry, and
+    # revocation status BEFORE honoring the admission — a structurally valid
+    # document with a forged or expired attestation must never reach the gate.
+    service = get_attestation_service()
+    ok, claims, error = service.verify_attestation(token)
+    if not ok:
+        raise PermissionError(f"Attestation verification failed: {error} — reject")
+
     # ... proceed with the gated operation ...
 else:
     raise PermissionError(f"Verification denied ({document['verdict']}) — reject")

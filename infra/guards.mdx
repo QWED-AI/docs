@@ -36,7 +36,7 @@ doc = guard.to_verification_context(
     resource="arn:aws:s3:::bucket/*",
     context={"aws:SourceIp": "192.168.1.5"},
     formal_statement="IAM policy is safe to apply",
-    attestation_token=token,  # optional; see attestation trust boundary
+    attestation_token=attestation.token,  # optional — mint and check `is_issued` first; see "Attestation trust boundary" below
 )
 ```
 
@@ -77,7 +77,7 @@ doc = guard.to_verification_context(
     "public-subnet",
     80,
     formal_statement="Traffic from internet to public-subnet on port 80 is safe",
-    attestation_token=token,  # optional; see attestation trust boundary
+    attestation_token=attestation.token,  # optional — mint and check `is_issued` first; see "Attestation trust boundary" below
 )
 ```
 
@@ -116,7 +116,7 @@ doc = guard.to_verification_context(
     resources,
     budget_monthly=500.0,
     formal_statement="Estimated monthly cost is within budget",
-    attestation_token=token,  # optional; see attestation trust boundary
+    attestation_token=attestation.token,  # optional — mint and check `is_issued` first; see "Attestation trust boundary" below
 )
 ```
 
@@ -161,7 +161,7 @@ doc = guard.to_verification_context(
     package_dir="src/mypackage",
     pyproject_path="pyproject.toml",
     formal_statement="Package boundary is safe to publish",
-    attestation_token=token,  # optional; see attestation trust boundary
+    attestation_token=attestation.token,  # optional — mint and check `is_issued` first; see "Attestation trust boundary" below
 )
 ```
 
