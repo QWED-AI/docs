@@ -22,7 +22,7 @@ All notable changes to the QWED platform, listed by release.
 - **Zero-guard verify fails closed.** Absence of verification is not success. A `verify()` call with no guards returns a `ResponseVerifier` guard result with `severity="error"` and the block reason "No guards configured — fail-closed (zero-guard verify)."
 - **ToolGuard envelope coverage.** ToolGuard now extracts tool calls from Anthropic `content[].type=tool_use` blocks and matches `type` values case-insensitively, so a `Tool_Use` block is policed instead of ignored. OpenAI `function` wrappers and JSON-encoded argument strings are normalized before blocklist and dangerous-pattern checks.
 - **ToolGuard fail-closed rejections.** Tool-like content in an unrecognized shape, non-object entries in `tool_calls`/`choices`/`content`, hybrid envelopes that mix a direct tool call with a sibling collection, nameless tool calls, and argument payloads over 10,000 characters or 128 nesting levels are all blocked instead of passing silently.
-- **SafetyGuard recursive extraction.** SafetyGuard scans string content at any nesting depth (bounded to 12 levels), including the canonical `choices[].message.content` shape, so PII, injection, and harmful patterns inside nested structures are detected.
+- **SafetyGuard recursive extraction.** SafetyGuard scans string content nested up to 12 levels deep, including the canonical `choices[].message.content` shape, so PII, injection, and harmful patterns inside nested structures are detected.
 
 ### What this means for you
 

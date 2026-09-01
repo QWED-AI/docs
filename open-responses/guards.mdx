@@ -219,13 +219,13 @@ result = guard.check({
 
 ### Content extraction
 
-SafetyGuard scans string content at any nesting depth (bounded to 12 levels), not just top-level keys. This includes:
+SafetyGuard scans string content nested up to 12 levels deep, not just top-level keys. This includes:
 
 - The canonical OpenAI shape: `choices[].message.content`
 - Anthropic content block envelopes
 - Strings nested inside arbitrary wrapper objects and arrays
 
-Content hidden inside a nested structure is checked for PII, injection, and harmful patterns the same as top-level content.
+Content hidden inside a nested structure is checked for PII, injection, and harmful patterns the same as top-level content. Content nested deeper than 12 levels is **not** scanned — keep payloads you need verified within that bound.
 
 ---
 
