@@ -7,6 +7,36 @@ All notable changes to the QWED platform, listed by release.
 
 ---
 
+## QWED-MCP v0.2.2 — hardened math expression sandbox (security release)
+
+**Released: August 27, 2026** · [GitHub PR #48](https://github.com/QWED-AI/qwed-mcp/pull/48) · [GHSA-2p69-jpm6-jrxh ↗](https://github.com/QWED-AI/qwed-mcp/security/advisories/GHSA-2p69-jpm6-jrxh)
+
+> `qwed-mcp` v0.2.2 fixes **GHSA-2p69-jpm6-jrxh** (CWE-94), a residual sandbox-escape bypass in the math expression parser. The previous regex denylist could be evaded through unlisted dunder names, string-literal splitting, and NFKC-equivalent Unicode identifiers. The parser now validates expressions structurally before any evaluation.
+
+### What changed
+
+The math expression sandbox in `qwed-mcp` now applies layered validation before an expression reaches SymPy's `parse_expr`:
+
+- **AST node allowlist.** Only arithmetic node types survive (binary and unary operations, calls, names, numeric constants). Attribute access, subscripts, lambdas, and comprehensions are rejected before parsing. Every sandbox-escape traversal needs an attribute or subscript node; legitimate math never does.
+- **String and bytes literals rejected.** Expressions containing string or bytes constants fail with `SafeParserError`, closing the concatenation-gadget class (for example `'__glo'+'bals'+'__'`).
+- **NFKC normalization before validation.** CPython NFKC-normalizes identifiers at compile time, so Unicode look-alike characters (mathematical bold letters, fullwidth forms) could previously bypass the ASCII denylist. Input is now normalized first, so the checks see exactly what the compiler sees.
+- **Implicit-multiplication charset guard.** Inputs that are not valid Python (such as `2x` or `sin x`) cannot be AST-checked, so their character set is restricted instead: quotes, brackets, and separators are banned, and `.` is only allowed as a decimal point. `2x`, `sin x`, `x^2`, `2.5x`, and `2(x+1)` still parse; `2x.__class__` is blocked.
+- **Regex denylist retained** as defense in depth.
+
+### What this means for you
+
+Upgrade to `qwed-mcp` 0.2.2 or later:
+
+```bash
+pip install --upgrade qwed-mcp
+```
+
+No API changes. Legitimate mathematical expressions parse exactly as before. Expressions containing attribute access, subscripts, string literals, or other non-arithmetic syntax now fail with a `SafeParserError` instead of reaching the evaluator.
+
+See the [MCP tools reference](/mcp/tools) for the current tool surface.
+
+---
+
 ## v6.0.0 — Trust Boundary Completion
 
 **Released: August 2, 2026** · [GitHub Release ↗](https://github.com/QWED-AI/qwed-verification/releases/tag/v6.0.0) · [GitHub PR #291](https://github.com/QWED-AI/qwed-verification/pull/291)
