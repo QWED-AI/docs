@@ -782,7 +782,7 @@ Convert a [`DiagnosticResult`](/advanced/diagnostics) into a schema-valid Verifi
     "proof_ref": "sha256:9f2c…"
   },
   "verifier_version": "7.1.0",
-  "attestation_token": "eyJhbGciOiJFUzI1NiIs..."
+  "attestation_token": "<ES256 JWT attestation>"
 }
 ```
 
@@ -814,7 +814,17 @@ Validate a Verification Context document against the v1.0 JSON Schema, including
 
 ```json
 {
-  "document": { "spec_version": "1.0", "object": {"...": "..."}, "context": {"...": "..."}, "verdict": "VERIFIED" }
+  "document": {
+    "spec_version": "1.0",
+    "object": {"formal_statement": "x**2 + 2*x + 1 = (x+1)**2"},
+    "context": {
+      "interpretation": {"theory": "real-closed field", "logic": "first-order logic"},
+      "proof": {"verifier": "qwed", "verifier_version": "7.1.0"},
+      "evidence": {"evidence": {"status": "VERIFIED"}, "proof_ref": "sha256:9f2c…"},
+      "decision": {"admission": "ADMIT"}
+    },
+    "verdict": "VERIFIED"
+  }
 }
 ```
 
@@ -834,7 +844,17 @@ Resolve the `proof_ref` evidence commitment of a Verification Context document. 
 
 ```json
 {
-  "document": { "spec_version": "1.0", "object": {"...": "..."}, "context": {"...": "..."}, "verdict": "VERIFIED" }
+  "document": {
+    "spec_version": "1.0",
+    "object": {"formal_statement": "x**2 + 2*x + 1 = (x+1)**2"},
+    "context": {
+      "interpretation": {"theory": "real-closed field", "logic": "first-order logic"},
+      "proof": {"verifier": "qwed", "verifier_version": "7.1.0"},
+      "evidence": {"evidence": {"status": "VERIFIED"}, "proof_ref": "sha256:9f2c…"},
+      "decision": {"admission": "ADMIT"}
+    },
+    "verdict": "VERIFIED"
+  }
 }
 ```
 

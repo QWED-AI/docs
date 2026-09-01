@@ -66,7 +66,7 @@ Use these extension-specific actions when you want domain-focused checks in your
 | `llm_output` | The LLM output to verify. Required for the `code` engine. | Conditional | - |
 | `engine` | Verification engine: `math`, `logic`, `code`, `sql`, `shell` | No | `math` |
 | `paths` | Glob patterns for files to scan (e.g., `**/*.py,**/*.env`) | No | `.` |
-| `output_format` | Output format: `text`, `json`, `sarif` | No | `text` |
+| `output_format` | Output format: `text`, `json`, `sarif`, `verification-context` | No | `text` |
 | `fail_on_findings` | Fail the action if security issues are found | No | `true` |
 
 <Note>
