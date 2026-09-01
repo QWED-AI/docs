@@ -102,7 +102,7 @@ Every intent must include an `action` field. `TaxPreFlight` normalizes the actio
 | Action | Purpose | Required claim fields |
 | --- | --- | --- |
 | `hire` | Worker classification (W-2 vs 1099) | `worker_type`, `worker_facts.provides_tools`, `worker_facts.reimburses_expenses`, `worker_facts.indefinite_relationship` |
-| `economic_nexus` | US sales-tax nexus check | `state`, `sales_data.amount`, `sales_data.transactions`, `tax_decision` |
+| `economic_nexus` | US sales-tax nexus check | `state`, `sales_data.amount`, `sales_data.transactions`, `claimed_collects_tax` |
 | `trade_tax` | Trader set-off or capital gains | `loss_head`, `offset_head`, `loss_amount` — **or** — `asset_type`, `dates.buy`, `dates.sell`, `claimed_rate` |
 | `corporate_action` | Related-party loans or startup valuations | `lender_type`, `borrower_role`, `interest_rate`, `market_rate` — **or** — `investment_round="convertible_note"` plus `investment_amount`, `cap_price`, `discount`, `next_round_price` |
 | `remit_money` | International remittance (LRS/TCS) | `remittance_amount_usd`, `purpose`, `fy_usage` |
@@ -235,7 +235,7 @@ Each action requires a complete claim shape. If any listed field is missing, `nu
 | Action | Required fields |
 | --- | --- |
 | `hire` | `worker_type`, `worker_facts.provides_tools`, `worker_facts.reimburses_expenses`, `worker_facts.indefinite_relationship` |
-| `economic_nexus` | `state`, `sales_data.amount`, `sales_data.transactions`, `tax_decision` |
+| `economic_nexus` | `state`, `sales_data.amount`, `sales_data.transactions`, `claimed_collects_tax` |
 | `trade_tax` (trader set-off) | `loss_head`, `offset_head`, `loss_amount` |
 | `trade_tax` (capital gains) | `asset_type`, `dates.buy`, `dates.sell`, `claimed_rate` |
 | `corporate_action` (loans) | `lender_type`, `borrower_role`, `interest_rate`, `market_rate` |
@@ -247,6 +247,40 @@ Each action requires a complete claim shape. If any listed field is missing, `nu
 <Note>
   For `trade_tax` and `corporate_action`, at least one of the claim shapes above must be fully present. Providing trigger fields for a claim but omitting any of its required fields is treated as an incomplete claim and fails closed. Startup valuation (`corporate_action`) additionally only runs when `investment_round == "convertible_note"`; other rounds are blocked with an explicit message.
 </Note>
+
+### Economic nexus requires an explicit boolean claim
+
+<Warning>
+  **Breaking schema change.** The `economic_nexus` action no longer accepts a free-form `tax_decision` string. Intents must include `claimed_collects_tax` as an explicit boolean. Free-form model text (e.g. `"No tax needed"`) is not interpreted as a verification claim. An intent that still sends `tax_decision` is missing `claimed_collects_tax`, so `audit_transaction` blocks it as an incomplete claim before `NexusGuard` runs.
+</Warning>
+
+Set `claimed_collects_tax` to `True` when the AI decided tax must be collected in the state, and `False` when it decided no collection is required. `NexusGuard` computes the state's threshold independently and verifies the boolean against the computed nexus.
+
+```python
+# Before — free-form text (no longer interpreted; now blocked as incomplete)
+intent = {
+    "action": "economic_nexus",
+    "state": "NY",
+    "sales_data": {"amount": 600000, "transactions": 10},
+    "tax_decision": "No tax needed",
+}
+
+# After — explicit boolean claim
+intent = {
+    "action": "economic_nexus",
+    "state": "NY",
+    "sales_data": {"amount": 600000, "transactions": 10},
+    "claimed_collects_tax": False,
+}
+
+report = preflight.audit_transaction(intent)
+# report["allowed"] = False
+# report["blocks"] = [
+#   "Nexus Violation: NY threshold exceeded (YTD Sales $600000 >= $500000). Tax collection is mandatory."
+# ]
+```
+
+See [NexusGuard](/tax/guards#nexusguard-economic-nexus) for the underlying `check_nexus_liability` contract, including the computed-only result returned when the claim is omitted in direct guard calls.
 
 ### Numeric inputs must be finite
 
@@ -266,7 +300,7 @@ report = preflight.audit_transaction({
 | `worker_facts` | `dict` | ClassificationGuard |
 | `state` | `str` | NexusGuard |
 | `sales_data` | `dict` (`amount`, `transactions`) | NexusGuard |
-| `tax_decision` | `str` | NexusGuard |
+| `claimed_collects_tax` | `bool` | NexusGuard |
 | `loss_head` | `str` | SpeculationGuard |
 | `loss_amount` | `float` | SpeculationGuard |
 | `offset_head` | `str` | SpeculationGuard |
