@@ -215,6 +215,169 @@ No action required. Every change is additive: existing `/verify/*` responses, SD
 
 ---
 
+## v7.0.0 — Full DiagnosticResult engine conformance
+
+**Released: August 8, 2026** · [GitHub Release ↗](https://github.com/QWED-AI/qwed-verification/releases/tag/v7.0.0) · [GitHub PR #300](https://github.com/QWED-AI/qwed-verification/pull/300)
+
+> v7.0.0 completes the engine migration to the unified [`DiagnosticResult`](/advanced/diagnostics) contract (META #216). `SchemaVerifier`, `SQLVerifier`, `CodeVerifier`, `SecureCodeExecutor`, and `StatsVerifier` — plus the fact and image batch entry points — now all return `DiagnosticResult` (`status` / `agent_message` / `developer_fields` / `proof_ref`). The release also completes the truth-vs-admission separation: verification answers *"is this claim provably true?"* while a separate `AdmissionDecision` answers *"should this be allowed at this boundary?"*.
+
+<Warning>
+**Two breaking wire changes.** `POST /verify/code` now returns `status: "VERIFIED"` for proven-unsafe code, with admission driven by the new `admission` field. `POST /verify/stats` now returns `status: "UNVERIFIABLE"` on successful execution instead of the legacy `SUCCESS` shape — execution is not verification. Migration examples below.
+</Warning>
+
+### Breaking: `POST /verify/code` — `VERIFIED` is truth, `admission` is policy
+
+Proving a snippet is unsafe is a successful proof. Unsafe code is therefore `VERIFIED` (previously `BLOCKED`), with `developer_fields.is_valid: false`, a bound `proof_ref`, and a non-null `critical_count`. `BLOCKED` is reserved for cases where verification itself failed (empty code, non-string `language`, internal errors), and blocked results carry no `proof_ref`. The response attaches an explicit `admission` field (`ADMIT` / `BLOCKED`) so authority-only consumers reading `status == "VERIFIED"` cannot admit unsafe code.
+
+**Before (v6.x) — unsafe code:**
+
+```json
+{
+  "status": "BLOCKED",
+  "agent_message": "The code failed security verification and is not safe to use.",
+  "developer_fields": { "is_safe": false },
+  "proof_ref": null
+}
+```
+
+**After (v7.0.0) — unsafe code:**
+
+```json
+{
+  "status": "VERIFIED",
+  "agent_message": "The code failed security verification and is not safe to use.",
+  "developer_fields": {
+    "constraint_id": "code_verifier.code_unsafe",
+    "is_safe": false,
+    "is_valid": false,
+    "critical_count": 1,
+    "issues": [ ... ]
+  },
+  "proof_ref": "sha256:...",
+  "is_authoritative": true,
+  "admission": "BLOCKED"
+}
+```
+
+**Migrating:** consumers that branched on `status == "BLOCKED"` or `status == "VERIFIED"` for safety gating must switch to the `admission` field or `developer_fields.is_valid`. `status == "VERIFIED"` alone must never be treated as "safe to execute".
+
+```python
+# Before (v6.x)
+if response["status"] == "VERIFIED":
+    execute(code)
+
+# After (v7.0.0)
+if response["admission"] == "ADMIT":
+    execute(code)
+```
+
+### Breaking: `POST /verify/stats` — execution success is never `VERIFIED`
+
+A run that executes cleanly in the Docker sandbox and returns an observed statistic is `UNVERIFIABLE` (`stats_verifier.claim_not_verified`) — the engine has no deterministic claim-proof, so it cannot attest the original natural-language claim. Execution evidence (`observed_result`, `generated_code`, `columns`, a deterministic `dataset_sha256`, sandbox type, timing, and security checks) is retained in `developer_fields` for audit. `BLOCKED` is reserved for failure states: `stats_verifier.validation_error`, `stats_verifier.execution_failure`, and `stats_verifier.runtime_unavailable`.
+
+**Before (v6.x) — successful execution:**
+
+```json
+{
+  "status": "SUCCESS",
+  "result": 52340.5,
+  "code": "df['salary'].mean()"
+}
+```
+
+**After (v7.0.0) — successful execution:**
+
+```json
+{
+  "status": "UNVERIFIABLE",
+  "agent_message": "Statistical analysis completed, but the claim could not be deterministically verified.",
+  "developer_fields": {
+    "constraint_id": "stats_verifier.claim_not_verified",
+    "is_valid": false,
+    "observed_result": 52340.5,
+    "generated_code": "df['salary'].mean()",
+    "dataset_sha256": "9f2c...",
+    "sandbox_type": "docker"
+  },
+  "proof_ref": null,
+  "is_authoritative": false
+}
+```
+
+**Migrating:** read the computed value from `developer_fields.observed_result` instead of `result`, and treat the verdict as advisory — a legitimate execution is not a proven claim. `compute_statistics()` and `get_sandbox_info()` are utilities, not verification boundaries, and keep their existing dict return shape.
+
+### `SchemaVerifier` → `DiagnosticResult` ([#294](https://github.com/QWED-AI/qwed-verification/pull/294))
+
+- `verify()` and `verify_ucp_transaction()` return `DiagnosticResult`. A schema violation is `VERIFIED` (as-invalid) with `developer_fields.is_valid: false`; `BLOCKED` (`schema_verifier.parse_error` / `schema_verifier.validation_error`) is reserved for schemas that cannot be parsed or validated.
+- `proof_ref` is computed deterministically from canonical JSON of the schema + instance evidence; unsupported values and cyclic structures fail closed to `BLOCKED`.
+- Recursive schema meta-validation: malformed keyword shapes (non-dict `properties`, invalid `required` entries, invalid or non-finite numeric constraints, negative size constraints) return `BLOCKED` instead of being silently treated as empty. Oversized integer bounds (e.g. `10**1000`) no longer raise `OverflowError`.
+- UCP hardening: money arithmetic uses `Decimal` quantized to the currency precision (no more `0.01` float tolerance), `tax` is selected by key presence so `tax: 0` is honored, verdict fields (`transaction_type`, `currency`, `schema_verifier.ucp_*` constraint ids) are complete on every path, and string/`None` amounts no longer raise.
+- `agent_message` is sanitized — no rule IDs, issue types, or schema internals leak into agent-facing output.
+
+See the updated [Schema verifier](/engines/schema) page.
+
+### `SQLVerifier` → `DiagnosticResult` ([#295](https://github.com/QWED-AI/qwed-verification/pull/295))
+
+- `verify_sql()` returns `DiagnosticResult`. A safe query is `VERIFIED` (`sql_verifier.sql_valid`, `is_valid: true`, `proof_ref` from the AST). A proven-malicious query is `VERIFIED`-as-malicious (`sql_verifier.malicious`, `is_valid: false`, `malicious_classification: true`) — proving malice is a successful proof, so it retains its `proof_ref`.
+- `BLOCKED` is reserved for incomplete or failed analysis: `sql_verifier.parse_error`, `sql_verifier.schema_parse_error` (takes precedence over malice detection — no authoritative proof from incomplete analysis), `sql_verifier.complexity_limit_exceeded`, and `sql_verifier.execution_error`.
+- `POST /verify/sql` attaches the `admission` field (`ADMIT` / `BLOCKED`) alongside the verdict.
+
+See the updated [SQL engine](/engines/sql) page.
+
+### `CodeVerifier` & `SecureCodeExecutor` → `DiagnosticResult` ([#296](https://github.com/QWED-AI/qwed-verification/pull/296))
+
+- `verify_code()`, `verify_python_deep()`, and `verify_batch()` return `DiagnosticResult` with the truth-vs-admission semantics described above.
+- `verify_batch()` returns per-item `verdicts` plus a `summary` (`safe` / `unsafe` / `blocked` counts, `total_critical`) and an overall `is_valid` that is `true` only when **all** snippets are safe — the batch is otherwise non-admissible.
+- `SecureCodeExecutor.execute()` no longer executes code wholesale on the verifier verdict: an unconditional OWASP LLM06 dangerous-pattern gate blocks execution with `CONSTRAINT_DANGEROUS_PATTERN`. The scan is AST-aware, so dangerous keywords appearing only in comments, docstrings, or string literals do not cause false denials.
+- `ConsensusVerifier` and `StatsVerifier` code stages now require `is_verified` **and** `developer_fields.is_valid is True`, so consensus results can no longer admit unsafe code.
+
+See the updated [Code engine](/engines/code#security-scanning-codeverifier) page.
+
+### `StatsVerifier` → `DiagnosticResult` ([#297](https://github.com/QWED-AI/qwed-verification/pull/297))
+
+- `verify_stats()` returns `DiagnosticResult` with the execution-is-not-verification semantics described above.
+- The API boundary is a thin pass-through: `POST /verify/stats` forwards the engine's `DiagnosticResult` through `enforce_trust_decision()` unchanged.
+- Logging is fail-closed and claim-aware: a non-authoritative result (`BLOCKED` / `UNVERIFIABLE`, `proof_ref: null`) can never be persisted as verified, even if mutable `developer_fields.is_valid` metadata is `true`.
+- A non-serializable sandbox result (e.g. a DataFrame) is coerced to a JSON-safe value before entering `developer_fields`, so a legitimate `UNVERIFIABLE` verdict is not silently downgraded to `BLOCKED`.
+
+See the updated [Stats engine](/engines/stats) page.
+
+### Fact & image batch verification fail closed ([#297](https://github.com/QWED-AI/qwed-verification/pull/297))
+
+`BatchFactVerifier.verify_batch()` and `ImageVerifier.verify_batch()` — the last two public engine entry points returning ad-hoc dicts — now return a single `DiagnosticResult` with per-claim verdicts in `developer_fields.results` and a `summary`:
+
+- The batch is authoritative (`VERIFIED` + `proof_ref`) only when **every** claim is deterministically verified.
+- Any refuted or blocked claim fails the whole batch closed (`fact_verifier.batch_blocked` / `image_verifier.batch_blocked`).
+- An empty batch is `BLOCKED` (`*.empty_batch`).
+- The batch `proof_ref` binds full claim digests **and the shared input** (image digest for image batches, context digest for fact batches), never truncated display text.
+- Aggregation is shared via `diagnostics.aggregate_batch_diagnostic()` so the fail-closed logic cannot drift between engines.
+
+### Version bumps
+
+| Surface | From | To |
+|---|---|---|
+| `qwed` (PyPI) | `6.0.0` | `7.0.0` |
+| `qwed_sdk` (Python) | `6.0.0` | `7.0.0` |
+| `@qwed-ai/sdk` (npm) | `6.0.0` | `7.0.0` |
+| `qwed` (crates.io) | `6.0.0` | `7.0.0` |
+| API version marker | `6.0.0` | `7.0.0` |
+
+### Included PRs
+
+| PR | Summary |
+|---|---|
+| [#294](https://github.com/QWED-AI/qwed-verification/pull/294) | `SchemaVerifier` → `DiagnosticResult` |
+| [#295](https://github.com/QWED-AI/qwed-verification/pull/295) | `SQLVerifier` → `DiagnosticResult` |
+| [#296](https://github.com/QWED-AI/qwed-verification/pull/296) | `CodeVerifier` and `SecureCodeExecutor` → `DiagnosticResult` |
+| [#297](https://github.com/QWED-AI/qwed-verification/pull/297) | `StatsVerifier.verify_stats` → `DiagnosticResult` (+ fact/image batch) |
+| [#300](https://github.com/QWED-AI/qwed-verification/pull/300) | Release: v7.0.0 — Full DiagnosticResult Engine Conformance |
+
+### Upgrading
+
+If you only consume the high-level SDK clients and gate on `admission` / `developer_fields.is_valid`, bump the version and you are done. If your code branches on `status` from `POST /verify/code` for safety gating, or parses the legacy `SUCCESS` / `ERROR` shape from `POST /verify/stats`, apply the migrations shown above before upgrading.
+
+---
+
 ## v6.0.0 — Trust Boundary Completion
 
 **Released: August 2, 2026** · [GitHub Release ↗](https://github.com/QWED-AI/qwed-verification/releases/tag/v6.0.0) · [GitHub PR #291](https://github.com/QWED-AI/qwed-verification/pull/291)

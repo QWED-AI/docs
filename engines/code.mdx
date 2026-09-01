@@ -8,6 +8,10 @@ description: "QWED Code engine reference: CrossHair symbolic execution for Pytho
 **Updated in v5.3.0 (breaking).** Every `SymbolicVerifier` public method now returns a [`DiagnosticResult`](/advanced/diagnostics) instead of an ad-hoc dict. See the [migration section](#migrating-from-the-legacy-dict-api) for a field-by-field mapping. The Code Engine is the first fully `DiagnosticResult`-conformant engine and serves as the reference implementation for future engine migrations.
 </Info>
 
+<Info>
+**Updated in v7.0.0 (breaking).** The security-scanning path (`CodeVerifier` and `SecureCodeExecutor`, backing `POST /verify/code`) also returns `DiagnosticResult` now, and proven-unsafe code is reported as `VERIFIED` with a separate admission decision. See [Security scanning](#security-scanning-codeverifier) below and the [changelog](/changelog#v7-0-0-—-full-diagnosticresult-engine-conformance).
+</Info>
+
 The Code Engine uses [CrossHair](https://github.com/pschanely/crosshair), a symbolic execution tool for Python, to verify code properties without running it.
 
 ---
@@ -311,6 +315,35 @@ Do not gate control flow on `is_verified` for symbolic-engine results — it is 
 ### Removed parameters
 
 - `verify_code(code, check_assertions=...)` — the parameter was never used. Remove it from your call sites; passing it now raises `TypeError`.
+
+---
+
+## Security scanning (`CodeVerifier`)
+
+Separate from symbolic execution, `CodeVerifier` scans code for security vulnerabilities using AST and pattern analysis. It backs [`POST /verify/code`](/api/endpoints#post-verifycode) and the `CODE` item type in batch verification. As of v7.0.0, `verify_code()`, `verify_python_deep()`, and `verify_batch()` return a `DiagnosticResult`.
+
+### Status semantics: `VERIFIED` is truth, not admission
+
+| Outcome | `status` | `developer_fields` | `proof_ref` |
+| ------- | -------- | ------------------ | ----------- |
+| Safe code | `VERIFIED` | `is_valid: true`, `is_safe: true`, `constraint_id: "code_verifier.code_safe"` | Present |
+| Unsafe code | `VERIFIED` (as-unsafe) | `is_valid: false`, `is_safe: false`, `critical_count`, `issues` | Present |
+| Empty code or non-string `language` | `BLOCKED` | `constraint_id: "code_verifier.unsupported_language"` | `null` |
+| Internal error | `BLOCKED` | `constraint_id: "code_verifier.execution_error"` | `null` |
+
+Proving that a snippet is unsafe is a successful proof, so unsafe code is `VERIFIED`, never `BLOCKED`. `BLOCKED` is reserved for cases where verification itself failed, and blocked results carry no `proof_ref`.
+
+<Warning>
+Never treat `status == "VERIFIED"` as "safe to execute". Admission is a separate decision: `POST /verify/code` attaches an explicit `admission` field (`ADMIT` or `BLOCKED`), and `developer_fields.is_valid` is the safety gate. Gate execution on `admission` or `is_valid`, not on `status`.
+</Warning>
+
+### Batch verification
+
+`verify_batch()` returns a single `DiagnosticResult` with per-item `verdicts`, a `summary` (`safe` / `unsafe` / `blocked` counts and `total_critical`), and an overall `is_valid`. `is_valid` is `true` only when **all** snippets are safe — a batch with any unsafe or blocked item is non-admissible.
+
+### `SecureCodeExecutor` dangerous-pattern gate
+
+`SecureCodeExecutor.execute()` no longer admits execution on the verifier verdict alone. It applies an unconditional OWASP LLM06 dangerous-pattern gate (`os.`, `sys.`, `subprocess`, `__import__`, `eval`, `exec`, `compile`, `open(`, `socket`, `urllib`, `requests`, `http`, and similar) and blocks execution with `CONSTRAINT_DANGEROUS_PATTERN`. The scan is AST-aware: it matches actual executable operations (imports, attribute access, calls), so dangerous keywords appearing only in comments, docstrings, or string literals do not cause false denials. The advisory-only fallback is retained only when verification itself fails closed.
 
 ---
 

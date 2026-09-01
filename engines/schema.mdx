@@ -4,6 +4,10 @@ title: "Schema verifier"
 description: "The QWED Schema Verifier combines Pydantic validation with embedded math constraints to enforce structural and numerical correctness in LLM output payloads."
 ---
 
+<Info>
+**Updated in v7.0.0 (breaking).** `SchemaVerifier.verify()` and `verify_ucp_transaction()` now return a [`DiagnosticResult`](/advanced/diagnostics) instead of an ad-hoc dict. A payload that violates its schema is `VERIFIED` (the check completed and proved the violation) with `developer_fields.is_valid: false` — `BLOCKED` is reserved for schemas the verifier cannot parse or validate. See the [changelog](/changelog#v7-0-0-—-full-diagnosticresult-engine-conformance) for migration details.
+</Info>
+
 The **Schema Verifier** goes beyond standard JSON validation. It combines **Pydantic** structure enforcement with **Symbolic Math** checks deeply embedded within the schema.
 
 ## How it works
@@ -12,6 +16,23 @@ It validates that:
 
 1. **Structure:** The output matches the required JSON keys and types.
 2. **Logic:** The numeric values _inside_ the JSON are mathematically consistent (e.g., `total == sum(items)`).
+
+## The `DiagnosticResult` contract
+
+`verify()` returns a `DiagnosticResult` with a status, an agent-safe `agent_message`, structured `developer_fields`, and a deterministic `proof_ref`:
+
+| Outcome | `status` | `developer_fields` | `proof_ref` |
+| ------- | -------- | ------------------ | ----------- |
+| Payload conforms to the schema | `VERIFIED` | `is_valid: true`, `constraint_id: "schema_verifier.schema_valid"` | Present |
+| Payload violates the schema | `VERIFIED` (as-invalid) | `is_valid: false`, `constraint_id: "schema_verifier.schema_violation"`, `issues` | Present |
+| Schema cannot be parsed | `BLOCKED` | `constraint_id: "schema_verifier.parse_error"` | `null` |
+| Unexpected validation error | `BLOCKED` | `constraint_id: "schema_verifier.validation_error"` | `null` |
+
+A schema violation is a completed, proven verdict, so it is `VERIFIED` — read `developer_fields.is_valid` for the pass/fail outcome and `developer_fields.issues` for per-path detail. `proof_ref` is computed deterministically from a canonical JSON encoding of the schema plus the instance evidence. Unsupported values (non-finite floats such as `NaN` or `±inf`, hostile objects) and cyclic structures fail closed to `BLOCKED` instead of emitting a proof.
+
+Malformed schemas also fail closed: non-dict `properties`, invalid `required` entries, invalid numeric constraints, non-finite bounds, and negative size constraints return `BLOCKED` (`schema_verifier.parse_error`) instead of being silently treated as empty.
+
+`agent_message` is sanitized — rule IDs, issue types, and schema internals never leak into agent-facing output.
 
 ## Usage
 
@@ -32,14 +53,17 @@ response = client.verify_schema(
     obj={"items": [10, 20], "total": 30},
     schema=schema
 )
-# -> ✅ Verified
+# -> status: "VERIFIED", developer_fields.is_valid: true
 
 response = client.verify_schema(
     obj={"items": [10, 20], "total": 300}, # LLM hallucinations
     schema=schema
 )
-# -> ❌ MATH ERROR: total (300) != sum(items) (30)
+# -> status: "VERIFIED", developer_fields.is_valid: false
+# -> issue: total (300) != sum(items) (30)
 ```
+
+Money arithmetic uses `Decimal`, not float tolerance — computed-total and tax checks quantize operands to the currency precision and compare exactly, so boundary transactions deterministically pass or fail.
 
 ## Object validation
 
@@ -47,7 +71,7 @@ The Schema Verifier supports standard JSON Schema object keywords including `pro
 
 ### `additionalProperties: false` — strict fail-closed validation
 
-When a schema sets `"additionalProperties": false` and the verifier runs with `strict=True` (the default), any property that is not declared in `properties` causes the payload to fail validation. The verifier records each undeclared property as an `ERROR`-severity `additional_property` issue, so `is_valid` is `false` and `status` is `INVALID`.
+When a schema sets `"additionalProperties": false` and the verifier runs with `strict=True` (the default), any property that is not declared in `properties` causes the payload to fail validation. The verifier records each undeclared property as an `ERROR`-severity `additional_property` issue, so `developer_fields.is_valid` is `false`.
 
 In non-strict mode (`strict=False`), `additionalProperties: false` is treated as advisory and undeclared properties do not block validation.
 
@@ -74,8 +98,8 @@ result = client.verify_schema(
     schema=schema,
     strict=True
 )
-# -> is_valid: false, status: "INVALID"
-# -> issue_type: "additional_property", severity: "ERROR"
+# -> status: "VERIFIED", developer_fields.is_valid: false
+# -> issue type: "additional_property", severity: "ERROR"
 # -> message: "Additional property 'role' not allowed"
 ```
 
@@ -87,7 +111,7 @@ result = client.verify_schema(
     schema=schema,
     strict=True
 )
-# -> is_valid: true, status: "VALID"
+# -> status: "VERIFIED", developer_fields.is_valid: true
 ```
 
 **Example — nested objects also fail closed:**
@@ -111,9 +135,17 @@ result = client.verify_schema(
     schema=schema,
     strict=True
 )
-# -> is_valid: false, status: "INVALID"
-# -> path: "$.user.role", issue_type: "additional_property", severity: "ERROR"
+# -> status: "VERIFIED", developer_fields.is_valid: false
+# -> issue path: "$.user.role", type: "additional_property", severity: "ERROR"
 ```
+
+**Behavior matrix:**
+
+| Mode | `additionalProperties` | Extra field present | Result |
+|---|---|---|---|
+| `strict=True` | `false` | yes | `is_valid: false`, issue severity `ERROR` |
+| `strict=True` | `false` | no | `is_valid: true` |
+| `strict=False` | `false` | yes | `is_valid: true` (permissive) |
 
 <Info>
 This fail-closed behavior for strict `additionalProperties: false` was hardened in the v5.1.x line. See the [changelog](/changelog#qwed-verification--strict-additionalproperties-fail-closed) for the release notes.
@@ -142,7 +174,7 @@ This ensures that unverifiable arrays are never treated as valid.
 schema = {"type": "array", "uniqueItems": True}
 
 result = client.verify_schema(obj=[1, 2, 2, 3], schema=schema)
-# -> is_valid: false, issue_type: "uniqueness_violation"
+# -> developer_fields.is_valid: false, issue type: "uniqueness_violation"
 ```
 
 **Example — uncheckable items fail closed:**
@@ -152,8 +184,8 @@ schema = {"type": "array", "uniqueItems": True}
 
 # Items containing unhashable types cannot be compared deterministically
 result = client.verify_schema(obj=[{"bad": {1, 2}}, {"bad": {3, 4}}], schema=schema)
-# -> is_valid: false, status: "INVALID"
-# -> issue_type: "uniqueness_validation_error"
+# -> developer_fields.is_valid: false
+# -> issue type: "uniqueness_validation_error"
 # -> message: "uniqueItems could not be verified deterministically: ..."
 ```
 
@@ -161,74 +193,14 @@ result = client.verify_schema(obj=[{"bad": {1, 2}}, {"bad": {3, 4}}], schema=sch
 This fail-closed behavior shipped in v5.1.0. See the [changelog](/changelog#v5-1-0-—-agent-state-governance-and-fail-closed-hardening) for the full release notes.
 </Info>
 
-## Object validation
+## UCP transaction verification
 
-### Strict mode and `additionalProperties: false`
+`verify_ucp_transaction()` shares the same `DiagnosticResult` contract and was hardened in v7.0.0:
 
-When a schema sets `additionalProperties: false` and you call the verifier with `strict=True`, undeclared properties on the payload now cause verification to **fail closed**. The verifier emits an `additional_property` issue with severity `ERROR`, and the overall result is `INVALID`.
-
-Previously, undeclared properties in strict mode were recorded with severity `WARNING`. Because validity was determined only by `ERROR`-level issues, payloads with forbidden extra fields could still return `VALID`. A strict schema denial is a structural validation failure, not an advisory warning, so strict mode now rejects these payloads outright.
-
-This applies at every level of the schema — extra properties on nested objects that set `additionalProperties: false` are also rejected.
-
-**Behavior matrix:**
-
-| Mode | `additionalProperties` | Extra field present | Result |
-|---|---|---|---|
-| `strict=True` | `false` | yes | `is_valid: false`, `status: "INVALID"`, `severity: "ERROR"` |
-| `strict=True` | `false` | no | `is_valid: true`, `status: "VALID"` |
-| `strict=False` | `false` | yes | `is_valid: true`, `status: "VALID"` (permissive) |
-
-**Example — strict mode rejects extra fields:**
-
-```python
-schema = {
-    "type": "object",
-    "properties": {
-        "name": {"type": "string"}
-    },
-    "required": ["name"],
-    "additionalProperties": False,
-}
-
-result = verifier.verify(
-    {"name": "rahul", "role": "admin"},
-    schema,
-    strict=True,
-)
-# -> is_valid: false, status: "INVALID"
-# -> issue: { "type": "additional_property", "severity": "ERROR",
-#             "message": "Additional property 'role' not allowed" }
-```
-
-**Example — nested objects also fail closed:**
-
-```python
-schema = {
-    "type": "object",
-    "properties": {
-        "user": {
-            "type": "object",
-            "properties": {"name": {"type": "string"}},
-            "required": ["name"],
-            "additionalProperties": False,
-        }
-    },
-    "required": ["user"],
-}
-
-result = verifier.verify(
-    {"user": {"name": "rahul", "role": "admin"}},
-    schema,
-    strict=True,
-)
-# -> is_valid: false
-# -> issue path: "$.user.role"
-```
-
-<Info>
-This fail-closed behavior is enabled only when `strict=True`. With `strict=False`, extra properties remain non-blocking and the payload is still treated as valid, preserving permissive workflows.
-</Info>
+- **Complete verdict fields on every path** — the result always carries `transaction_type`, `currency`, and `schema_verifier.ucp_*` constraint ids in `developer_fields`, for both valid and violated verdicts.
+- **Type safety** — string or `None` amount fields and non-dict transactions produce deterministic verdicts instead of raising `TypeError` or `AttributeError`.
+- **Exact money arithmetic** — computed-total and tax checks use `Decimal` quantized to the currency precision, removing the previous `0.01` float tolerance.
+- **`tax` is selected by key presence, not truthiness** — a declared `tax: 0` is used instead of silently falling back to `tax_amount`.
 
 ## When to use
 

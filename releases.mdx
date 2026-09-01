@@ -1,12 +1,12 @@
 ---
-title: "QWED Protocol releases — SDK versions and install downloads"
+title: "QWED Protocol releases: SDK versions and installs"
 description: "QWED Protocol release history with download links, installation instructions, version notes, and upgrade guidance across Python, TypeScript, Go, and Rust SDKs."
 ---
 
 ## Current release
 
-<Card title="v6.0.0 — Trust Boundary Completion" icon="shield-check" href="/changelog#v6-0-0--trust-boundary-completion">
-  Trust Boundary Completion epic closed (Issue #263, 12/12). Every `/verify/*` endpoint returns unified `DiagnosticResult`. Control plane requires and verifies attestation before admitting VERIFIED. VERIFIED is a protocol guarantee backed by deterministic `proof_ref` — never by execution, agreement, or confidence. Breaking API response schema.
+<Card title="v7.0.0 — Full DiagnosticResult Engine Conformance" icon="shield-check" href="/changelog#v7-0-0-%E2%80%94-full-diagnosticresult-engine-conformance">
+  Engine migration to `DiagnosticResult` complete (META #216): `SchemaVerifier`, `SQLVerifier`, `CodeVerifier`, `SecureCodeExecutor`, `StatsVerifier`, and fact/image batch. Truth and admission are separated: `POST /verify/code` returns `VERIFIED` for proven-unsafe code with a separate `admission` decision, and `POST /verify/stats` returns `UNVERIFIABLE` on execution success — execution is never verification. Breaking wire changes.
 </Card>
 
 ### Install
@@ -14,23 +14,23 @@ description: "QWED Protocol release history with download links, installation in
 <CodeGroup>
 
 ```bash pip
-pip install qwed==6.0.0
+pip install qwed==7.0.0
 ```
 
 ```bash docker
-docker pull qwedai/qwed-verification:6.0.0
+docker pull qwedai/qwed-verification:7.0.0
 ```
 
 ```bash npm
-npm install @qwed-ai/sdk@6.0.0
+npm install @qwed-ai/sdk@7.0.0
 ```
 
 ```bash cargo
-cargo add qwed@6.0.0
+cargo add qwed@7.0.0
 ```
 
 ```bash go
-go get github.com/QWED-AI/qwed-verification/sdk-go@v6.0.0
+go get github.com/QWED-AI/qwed-verification/sdk-go@v7.0.0
 ```
 
 </CodeGroup>
@@ -41,7 +41,15 @@ go get github.com/QWED-AI/qwed-verification/sdk-go@v6.0.0
 
 <AccordionGroup>
 
-<Accordion title="v6.0.0 — Trust Boundary Completion (August 2, 2026)" icon="shield-check" defaultOpen>
+<Accordion title="v7.0.0 — Full DiagnosticResult Engine Conformance (August 8, 2026)" icon="shield-check" defaultOpen>
+  **Engine migration to `DiagnosticResult` complete (META #216).** [`SchemaVerifier`](/engines/schema), [`SQLVerifier`](/engines/sql), [`CodeVerifier` and `SecureCodeExecutor`](/engines/code#security-scanning-codeverifier), and [`StatsVerifier`](/engines/stats) — plus fact/image batch verification — now return the unified `DiagnosticResult` contract. Truth and admission are separated: proven-unsafe code and proven-malicious SQL are `VERIFIED` (the proof succeeded) with an explicit `admission: BLOCKED`, and successful stats execution is `UNVERIFIABLE` because execution is not verification. SDK 6.0.0 → 7.0.0 across Python, TypeScript, and Rust.
+
+  <Warning>**Breaking wire changes:** `POST /verify/code` returns `VERIFIED` for proven-unsafe code (gate on `admission` / `developer_fields.is_valid`, not `status`), and `POST /verify/stats` returns the `DiagnosticResult` shape with `UNVERIFIABLE` on execution success instead of the legacy `SUCCESS` shape.</Warning>
+
+  [Full Release Notes →](/changelog#v7-0-0--full-diagnosticresult-engine-conformance) · [GitHub Release ↗](https://github.com/QWED-AI/qwed-verification/releases/tag/v7.0.0)
+</Accordion>
+
+<Accordion title="v6.0.0 — Trust Boundary Completion (August 2, 2026)" icon="shield-check">
   **Trust Boundary Completion epic closed (Issue #263, 12/12 sub-issues, 21 PRs).** All `/verify/*` endpoints return unified [`DiagnosticResult`](/advanced/diagnostics). Control plane requires and verifies attestation at the admission boundary before admitting `VERIFIED`. VERIFIED is a protocol guarantee backed by deterministic `proof_ref` — heuristic and advisory analysis now reports `UNVERIFIABLE` with structured `advisory_checks`. Covers [consensus](/engines/consensus), [batch math](/api/endpoints#post-verifybatch), [control-plane attestation](/advanced/attestations), and [agent state](/advanced/agent-state-guard). SDK 5.3.0 → 6.0.0 across Python, TypeScript, Rust, Docker, and Kubernetes.
 
   <Warning>**Breaking change:** `/verify/*` responses now use the unified `DiagnosticResult` schema. Migrate consumers of the previous ad-hoc dict responses.</Warning>

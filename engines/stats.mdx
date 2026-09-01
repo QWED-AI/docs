@@ -1,8 +1,12 @@
 ---
 sidebar_position: "5"
 title: "Stats engine"
-description: "QWED's Stats Engine executes statistical queries on tabular data using the secure Docker sandbox. In-process fallbacks are disabled."
+description: "QWED's Stats Engine executes statistical queries on tabular data using the secure Docker sandbox. Execution success is never presented as verification."
 ---
+
+<Info>
+**Updated in v7.0.0 (breaking).** `StatsVerifier.verify_stats()` now returns a [`DiagnosticResult`](/advanced/diagnostics), and a successful sandbox execution is reported as `UNVERIFIABLE`, never `VERIFIED` — computation is not verification. See the [changelog](/changelog#v7-0-0-—-full-diagnosticresult-engine-conformance) for migration details.
+</Info>
 
 The Stats Engine executes statistical queries on tabular data. All model-generated code runs inside a secure Docker sandbox — in-process execution paths (Wasm and restricted Python) are disabled.
 
@@ -16,6 +20,35 @@ The Stats Engine executes statistical queries on tabular data. All model-generat
 ## Prerequisites
 
 The Stats Engine requires a running Docker daemon. Without Docker, all statistical verification requests return HTTP 503. See the [deployment guide](/advanced/deployment) for setup instructions.
+
+## The `DiagnosticResult` contract
+
+`verify_stats()` returns a `DiagnosticResult`. Execution success alone never produces `VERIFIED`:
+
+| Outcome | `status` | `constraint_id` | `proof_ref` |
+| ------- | -------- | --------------- | ----------- |
+| Execution succeeded | `UNVERIFIABLE` | `stats_verifier.claim_not_verified` | `null` |
+| Translation or security validation failed | `BLOCKED` | `stats_verifier.validation_error` | `null` |
+| Execution failed in the sandbox | `BLOCKED` | `stats_verifier.execution_failure` | `null` |
+| Docker sandbox unavailable | `BLOCKED` | `stats_verifier.runtime_unavailable` | `null` |
+
+A run that executes cleanly and returns an observed statistic is `UNVERIFIABLE` because the engine has no deterministic proof of the original natural-language claim — it only observed a computation. `VERIFIED` with a `proof_ref` is reserved for deterministic claim evaluation, which this engine does not yet emit.
+
+### Execution evidence is preserved
+
+On `UNVERIFIABLE`, the full execution evidence is retained in `developer_fields` for audit and review:
+
+| Key | Description |
+| --- | ----------- |
+| `observed_result` | The computed statistic (JSON-safe coerced) |
+| `generated_code` | The code that ran in the sandbox |
+| `columns` | Columns of the input dataset |
+| `dataset_sha256` | Deterministic fingerprint of the input dataset |
+| `sandbox_type` | Sandbox used for execution |
+| `execution_time_ms`, `total_time_ms` | Timing |
+| `security_checks` | AST validation result, checks passed, risk level |
+
+`agent_message` is sanitized — raw subprocess output, sandbox identifiers, and error strings never reach the agent-facing layer. Blocked results carry no `proof_ref` and cannot be mistaken for a verdict.
 
 ## Usage
 
@@ -36,7 +69,9 @@ result = client.verify_stats(
     query="What is the average sales?",
     data=df
 )
-print(result.answer)  # 150.0
+print(result.status)                                      # "UNVERIFIABLE"
+print(result.developer_fields["observed_result"])         # 150.0
+print(result.developer_fields["constraint_id"])           # "stats_verifier.claim_not_verified"
 ```
 
 ## Execution model
@@ -45,11 +80,11 @@ All generated statistical code is executed inside a Docker container with enforc
 
 | Scenario | Behavior |
 | -------- | -------- |
-| Docker running | Code executes in an isolated container |
+| Docker running, execution succeeds | `UNVERIFIABLE` with the observed result in `developer_fields` |
 | Docker unavailable at startup | Requests return `503 Service Temporarily Unavailable` |
 | Docker becomes unavailable mid-operation | Request is blocked and returns `503` |
 | Code fails AST security check | Request returns `403 Verification Blocked by Security Policy` |
-| Code generation fails | Request returns `Internal verification error` |
+| Code generation fails | `BLOCKED` with `stats_verifier.validation_error` |
 
 <Warning>
 Previous versions of QWED offered Wasm and restricted Python fallbacks when Docker was unavailable. These fallback paths have been removed. You must have a running Docker daemon for statistical verification to work.
@@ -72,6 +107,10 @@ result = client.compute_statistics(
     operation="mean"  # mean, median, std, var, sum, count, min, max, mode
 )
 ```
+
+<Note>
+`compute_statistics()` and `get_sandbox_info()` are utilities, not claim-verification boundaries, and deliberately keep their existing dict return shape (`SUCCESS` / `ERROR`). Only `verify_stats()` returns a `DiagnosticResult`.
+</Note>
 
 | Operation | Description |
 | --------- | ----------- |

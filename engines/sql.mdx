@@ -4,6 +4,10 @@ title: "SQL engine"
 description: "QWED's SQL Engine validates queries for injection attacks, destructive operations, schema compliance, and syntax errors before execution in production."
 ---
 
+<Info>
+**Updated in v7.0.0 (breaking).** `SQLVerifier.verify_sql()` now returns a [`DiagnosticResult`](/advanced/diagnostics) instead of an ad-hoc dict, and a proven-malicious query is reported as `VERIFIED` (truth) with a separate admission decision (policy). See the [changelog](/changelog#v7-0-0-—-full-diagnosticresult-engine-conformance) for migration details.
+</Info>
+
 SQL query validation and injection detection.
 
 ## Overview
@@ -15,6 +19,29 @@ The SQL Engine validates queries for:
 - Schema compliance
 - Syntax correctness
 
+Verification is static AST analysis (SQLGlot). The engine never connects to a database.
+
+## The `DiagnosticResult` contract
+
+`verify_sql()` returns a `DiagnosticResult` with a status, an agent-safe `agent_message`, structured `developer_fields`, and a `proof_ref` bound to the query AST:
+
+| Outcome | `status` | `developer_fields` | `proof_ref` |
+| ------- | -------- | ------------------ | ----------- |
+| Safe query | `VERIFIED` | `is_valid: true` | Present |
+| Malicious query | `VERIFIED` (as-malicious) | `is_valid: false`, `malicious_classification: true` | Present |
+| Complexity limit exceeded | `BLOCKED` | `constraint_id: "sql_verifier.complexity_limit_exceeded"` | `null` |
+| DDL schema parse failure | `BLOCKED` | `constraint_id: "sql_verifier.schema_parse_error"` | `null` |
+| Query parse error | `BLOCKED` | `constraint_id: "sql_verifier.parse_error"` | `null` |
+| Internal error | `BLOCKED` | `constraint_id: "sql_verifier.execution_error"` | `null` |
+
+Proving that a query is malicious is a successful proof, so a malicious query is `VERIFIED` — not `BLOCKED`. `BLOCKED` is reserved for cases where verification itself could not complete, and blocked results never carry a `proof_ref`. If the DDL schema fails to parse, the incomplete analysis is `BLOCKED` even when the query itself looks malicious (`schema_parse_error` takes precedence).
+
+`agent_message` never leaks detection rules, rule IDs, or raw parser output. Rule-level detail lives in `developer_fields`.
+
+### Admission is a separate decision
+
+Do not gate execution on `status` alone. `POST /verify/sql` returns an explicit `admission` field (`ADMIT` or `BLOCKED`) alongside the verdict. A malicious query is `VERIFIED` at the truth layer but `BLOCKED` at the admission layer. Gate on `admission` (or `developer_fields.is_valid`), never on `status == "VERIFIED"`.
+
 ## Usage
 
 ```python
@@ -22,17 +49,21 @@ result = client.verify_sql(
     query="SELECT * FROM users WHERE id = 1",
     schema="CREATE TABLE users (id INT, name TEXT)"
 )
-print(result.verified)  # True
+print(result.status)                            # "VERIFIED"
+print(result.developer_fields["is_valid"])      # True
+print(result.proof_ref)                         # "sha256:..."
 ```
 
 ## Injection detection
 
 ```python
-# SQL injection pattern
+# SQL injection pattern — proven malicious
 result = client.verify_sql("SELECT * FROM users; DROP TABLE users; --")
-print(result.status)  # "BLOCKED"
-print(result.vulnerabilities)
-# [{"type": "injection", "message": "Chained DROP statement"}]
+print(result.status)                                            # "VERIFIED" (as-malicious)
+print(result.developer_fields["is_valid"])                      # False
+print(result.developer_fields["malicious_classification"])      # True
+print(result.developer_fields["issues"])
+# [{"severity": "CRITICAL", "issue_type": "injection", ...}]
 ```
 
 ## Detected patterns
@@ -47,11 +78,11 @@ print(result.vulnerabilities)
 ## Destructive operations
 
 ```python
-# Destructive query
+# Destructive query — verified, not valid, not admissible
 result = client.verify_sql("DELETE FROM users")
-print(result.status)  # "FAILED"
-print(result.vulnerabilities)
-# [{"type": "destructive_delete", "severity": "high"}]
+print(result.developer_fields["is_valid"])   # False
+print(result.developer_fields["issues"])
+# [{"issue_type": "destructive_delete", "severity": "CRITICAL", ...}]
 ```
 
 | Operation  | Severity |
@@ -75,6 +106,10 @@ The SQL engine also blocks administrative SQL commands by default:
 | REVOKE      | Critical |
 | SET         | Medium   |
 | TRANSACTION | Medium   |
+
+<Note>
+A resource-limit violation is a `CRITICAL` admission failure but not evidence of malicious intent. Only true-malice issue types set `malicious_classification: true`.
+</Note>
 
 ## Supported dialects
 

@@ -268,7 +268,9 @@ The `provider_used` field indicates which LLM provider handled the translation s
 
 ### POST /verify/code
 
-Check code for security vulnerabilities using AST analysis.
+<Info>Updated in v7.0.0 (breaking)</Info>
+
+Check code for security vulnerabilities using AST analysis. Returns the unified [`DiagnosticResult`](/advanced/diagnostics) shape plus a separate `admission` decision.
 
 **Request:**
 
@@ -284,32 +286,52 @@ Check code for security vulnerabilities using AST analysis.
 | `code` | string | Yes | Source code to analyze |
 | `language` | string | No | Programming language (default: `python`) |
 
-**Response:**
+**Response (unsafe code — proven unsafe, not admitted):**
 
 ```json
 {
-  "is_safe": false,
-  "vulnerabilities": [
-    {
-      "type": "os.system",
-      "severity": "critical",
-      "line": 2,
-      "message": "Shell command execution"
-    }
-  ]
+  "status": "VERIFIED",
+  "agent_message": "The code failed security verification and is not safe to use.",
+  "developer_fields": {
+    "constraint_id": "code_verifier.code_unsafe",
+    "is_safe": false,
+    "is_valid": false,
+    "language": "python",
+    "critical_count": 1,
+    "issues": [
+      {
+        "severity": "CRITICAL",
+        "type": "os.system",
+        "line_number": 2,
+        "description": "Shell command execution"
+      }
+    ]
+  },
+  "proof_ref": "sha256:...",
+  "is_authoritative": true,
+  "admission": "BLOCKED"
 }
 ```
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `is_safe` | boolean | Whether the code passed all security checks |
-| `vulnerabilities` | array | List of detected vulnerabilities with type, severity, line number, and message |
+| `status` | string | `VERIFIED` when the scan completed (safe **or** unsafe code); `BLOCKED` when verification itself failed (empty code, unsupported language, internal error) |
+| `admission` | string | `ADMIT` or `BLOCKED` — the fail-closed admission decision. `ADMIT` only when `status` is `VERIFIED` **and** `developer_fields.is_valid` is `true` |
+| `developer_fields.is_valid` | boolean | The safety gate — `true` only when no critical issue was found |
+| `developer_fields.issues` | array | Detected vulnerabilities with severity, type, line number, and description |
+| `proof_ref` | string | Present on `VERIFIED` results (including verified-unsafe); `null` on `BLOCKED` |
+
+<Warning>
+**Breaking change (v7.0.0):** proven-unsafe code now returns HTTP 200 with `status: "VERIFIED"` (previously `BLOCKED`). `VERIFIED` answers "was the code checked?", not "is it safe to execute?". Consumers that gated on `status` for safety must switch to the `admission` field or `developer_fields.is_valid`.
+</Warning>
 
 ---
 
 ### POST /verify/sql
 
-Validate SQL queries against a provided schema.
+<Info>Updated in v7.0.0 (breaking)</Info>
+
+Validate SQL queries against a provided schema. Returns the unified [`DiagnosticResult`](/advanced/diagnostics) shape plus a separate `admission` decision.
 
 **Request:**
 
@@ -327,14 +349,24 @@ Validate SQL queries against a provided schema.
 | `schema_ddl` | string | Yes | DDL schema definition (e.g., `CREATE TABLE` statements) |
 | `dialect` | string | No | SQL dialect (default: `sqlite`) |
 
-**Response:**
+**Response (safe query):**
 
 ```json
 {
-  "is_valid": true,
-  "message": "Query is valid against the provided schema"
+  "status": "VERIFIED",
+  "agent_message": "The SQL query passed verification and is safe to execute.",
+  "developer_fields": {
+    "constraint_id": "sql_verifier.sql_valid",
+    "is_valid": true,
+    "malicious_classification": false
+  },
+  "proof_ref": "sha256:...",
+  "is_authoritative": true,
+  "admission": "ADMIT"
 }
 ```
+
+A proven-malicious query returns `status: "VERIFIED"` with `developer_fields.is_valid: false`, `developer_fields.malicious_classification: true`, and `admission: "BLOCKED"` — proving malice is a successful proof, so the truth verdict is preserved while admission is denied. `BLOCKED` status is reserved for verification failures: `sql_verifier.parse_error`, `sql_verifier.schema_parse_error`, `sql_verifier.complexity_limit_exceeded`, and `sql_verifier.execution_error`. See the [SQL engine](/engines/sql) page for the full contract.
 
 ---
 
@@ -511,15 +543,31 @@ curl -X POST https://api.qwedai.com/v1/verify/stats \
 | `file` | file | Yes | CSV data file |
 | `query` | string | Yes | Statistical claim to verify |
 
-**Response:**
+**Response (execution succeeded):**
 
 ```json
 {
-  "status": "SUCCESS",
-  "computed_value": 52340.5,
-  "message": "Statistical claim verified against dataset"
+  "status": "UNVERIFIABLE",
+  "agent_message": "Statistical analysis completed, but the claim could not be deterministically verified.",
+  "developer_fields": {
+    "constraint_id": "stats_verifier.claim_not_verified",
+    "is_valid": false,
+    "observed_result": 52340.5,
+    "columns": ["salary"],
+    "dataset_sha256": "9f2c...",
+    "sandbox_type": "docker",
+    "execution_time_ms": 412.7
+  },
+  "proof_ref": null,
+  "is_authoritative": false
 }
 ```
+
+<Warning>
+**Breaking change (v7.0.0):** the endpoint returns the unified [`DiagnosticResult`](/advanced/diagnostics) shape instead of the legacy `{"status": "SUCCESS" | "ERROR" | "BLOCKED", "result": ..., "code": ...}` shape. Successful execution now reports `status: "UNVERIFIABLE"` with the observed value in `developer_fields.observed_result` — execution success alone is never presented as a proven claim, so `VERIFIED` is not emitted from this endpoint.
+</Warning>
+
+Failure states return `status: "BLOCKED"` with a `constraint_id` of `stats_verifier.validation_error` (translation or security validation failed), `stats_verifier.execution_failure` (sandbox execution failed), or `stats_verifier.runtime_unavailable` (Docker unavailable). Blocked results carry no `proof_ref`.
 
 | Status | Description |
 |--------|-------------|
