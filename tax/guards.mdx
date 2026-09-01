@@ -234,6 +234,10 @@ result = guard.check_nexus_liability(
 )
 # {"verified": False, "has_nexus": True, "claimed_collects_tax": False,
 #  "error": "Nexus Violation: NY threshold exceeded (YTD Sales $600000 >= $500000). Tax collection is mandatory."}
+
+if not result["verified"]:
+    # Fail closed — never act on an unverified nexus claim
+    raise RuntimeError(f"Nexus verification rejected: {result['error']}")
 ```
 
 | Parameter | Type | Required | Description |
