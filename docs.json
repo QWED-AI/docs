@@ -349,6 +349,7 @@
                   "specs/overview",
                   "whitepaper",
                   "specs/qwed-spec",
+                  "specs/verification-context",
                   "specs/attestation",
                   "specs/agent",
                   "advanced/specification-guide"
