@@ -70,6 +70,30 @@ result = guard.check({
 - `rm -rf`, `rmdir /s`
 - `eval(`, `exec(`, `__import__`
 
+### Recognized tool-call shapes
+
+ToolGuard extracts tool calls from these response envelopes:
+
+| Shape | Format |
+|-------|--------|
+| Direct tool call | `{"type": "tool_call", "tool_name": ..., "arguments": ...}` |
+| Direct function call | `{"type": "function_call", "name": ..., "arguments": ...}` (Responses API) |
+| Tool call list | `{"tool_calls": [...]}`, including OpenAI `{"function": {"name", "arguments"}}` wrappers |
+| Chat Completions | `{"choices": [{"message": {"tool_calls": [...]}}]}` |
+| Anthropic content blocks | `{"content": [{"type": "tool_use", "name": ..., "input": ...}]}` |
+
+The `type` match is case-insensitive, so a `Tool_Use` block is treated as a tool call. JSON-encoded argument strings are parsed before blocklist and dangerous-pattern checks run, so a call cannot hide arguments inside a string.
+
+### Fail-closed rejections
+
+ToolGuard blocks rather than passes when a response cannot be validated unambiguously:
+
+- **Unrecognized tool-like content.** A response that looks like a tool call but matches none of the recognized shapes is blocked instead of passing with "No tool calls".
+- **Malformed entries.** A non-object item inside `tool_calls`, `choices`, or `content` is blocked, never silently dropped.
+- **Ambiguous hybrid envelopes.** A response that mixes a direct tool call (`type=tool_call` or `type=function_call`) with a sibling `tool_calls`, `choices`, or `content` collection is blocked, because validating one side would let the other escape policy checks.
+- **Nameless calls.** A tool call without a non-blank string name is blocked. A blank name can never match blocklist or allowlist checks.
+- **Oversized arguments.** JSON-encoded argument payloads over 10,000 characters or nested deeper than 128 levels are blocked before parsing.
+
 ---
 
 ## MathGuard
@@ -193,6 +217,16 @@ result = guard.check({
 | **Harmful** | API keys, passwords, private keys |
 | **Budget** | Cost/token limits exceeded |
 
+### Content extraction
+
+SafetyGuard scans string content at any nesting depth (bounded to 12 levels), not just top-level keys. This includes:
+
+- The canonical OpenAI shape: `choices[].message.content`
+- Anthropic content block envelopes
+- Strings nested inside arbitrary wrapper objects and arrays
+
+Content hidden inside a nested structure is checked for PII, injection, and harmful patterns the same as top-level content.
+
 ---
 
 ## Combining guards
@@ -217,3 +251,17 @@ result = verifier.verify(response)
 print(f"Passed: {result.guards_passed}")
 print(f"Failed: {result.guards_failed}")
 ```
+
+### Zero guards fail closed
+
+`verify()` with no guards configured returns `verified=False`. Absence of verification is not success.
+
+```python
+verifier = ResponseVerifier()  # no default_guards
+
+result = verifier.verify(response)
+print(result.verified)      # False
+print(result.block_reason)  # "No guards configured — fail-closed (zero-guard verify)."
+```
+
+When `strict_mode=True` (the default), the result is also `blocked=True`. Pass at least one guard to `verify()` or set `default_guards` on the verifier. The TypeScript `ResponseVerifier` behaves the same way with `defaultGuards`.
