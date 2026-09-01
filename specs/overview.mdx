@@ -11,6 +11,7 @@ QWED is defined by formal specifications that enable interoperability.
 | Specification | Version | Description |
 |---------------|---------|-------------|
 | [QWED-SPEC](/specs/qwed-spec) | v1.0.0 | Core protocol definition |
+| [Verification Context](/specs/verification-context) | v1.0 | Atomic record of a verification |
 | [QWED-Attestation](/specs/attestation) | v1.0.0 | Cryptographic proofs |
 | [QWED-Agent](/specs/agent) | v1.0.0 | AI agent verification |
 
@@ -25,6 +26,16 @@ The core specification defines:
 - **QWED-Logic DSL** — Grammar for logical expressions
 - **Error codes** — Standardized error taxonomy
 - **Versioning** — Semantic versioning rules
+
+### Verification Context v1.0
+
+The Verification Context specification defines:
+
+- **Document format** — the atomic JSON record of a verification
+- **Four context layers** — interpretation, proof, evidence, decision
+- **Verdict invariants** — `VERIFIED` requires a `sha256` `proof_ref`; `UNVERIFIABLE`/`BLOCKED` require `null`
+- **`proof_ref`** — canonical RFC 8785 evidence commitment
+- **Truth vs. admission** — gate execution on `admission == "ADMIT"` only
 
 ### QWED-Attestation v1.0
 

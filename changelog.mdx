@@ -7,6 +7,62 @@ All notable changes to the QWED platform, listed by release.
 
 ---
 
+## v7.1.0 — Verification Context v1.0 Rollout
+
+**Released: August 16, 2026** · [GitHub Release ↗](https://github.com/QWED-AI/qwed-verification/releases/tag/v7.1.0) · [GitHub PR #317](https://github.com/QWED-AI/qwed-verification/pull/317)
+
+> v7.1.0 ships [Verification Context v1.0](/specs/verification-context) end-to-end: a formal specification with a machine-readable JSON Schema, a typed document model with fail-closed invariants, public `proof_ref` generation and resolution, and exposure across the API, Python SDK, CLI, verifiers, and the Docker GitHub Action. The release is additive — a semver minor with no breaking wire changes.
+
+### Spec and core model
+
+- **Verification Context v1.0 specification** — the atomic JSON record of a verification: verified object, four context layers (interpretation / proof / evidence / decision), verdict, and admission, with canonical RFC 8785 encoding for the `proof_ref` evidence commitment (PR #302). See the [Verification Context specification](/specs/verification-context).
+- **`VerificationContextDocument` model + schema validation** — typed `VerificationContext`, `VerificationContextDocument`, `Verdict`, `Admission`, and nested layer types with fail-closed invariants enforced at construction: `VERIFIED` requires a `sha256:<64-hex>` `proof_ref`; `UNVERIFIABLE`/`BLOCKED` require `proof_ref: null` with admission `DENY` (PR #308).
+- **Public `proof_ref` generation and resolution** — `compute_document_proof_ref()` and `resolve_document_proof_ref()` derive and verify the content-bound SHA-256 commitment over the canonical document. Resolution fails closed: a `proof_ref` that cannot be resolved confers no authority (PR #309).
+
+### Surface exposure
+
+- **API endpoints** — [`POST /verification-context/from-diagnostic`, `/validate`, and `/resolve`](/api/endpoints#verification-context-endpoints) convert `DiagnosticResult` records into VC documents, validate documents against the schema, and resolve `proof_ref` commitments (PR #311).
+- **CLI commands** — the [`qwed context`](/advanced/cli#qwed-context---verification-context-utilities) group: `validate`, `resolve`, and `from-diagnostic` (PR #311).
+- **SDK re-exports** — all VC v1.0 types and helpers importable directly from `qwed_sdk`, plus `create_verification_context_from_diagnostic()`, `validate_verification_context()`, and `resolve_verification_context()` on both sync and async clients. See the [Python SDK](/sdks/python#verification-context) (PRs #311, #315).
+- **`to_verification_context()` on all 13 verifiers** — complete engine coverage (Math, Logic, Symbolic, SQL, Code, Schema, Fact, Image, Graph, Reasoning, Stats, Consensus, and the secure code executor) maps each engine's `DiagnosticResult` to a VC document (PRs #310, #316).
+- **Docker action VC outputs** — the GitHub Action emits `verdict`, `admission`, `proof_ref`, and `verification_context` [outputs](/advanced/github-action#verification-context-outputs) in every mode (PR #313).
+
+### Fail-closed behavior
+
+- A `VERIFIED` diagnostic without a valid attestation token is demoted to `UNVERIFIABLE` when converted to a VC document — attestation is enforced through the same trust boundary as `/verify/*`.
+- Malformed diagnostic payloads convert to `BLOCKED` documents instead of crashing, so the audit trail records the failure.
+- `resolve` returns `true` only for a schema-valid `VERIFIED` document whose stored `proof_ref` matches the re-derived commitment.
+
+### Version bumps
+
+| Surface | From | To |
+|---|---|---|
+| `qwed` (PyPI) | `7.0.0` | `7.1.0` |
+| `qwed_sdk` (Python) | `7.0.0` | `7.1.0` |
+| `@qwed-ai/sdk` (npm) | `7.0.0` | `7.1.0` |
+| `qwed` (crates.io) | `7.0.0` | `7.1.0` |
+| API version marker | `7.0.0` | `7.1.0` |
+
+### Included PRs
+
+| PR | Summary |
+|---|---|
+| [#302](https://github.com/QWED-AI/qwed-verification/pull/302) | Verification Context Specification v1.0 + JSON Schema |
+| [#308](https://github.com/QWED-AI/qwed-verification/pull/308) | `VerificationContext` model and schema validation helpers |
+| [#309](https://github.com/QWED-AI/qwed-verification/pull/309) | Public `proof_ref` generation and resolution |
+| [#310](https://github.com/QWED-AI/qwed-verification/pull/310) | `StatsVerifier` `DiagnosticResult` → Verification Context mapping |
+| [#311](https://github.com/QWED-AI/qwed-verification/pull/311) | Verification Context exposed across SDK, API, and CLI |
+| [#313](https://github.com/QWED-AI/qwed-verification/pull/313) | Docker action emits VC v1.0 outputs |
+| [#315](https://github.com/QWED-AI/qwed-verification/pull/315) | VC v1.0 types re-exported from `qwed_sdk` |
+| [#316](https://github.com/QWED-AI/qwed-verification/pull/316) | `to_verification_context()` on all remaining verifiers |
+| [#317](https://github.com/QWED-AI/qwed-verification/pull/317) | v7.1.0 release preparation |
+
+### Upgrading
+
+No action required. Every change is additive: existing `/verify/*` responses, SDK methods, CLI commands, and action outputs are unchanged. Adopt Verification Context by calling the new endpoints, importing the new types from `qwed_sdk`, or reading the new action outputs.
+
+---
+
 ## v6.0.0 — Trust Boundary Completion
 
 **Released: August 2, 2026** · [GitHub Release ↗](https://github.com/QWED-AI/qwed-verification/releases/tag/v6.0.0) · [GitHub PR #291](https://github.com/QWED-AI/qwed-verification/pull/291)

@@ -759,6 +759,95 @@ Get the status and results of a batch verification job. Use this to poll results
 
 ---
 
+## Verification Context endpoints
+
+<Info>New in v7.1.0</Info>
+
+These endpoints work with [Verification Context v1.0](/specs/verification-context) documents — the standardized JSON record of a verification. All three require an API key and are rate-limited per key.
+
+### POST /verification-context/from-diagnostic
+
+Convert a [`DiagnosticResult`](/advanced/diagnostics) into a schema-valid Verification Context document. Use this when you have an engine verdict and need the standardized VC record for auditing or downstream gating.
+
+**Request:**
+
+```json
+{
+  "query": "x**2 + 2*x + 1 = (x+1)**2",
+  "verifier": "MathVerifier",
+  "diagnostic": {
+    "status": "VERIFIED",
+    "agent_message": "Identity verified",
+    "developer_fields": {"is_valid": true},
+    "proof_ref": "sha256:9f2c…"
+  },
+  "verifier_version": "7.1.0",
+  "attestation_token": "eyJhbGciOiJFUzI1NiIs..."
+}
+```
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `query` | string | Yes | The formal statement that was verified |
+| `verifier` | string | Yes | Name of the engine that produced the diagnostic |
+| `diagnostic` | object | Yes | The `DiagnosticResult` record (`status` / `agent_message` / `developer_fields` / `proof_ref`) |
+| `verifier_version` | string | No | Engine version. Defaults to the installed `qwed` package version |
+| `attestation_token` | string | No | Signed attestation for the diagnostic. Required to keep a `VERIFIED` status |
+
+**Response:** the full Verification Context document (`spec_version`, `object`, `context`, `verdict`).
+
+**Fail-closed behavior:**
+
+- A malformed `diagnostic` payload is converted to a `BLOCKED` document instead of being rejected, so the audit trail records the failure.
+- A `VERIFIED` diagnostic without a valid `attestation_token` is demoted to `UNVERIFIABLE`. Attestation is enforced through the same trust boundary as `/verify/*`.
+
+| Status | Description |
+|--------|-------------|
+| 422 | The resulting document failed Verification Context validation |
+| 500 | Audit persistence failed |
+
+### POST /verification-context/validate
+
+Validate a Verification Context document against the v1.0 JSON Schema, including the verdict/`proof_ref` invariants.
+
+**Request:**
+
+```json
+{
+  "document": { "spec_version": "1.0", "object": {"...": "..."}, "context": {"...": "..."}, "verdict": "VERIFIED" }
+}
+```
+
+**Response:**
+
+```json
+{"valid": true}
+```
+
+An invalid document returns `{"valid": false, "error": "validation_failed"}` with HTTP 200. Gate on the `valid` field.
+
+### POST /verification-context/resolve
+
+Resolve the `proof_ref` evidence commitment of a Verification Context document. The server removes the stored `proof_ref`, re-derives the SHA-256 commitment over the canonical (RFC 8785) bound payload, and compares it to the stored value.
+
+**Request:**
+
+```json
+{
+  "document": { "spec_version": "1.0", "object": {"...": "..."}, "context": {"...": "..."}, "verdict": "VERIFIED" }
+}
+```
+
+**Response:**
+
+```json
+{"resolved": true}
+```
+
+`resolved` is `true` only when the document has `verdict: "VERIFIED"`, validates against the schema, and the stored `proof_ref` matches the re-derived commitment. Any other outcome (non-`VERIFIED` verdict, schema failure, mismatched or missing commitment) returns `{"resolved": false}` — a `proof_ref` that cannot be resolved confers no authority.
+
+---
+
 ## Agent endpoints
 
 ### POST /agents/register

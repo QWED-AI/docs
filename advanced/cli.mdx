@@ -478,6 +478,71 @@ Detected: 1 entities
 Install PII support with `pip install 'qwed[pii]'` and download the spaCy model: `python -m spacy download en_core_web_lg`.
 </Note>
 
+### `qwed context` - Verification Context utilities
+
+<Info>New in v7.1.0</Info>
+
+Work with [Verification Context v1.0](/specs/verification-context) documents from the command line. All subcommands print JSON and exit non-zero on failure, so they compose cleanly in CI pipelines.
+
+#### `qwed context validate`
+
+Validate a Verification Context document file against the v1.0 JSON Schema, including the verdict/`proof_ref` invariants.
+
+```bash
+qwed context validate document.json
+```
+
+**Example output:**
+
+```json
+{
+  "valid": true
+}
+```
+
+An invalid or unreadable file prints `{"valid": false, "error": "..."}` and exits with code 1. Error values are `invalid_document_file` (file could not be read or parsed as JSON) and `validation_failed` (schema or invariant violation).
+
+#### `qwed context resolve`
+
+Resolve the `proof_ref` evidence commitment of a document file. The command re-derives the SHA-256 commitment over the canonical bound payload and compares it to the stored value.
+
+```bash
+qwed context resolve document.json
+```
+
+**Example output:**
+
+```json
+{
+  "resolved": true
+}
+```
+
+`resolved` is `true` only for a schema-valid `VERIFIED` document whose stored `proof_ref` matches the re-derived commitment. Any other outcome prints `{"resolved": false}` (fail-closed).
+
+#### `qwed context from-diagnostic`
+
+Create a Verification Context document from a [`DiagnosticResult`](/advanced/diagnostics) JSON file and print it.
+
+```bash
+qwed context from-diagnostic \
+  --diagnostic-file diag.json \
+  --query "x + x = 2*x" \
+  --verifier MathVerifier \
+  --verifier-version 7.1.0 \
+  --attestation-token "$QWED_ATTESTATION"
+```
+
+| Option | Required | Description |
+|--------|----------|-------------|
+| `--diagnostic-file` | Yes | Path to the `DiagnosticResult` JSON file |
+| `--query` | Yes | The formal statement that was verified |
+| `--verifier` | Yes | Name of the engine that produced the diagnostic |
+| `--verifier-version` | No | Engine version. Defaults to the installed `qwed` version |
+| `--attestation-token` | No | Signed attestation. Required to keep a `VERIFIED` status |
+
+A malformed diagnostic file produces a `BLOCKED` document rather than a crash. A `VERIFIED` diagnostic without a valid attestation token is demoted to `UNVERIFIABLE` (fail-closed).
+
 ---
 
 ## Environment variables

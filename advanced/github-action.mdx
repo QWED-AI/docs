@@ -118,6 +118,31 @@ Set `mask_pii: "true"` to automatically redact personally identifiable informati
 | `findings_count` | Number of security issues found (for scan modes) |
 | `badge_url` | URL for QWED verified badge |
 | `sarif_file` | Path to SARIF output file (if `output_format=sarif`) |
+| `verdict` | [Verification Context v1.0](/specs/verification-context) verdict: `VERIFIED`, `UNVERIFIABLE`, or `BLOCKED` (v7.1.0) |
+| `admission` | Safe-to-run decision: `ADMIT` or `DENY`. Gate downstream steps on this, not on `verified` alone (v7.1.0) |
+| `proof_ref` | `sha256:<64-hex>` evidence commitment. Set only when `verdict` is `VERIFIED`; empty otherwise (v7.1.0) |
+| `verification_context` | Full Verification Context v1.0 document as compact JSON. Emitted only when `output_format` is `json` or `verification-context` (v7.1.0) |
+
+### Verification Context outputs
+
+<Info>New in v7.1.0</Info>
+
+Every action mode (`verify`, `scan-secrets`, `scan-code`, `verify-shell`) emits [Verification Context v1.0](/specs/verification-context) outputs alongside the legacy `verified` flag. The invariants are fail-closed: `proof_ref` is set only on a `VERIFIED` verdict, and non-verified verdicts always carry `admission: DENY`.
+
+```yaml
+- name: Verify math
+  id: qwed
+  uses: QWED-AI/qwed-verification@v7.1.0
+  with:
+    action: verify
+    engine: math
+    query: "sqrt(144) = 12"
+    output_format: json
+
+- name: Gate on admission
+  if: steps.qwed.outputs.admission == 'ADMIT'
+  run: echo "proof_ref=${{ steps.qwed.outputs.proof_ref }}"
+```
 
 ## Examples
 
