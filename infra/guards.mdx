@@ -5,7 +5,7 @@ sidebarTitle: "Verification guards"
 description: "Reference for IamGuard, NetworkGuard, CostGuard, and ArtifactBoundaryGuard — the four QWED-Infra guards for IAM, network, budget, and release checks."
 ---
 
-`qwed-infra` provides four guards to verify different aspects of your infrastructure. Every guard's `to_diagnostic()` method converts its result into a unified `InfraDiagnosticResult` with an audit trace and proof reference.
+`qwed-infra` provides four guards to verify different aspects of your infrastructure. Every guard's `to_diagnostic()` method converts its result into a unified `InfraDiagnosticResult` with an audit trace and proof reference. As of v0.3.0, every guard also exposes a `to_verification_context()` method that runs the verification and emits a portable [Verification Context v1.0 document](#verification-context-documents).
 
 ## 1. IamGuard
 
@@ -28,6 +28,16 @@ guard = IamGuard()
 result = guard.verify_access(policy, action="s3:GetObject", resource="*", context={})
 result = guard.verify_least_privilege(policy)
 diag = IamGuard.to_diagnostic(result, audit_trace=None)
+
+# Verification Context v1.0 — the guard runs verify_access() internally
+doc = guard.to_verification_context(
+    policy,
+    action="s3:GetObject",
+    resource="arn:aws:s3:::bucket/*",
+    context={"aws:SourceIp": "192.168.1.5"},
+    formal_statement="IAM policy is safe to apply",
+    attestation_token=attestation.token,  # optional — mint and check `is_issued` first; see "Attestation trust boundary" below
+)
 ```
 
 ### Diagnostic Mapping
@@ -59,7 +69,19 @@ guard = NetworkGuard()
 guard.build_graph(resources)  # Build NetworkX digraph from infra definition
 result = guard.verify_reachability(resources, source="internet", destination="public-subnet", port=80)
 diag = NetworkGuard.to_diagnostic(result)
+
+# Verification Context v1.0 — the guard runs verify_reachability() internally
+doc = guard.to_verification_context(
+    resources,
+    "internet",
+    "public-subnet",
+    80,
+    formal_statement="Traffic from internet to public-subnet on port 80 is safe",
+    attestation_token=attestation.token,  # optional — mint and check `is_issued` first; see "Attestation trust boundary" below
+)
 ```
+
+Malformed topology inputs (non-dict `resources`, subnets missing `id` keys, and similar) map to a fail-closed `BLOCKED` document instead of raising an exception.
 
 ### Diagnostic Mapping
 
@@ -88,7 +110,17 @@ CostGuard estimates the monthly cost of your infrastructure definition *before* 
 guard = CostGuard()
 result = guard.verify_budget(resources, budget_monthly=500.0)
 diag = CostGuard.to_diagnostic(result)
+
+# Verification Context v1.0 — the guard runs verify_budget() internally
+doc = guard.to_verification_context(
+    resources,
+    budget_monthly=500.0,
+    formal_statement="Estimated monthly cost is within budget",
+    attestation_token=attestation.token,  # optional — mint and check `is_issued` first; see "Attestation trust boundary" below
+)
 ```
+
+Malformed inputs (an undecimal budget, non-dict resources, non-dict resource entries) map to a fail-closed `BLOCKED` document instead of raising an exception.
 
 ### Diagnostic Mapping
 
@@ -123,7 +155,17 @@ result = guard.verify_package_boundary(
     package_name="mypackage",
 )
 diag = ArtifactBoundaryGuard.to_diagnostic(result)
+
+# Verification Context v1.0 — the guard runs verify_package_boundary() internally
+doc = guard.to_verification_context(
+    package_dir="src/mypackage",
+    pyproject_path="pyproject.toml",
+    formal_statement="Package boundary is safe to publish",
+    attestation_token=attestation.token,  # optional — mint and check `is_issued` first; see "Attestation trust boundary" below
+)
 ```
+
+The package identity is derived from the inspected `package_dir`, so a caller cannot scan one directory while checking the wheel configuration of another. Symlink escapes, symlink loops, non-string build backends, and wheel entries outside the scanned boundary map to a fail-closed `BLOCKED` document.
 
 ### Diagnostic Mapping
 
@@ -131,3 +173,75 @@ diag = ArtifactBoundaryGuard.to_diagnostic(result)
 |------------------------------|----------------------|-----------|
 | `is_safe=True` | `VERIFIED` | `sha256:...` |
 | `is_safe=False` (with BLOCK-severity findings) | `BLOCKED` | `None` |
+
+## Verification Context documents
+
+Every guard's `to_verification_context()` method returns a `VerificationContextDocument`: a portable, JSON-serializable trust artifact that records what was verified, by whom, with what proof, and whether a downstream system should admit or deny. Use it when a verification decision has to travel beyond your process: CI/CD gates, release pipelines, and audit logs.
+
+### Guards compute from raw inputs
+
+`to_verification_context()` takes **raw verification inputs**, never a pre-computed result object. Each guard runs its own deterministic solver internally before emitting the document. A result-accepting signature would be forgeable: a caller could fabricate a positive result and mint an `ADMIT` decision. `formal_statement` is keyword-only and required on every guard:
+
+```python
+IamGuard().to_verification_context(policy, action, resource, context=None,
+                                   formal_statement="IAM policy is safe to apply")
+NetworkGuard().to_verification_context(resources, source, destination, port,
+                                       formal_statement="Traffic path is safe")
+CostGuard().to_verification_context(resources, budget_monthly,
+                                    formal_statement="Estimated cost is within budget")
+ArtifactBoundaryGuard().to_verification_context(package_dir="mypkg", pyproject_path="pyproject.toml",
+                                                formal_statement="Package boundary is safe to publish")
+```
+
+<Warning>
+**Breaking change in v0.3.0 (pre-1.0 API).** Earlier unreleased signatures that accepted result objects were removed. If you passed a `VerificationResult`, `ComputedPath`, `CostEstimate`, or `ArtifactBoundaryResult` into `to_verification_context()`, pass the raw inputs instead and let the guard verify them itself.
+</Warning>
+
+### Attestation trust boundary
+
+A `VERIFIED` result produces an `ADMIT` decision **only** when accompanied by a cryptographically valid ES256 (ECDSA P-256) JWT attestation. Validation checks the signature, issuer, expiry, and revocation status, plus binding to the exact claim and evidence: the token's status must match, its `query_hash` must equal `sha256(formal_statement)`, and its `proof_hash` must equal the diagnostic's `proof_ref`. A token minted for one statement can never admit a different one.
+
+Arbitrary non-empty attestation strings no longer grant `ADMIT`. They are rejected as forged tokens and produce `BLOCKED`.
+
+Mint a valid token with `mint_diagnostic_attestation()`, which binds the token to a `VERIFIED` diagnostic's own evidence commitment:
+
+```python
+from qwed_infra.attestation import mint_diagnostic_attestation
+
+statement = "Traffic from internet to public-subnet on port 80 is safe"
+diagnostic = NetworkGuard.to_diagnostic(
+    net.verify_reachability(infra, "internet", "public-subnet", 80)
+)
+attestation = mint_diagnostic_attestation(
+    diagnostic, engine="NetworkGuard", query=statement
+)
+if not attestation.is_issued:
+    # Fail-closed contract: never proceed on an unissued attestation
+    raise RuntimeError(f"Attestation unavailable [{attestation.error_code}]")
+
+doc = net.to_verification_context(
+    infra, "internet", "public-subnet", 80,
+    formal_statement=statement,
+    attestation_token=attestation.token,
+)
+print(doc.verdict.value)                     # VERIFIED / UNVERIFIABLE / BLOCKED
+print(doc.context.decision.admission.value)  # ADMIT / DENY
+```
+
+`mint_diagnostic_attestation()` and the lower-level `create_verification_attestation()` return an `AttestationResult`, never `None`. Check `.is_issued` before using `.token`: `BLOCKED` means signing failed, `UNVERIFIABLE` means the `cryptography`/`pyjwt` packages are unavailable.
+
+Attestations are self-signed by the guard process with an ephemeral key and validated at the admission boundary. Multi-replica deployments require shared signing keys.
+
+### Verdict and admission mapping
+
+The document is fail-closed by construction: anything that is not proven is `DENY`.
+
+| Diagnostic status | Attestation token | Document verdict | Admission |
+|---|---|---|---|
+| `VERIFIED` | Valid and bound to the claim and evidence | `VERIFIED` | `ADMIT` |
+| `VERIFIED` | Missing (`None`) | `UNVERIFIABLE` | `DENY` |
+| `VERIFIED` | Forged, expired, revoked, or bound to a different claim | `BLOCKED` | `DENY` |
+| `UNVERIFIABLE` | Ignored | `UNVERIFIABLE` | `DENY` |
+| `BLOCKED` | Ignored | `BLOCKED` | `DENY` |
+
+Malformed inputs at any VC boundary (invalid status values, non-dict developer fields, malformed topology, policy, budget, or package inputs) also map to `BLOCKED`/`DENY` documents instead of exceptions.
