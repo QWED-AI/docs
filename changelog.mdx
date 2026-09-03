@@ -7,6 +7,47 @@ All notable changes to the QWED platform, listed by release.
 
 ---
 
+## QWED Verification — structural math parser and sandbox gate hardening (security release)
+
+**Released: September 3, 2026** · [GitHub PR #344](https://github.com/QWED-AI/qwed-verification/pull/344) · [GitHub PR #346](https://github.com/QWED-AI/qwed-verification/pull/346)
+
+> Two security fixes close sandbox-escape bypasses in math expression parsing and sandboxed code execution. The math parser now validates expressions structurally (NFKC normalization, ASCII charset gate, AST node allowlist) instead of relying on a denylist, and the consensus and stats execution paths gained a single-expression structural gate plus a module-indirection blocklist.
+
+### Math expression parser (PR #344)
+
+The safe expression parser applies layered structural validation before any SymPy evaluation:
+
+- **NFKC normalization first.** CPython normalizes identifiers at compile time, so Unicode look-alike codepoints (mathematical bold letters, fullwidth forms) could previously slip past string filters. All checks now see exactly what the compiler sees.
+- **ASCII charset allowlist.** Only letters, digits, underscore, whitespace, and `+ - * / ( ) . , ^ %` are accepted. A `.` is legal only as a decimal point with digits on both sides, which makes attribute access structurally impossible on the implicit-multiplication path.
+- **AST node-type allowlist.** Python-parseable input may contain only arithmetic operators, function calls, names, and numeric constants. Attribute access, subscripts, string constants, lambdas, comprehensions, and comparisons are rejected before evaluation.
+- **Caret exponentiation fixed.** `convert_xor` joined the default transformation pipeline, so `x^2` parses as `x**2` instead of failing at evaluation time.
+- The regex denylist is retained as defense in depth.
+
+### Execution gates (PR #346)
+
+- **Single-expression gate on translated math.** A translated math expression must parse as exactly one Python expression (`ast.parse` in `eval` mode). Multi-statement, import-bearing, and multi-line-smuggled input fails by construction. Expressions over 500 characters are rejected before parsing.
+- **Module-indirection blocklist.** The pre-execution AST check on sandboxed code now inspects every dotted segment of imports and attribute chains. Blocked module roots were extended (`posix`, `nt`, `importlib`, `ctypes`, `builtins`), OS-primitive call names (`system`, `popen`, `import_module`, the `exec*`/`spawn*` families, `fork`) are matched on bare names and attribute targets, and package-internal re-export gadgets through pandas/numpy internals are caught.
+- **`sys` read-only allowlist in the stats executor.** Only named read-only interpreter metadata is accessible; frame introspection and every other `sys` member fail closed.
+
+### Behavior changes
+
+<Warning>
+Math expression inputs that previously parsed may now be rejected before evaluation:
+
+- Bare decimals are rejected — write `0.5` and `2.0`, not `.5` and `2.`.
+- Non-ASCII symbols are rejected — write `alpha`, not `α`.
+- String constants, attribute access, and comparisons inside math expressions are rejected.
+- Multi-statement or import-bearing expressions fail by construction.
+
+Legitimate arithmetic, implicit multiplication (`2x`, `sin x`), and pandas/numpy public APIs in generated stats code (`np.linalg.norm`, `pd.Timestamp.now`) are unaffected.
+</Warning>
+
+### What this means for you
+
+A character denylist can never defend an `eval` sink — these releases replace pattern-matching known attacks with structural guarantees that reject entire vulnerability classes by construction. See [Math engine — Expression input rules](/engines/math#expression-input-rules), [Consensus engine — Secure execution gates](/engines/consensus#secure-execution-gates), and [Stats engine — Pre-execution security validation](/engines/stats#pre-execution-security-validation).
+
+---
+
 ## QWED Verification — API-key lookup migration and per-IP auth throttling
 
 **Released: September 2, 2026** · [GitHub PR #345](https://github.com/QWED-AI/qwed-verification/pull/345)

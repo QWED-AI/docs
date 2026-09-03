@@ -97,6 +97,32 @@ The recorded result uses `engine_name: "consensus_orchestrator"`, `method: "asyn
 
 ---
 
+## Secure execution gates
+
+Before any Python code runs in the Docker sandbox, two validation layers apply. Both fail closed: a rejected input returns a security error instead of executing.
+
+### Single-expression gate on translated math
+
+When consensus translates a natural-language math query, the translated expression is interpolated into the generated verification code. The translator therefore enforces that the output is exactly one Python expression:
+
+- The expression must parse with `ast.parse(..., mode="eval")`. Multi-statement input, semicolon chains, assignments, imports, and multi-line newline smuggling all fail by construction.
+- Expressions longer than 500 characters are rejected before parsing, so deeply nested adversarial input never reaches the parser.
+- The existing character-set and denylist checks remain as defense in depth.
+
+Bracketed multi-line expressions (a single expression wrapped in parentheses across lines) still pass. Anything that is not one expression does not.
+
+### Module-indirection blocklist on executed code
+
+The pre-execution AST check on sandboxed Python code inspects every dotted segment, not just the first:
+
+- **Imports** of OS, process, and reflection modules (`os`, `sys`, `subprocess`, `socket`, `posix`, `nt`, `importlib`, `ctypes`, `builtins`, and network clients) are blocked wherever the module name appears in the import path, including `from ... import os as safe` aliasing.
+- **Attribute chains** are blocked when any segment names a dangerous module, so package-internal re-exports (reaching the OS module through pandas or numpy internals) are caught even though the chain is rooted at an innocuous alias.
+- **OS-primitive calls** (`system`, `popen`, `import_module`, the `exec*`/`spawn*` families, `fork`) are blocked as bare names and as attribute targets, which also stops `importlib.import_module("os")`-style indirection.
+
+Legitimate pandas and numpy verification code at the public API surface (`np.linalg.norm`, `pd.Timestamp.now`) is unaffected.
+
+---
+
 ## Engine selection
 
 The consensus engine automatically selects which engines to run based on the verification mode:
