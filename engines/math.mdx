@@ -178,7 +178,7 @@ result = client.verify_irr(
 ```
 
 <Note>
-Cash flows with more than one sign change, or that fail to converge, are now rejected with `BLOCKED` rather than returning a best-effort iterate. See [`verify_irr` — convergence proof](#verify_irr--convergence-proof) for the full state table.
+Cash flows with more than one sign change, or that fail to converge, are now rejected with `BLOCKED` rather than returning a best-effort iterate. See [`verify_irr` — convergence proof](#verify_irr-—-convergence-proof) for the full state table.
 </Note>
 
 ---
@@ -228,7 +228,7 @@ result = client.verify_statistics(
 # result["status"] == "VERIFIED"
 ```
 
-The Stats Engine's `compute_statistics` method returns an equivalent multimodal error on its own surface — see [Stats engine — Errors](/engines/stats#errors).
+The Stats Engine's `compute_statistics` method returns an equivalent multimodal error on its own surface — see [Stats engine — Error handling](/engines/stats#error-handling).
 
 ### `verify_matrix_operation(operation="eigenvalues")` — cardinality match required
 

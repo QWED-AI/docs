@@ -708,7 +708,7 @@ print(result.claim_type_matched)    # False
 ```
 
 <Warning>
-  This is a breaking change. `get_limitation_period()` now returns `Optional[float]` and `StatuteResult` date and period fields are `Optional`. Callers that previously assumed a numeric result must handle `None` and treat unverifiable inputs as a hard failure rather than a passing check. See the [changelog entry](/changelog#qwed-legal-statuteoflimitationsguard-fail-closed-on-unknown-jurisdictions-and-claim-types) for migration notes.
+  This is a breaking change. `get_limitation_period()` now returns `Optional[float]` and `StatuteResult` date and period fields are `Optional`. Callers that previously assumed a numeric result must handle `None` and treat unverifiable inputs as a hard failure rather than a passing check. See the [changelog entry](/changelog-archive#qwed-legal-—-statuteoflimitationsguard-fail-closed-on-unknown-jurisdictions-and-claim-types) for migration notes.
 </Warning>
 
 ### Get limitation period

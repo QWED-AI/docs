@@ -26,7 +26,7 @@ print(result.status)    # "VERIFIED"
 ```
 
 <Note>
-As of v5.0.0, the `status` field may return `INCONCLUSIVE`, `BLOCKED`, or `UNKNOWN` in addition to `VERIFIED` and `ERROR`. Natural-language math queries return `INCONCLUSIVE` when the inner engine succeeds, because the LLM translation step is non-deterministic. See the [trust boundary documentation](/api/endpoints#post-verifynatural_language) for details.
+As of v5.0.0, the `status` field may return `INCONCLUSIVE`, `BLOCKED`, or `UNKNOWN` in addition to `VERIFIED` and `ERROR`. Natural-language math queries return `INCONCLUSIVE` when the inner engine succeeds, because the LLM translation step is non-deterministic. See the [trust boundary documentation](/api/endpoints#post-%2Fverify%2Fnatural_language) for details.
 </Note>
 
 ## Async client
@@ -345,7 +345,7 @@ VerificationCache(cache_dir: Optional[str] = None, ttl: int = 86400)
 - `ttl` — Time-to-live in seconds. Defaults to 24 hours.
 
 <Warning>
-`get()` and `set()` require a `CacheContext` argument as of the May 17, 2026 release. Calls that omit the context raise `TypeError`. See the [changelog entry](/changelog#qwed-verification-—-context-bound-verification-cache-replay-prevention) for migration details.
+`get()` and `set()` require a `CacheContext` argument as of the May 17, 2026 release. Calls that omit the context raise `TypeError`. See the [changelog entry](/changelog-archive#qwed-verification-—-context-bound-verification-cache-replay-prevention) for migration details.
 </Warning>
 
 ## CLI
@@ -370,7 +370,7 @@ qwed context from-diagnostic --diagnostic-file diag.json \
   --query "x + x = 2*x" --verifier MathVerifier
 ```
 
-See the [CLI reference](/advanced/cli#qwed-context---verification-context-utilities) for details on the `qwed context` command group.
+See the [CLI reference](/advanced/cli#qwed-context-verification-context-utilities) for details on the `qwed context` command group.
 
 ## Verification cache
 

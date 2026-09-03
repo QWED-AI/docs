@@ -296,6 +296,14 @@ report = preflight.audit_transaction({
 # report["allowed"] = False
 # report["blocks"] contains:
 #   "TDS verification requires finite invoice_amount and ytd_payment values."
+```
+
+### Intent field types
+
+`audit_transaction` inspects the following intent fields. Only include the fields relevant to your transaction. Guards are skipped when their required fields are absent.
+
+| Field | Type | Used by |
+| --- | --- | --- |
 | `worker_type` | `str` | ClassificationGuard |
 | `worker_facts` | `dict` | ClassificationGuard |
 | `state` | `str` | NexusGuard |

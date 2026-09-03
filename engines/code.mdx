@@ -320,7 +320,7 @@ Do not gate control flow on `is_verified` for symbolic-engine results — it is 
 
 ## Security scanning (`CodeVerifier`)
 
-Separate from symbolic execution, `CodeVerifier` scans code for security vulnerabilities using AST and pattern analysis. It backs [`POST /verify/code`](/api/endpoints#post-verifycode) and the `CODE` item type in batch verification. As of v7.0.0, `verify_code()`, `verify_python_deep()`, and `verify_batch()` return a `DiagnosticResult`.
+Separate from symbolic execution, `CodeVerifier` scans code for security vulnerabilities using AST and pattern analysis. It backs [`POST /verify/code`](/api/endpoints#post-%2Fverify%2Fcode) and the `CODE` item type in batch verification. As of v7.0.0, `verify_code()`, `verify_python_deep()`, and `verify_batch()` return a `DiagnosticResult`.
 
 ### Status semantics: `VERIFIED` is truth, not admission
 
