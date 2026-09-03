@@ -7,6 +7,25 @@ All notable changes to the QWED platform, listed by release.
 
 ---
 
+## QWED-Tax — npm verifier enforces structured nexus claims fail-closed
+
+**Released: September 1, 2026** · [GitHub PR #65](https://github.com/QWED-AI/qwed-tax/pull/65)
+
+> The `@qwed-ai/tax` npm verifier now requires the structured boolean `claimed_collects_tax` claim for economic-nexus checks, matching the Python guard's contract. Unknown states, non-boolean claims, and malformed sales facts fail closed instead of passing as no-nexus.
+
+### What changed
+
+- **Structured claim required** — `TaxPreFlight.audit` and `NexusGuard.checkNexus` verify the boolean `claimed_collects_tax` against the independently computed nexus. Non-boolean values (including strings like `"false"`) are rejected with `"Computed nexus liability only. Provide claimed_collects_tax as a boolean for deterministic verification."`.
+- **Legacy fallback narrowed** — `tax_decision: 'no_tax'` maps to `claimed_collects_tax: false` only when the intent does not contain a `claimed_collects_tax` key. A present-but-invalid structured claim is blocked even when the legacy string is also set.
+- **Unknown states fail closed** — states not in the npm threshold table (currently NY, CA, TX, FL) return `verified: false` with a block-pending-configuration error instead of being verified as no-nexus.
+- **Input hardening** — nexus validation runs whenever `sales_data` is present (including falsy or explicitly `undefined` values). Non-string `state`, non-finite amounts (`NaN`, `Infinity`), and negative sales or transaction counts are rejected before threshold math.
+
+### What this means for you
+
+If your frontend or Node integration relied on unknown states passing, on truthy strings as claims, or on omitting `sales_data` fields to skip the nexus check, those intents now block. Pass `claimed_collects_tax` as an explicit boolean and treat unknown-state blocks as hold-and-escalate signals. See [Economic nexus in the TypeScript SDK](/tax/integration#economic-nexus-in-the-typescript-sdk) for the full contract.
+
+---
+
 ## QWED-Tax — explicit boolean claim required for economic nexus verification
 
 **Released: August 31, 2026** · [GitHub PR #62](https://github.com/QWED-AI/qwed-tax/pull/62)
