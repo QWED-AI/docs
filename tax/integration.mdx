@@ -555,3 +555,48 @@ if (!result.allowed) {
    alert("Compliance Block: " + result.blocks.join(", "));
 }
 ```
+
+### Economic nexus in the TypeScript SDK
+
+`TaxPreFlight.audit` runs `NexusGuard.checkNexus` whenever the intent contains a `sales_data` key. The nexus check enforces the same structured-claim contract as the Python guard.
+
+**Structured claim contract.** Provide `claimed_collects_tax` as a boolean at the top level of the intent. `true` means the AI decided tax must be collected in the state, `false` means it decided no collection is required. The guard computes the state's threshold independently and verifies the boolean against the computed nexus. Non-boolean values (including strings like `"false"`) are rejected with the block reason `"Computed nexus liability only. Provide claimed_collects_tax as a boolean for deterministic verification."`.
+
+**Legacy fallback.** When the intent does not contain a `claimed_collects_tax` key, `tax_decision: 'no_tax'` is interpreted as `claimed_collects_tax: false`. This fallback applies only when the structured claim is absent. If `claimed_collects_tax` is present but non-boolean, the intent is blocked even when `tax_decision: 'no_tax'` is also set. Any `tax_decision` value other than `'no_tax'` is not interpreted. Migrate to the structured boolean; the legacy string is a compatibility path.
+
+```typescript
+import { TaxPreFlight } from '@qwed-ai/tax';
+
+// Structured claim — over-threshold sale with a no-tax claim is blocked
+const result = TaxPreFlight.audit({
+  state: "NY",
+  sales_data: { amount: 600000, transactions: 0 },
+  claimed_collects_tax: false,
+});
+// result.allowed = false
+// result.blocks = ["Nexus threshold exceeded in NY. Registration required."]
+
+// Non-boolean claim — rejected even though it looks like a claim
+TaxPreFlight.audit({
+  state: "NY",
+  sales_data: { amount: 600000, transactions: 0 },
+  claimed_collects_tax: "false",
+});
+// blocks = ["Computed nexus liability only. Provide claimed_collects_tax as a boolean for deterministic verification."]
+
+// Legacy fallback — only used when claimed_collects_tax is absent
+TaxPreFlight.audit({
+  state: "NY",
+  sales_data: { amount: 600000, transactions: 0 },
+  tax_decision: "no_tax",
+});
+// blocks = ["Nexus threshold exceeded in NY. Registration required."]
+```
+
+<Note>
+  **Fails closed on unsupported states.** `NexusGuard.checkNexus` returns `{ verified: false, error: "State <CODE> not in configured nexus threshold table. Cannot verify nexus liability — block pending rule configuration." }` for any state that is not in the npm package's threshold table (currently NY, CA, TX, and FL). Unknown states were previously verified as no-nexus; they are now blocked. Treat this as a hold-and-escalate signal, not a "no tax owed" verdict.
+</Note>
+
+<Note>
+  **Malformed sales facts are blocked, not skipped.** Nexus validation runs whenever the `sales_data` key is present, including falsy or explicitly `undefined` values. `sales_data` must be an object with numeric fields. Non-string `state` values, non-finite amounts (`NaN`, `Infinity`, non-numeric strings), and negative `amount` or `transactions` values all fail closed with a structured block reason instead of reading as "below threshold".
+</Note>
