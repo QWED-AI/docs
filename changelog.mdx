@@ -7,6 +7,50 @@ All notable changes to the QWED platform, listed by release.
 
 ---
 
+## QWED Verification — API-key lookup migration and per-IP auth throttling
+
+**Released: September 2, 2026** · [GitHub PR #345](https://github.com/QWED-AI/qwed-verification/pull/345)
+
+> API-key lookup digests move from PBKDF2 to HMAC-SHA256 keyed by a new required `QWED_API_KEY_LOOKUP_SECRET`, removing ~67ms of CPU cost from every unauthenticated request. Anonymous `/auth/*` routes gain a per-IP rate limit, and password hashing no longer blocks the event loop.
+
+### Breaking changes
+
+<Warning>
+  **API keys issued before v7.2 stop working.** There is no PBKDF2 fallback — a legacy fallback would re-introduce the denial-of-service the migration fixes. Each key must be re-issued once; the old raw key is never required:
+
+  ```bash
+  # Before (pre-v7.2 key): now rejected
+  curl -H "X-API-Key: qwed_live_old_key" https://api.qwedai.com/v1/health
+  # -> 401 Unauthorized
+
+  # After: sign in with email/password (no API key needed), then mint a new key
+  curl -X POST https://api.qwedai.com/v1/auth/signin \
+    -H "Content-Type: application/json" \
+    -d '{"email": "user@example.com", "password": "..."}'
+
+  curl -X POST https://api.qwedai.com/v1/auth/api-keys \
+    -H "Authorization: Bearer eyJhbG..." \
+    -H "Content-Type: application/json" \
+    -d '{"name": "Production Key"}'
+  ```
+
+  Keys can also be rotated by key ID through `/admin/keys/rotate` using any already-working key. Newly issued and rotated keys are HMAC digests automatically.
+</Warning>
+
+### What changed
+
+- **HMAC-SHA256 API-key lookup.** The previous PBKDF2 digest (100,000 iterations, ~67ms) ran on every request carrying an `x-api-key` header, valid or not, letting ~15 garbage requests per second saturate the service. API keys are high-entropy random tokens, so the KDF cost bought no brute-force resistance. The replacement keyed MAC costs microseconds.
+- **Dedicated lookup secret (required).** Digests are keyed by `QWED_API_KEY_LOOKUP_SECRET`. Self-hosted servers fail closed at startup if it is missing or equal to `QWED_JWT_SECRET_KEY` — reusing the JWT secret would silently break every API-key lookup on the next JWT-secret rotation. Set it before issuing v7.2 keys; changing it later requires a one-time re-issue.
+- **Per-IP rate limit on `/auth/*`.** Anonymous auth routes (signup, signin) are throttled per client IP: `QWED_RATE_LIMIT_PER_IP`, default 10 requests per minute. Over-limit requests get `429 Too Many Requests` with a `Retry-After` header of at least 1 second. `X-Forwarded-For` is honored only when the direct peer is listed in `QWED_AUTH_TRUSTED_PROXIES` (comma-separated CIDRs, default empty), and only the rightmost hop is used, so clients cannot choose their own bucket. The IP table is hard-bounded against spoofed-address floods.
+- **Password hashing off the event loop.** Signup and signin bcrypt calls run in a worker thread instead of blocking the server. Signin also performs a dummy verify on unknown emails, so response timing no longer reveals which addresses are registered.
+- **Atomic signup.** The organization and user rows commit in one transaction; a failure mid-signup rolls back both instead of stranding an orphaned organization.
+
+### What this means for you
+
+Re-issue any API key created before v7.2. Self-hosted operators must add `QWED_API_KEY_LOOKUP_SECRET` to their environment (distinct from `QWED_JWT_SECRET_KEY`) and, if running behind a proxy, set `QWED_AUTH_TRUSTED_PROXIES` so per-IP throttling keys on real client addresses. See [Authentication](/api/authentication#api-key-storage-and-migration-v7-2) for the migration path and [Rate limits](/api/rate-limits#per-ip-limits-on-authentication-endpoints) for the throttle contract.
+
+---
+
 ## QWED-Tax — explicit boolean claim required for economic nexus verification
 
 **Released: August 31, 2026** · [GitHub PR #62](https://github.com/QWED-AI/qwed-tax/pull/62)

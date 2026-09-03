@@ -46,6 +46,46 @@ client = QWEDClient()  # Uses QWED_API_KEY env var
 | `qwed_test_` | Test/sandbox key |
 | `qwed_agent_` | Agent token |
 
+## API key storage and migration (v7.2)
+
+As of v7.2, QWED stores API keys as HMAC-SHA256 lookup digests keyed by a dedicated server-side secret (`QWED_API_KEY_LOOKUP_SECRET`). Earlier versions used PBKDF2, which added ~67ms of CPU cost to every request on the unauthenticated lookup path. Because API keys are high-entropy random tokens, the key-derivation cost bought no additional brute-force resistance, so it was removed.
+
+<Warning>
+**Breaking change.** There is no legacy fallback: API keys issued before v7.2 no longer authenticate and return `401 Unauthorized`. Each key must be re-issued once. The old raw key is never required:
+
+- **Portal or API:** sign in with your email and password to get a JWT, then call `POST /auth/api-keys` to mint a new key. This path needs no API key.
+- **Rotation by key ID:** call `/admin/keys/rotate` with the key's ID, authenticated with any already-working key.
+
+```bash
+# Before (pre-v7.2 key): now rejected
+curl -H "X-API-Key: qwed_live_old_key" https://api.qwedai.com/v1/health
+# -> 401 Unauthorized
+
+# After: re-issue via JWT login (no API key required)
+curl -X POST https://api.qwedai.com/v1/auth/signin \
+  -H "Content-Type: application/json" \
+  -d '{"email": "user@example.com", "password": "..."}'
+
+curl -X POST https://api.qwedai.com/v1/auth/api-keys \
+  -H "Authorization: Bearer eyJhbG..." \
+  -H "Content-Type: application/json" \
+  -d '{"name": "Production Key"}'
+```
+</Warning>
+
+### Self-hosted configuration
+
+Self-hosted deployments must set `QWED_API_KEY_LOOKUP_SECRET` before starting the server:
+
+- The server fails closed at startup if the variable is missing.
+- The value must differ from `QWED_JWT_SECRET_KEY`. Equal values are rejected at startup, because reusing the JWT secret would break every API-key lookup on the next JWT-secret rotation.
+- Set the secret before issuing any v7.2 keys. Digests are derived from the secret active at issue time, so changing it later requires a one-time re-issue of all keys.
+
+```bash
+# Generate a dedicated secret
+python -c "import secrets; print(secrets.token_urlsafe(48))"
+```
+
 ## Security best practices
 
 1. **Never commit API keys** to version control
@@ -93,6 +133,8 @@ API keys can have restricted scopes:
 ## Auth endpoints
 
 The following endpoints manage user accounts and API keys via JWT-based authentication.
+
+Anonymous `/auth/*` routes are rate limited per client IP (default 10 requests per minute). Exceeding the limit returns `429 Too Many Requests` with a `Retry-After` header. See [Per-IP limits on authentication endpoints](/api/rate-limits#per-ip-limits-on-authentication-endpoints).
 
 ### POST /auth/signup
 
