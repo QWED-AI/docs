@@ -46,15 +46,15 @@ go get github.com/QWED-AI/qwed-verification/sdk-go@v7.0.0
 
   <Warning>**Breaking wire changes:** `POST /verify/code` returns `VERIFIED` for proven-unsafe code (gate on `admission` / `developer_fields.is_valid`, not `status`), and `POST /verify/stats` returns the `DiagnosticResult` shape with `UNVERIFIABLE` on execution success instead of the legacy `SUCCESS` shape.</Warning>
 
-  [Full Release Notes →](/changelog#v7-0-0--full-diagnosticresult-engine-conformance) · [GitHub Release ↗](https://github.com/QWED-AI/qwed-verification/releases/tag/v7.0.0)
+  [Full Release Notes →](/changelog#v7-0-0-—-full-diagnosticresult-engine-conformance) · [GitHub Release ↗](https://github.com/QWED-AI/qwed-verification/releases/tag/v7.0.0)
 </Accordion>
 
 <Accordion title="v6.0.0 — Trust Boundary Completion (August 2, 2026)" icon="shield-check">
-  **Trust Boundary Completion epic closed (Issue #263, 12/12 sub-issues, 21 PRs).** All `/verify/*` endpoints return unified [`DiagnosticResult`](/advanced/diagnostics). Control plane requires and verifies attestation at the admission boundary before admitting `VERIFIED`. VERIFIED is a protocol guarantee backed by deterministic `proof_ref` — heuristic and advisory analysis now reports `UNVERIFIABLE` with structured `advisory_checks`. Covers [consensus](/engines/consensus), [batch math](/api/endpoints#post-verifybatch), [control-plane attestation](/advanced/attestations), and [agent state](/advanced/agent-state-guard). SDK 5.3.0 → 6.0.0 across Python, TypeScript, Rust, Docker, and Kubernetes.
+  **Trust Boundary Completion epic closed (Issue #263, 12/12 sub-issues, 21 PRs).** All `/verify/*` endpoints return unified [`DiagnosticResult`](/advanced/diagnostics). Control plane requires and verifies attestation at the admission boundary before admitting `VERIFIED`. VERIFIED is a protocol guarantee backed by deterministic `proof_ref` — heuristic and advisory analysis now reports `UNVERIFIABLE` with structured `advisory_checks`. Covers [consensus](/engines/consensus), [batch math](/api/endpoints#post-%2Fverify%2Fbatch), [control-plane attestation](/advanced/attestations), and [agent state](/advanced/agent-state-guard). SDK 5.3.0 → 6.0.0 across Python, TypeScript, Rust, Docker, and Kubernetes.
 
   <Warning>**Breaking change:** `/verify/*` responses now use the unified `DiagnosticResult` schema. Migrate consumers of the previous ad-hoc dict responses.</Warning>
 
-  [Full Release Notes →](/changelog#v6-0-0--trust-boundary-completion) · [GitHub Release ↗](https://github.com/QWED-AI/qwed-verification/releases/tag/v6.0.0)
+  [Full Release Notes →](/changelog#v6-0-0-—-trust-boundary-completion) · [GitHub Release ↗](https://github.com/QWED-AI/qwed-verification/releases/tag/v6.0.0)
 </Accordion>
 
 <Accordion title="v5.2.0 — Structured Verification Diagnostics (June 19, 2026)" icon="shield-check">

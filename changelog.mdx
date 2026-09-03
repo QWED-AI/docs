@@ -171,7 +171,7 @@ See the [guards reference](/infra/guards) and [usage examples](/infra/examples) 
 ### Surface exposure
 
 - **API endpoints** — [`POST /verification-context/from-diagnostic`, `/validate`, and `/resolve`](/api/endpoints#verification-context-endpoints) convert `DiagnosticResult` records into VC documents, validate documents against the schema, and resolve `proof_ref` commitments (PR #311).
-- **CLI commands** — the [`qwed context`](/advanced/cli#qwed-context---verification-context-utilities) group: `validate`, `resolve`, and `from-diagnostic` (PR #311).
+- **CLI commands** — the [`qwed context`](/advanced/cli#qwed-context-verification-context-utilities) group: `validate`, `resolve`, and `from-diagnostic` (PR #311).
 - **SDK re-exports** — all VC v1.0 types and helpers importable directly from `qwed_sdk`, plus `create_verification_context_from_diagnostic()`, `validate_verification_context()`, and `resolve_verification_context()` on both sync and async clients. See the [Python SDK](/sdks/python#verification-context) (PRs #311, #315).
 - **`to_verification_context()` on all 13 verifiers** — complete engine coverage (Math, Logic, Symbolic, SQL, Code, Schema, Fact, Image, Graph, Reasoning, Stats, Consensus, and the secure code executor) maps each engine's `DiagnosticResult` to a VC document (PRs #310, #316).
 - **Docker action VC outputs** — the GitHub Action emits `verdict`, `admission`, `proof_ref`, and `verification_context` [outputs](/advanced/github-action#verification-context-outputs) in every mode (PR #313).
@@ -394,7 +394,7 @@ The API is the **observation surface** — an honest witness that returns what v
 
 - **All `/verify/*` endpoints return `DiagnosticResult`** — unified response contract across every verification surface (PR #276)
 - **Control plane enforces mandatory attestation** — `require_attestation=True`, attestation issued and verified at the admission boundary, and the enforced status drives the HTTP response status (PR #278). See [Cryptographic attestations](/advanced/attestations).
-- **Batch math routes through the trust boundary** — `/verify/batch` results carry `DiagnosticResult`, `proof_ref`, and attestation, and pass through `enforce_trust_decision` (PR #282). See [`POST /verify/batch`](/api/endpoints#post-verifybatch).
+- **Batch math routes through the trust boundary** — `/verify/batch` results carry `DiagnosticResult`, `proof_ref`, and attestation, and pass through `enforce_trust_decision` (PR #282). See [`POST /verify/batch`](/api/endpoints#post-%2Fverify%2Fbatch).
 - **Attestation scope alignment** — attestations bind to the translated expression, not the natural-language query, so `query_hash` binds to what was actually verified (PR #285).
 
 ### `VERIFIED` is a protocol guarantee
@@ -463,7 +463,7 @@ The following 21 PRs shipped in the v6.0.0 release:
 
 ### Upgrading
 
-If you are on v5.3.x and only consume the high-level SDK clients or attestations, bump the version and you are done — every engine already returns `DiagnosticResult`. If your code parses raw HTTP responses from `/verify/*`, migrate to the [3-layer `DiagnosticResult`](/advanced/diagnostics) shape before upgrading. Direct callers of `LogicVerifier` should also review the [`LogicVerifier` migration notes](#v6-0-0--logicverifier-conforms-to-diagnosticresult) below.
+If you are on v5.3.x and only consume the high-level SDK clients or attestations, bump the version and you are done — every engine already returns `DiagnosticResult`. If your code parses raw HTTP responses from `/verify/*`, migrate to the [3-layer `DiagnosticResult`](/advanced/diagnostics) shape before upgrading. Direct callers of `LogicVerifier` should also review the [`LogicVerifier` migration notes](#v6-0-0-—-logicverifier-conforms-to-diagnosticresult) below.
 
 ---
 
@@ -482,7 +482,7 @@ If you are on v5.3.x and only consume the high-level SDK clients or attestations
 - **All nine methods return `DiagnosticResult`.** `verify_logic`, `verify_with_quantifiers`, `verify_bitvector`, `verify_array`, `prove_theorem`, `check_implication`, `check_equivalence`, `verify_optimization`, and `check_vacuity` all now return a `DiagnosticResult` with the three diagnostic layers populated.
 - **Per-method SAT/UNSAT disambiguation.** Z3's `sat`/`unsat` outcome is mapped to a `DiagnosticStatus` per method (for example, `verify_logic` `sat` → `VERIFIED`, but `prove_theorem` `sat` → `BLOCKED` with a counterexample; `prove_theorem` `unsat` → `VERIFIED` because the theorem was proved by contradiction). The raw solver verdict is preserved on `developer_fields["deterministic_verdict"]`.
 - **`symbol_table` on every `VERIFIED` result.** `developer_fields["symbol_table"]` is a sorted list of `{"name": ..., "type": ...}` entries for every declared variable, so audit logs capture exactly what was proven.
-- **`proof_ref` from the Z3 assertion stack.** Every `VERIFIED` result carries a deterministic `sha256:...` `proof_ref` computed from the solver's assertions — the [authority bit](/advanced/diagnostics#layer-3--proof-diagnostics) that downstream gates use for admissibility.
+- **`proof_ref` from the Z3 assertion stack.** Every `VERIFIED` result carries a deterministic `sha256:...` `proof_ref` computed from the solver's assertions — the [authority bit](/advanced/diagnostics#layer-3-—-proof-diagnostics) that downstream gates use for admissibility.
 - **Empty `variables` dict now fails closed.** The `_infer_variables` type-guessing heuristic has been removed. Calls with an empty `variables` dict return `BLOCKED` with `constraint_id = "logic_verifier.explicit_declarations_required"`. Declare every variable explicitly.
 - **Malformed `BitVec[N]` declarations now fail closed.** Type strings such as `"BitVec"`, `"BitVec[]"`, or `"BitVec[abc]"` no longer silently default to 32 bits. They return `BLOCKED` with `constraint_id = "dsl_compiler.type_validation"`.
 - **`agent_message` is sanitized.** No raw Z3 output leaks into the agent-facing layer. Structured diagnostic details live under `developer_fields`.
@@ -560,13 +560,13 @@ Callers that already treat non-`VERIFIED` results as unverified continue to work
 
 - Downstream consumers verifying a QWED attestation must hash the translated expression when re-checking `qwed.query_hash`. Hashing `user_query` will not match â€” that is intentional, because QWED does not attest to the LLM translation step.
 - If your integration branched on `trust_boundary.overall_status`, it now reflects the post-attestation decision. Signing outages surface as `BLOCKED` with `attestation_error`, not as a raw `VERIFIED` verdict.
-- See [Trust boundary](/engines/math#trust-boundary) and [`POST /verify/natural_language`](/api/endpoints#post-verify-natural-language) for the full response contract, and [Cryptographic attestations](/advanced/attestations) for the `AttestationResult` fail-closed contract.
+- See [Trust boundary](/engines/math#trust-boundary) and [`POST /verify/natural_language`](/api/endpoints#post-%2Fverify%2Fnatural_language) for the full response contract, and [Cryptographic attestations](/advanced/attestations) for the `AttestationResult` fail-closed contract.
 
 ## v5.3.0 — SymbolicVerifier: `DiagnosticResult` reference implementation
 
 **Released: July 25, 2026** · [GitHub Release](https://github.com/QWED-AI/qwed-verification/releases/tag/v5.3.0) · Minor · [PR #244](https://github.com/QWED-AI/qwed-verification/pull/244)
 
-> QWED-Verification v5.3.0 makes `SymbolicVerifier` the **first fully `DiagnosticResult`-conformant engine**. The unified 3-layer diagnostic model introduced in [v5.2.0](/changelog#v520--structured-verification-diagnostics) is no longer aspirational — the Code engine is the reference implementation the remaining engines will migrate to.
+> QWED-Verification v5.3.0 makes `SymbolicVerifier` the **first fully `DiagnosticResult`-conformant engine**. The unified 3-layer diagnostic model introduced in [v5.2.0](/changelog#v5-2-0-—-structured-verification-diagnostics) is no longer aspirational — the Code engine is the reference implementation the remaining engines will migrate to.
 
 <Warning>
 **Breaking change for the Code engine.** All six `SymbolicVerifier` public methods now return a [`DiagnosticResult`](/advanced/diagnostics) instead of a dict. Callers that read `result["status"]`, `result.verified`, `result["issues"]`, `result["complexity"]`, `result["loop_depth"]`, or `result["recursive"]` must migrate. See the [Code engine migration guide](/engines/code#migrating-from-the-legacy-dict-api) for the field-by-field mapping.
@@ -837,7 +837,7 @@ If you call `create_verification_attestation()` directly, always pass `proof_dat
 > `A2ACryptoService.verify_attestation()` used to accept a token on its own — a cryptographically valid signature was treated as sufficient proof. A detached attestation could therefore be lifted from one exchange and replayed against a different sender, receiver, or payload without detection. The method now requires a second argument, an `AttestationContext` describing the current request, and rejects the token if the sender, receiver, payload hash, or session claim does not match.
 
 <Warning>
-**Breaking change.** The single-argument form `verify_attestation(token)` has been removed — there is no context-free overload. Every call site must construct an `AttestationContext` and pass it as the second positional argument, or the call raises `TypeError`. See [Migrating to context-bound verification](/a2a/crypto-attestations#migrating-to-context-bound-verification) for the exact before/after.
+**Breaking change.** The single-argument form `verify_attestation(token)` has been removed — there is no context-free overload. Every call site must construct an `AttestationContext` and pass it as the second positional argument, or the call raises `TypeError`. See the migration example under "What this means for you" below for the exact before/after.
 </Warning>
 
 ### What changed
@@ -869,7 +869,7 @@ See [Verifying an attestation](/a2a/crypto-attestations#verifying-an-attestation
 
 ## QWED Math Engine — fail-closed on mode ambiguity, eigenvalue cardinality, and IRR convergence
 
-**Released: July 24, 2026** · [Jump to details](#qwed-math-engine--fail-closed-on-mode-ambiguity-eigenvalue-cardinality-and-irr-convergence) · [PR #217](https://github.com/qwed-ai/qwed-verification/pull/217) · [PR #218](https://github.com/qwed-ai/qwed-verification/pull/218) · [PR #219](https://github.com/qwed-ai/qwed-verification/pull/219)
+**Released: July 24, 2026** · [Jump to details](#qwed-math-engine-—-fail-closed-on-mode-ambiguity-eigenvalue-cardinality-and-irr-convergence) · [PR #217](https://github.com/qwed-ai/qwed-verification/pull/217) · [PR #218](https://github.com/qwed-ai/qwed-verification/pull/218) · [PR #219](https://github.com/qwed-ai/qwed-verification/pull/219)
 
 > Three core-verifier fixes tighten the math engine's fail-closed contract. `verify_statistics(statistic="mode")`, `verify_matrix_operation(operation="eigenvalues")`, and `verify_irr()` no longer produce `VERIFIED` when the underlying claim is ambiguous, under-specified, or numerically unproven. Callers see `BLOCKED` or `CORRECTION_NEEDED` with structured diagnostics instead of a best-effort answer.
 
@@ -959,7 +959,7 @@ If you run QWED Finance in CI, update the action reference so SARIF findings and
   uses: QWED-AI/qwed-finance@v2.1.0
 ```
 
-This is a version-sync patch for the existing v2.1.0 release (May 2026). It contains no new API or guard behavior changes beyond those already shipped in v2.1.0 (Decimal migration, fail-closed enforcement, rate parsing fix). For the original breaking changes, see the [v2.1.0 release notes](/changelog-archive#qwed-finance--v210). See [GitHub Action (CI/CD)](/finance/action) for the updated workflow example.
+This is a version-sync patch for the existing v2.1.0 release (May 2026). It contains no new API or guard behavior changes beyond those already shipped in v2.1.0 (Decimal migration, fail-closed enforcement, rate parsing fix). For the original breaking changes, see the [v2.1.0 release notes](/changelog-archive#qwed-finance-v2-1-0-—-security-audit-hardening). See [GitHub Action (CI/CD)](/finance/action) for the updated workflow example.
 
 ---
 
@@ -1106,7 +1106,7 @@ If you deploy the QWED-A2A gateway, you now get audit continuity across restarts
 
 **Released: June 21, 2026** · [GitHub PR #45](https://github.com/QWED-AI/qwed-tax/pull/45)
 
-> QWED-Tax adopts the same 3-layer `DiagnosticResult` contract introduced in [QWED-Verification v5.2.0](/changelog#v520--structured-verification-diagnostics) — as an independent model, no cross-package dependency. The first three guards (TDS, Input Tax Credit, GST reverse-charge) now expose a structured diagnostic in addition to their existing dict response.
+> QWED-Tax adopts the same 3-layer `DiagnosticResult` contract introduced in [QWED-Verification v5.2.0](/changelog#v5-2-0-—-structured-verification-diagnostics) — as an independent model, no cross-package dependency. The first three guards (TDS, Input Tax Credit, GST reverse-charge) now expose a structured diagnostic in addition to their existing dict response.
 
 ### What's new
 
@@ -1160,7 +1160,7 @@ If you've already adopted the QWED-Verification diagnostic contract, the same re
 
 ### What this means for you
 
-If your agent forwards Indian VDA tax claims, startup conversion math, or LRS remittance requests through QWED-Tax, audit the calling code for: (1) tax claims that aren't pre-quantized to two decimal places, (2) discount/cap/investment inputs that can legitimately be zero or out of range, (3) negative remittance amounts being passed defensively, and (4) AI payloads that include fields not declared on the QWED-Tax input models. See the [CryptoTaxGuard](/tax/guards#cryptotaxguard-sec-115bbh), [ValuationGuard](/tax/guards#valuationguard), [RemittanceGuard](/tax/guards#remittanceguard), and [middleware integration guide](/tax/integration#qwedtaxmiddleware-gusto-interceptor) for the updated contracts.
+If your agent forwards Indian VDA tax claims, startup conversion math, or LRS remittance requests through QWED-Tax, audit the calling code for: (1) tax claims that aren't pre-quantized to two decimal places, (2) discount/cap/investment inputs that can legitimately be zero or out of range, (3) negative remittance amounts being passed defensively, and (4) AI payloads that include fields not declared on the QWED-Tax input models. See the [CryptoTaxGuard](/tax/guards#cryptotaxguard-sec-115bbh), [ValuationGuard](/tax/guards#valuationguard-verify_conversion), [RemittanceGuard](/tax/guards#remittanceguard-fema%2Flrs), and [middleware integration guide](/tax/integration#qwedtaxmiddleware-gusto-interceptor) for the updated contracts.
 
 ### Audit reference
 

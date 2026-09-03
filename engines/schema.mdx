@@ -148,7 +148,7 @@ result = client.verify_schema(
 | `strict=False` | `false` | yes | `is_valid: true` (permissive) |
 
 <Info>
-This fail-closed behavior for strict `additionalProperties: false` was hardened in the v5.1.x line. See the [changelog](/changelog#qwed-verification--strict-additionalproperties-fail-closed) for the release notes.
+This fail-closed behavior for strict `additionalProperties: false` was hardened in the v5.1.x line. See the [changelog](/changelog-archive#qwed-verification-—-strict-additionalproperties-fail-closed) for the release notes.
 </Info>
 
 ## Array validation
@@ -190,7 +190,7 @@ result = client.verify_schema(obj=[{"bad": {1, 2}}, {"bad": {3, 4}}], schema=sch
 ```
 
 <Info>
-This fail-closed behavior shipped in v5.1.0. See the [changelog](/changelog#v5-1-0-—-agent-state-governance-and-fail-closed-hardening) for the full release notes.
+This fail-closed behavior shipped in v5.1.0. See the [changelog](/changelog-archive#v5-1-0-—-agent-state-governance-and-fail-closed-hardening) for the full release notes.
 </Info>
 
 ## UCP transaction verification

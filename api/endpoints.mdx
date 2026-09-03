@@ -1004,7 +1004,7 @@ Verify a claim using an agent token. Creates an auditable record tied to the age
 | `context` | object | Yes | Action context — see below |
 | `context.conversation_id` | string | Yes | Unique identifier for the conversation/session |
 | `context.step_number` | integer | Yes | Monotonically increasing step counter (>= 1) |
-| `context.pre_action_state_hash` | string | Conditional | SHA-256 hex digest (64 lowercase hex characters) of the world state before the action. Must be provided together with `state_source`. Enables [LOOP-004](/specs/agent#94-progress-aware-doom-loop-detection-loop-004) detection |
+| `context.pre_action_state_hash` | string | Conditional | SHA-256 hex digest (64 lowercase hex characters) of the world state before the action. Must be provided together with `state_source`. Enables [LOOP-004](/specs/agent#9-4-progress-aware-doom-loop-detection-loop-004) detection |
 | `context.state_source` | string | Conditional | Declares how `pre_action_state_hash` was derived. One of: `file_tree`, `db_snapshot`, `conversation_digest`, `git_tree`, `custom`. Must be provided together with `pre_action_state_hash` |
 | `tool_schema` | object | No | MCP tool definition to scan. When provided, `MCPPoisonGuard` runs automatically |
 
