@@ -90,6 +90,19 @@ All generated statistical code is executed inside a Docker container with enforc
 Previous versions of QWED offered Wasm and restricted Python fallbacks when Docker was unavailable. These fallback paths have been removed. You must have a running Docker daemon for statistical verification to work.
 </Warning>
 
+## Pre-execution security validation
+
+Generated statistical code is validated with an AST walk before it reaches the sandbox. Code that fails validation is blocked with a `403` and never executes. The check blocks:
+
+- **Dangerous imports anywhere in the import path.** OS, process, and reflection modules (`os`, `sys`, `subprocess`, `socket`, `posix`, `nt`, `importlib`, `ctypes`, `builtins`) are rejected in every dotted segment of an `import` or `from ... import` statement, including members bound under innocuous aliases (`from pandas.io.common import os as safe`).
+- **Blocked call names on bare names and attribute targets.** Interpreter builtins (`eval`, `exec`, `open`, ...) and OS primitives (`system`, `popen`, `import_module`, the `exec*`/`spawn*` families, `fork`) are rejected whether called directly or as `x.eval(...)`-style attribute calls. This also catches reflective re-binding such as `sys.modules['os'].system(...)` at the call site.
+- **Traversal through sandbox module internals.** Attribute chains rooted at the sandbox aliases (`pd`, `np`, `json`, `sys`) are rejected when any segment names a dangerous module — for example reaching the OS module through pandas or numpy internal re-exports. Legitimate nested public APIs (`np.linalg.norm`, `np.random.seed`, `pd.Timestamp.now`) pass, because they never name a dangerous module.
+- **`sys` restricted to a read-only allowlist.** Only known read-only interpreter metadata (`sys.maxsize`, `sys.version`, `sys.float_info`, `sys.platform`, ...) is accessible. Any other `sys` member, including frame introspection like `sys._getframe`, fails closed.
+
+<Note>
+Known trade-off: a DataFrame column named like a dangerous module cannot be read with attribute access — `df.os` is rejected because static analysis cannot distinguish it from a gadget. Use subscript access (`df['os']`) instead.
+</Note>
+
 ## Error handling
 
 When the Stats Engine encounters an internal failure — such as a code generation or translation error — it returns a generic `"Internal verification error"` message. Sensitive details like file paths, credentials, or stack traces are never included in the API response.
