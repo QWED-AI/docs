@@ -106,6 +106,38 @@ Some endpoints have specific limits:
 | `/agent/register` | 10/hour |
 | `/attestation/verify` | 1000/hour |
 
+## Per-IP limits on authentication endpoints
+
+Anonymous `/auth/*` routes such as `POST /auth/signup` and `POST /auth/signin` carry no API key, so the per-key limiter cannot apply. As of v7.2, these routes are rate limited per client IP instead. This blocks password-guessing and prevents unauthenticated requests from saturating the service with expensive password hashing.
+
+| Environment variable | Default | Description |
+|----------------------|---------|-------------|
+| `QWED_RATE_LIMIT_PER_IP` | `10` | Requests per minute per client IP on anonymous `/auth/*` routes. Must be at least 1; the server fails at startup otherwise. |
+| `QWED_AUTH_TRUSTED_PROXIES` | empty | Comma-separated IPs or CIDR ranges of reverse proxies trusted to set `X-Forwarded-For`. |
+
+When the limit is exceeded, the API returns `429 Too Many Requests` with a `Retry-After` header (always at least 1 second):
+
+```
+HTTP/1.1 429 Too Many Requests
+Retry-After: 42
+
+{"detail": "Too many authentication attempts. Try again in 42 seconds."}
+```
+
+### Client IP resolution behind proxies
+
+By default the direct peer address is the rate-limit key and the `X-Forwarded-For` header is ignored, so a client cannot mint fresh quotas by rotating spoofed header values. If QWED runs behind a load balancer or reverse proxy, set `QWED_AUTH_TRUSTED_PROXIES` to the proxy's address range:
+
+```bash
+export QWED_AUTH_TRUSTED_PROXIES=172.16.0.0/12
+```
+
+When the direct peer matches a trusted proxy, QWED uses the rightmost `X-Forwarded-For` hop as the client IP. Trusted proxies append the real client address after any client-supplied entries, so clients still cannot choose their own bucket. Port suffixes (`1.2.3.4:8080`, `[2001:db8::1]:8080`) are stripped before bucketing.
+
+<Note>
+Per-IP buckets are process-local. Running multiple workers or replicas multiplies the effective per-IP budget by the process count. Run a single replica for exact limits, or move rate limiting to a shared store such as Redis before scaling out.
+</Note>
+
 ## Thread-safe in-memory limiter
 
 The default in-memory rate limiter is thread-safe. All check-and-record operations (per-key and global) are protected by a lock, making it safe to use with multi-threaded ASGI servers such as Uvicorn with multiple workers. The `get_reset_time` method also operates under the lock to prevent stale reads.

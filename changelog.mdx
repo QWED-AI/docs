@@ -7,6 +7,110 @@ All notable changes to the QWED platform, listed by release.
 
 ---
 
+## QWED Verification — structural math parser and sandbox gate hardening (security release)
+
+**Released: September 3, 2026** · [GitHub PR #344](https://github.com/QWED-AI/qwed-verification/pull/344) · [GitHub PR #346](https://github.com/QWED-AI/qwed-verification/pull/346)
+
+> Two security fixes close sandbox-escape bypasses in math expression parsing and sandboxed code execution. The math parser now validates expressions structurally (NFKC normalization, ASCII charset gate, AST node allowlist) instead of relying on a denylist, and the consensus and stats execution paths gained a single-expression structural gate plus a module-indirection blocklist.
+
+### Math expression parser (PR #344)
+
+The safe expression parser applies layered structural validation before any SymPy evaluation:
+
+- **NFKC normalization first.** CPython normalizes identifiers at compile time, so Unicode look-alike codepoints (mathematical bold letters, fullwidth forms) could previously slip past string filters. All checks now see exactly what the compiler sees.
+- **ASCII charset allowlist.** Only letters, digits, underscore, whitespace, and `+ - * / ( ) . , ^ %` are accepted. A `.` is legal only as a decimal point with digits on both sides, which makes attribute access structurally impossible on the implicit-multiplication path.
+- **AST node-type allowlist.** Python-parseable input may contain only arithmetic operators, function calls, names, and numeric constants. Attribute access, subscripts, string constants, lambdas, comprehensions, and comparisons are rejected before evaluation.
+- **Caret exponentiation fixed.** `convert_xor` joined the default transformation pipeline, so `x^2` parses as `x**2` instead of failing at evaluation time.
+- The regex denylist is retained as defense in depth.
+
+### Execution gates (PR #346)
+
+- **Single-expression gate on translated math.** A translated math expression must parse as exactly one Python expression (`ast.parse` in `eval` mode). Multi-statement, import-bearing, and multi-line-smuggled input fails by construction. Expressions over 500 characters are rejected before parsing.
+- **Module-indirection blocklist.** The pre-execution AST check on sandboxed code now inspects every dotted segment of imports and attribute chains. Blocked module roots were extended (`posix`, `nt`, `importlib`, `ctypes`, `builtins`), OS-primitive call names (`system`, `popen`, `import_module`, the `exec*`/`spawn*` families, `fork`) are matched on bare names and attribute targets, and package-internal re-export gadgets through pandas/numpy internals are caught.
+- **`sys` read-only allowlist in the stats executor.** Only named read-only interpreter metadata is accessible; frame introspection and every other `sys` member fail closed.
+
+### Behavior changes
+
+<Warning>
+Math expression inputs that previously parsed may now be rejected before evaluation:
+
+- Bare decimals are rejected — write `0.5` and `2.0`, not `.5` and `2.`.
+- Non-ASCII symbols are rejected — write `alpha`, not `α`.
+- String constants, attribute access, and comparisons inside math expressions are rejected.
+- Multi-statement or import-bearing expressions fail by construction.
+
+Legitimate arithmetic, implicit multiplication (`2x`, `sin x`), and pandas/numpy public APIs in generated stats code (`np.linalg.norm`, `pd.Timestamp.now`) are unaffected.
+</Warning>
+
+### What this means for you
+
+A character denylist can never defend an `eval` sink — these releases replace pattern-matching known attacks with structural guarantees that reject entire vulnerability classes by construction. See [Math engine — Expression input rules](/engines/math#expression-input-rules), [Consensus engine — Secure execution gates](/engines/consensus#secure-execution-gates), and [Stats engine — Pre-execution security validation](/engines/stats#pre-execution-security-validation).
+
+---
+
+## QWED Verification — API-key lookup migration and per-IP auth throttling
+
+**Released: September 2, 2026** · [GitHub PR #345](https://github.com/QWED-AI/qwed-verification/pull/345)
+
+> API-key lookup digests move from PBKDF2 to HMAC-SHA256 keyed by a new required `QWED_API_KEY_LOOKUP_SECRET`, removing ~67ms of CPU cost from every unauthenticated request. Anonymous `/auth/*` routes gain a per-IP rate limit, and password hashing no longer blocks the event loop.
+
+### Breaking changes
+
+<Warning>
+  **API keys issued before v7.2 stop working.** There is no PBKDF2 fallback — a legacy fallback would re-introduce the denial-of-service the migration fixes. Each key must be re-issued once; the old raw key is never required:
+
+  ```bash
+  # Before (pre-v7.2 key): now rejected
+  curl -H "X-API-Key: qwed_live_old_key" https://api.qwedai.com/v1/health
+  # -> 401 Unauthorized
+
+  # After: sign in with email/password (no API key needed), then mint a new key
+  curl -X POST https://api.qwedai.com/v1/auth/signin \
+    -H "Content-Type: application/json" \
+    -d '{"email": "user@example.com", "password": "..."}'
+
+  curl -X POST https://api.qwedai.com/v1/auth/api-keys \
+    -H "Authorization: Bearer eyJhbG..." \
+    -H "Content-Type: application/json" \
+    -d '{"name": "Production Key"}'
+  ```
+
+  Keys can also be rotated by key ID through `/admin/keys/rotate` using any already-working key. Newly issued and rotated keys are HMAC digests automatically.
+</Warning>
+
+### What changed
+
+- **HMAC-SHA256 API-key lookup.** The previous PBKDF2 digest (100,000 iterations, ~67ms) ran on every request carrying an `x-api-key` header, valid or not, letting ~15 garbage requests per second saturate the service. API keys are high-entropy random tokens, so the KDF cost bought no brute-force resistance. The replacement keyed MAC costs microseconds.
+- **Dedicated lookup secret (required).** Digests are keyed by `QWED_API_KEY_LOOKUP_SECRET`. Self-hosted servers fail closed at startup if it is missing or equal to `QWED_JWT_SECRET_KEY` — reusing the JWT secret would silently break every API-key lookup on the next JWT-secret rotation. Set it before issuing v7.2 keys; changing it later requires a one-time re-issue.
+- **Per-IP rate limit on `/auth/*`.** Anonymous auth routes (signup, signin) are throttled per client IP: `QWED_RATE_LIMIT_PER_IP`, default 10 requests per minute. Over-limit requests get `429 Too Many Requests` with a `Retry-After` header of at least 1 second. `X-Forwarded-For` is honored only when the direct peer is listed in `QWED_AUTH_TRUSTED_PROXIES` (comma-separated CIDRs, default empty), and only the rightmost hop is used, so clients cannot choose their own bucket. The IP table is hard-bounded against spoofed-address floods.
+- **Password hashing off the event loop.** Signup and signin bcrypt calls run in a worker thread instead of blocking the server. Signin also performs a dummy verify on unknown emails, so response timing no longer reveals which addresses are registered.
+- **Atomic signup.** The organization and user rows commit in one transaction; a failure mid-signup rolls back both instead of stranding an orphaned organization.
+
+### What this means for you
+
+Re-issue any API key created before v7.2. Self-hosted operators must add `QWED_API_KEY_LOOKUP_SECRET` to their environment (distinct from `QWED_JWT_SECRET_KEY`) and, if running behind a proxy, set `QWED_AUTH_TRUSTED_PROXIES` so per-IP throttling keys on real client addresses. See [Authentication](/api/authentication#api-key-storage-and-migration-v7-2) for the migration path and [Rate limits](/api/rate-limits#per-ip-limits-on-authentication-endpoints) for the throttle contract.
+
+---
+
+## QWED-Tax — npm verifier enforces structured nexus claims fail-closed
+
+**Released: September 1, 2026** · [GitHub PR #65](https://github.com/QWED-AI/qwed-tax/pull/65)
+
+> The `@qwed-ai/tax` npm verifier now requires the structured boolean `claimed_collects_tax` claim for economic-nexus checks, matching the Python guard's contract. Unknown states, non-boolean claims, and malformed sales facts fail closed instead of passing as no-nexus.
+
+### What changed
+
+- **Structured claim required** — `TaxPreFlight.audit` and `NexusGuard.checkNexus` verify the boolean `claimed_collects_tax` against the independently computed nexus. Non-boolean values (including strings like `"false"`) are rejected with `"Computed nexus liability only. Provide claimed_collects_tax as a boolean for deterministic verification."`.
+- **Legacy fallback narrowed** — `tax_decision: 'no_tax'` maps to `claimed_collects_tax: false` only when the intent does not contain a `claimed_collects_tax` key. A present-but-invalid structured claim is blocked even when the legacy string is also set.
+- **Unknown states fail closed** — states not in the npm threshold table (currently NY, CA, TX, FL) return `verified: false` with a block-pending-configuration error instead of being verified as no-nexus.
+- **Input hardening** — nexus validation runs whenever `sales_data` is present (including falsy or explicitly `undefined` values). Non-string `state`, non-finite amounts (`NaN`, `Infinity`), and negative sales or transaction counts are rejected before threshold math.
+
+### What this means for you
+
+If your frontend or Node integration relied on unknown states passing, on truthy strings as claims, or on omitting `sales_data` fields to skip the nexus check, those intents now block. Pass `claimed_collects_tax` as an explicit boolean and treat unknown-state blocks as hold-and-escalate signals. See [Economic nexus in the TypeScript SDK](/tax/integration#economic-nexus-in-the-typescript-sdk) for the full contract.
+
+---
+
 ## QWED-Tax — explicit boolean claim required for economic nexus verification
 
 **Released: August 31, 2026** · [GitHub PR #62](https://github.com/QWED-AI/qwed-tax/pull/62)

@@ -579,6 +579,54 @@ result = client.verify_math("1/(2*(3+1))")
 
 ---
 
+## Expression input rules
+
+Every math expression passes through a layered structural validator before SymPy evaluates it. The validator runs in order: NFKC Unicode normalization, an ASCII character-set gate, a construct denylist, and an AST node-type allowlist. An expression that fails any layer is rejected before evaluation.
+
+These are the rules your expressions must follow:
+
+| Rule | Rejected | Write instead |
+| --- | --- | --- |
+| Decimal points need a digit on both sides | `.5`, `2.` | `0.5`, `2.0` |
+| ASCII characters only | `α + 1`, `２＋２` | `alpha + 1`, `2+2` |
+| No string or bytes literals | `"abc" + x` | Remove the string |
+| No attribute access | `x.real`, `(2).bit_length()` | Not supported |
+| No comparisons, booleans, or assignment | `x > 1`, `True`, `a = b` | Use an equality claim (`lhs = rhs`) at the top level only |
+| No subscripts, brackets, or semicolons | `a[0]`, `{x}`, `1; 2` | Not supported |
+| No lambdas or comprehensions | `lambda: 1` | Not supported |
+
+Additional details:
+
+- **Greek letters:** the parser provides ASCII names for the full Greek alphabet (`alpha`, `beta`, `gamma`, ... `omega`). Write `alpha * x`, not `α * x`. Non-ASCII codepoints never reach the parser, including Unicode look-alikes that NFKC-normalize to ASCII identifiers.
+- **Allowed characters:** letters, digits, underscore, whitespace, and the operator set `+ - * / ( ) . , ^ %`.
+- **Allowed syntax:** arithmetic operators, function calls from the safe namespace (`sin`, `cos`, `log`, `sqrt`, `factorial`, ...), symbol names, and numeric constants. Everything else is rejected by the AST allowlist.
+- **Caret exponentiation:** `^` is converted to `**` by the default transformation pipeline, so `x^2` and `2^3` parse correctly.
+- **Depth and length limits:** expressions are capped at 5,000 characters, an AST depth of 30, and a SymPy tree depth of 40.
+- **Implicit multiplication** (`2x`, `sin x`, `2(x+1)`) still parses. These forms are covered by the character-set gate instead of the AST check.
+
+```python
+# Rejected — bare decimal
+result = client.verify_math(".5 * 200 = 100")
+# Validation error: write 0.5
+
+# Rejected — non-ASCII symbol
+result = client.verify_math("α^2 + 1 = 2")
+# Validation error: use alpha
+
+# Accepted
+result = client.verify_math("0.5 * 200 = 100")
+# ✓ Verified
+
+result = client.verify_math("(alpha + 1)^2 = alpha^2 + 2*alpha + 1")
+# ✓ Verified: algebraic identity
+```
+
+<Note>
+These rules are structural security guarantees, not style preferences. Attribute access, string constants, and non-ASCII identifiers are the building blocks of sandbox-escape payloads, so the parser rejects them by construction rather than pattern-matching known attacks. Legitimate arithmetic never needs them.
+</Note>
+
+---
+
 ## Edge cases
 
 | Scenario              | Behavior                              |
@@ -592,6 +640,9 @@ result = client.verify_math("1/(2*(3+1))")
 | Invalid tolerance     | Returns "BLOCKED" with error message  |
 | Sampling-only identity match | Returns "BLOCKED" — no formal proof established |
 | Ambiguous implicit multiplication | Returns "BLOCKED" — rewrite with explicit operators |
+| Bare decimal (`.5`, `2.`) | Rejected before evaluation — write `0.5`, `2.0` |
+| Non-ASCII characters (`α`, fullwidth digits) | Rejected before evaluation — use ASCII names like `alpha` |
+| Strings, attribute access, comparisons, subscripts | Rejected by the AST allowlist — see [Expression input rules](#expression-input-rules) |
 | Non-equality expression in batch verification | Returns `is_valid: false` with `status: "SIMPLIFIED"` — simplification is not a proof |
 | Ambiguous mode (multimodal data) | Returns "BLOCKED" with `ambiguous_modes` — only a unique mode can verify |
 | Incomplete or over-complete eigenvalue claim | Returns "CORRECTION_NEEDED" with `calculated_count`/`claimed_count` |
