@@ -204,7 +204,7 @@ gunicorn qwed_new.api.main:app -w 4 -k uvicorn.workers.UvicornWorker --bind 0.0.
 | `API_KEY_SECRET` | Secret key for signing JWTs | None (must be set) | **YES** |
 | `QWED_CORS_ORIGINS` | Comma-separated list of allowed CORS origins | None (must be set) | **YES** |
 | `QWED_SKIP_ENV_INTEGRITY_CHECK` | Set to `true` to bypass startup environment integrity check | `false` | No |
-| `API_KEY_SECRET` | Secret for PBKDF2 API-key hashing | None | **Yes** |
+| `QWED_API_KEY_LOOKUP_SECRET` | Secret for HMAC-SHA256 API-key lookup digests. Must differ from `QWED_JWT_SECRET_KEY` | None | **Yes** |
 | `QWED_CORS_ORIGINS` | Comma-separated allowed CORS origins | None | **Yes** |
 
 <Warning>

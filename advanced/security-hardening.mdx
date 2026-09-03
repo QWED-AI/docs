@@ -49,11 +49,15 @@ envconsul -prefix qwed/prod/ qwed-api
 
 <Info>Changed in v5.0.0</Info>
 
-`API_KEY_SECRET` is now **mandatory** — the server will not start without it. This secret is used for PBKDF2 API-key hashing. Generate one with:
+`API_KEY_SECRET` is now **mandatory** — the server will not start without it. Generate one with:
 
 ```bash
 python -c "import secrets; print(secrets.token_urlsafe(48))"
 ```
+
+<Info>Changed in v7.2</Info>
+
+API-key lookup digests are now HMAC-SHA256, keyed by the dedicated `QWED_API_KEY_LOOKUP_SECRET` (required — the server fails at startup if it is missing or equal to `QWED_JWT_SECRET_KEY`). Rotating this secret invalidates all existing API-key digests and requires re-issuing every key, so treat it as long-lived. See [Authentication](/api/authentication#api-key-storage-and-migration-v7-2).
 
 Ensure these secrets are rotated regularly:
 - `API_KEY_SECRET` (used for API key hashing — **required**)
@@ -91,6 +95,8 @@ You can adjust the rate limits using environment variables:
 |----------------------|---------|-------------|
 | `RATE_LIMIT_REQUESTS_PER_MINUTE` | `100` | Max requests per minute **per API key**. |
 | `RATE_LIMIT_WINDOW_SECONDS` | `60` | Time window in seconds. |
+| `QWED_RATE_LIMIT_PER_IP` | `10` | Max requests per minute **per client IP** on anonymous `/auth/*` routes. Must be at least 1. |
+| `QWED_AUTH_TRUSTED_PROXIES` | empty | Comma-separated proxy IPs/CIDRs trusted to set `X-Forwarded-For` for per-IP throttling. |
 
 **Example:**
 ```bash

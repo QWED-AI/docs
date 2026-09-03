@@ -273,6 +273,10 @@ if not result["verified"]:
   **Fails closed on unmodeled states.** A call with a `state` code that is not in the threshold table returns `{"verified": False, "error": "State <CODE> not in configured nexus threshold table. Cannot verify nexus liability — block pending rule configuration."}`. The guard never falls back to "not high-risk → no tax" for jurisdictions it has not been configured for.
 </Note>
 
+<Note>
+  **TypeScript parity.** The `@qwed-ai/tax` npm package enforces the same contract in `NexusGuard.checkNexus(state, ytdSales, transactions, claimedCollectsTax)`: the claim must be a boolean (non-boolean values are rejected), unmodeled states fail closed with the same block-pending-configuration error, and non-finite or negative sales inputs are rejected before threshold math. The npm threshold table currently covers NY, CA, TX, and FL. See [Economic nexus in the TypeScript SDK](/tax/integration#economic-nexus-in-the-typescript-sdk) for the intent-level contract, including the legacy `tax_decision: 'no_tax'` fallback.
+</Note>
+
 ### PayrollGuard (FICA limits)
 
 **Goal:** Verify paycheck math. **Logic:**
