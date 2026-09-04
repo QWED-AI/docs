@@ -1130,7 +1130,7 @@ Authorization: Bearer <jwt_token>
 X-API-Key: <api_key>
 ```
 
-An API key resolves through its owning user, so the key must belong to an allowlisted, active user. Expired or revoked keys are not usable credentials; if a request carries both an API key and a JWT, the JWT can still authorize the read.
+An API key resolves through its owning user, so the key must belong to an active user on the allowlist. Expired or revoked keys are not usable credentials; if a request carries both an API key and a JWT, the JWT can still authorize the read.
 
 **Response:**
 
@@ -1143,7 +1143,7 @@ An API key resolves through its owning user, so the key must belong to an allowl
 
 | Status | Description |
 |--------|-------------|
-| 401 | No authentication provided |
+| 401 | No usable authentication provided (no credentials, or only an expired API key) |
 | 403 | Authenticated, but the user is not in `QWED_METRICS_OPERATOR_USER_IDS` |
 
 ### GET /metrics/{organization_id}
@@ -1167,7 +1167,7 @@ X-API-Key: <api_key>
 
 | Status | Description |
 |--------|-------------|
-| 401 | No authentication provided |
+| 401 | No usable authentication provided (no credentials, or only an expired API key) |
 | 403 | Authenticated, but the user is not in `QWED_METRICS_OPERATOR_USER_IDS` |
 
 ### GET /logs

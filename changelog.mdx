@@ -23,7 +23,7 @@ All notable changes to the QWED platform, listed by release.
 ### Behavior changes
 
 <Warning>
-Deployments that scrape `/metrics` (e.g., Prometheus) will start receiving 401/403 after upgrading. Create a dedicated operator account, mint it an API key, and add its user ID to `QWED_METRICS_OPERATOR_USER_IDS` before deploying. The bundled Prometheus configuration in `deploy/` documents the bootstrap steps. See [Security Hardening](/advanced/security-hardening#all-tenant-metrics-authorization).
+Deployments that scrape the Prometheus endpoint (`/metrics/prometheus`) without the operator allowlist and valid scraper credentials will start receiving 401/403 after upgrading. Create a dedicated operator account, mint it an API key, and add its user ID to `QWED_METRICS_OPERATOR_USER_IDS` before deploying. The `deploy/prometheus.yml` in the [qwed-verification repository](https://github.com/QWED-AI/qwed-verification) documents the scrape bootstrap steps. See [Security Hardening](/advanced/security-hardening#all-tenant-metrics-authorization).
 </Warning>
 
 ## QWED Verification — structural math parser and sandbox gate hardening (security release)
