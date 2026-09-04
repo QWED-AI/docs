@@ -182,7 +182,7 @@ Fail-closed by design: with `QWED_METRICS_OPERATOR_USER_IDS` unset, `/metrics` a
 
 Self-service signup mints `role="owner"` for every new account, so organization roles cannot be trusted as platform-wide authority.
 
-If your monitoring stack scrapes `/metrics/prometheus`, create a dedicated operator account, mint it an API key, and add its user ID to the allowlist **before deploying**. Prometheus cannot template environment variables into its own config, so inject the key into the scrape config through your secret-management pipeline.
+If your monitoring stack scrapes `/metrics/prometheus`, create a dedicated operator account, mint it an API key, and add its user ID to the allowlist **before deploying**. Prometheus's `http_headers` block takes a static header value — it cannot read QWED's environment variables. On Prometheus 2.55+ you can keep the key out of the config file using file-backed `secrets`/`files` entries under `http_headers`, and have your secret-management pipeline render the key into that file.
 </Warning>
 
 ```bash
