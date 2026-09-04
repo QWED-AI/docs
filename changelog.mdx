@@ -7,6 +7,25 @@ All notable changes to the QWED platform, listed by release.
 
 ---
 
+## QWED Verification — all-tenant metrics restricted to explicit platform operators (security release)
+
+**Released: September 4, 2026** · [GitHub PR #349](https://github.com/QWED-AI/qwed-verification/pull/349) · Closes [issue #337](https://github.com/QWED-AI/qwed-verification/issues/337) (CWE-284, CVSS 7.1)
+
+> `GET /metrics` and `GET /metrics/prometheus` exposed every organization's request volumes, latencies, provider usage, and per-tenant breakdowns to any self-service signup. The access gate treated the organization-scoped `owner`/`admin` role as platform-wide authority, and since signup is the only user-creation path — hardcoding `role="owner"` for every new account — the gate degenerated to "possess any account," one anonymous request away. Access is now an explicit operator allowlist, fail-closed when unset.
+
+### What changed
+
+- **Operator allowlist.** All-tenant metrics require the caller's user ID to be listed in `QWED_METRICS_OPERATOR_USER_IDS` (comma-separated). The list is read per request, so granting or rotating operators takes effect without a restart.
+- **Org roles are no longer platform authority.** `owner` and `admin` remain meaningful inside their own organization; they confer no cross-tenant access anywhere.
+- **API-key path hardened.** A key resolves through its owning user, who must be on the allowlist. Expired (`expires_at`) or revoked (`revoked_at`) keys are no longer usable credentials — but they also no longer preempt a valid operator JWT presented in the same request. Key-only callers without a valid credential are still denied.
+- **Fail-closed by default.** With the variable unset, both endpoints deny every caller. Per-tenant metrics (`GET /metrics/{organization_id}`) are unchanged.
+
+### Behavior changes
+
+<Warning>
+Deployments that scrape `/metrics` (e.g., Prometheus) will start receiving 401/403 after upgrading. Create a dedicated operator account, mint it an API key, and add its user ID to `QWED_METRICS_OPERATOR_USER_IDS` before deploying. The bundled Prometheus configuration in `deploy/` documents the bootstrap steps. See [Security Hardening](/advanced/security-hardening#all-tenant-metrics-authorization).
+</Warning>
+
 ## QWED Verification — structural math parser and sandbox gate hardening (security release)
 
 **Released: September 3, 2026** · [GitHub PR #344](https://github.com/QWED-AI/qwed-verification/pull/344) · [GitHub PR #346](https://github.com/QWED-AI/qwed-verification/pull/346)

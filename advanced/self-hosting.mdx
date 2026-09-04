@@ -160,6 +160,8 @@ qwed_verification_latency_seconds
 qwed_cache_hit_rate
 ```
 
+Scraping `/metrics` requires a platform operator: add the scraper identity's user ID to `QWED_METRICS_OPERATOR_USER_IDS` (fail-closed when unset — every caller is denied, including org owners/admins). See [All-tenant metrics authorization](/advanced/security-hardening#all-tenant-metrics-authorization).
+
 ## Security
 
 1. **Always use HTTPS** in production
@@ -169,3 +171,4 @@ qwed_cache_hit_rate
 5. **Enable rate limiting**
 6. **Use network isolation**
 7. **Rotate secrets regularly**
+8. **Configure `QWED_METRICS_OPERATOR_USER_IDS`** if anything needs all-tenant metrics — unset means deny-all
