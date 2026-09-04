@@ -7,7 +7,7 @@ description: "Harden QWED for production with prompt injection defense, secret m
 This guide provides instructions for hardening your QWED deployment for production environments. It covers prompt injection defense, secret management, network security, authentication, and compliance with OWASP LLM Top 10.
 
 <Note>
-Only **QWED v5.x** is currently supported with security patches and updates. Versions 4.x and earlier are end-of-life. If you are running a prior version, upgrade before applying the guidance below.
+Only **QWED v7.x** is currently supported with security patches and updates. Versions 6.x and earlier are end-of-life. If you are running a prior version, upgrade before applying the guidance below.
 </Note>
 
 ## 1. Secret management
@@ -166,6 +166,30 @@ Control the lifetime of access tokens to reduce the window of opportunity for se
 ```bash
 export JWT_ACCESS_TOKEN_EXPIRE_MINUTES=30
 ```
+
+### All-tenant metrics authorization
+
+<Info>Changed in v7.2</Info>
+
+`GET /metrics` and `GET /metrics/prometheus` expose cross-tenant data: request volumes, latencies, provider usage, and per-tenant breakdowns for every organization. Access is a **platform-operator** capability controlled by an explicit allowlist, not an organization role:
+
+| Environment Variable | Default | Description |
+|----------------------|---------|-------------|
+| `QWED_METRICS_OPERATOR_USER_IDS` | empty | Comma-separated user IDs permitted to read all-tenant metrics. |
+
+<Warning>
+Fail-closed by design: with `QWED_METRICS_OPERATOR_USER_IDS` unset, `/metrics` and `/metrics/prometheus` deny **every** caller — including organization owners and admins.
+
+Self-service signup mints `role="owner"` for every new account, so organization roles cannot be trusted as platform-wide authority.
+
+If your monitoring stack scrapes `/metrics/prometheus`, create a dedicated operator account, mint it an API key, and add its user ID to the allowlist **before deploying**. Prometheus's `http_headers` block takes a static header value — it cannot read QWED's environment variables. On Prometheus 2.55+ you can keep the key out of the config file using file-backed `secrets`/`files` entries under `http_headers`, and have your secret-management pipeline render the key into that file.
+</Warning>
+
+```bash
+export QWED_METRICS_OPERATOR_USER_IDS="1,42"
+```
+
+Reading the allowlist is done per request, so granting or rotating operators takes effect immediately without a restart. Per-tenant metrics (`GET /metrics/{organization_id}`) are unchanged and remain scoped to the caller's own organization.
 
 ---
 

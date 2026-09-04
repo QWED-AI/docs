@@ -1121,7 +1121,7 @@ Verify an attestation JWT.
 
 ### GET /metrics
 
-Returns global system metrics and per-tenant breakdowns. Requires admin authentication. Provide either a JWT token for an active user with the `owner` or `admin` role, or an API key linked to an active `owner` or `admin` user.
+Returns global system metrics and per-tenant breakdowns. This is a cross-tenant, platform-operator capability: the caller must be a user ID listed in `QWED_METRICS_OPERATOR_USER_IDS` (comma-separated, fail-closed when unset). Organization roles (`owner` / `admin`) do **not** grant access — they are scoped to a single organization.
 
 **Headers (one of):**
 
@@ -1129,6 +1129,8 @@ Returns global system metrics and per-tenant breakdowns. Requires admin authenti
 Authorization: Bearer <jwt_token>
 X-API-Key: <api_key>
 ```
+
+An API key resolves through its owning user, so the key must belong to an active user on the allowlist. Expired or revoked keys are not usable credentials; if a request carries both an API key and a JWT, the JWT can still authorize the read.
 
 **Response:**
 
@@ -1141,8 +1143,8 @@ X-API-Key: <api_key>
 
 | Status | Description |
 |--------|-------------|
-| 401 | No authentication provided |
-| 403 | Authenticated but not an active admin or owner |
+| 401 | No usable authentication provided (no credentials, or only an expired API key) |
+| 403 | Authenticated, but the user is not in `QWED_METRICS_OPERATOR_USER_IDS` |
 
 ### GET /metrics/{organization_id}
 
@@ -1154,7 +1156,7 @@ Returns metrics scoped to a specific organization. Tenants can only view their o
 
 ### GET /metrics/prometheus
 
-Returns metrics in Prometheus text format for scraping by monitoring infrastructure. Requires the same admin authentication as `GET /metrics`.
+Returns metrics in Prometheus text format for scraping by monitoring infrastructure. Requires the same platform-operator authentication as `GET /metrics`.
 
 **Headers (one of):**
 
@@ -1165,8 +1167,8 @@ X-API-Key: <api_key>
 
 | Status | Description |
 |--------|-------------|
-| 401 | No authentication provided |
-| 403 | Authenticated but not an active admin or owner |
+| 401 | No usable authentication provided (no credentials, or only an expired API key) |
+| 403 | Authenticated, but the user is not in `QWED_METRICS_OPERATOR_USER_IDS` |
 
 ### GET /logs
 

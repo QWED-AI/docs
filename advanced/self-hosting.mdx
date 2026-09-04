@@ -160,6 +160,20 @@ qwed_verification_latency_seconds
 qwed_cache_hit_rate
 ```
 
+Scrape `GET /metrics/prometheus` (the Prometheus text exposition format — `/metrics` returns JSON). The endpoint requires a platform operator: create a dedicated scraper account, add its user ID to `QWED_METRICS_OPERATOR_USER_IDS` (fail-closed when unset — every caller is denied, including org owners/admins), mint the account an API key, and send it as a header on the scrape. See [All-tenant metrics authorization](/advanced/security-hardening#all-tenant-metrics-authorization).
+
+```yaml
+# prometheus scrape config
+scrape_configs:
+  - job_name: 'qwed-api'
+    metrics_path: '/metrics/prometheus'
+    static_configs:
+      - targets: ['localhost:8000']
+    http_headers:
+      X-Api-Key:
+        values: ['qwed_live_a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p']  # example key — render the real one from your secret pipeline
+```
+
 ## Security
 
 1. **Always use HTTPS** in production
@@ -169,3 +183,4 @@ qwed_cache_hit_rate
 5. **Enable rate limiting**
 6. **Use network isolation**
 7. **Rotate secrets regularly**
+8. **Configure `QWED_METRICS_OPERATOR_USER_IDS`** if anything needs all-tenant metrics — unset means deny-all
