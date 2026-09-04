@@ -5,8 +5,8 @@ description: "QWED Protocol release history with download links, installation in
 
 ## Current release
 
-<Card title="v7.0.0 — Full DiagnosticResult Engine Conformance" icon="shield-check" href="/changelog#v7-0-0-%E2%80%94-full-diagnosticresult-engine-conformance">
-  Engine migration to `DiagnosticResult` complete (META #216): `SchemaVerifier`, `SQLVerifier`, `CodeVerifier`, `SecureCodeExecutor`, `StatsVerifier`, and fact/image batch. Truth and admission are separated: `POST /verify/code` returns `VERIFIED` for proven-unsafe code with a separate `admission` decision, and `POST /verify/stats` returns `UNVERIFIABLE` on execution success — execution is never verification. Breaking wire changes.
+<Card title="v7.1.0 — Verification Context v1.0 Rollout" icon="shield-check" href="/changelog#v7-1-0-%E2%80%94-verification-context-v10-rollout">
+  Verification Context (VC) v1.0 shipped end-to-end: a formal spec with JSON Schema, public `proof_ref` generation and resolution, `to_verification_context()` on all 13 verifiers, API endpoints, CLI commands, SDK re-exports, and Docker-action VC outputs. Additive minor — no breaking wire changes.
 </Card>
 
 ### Install
@@ -14,23 +14,23 @@ description: "QWED Protocol release history with download links, installation in
 <CodeGroup>
 
 ```bash pip
-pip install qwed==7.0.0
+pip install qwed==7.1.0
 ```
 
 ```bash docker
-docker pull qwedai/qwed-verification:7.0.0
+docker pull qwedai/qwed-verification:7.1.0
 ```
 
 ```bash npm
-npm install @qwed-ai/sdk@7.0.0
+npm install @qwed-ai/sdk@7.1.0
 ```
 
 ```bash cargo
-cargo add qwed@7.0.0
+cargo add qwed@7.1.0
 ```
 
 ```bash go
-go get github.com/QWED-AI/qwed-verification/sdk-go@v7.0.0
+go get github.com/QWED-AI/qwed-verification/sdk-go@v7.1.0
 ```
 
 </CodeGroup>
@@ -41,7 +41,15 @@ go get github.com/QWED-AI/qwed-verification/sdk-go@v7.0.0
 
 <AccordionGroup>
 
-<Accordion title="v7.0.0 — Full DiagnosticResult Engine Conformance (August 8, 2026)" icon="shield-check" defaultOpen>
+<Accordion title="v7.1.0 — Verification Context v1.0 Rollout (August 16, 2026)" icon="shield-check" defaultOpen>
+  **Verification Context (VC) v1.0 shipped end-to-end (PRs #302–#316).** A formal specification with a machine-readable JSON Schema, a typed document model with fail-closed invariants, public [`proof_ref`](/api/endpoints#verification-context-endpoints) generation and resolution, `to_verification_context()` on all 13 verifiers, dedicated API endpoints, the `qwed context` CLI group, SDK re-exports on the Python client, and Docker-action VC outputs. Additive semver minor — no breaking wire changes.
+
+  <Info>**Fail-closed conversion:** a `VERIFIED` diagnostic without a valid attestation demotes to `UNVERIFIABLE` in the VC document; malformed diagnostics convert to `BLOCKED` instead of crashing.</Info>
+
+  [Full Release Notes →](/changelog#v7-1-0-%E2%80%94-verification-context-v10-rollout) · [GitHub Release ↗](https://github.com/QWED-AI/qwed-verification/releases/tag/v7.1.0)
+</Accordion>
+
+<Accordion title="v7.0.0 — Full DiagnosticResult Engine Conformance (August 8, 2026)" icon="shield-check">
   **Engine migration to `DiagnosticResult` complete (META #216).** [`SchemaVerifier`](/engines/schema), [`SQLVerifier`](/engines/sql), [`CodeVerifier` and `SecureCodeExecutor`](/engines/code#security-scanning-codeverifier), and [`StatsVerifier`](/engines/stats) — plus fact/image batch verification — now return the unified `DiagnosticResult` contract. Truth and admission are separated: proven-unsafe code and proven-malicious SQL are `VERIFIED` (the proof succeeded) with an explicit `admission: BLOCKED`, and successful stats execution is `UNVERIFIABLE` because execution is not verification. SDK 6.0.0 → 7.0.0 across Python, TypeScript, and Rust.
 
   <Warning>**Breaking wire changes:** `POST /verify/code` returns `VERIFIED` for proven-unsafe code (gate on `admission` / `developer_fields.is_valid`, not `status`), and `POST /verify/stats` returns the `DiagnosticResult` shape with `UNVERIFIABLE` on execution success instead of the legacy `SUCCESS` shape.</Warning>
