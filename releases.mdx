@@ -5,7 +5,7 @@ description: "QWED Protocol release history with download links, installation in
 
 ## Current release
 
-<Card title="v7.2.0 — Security Hardening Batch + Precision Advisory" icon="shield-check" href="/changelog#v7-2-0-—-precision-advisory-and-security-hardening-batch">
+<Card title="v7.2.0 — Security hardening batch + precision advisory" icon="shield-check" href="/changelog#v7-2-0-—-precision-advisory-and-security-hardening-batch">
   Fail-closed security hardening (expression, auth, sandbox, event loop) plus a new float-precision advisory. Additive minor — no breaking wire changes.
 </Card>
 
@@ -29,10 +29,6 @@ npm install @qwed-ai/sdk@7.2.0
 cargo add qwed@7.2.0
 ```
 
-```bash go
-go get github.com/QWED-AI/qwed-verification/sdk-go@v7.2.0
-```
-
 </CodeGroup>
 
 ---
@@ -43,6 +39,8 @@ go get github.com/QWED-AI/qwed-verification/sdk-go@v7.2.0
 
 <Accordion title="v7.2.0 — Precision advisory and security hardening batch (September 7, 2026)" icon="shield-check" defaultOpen>
   **Fail-closed hardening batch + one additive capability.** Expression/auth/sandbox/event-loop security fixes restoring intended behavior, plus a new advisory flag for binary floating-point constants.
+
+  <Warning>**API-key migration required.** API keys issued before v7.2 stop working — re-issue them after upgrading. Self-hosted deployments must also set a distinct `QWED_API_KEY_LOOKUP_SECRET` (the server fails closed at startup without it). See [Authentication](/api/authentication#api-key-storage-and-migration-v7-2).</Warning>
 
   [Full Release Notes →](/changelog#v7-2-0-—-precision-advisory-and-security-hardening-batch) · [GitHub Release](https://github.com/QWED-AI/qwed-verification/releases/tag/v7.2.0)
 </Accordion>

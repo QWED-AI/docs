@@ -6,7 +6,7 @@ icon: "shield-check"
 ---
 
 <Note>
-**QWED v7.2.0** is now live — Security hardening batch + precision advisory: fail-closed RCE/auth/sandbox fixes and a new float-precision advisory, with no breaking wire changes. [See what's new →](/releases)
+**QWED v7.2.0 is live** — you get fail-closed security hardening across expression parsing, auth, sandbox, and event loop, plus a new float-precision advisory. No breaking wire changes. [See what's new →](/releases)
 </Note>
 
 ## What is QWED?
@@ -138,11 +138,11 @@ qwed verify-logic "(AND (GT x 5) (LT y 10))"
 ## What's new in v7.2.0
 
 <AccordionGroup>
-  <Accordion title="Security Hardening Batch" icon="shield-check" defaultOpen>
-    Fail-closed fixes across expression parsing, auth, sandbox containment, and event-loop safety — including RCE fixes, auth DoS hardening, engine-call bounds, and dependency modernization. No breaking wire changes. [Learn more →](/releases)
+  <Accordion title="Security hardening batch" icon="shield-check" defaultOpen>
+    v7.2.0 hardens expression parsing, auth, sandbox containment, and event-loop safety against RCE, auth DoS, and resource exhaustion — with no breaking wire changes. [Learn more →](/releases)
   </Accordion>
-  <Accordion title="Precision Advisory" icon="microchip">
-    New additive capability: binary floating-point constants in math/stats verification surface a `precision.float-constants` advisory in `developer_fields.advisory_checks` without affecting verdicts.
+  <Accordion title="Precision advisory" icon="microchip">
+    When you verify expressions with binary floating-point constants, you will see a `precision.float-constants` advisory in `developer_fields.advisory_checks`. It never affects your verdict.
   </Accordion>
 </AccordionGroup>
 
