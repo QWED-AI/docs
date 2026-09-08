@@ -60,15 +60,25 @@ result = guard.check({
 
 ### Default blocked tools
 
-- `execute_shell`, `bash`, `cmd`
-- `delete_file`, `remove_file`
-- `send_email`, `transfer_money`
+Blocklist and allowlist matching is case-insensitive, so `Bash` and `POWERSHELL` are blocked the same as their lowercase forms. The default blocklist covers:
+
+- Execution primitives: `execute_shell`, `shell`, `exec`, `eval`
+- Common shells and OS command interpreters: `bash`, `sh`, `ash`, `dash`, `zsh`, `ksh`, `csh`, `tcsh`, `fish`, `cmd`, `powershell`, `pwsh`, plus their `.exe` variants and `osascript`, `wscript`, `cscript`
+- File mutation: `delete_file`, `remove_file`, `write_file`, `modify_file`
+- Side effects: `send_email`, `transfer_money`, `make_payment`
 
 ### Default dangerous patterns
 
-- `DROP TABLE`, `DELETE FROM`
-- `rm -rf`, `rmdir /s`
-- `eval(`, `exec(`, `__import__`
+ToolGuard ships a unified set of 14 dangerous-command patterns, matched case-insensitively. The Python and TypeScript packages enforce the identical superset, so `RM -RF /` is blocked on both runtimes:
+
+- SQL: `DROP TABLE`, `DELETE FROM`, `TRUNCATE TABLE`
+- Filesystem: `rm -rf`, `rmdir /s`, `del /f`, `format c:`
+- Privilege and permissions: `sudo`, `chmod 777`
+- Code execution: `eval(`, `exec(`, `__import__`, `subprocess`, `os.system`
+
+Custom patterns passed via `dangerous_patterns` are also compiled case-insensitively.
+
+Argument scanning additionally decodes bounded base64 tokens (7 or more alphabet characters) found inside serialized arguments and scans the decoded text with the same patterns, so a payload like `ZXhlYyg=` (`exec(`) cannot slip through as an encoded string. Pattern scanning is a heuristic, not a security boundary. For real enforcement, prefer `allowed_tools` allowlists plus OS-level sandboxing.
 
 ### Recognized tool-call shapes
 
@@ -118,9 +128,30 @@ result = guard.check({
 
 ### What it checks
 
-- Totals: `total = subtotal + tax + shipping`
-- Percentages: `tax_amount = subtotal * tax_rate`
-- Inline calculations: `"5 + 3 = 8"`
+- Totals: one canonical formula per vocabulary, with absent components defaulting to zero:
+  - `total = subtotal + tax + shipping - discount`
+  - `net = gross - deductions`
+  - `balance = credits - debits`
+- Percentages: fields ending in `_percent` or `_rate` are verified against their base and amount
+- Inline calculations in text: `"5 + 3 = 8"` (every equation in the string is verified, not just the first)
+- Custom rules: configured `equals` and `range` rules run whenever their field is present
+
+Each vocabulary (`total`, `net`, `balance`) is verified independently, so an invalid `net` is never hidden by a valid `total`.
+
+### No verifiable math fails with a warning
+
+A response that contains no verifiable math shape no longer passes vacuously. Prose, plain strings, and objects without recognized math fields fail with a warning-severity result:
+
+```python
+result = guard.check({"output": "The weather is sunny today."})
+# ⚠️ Failed (severity="warning"): "No verifiable math found in response"
+```
+
+In a `ResponseVerifier` with `strict_mode=True` (the default), this warning-severity failure blocks the response. Only include MathGuard in stacks where responses are expected to carry verifiable math.
+
+### Non-finite values fail closed
+
+`NaN`, infinity, `null`, blank strings, and other non-numeric values in totals, components, or percentage fields return explicit errors instead of silently passing tolerance checks.
 
 ---
 
@@ -212,10 +243,14 @@ result = guard.check({
 
 | Type | Examples |
 |------|----------|
-| **PII** | Emails, phones, SSN, credit cards |
-| **Injection** | "ignore previous", "you are now" |
-| **Harmful** | API keys, passwords, private keys |
+| **PII** | Emails, phones, SSN, credit cards, IP addresses |
+| **Injection** | "ignore previous", "you are now", `system:` role-override directives |
+| **Harmful** | API keys, passwords, private keys (including generic PEM headers) |
 | **Budget** | Cost/token limits exceeded |
+
+The Python and TypeScript packages run the same case-insensitive pattern superset. The TypeScript SafetyGuard performs the same harmful-content and IP-address PII checks as Python, and collects all error-severity findings instead of stopping at the first match.
+
+Credential detection is value-aware: a bare label like `password: required` or `api_key: not set` passes, while a label followed by a real-looking value is blocked. Injection detection requires instruction-override context after a `system:` marker, so benign text like `Operating system: Linux` is not flagged.
 
 ### Content extraction
 
@@ -251,6 +286,56 @@ result = verifier.verify(response)
 print(f"Passed: {result.guards_passed}")
 print(f"Failed: {result.guards_failed}")
 ```
+
+### Warning semantics
+
+A guard result with `severity="warning"` passes the guard. Warnings do not flip `verified` to `False` on their own. They surface as a separate, visible state on the result:
+
+```python
+result = verifier.verify(response)
+print(result.verified)   # True even with warnings
+for warning in result.warnings:
+    print(f"⚠️ {warning.guard_name}: {warning.message}")
+```
+
+To escalate warnings to failures, create the verifier with `allow_warnings=False`:
+
+```python
+verifier = ResponseVerifier(
+    default_guards=[MathGuard(), SafetyGuard()],
+    allow_warnings=False,  # warnings fail (and block in strict mode)
+)
+```
+
+With `strict_mode=True` (the default), any failed guard blocks the response.
+
+### Strict response parsing
+
+`verify()` accepts a dict or a JSON string that parses to an object. A string that parses to a JSON scalar, array, or `null` raises `ValueError` instead of verifying content that guards never inspected. A plain non-JSON string is wrapped as `{"type": "text", "content": ...}`. The TypeScript `parseResponse` behaves identically.
+
+### Tamper-evident bindings
+
+Results produced by `ResponseVerifier.verify()` carry a `binding`: a SHA-256 digest covering the verified response and the guard names. Call `verify_binding()` to detect a result that was replayed against a different response or had its guard metadata altered:
+
+```python
+result = verifier.verify(response)
+
+result.verify_binding()               # True — digest matches
+result.verify_binding(other_response) # False — replay detected
+```
+
+`verify_binding()` returns `False` for hand-constructed results with no binding. Binding digests are runtime-portable between Python and TypeScript. A binding detects mismatches only. It is public, recomputable data and does not authenticate the result, so treat results you did not produce in-process as untrusted.
+
+### Correlating results with request IDs
+
+Pass a `request_id` in the verification context to tie a verdict back to the response that produced it. The value is carried on `VerificationResult.request_id` (`requestId` in TypeScript) and included in `to_dict()` output:
+
+```python
+result = verifier.verify(response, context={"request_id": "req_abc123"})
+print(result.request_id)  # "req_abc123"
+```
+
+Result timestamps are timezone-aware UTC and carry the `+00:00` offset.
 
 ### Zero guards fail closed
 
