@@ -663,6 +663,47 @@ These rules are structural security guarantees, not style preferences. Attribute
 
 ---
 
+## Compute-cost bounds
+
+SymPy expands integer powers eagerly and exactly. An expression like `9^9^9^9` demands a result with billions of digits, so evaluating it would hang the engine. The parser now estimates the exact-expansion cost of every expression statically and rejects expressions that exceed the budget before evaluation starts.
+
+The bounds are:
+
+| Bound | Limit | Rejected example |
+| --- | --- | --- |
+| Integer literal magnitude | `10^300` | A 400-digit literal |
+| Exponent magnitude | `10,000` | `2^100000` |
+| Result digit budget | `100,000` digits | `9^9999^9999` (power tower) |
+| `factorial` / `binomial` argument | `10,000` | `factorial(100000)` |
+
+Additional details:
+
+- **Power towers and caret chains** are folded right-associatively and checked as a whole, so `((9^9)^9999)^9999` and `9^9^9^9` are both caught even though each individual exponent is small.
+- **Concrete-valued calls are evaluated statically.** Wrapping a large value in `abs()`, `factorial()`, `binomial()`, or a numeric constructor does not hide it from the gate: `2^abs(-100000)` and `2^factorial(10000)` are both rejected.
+- All cost comparisons use exact arithmetic, never binary floats, so the estimates are deterministic.
+
+A rejected expression fails validation before evaluation, with an error message naming the exceeded bound:
+
+```python
+# Rejected — exponent exceeds the 10,000 magnitude bound
+result = client.verify_math("2^100000 = 0")
+# Validation error: exponent exceeds the static bound
+
+# Rejected — power-tower expansion exceeds the digit budget
+result = client.verify_math("9^9999^9999 = 0")
+# Validation error: expansion would exceed the digit budget
+
+# Accepted — well within bounds
+result = client.verify_math("2^100 = 1267650600228229401496703205376")
+# ✓ Verified
+```
+
+<Note>
+These bounds are far above anything legitimate verification needs — `2^100`, `factorial(500)`, and 300-digit results all pass. They only reject expressions whose exact expansion is computationally unbounded.
+</Note>
+
+---
+
 ## Edge cases
 
 | Scenario              | Behavior                              |
@@ -680,6 +721,7 @@ These rules are structural security guarantees, not style preferences. Attribute
 | Non-ASCII characters (`α`, fullwidth digits) | Rejected before evaluation — use ASCII names like `alpha` |
 | Strings, attribute access, comparisons, subscripts | Rejected by the AST allowlist — see [Expression input rules](#expression-input-rules) |
 | Non-equality expression in batch verification | Returns `is_valid: false` with `status: "SIMPLIFIED"` — simplification is not a proof |
+| Oversized exponent, power tower, or huge factorial | Rejected before evaluation — see [Compute-cost bounds](#compute-cost-bounds) |
 | Ambiguous mode (multimodal data) | Returns "BLOCKED" with `ambiguous_modes` — only a unique mode can verify |
 | Incomplete or over-complete eigenvalue claim | Returns "CORRECTION_NEEDED" with `calculated_count`/`claimed_count` |
 | IRR with multi-root, derivative stall, or non-convergence | Returns "BLOCKED" — no best-effort iterate is returned |

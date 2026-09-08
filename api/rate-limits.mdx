@@ -106,6 +106,37 @@ Some endpoints have specific limits:
 | `/agent/register` | 10/hour |
 | `/attestation/verify` | 1000/hour |
 
+## Request size and time limits
+
+Beyond request-count quotas, the API enforces hard size and wall-clock bounds on expensive operations. These limits are fixed and apply to every plan tier.
+
+### `/verify/stats` upload limits
+
+Statistical verification accepts a CSV upload, and both the transfer and the parsed dataset are capped:
+
+| Limit | Value | Response when exceeded |
+|-------|-------|------------------------|
+| Upload size | 10 MB | `413` with the byte limit in `detail` |
+| Expanded dataset size | 1,000,000 cells (rows × columns) | `413` with the cell limit in `detail` |
+| Body read deadline | 30 seconds | `408 Request Timeout` |
+| Concurrent uploads (per process) | 8 in flight | `503` with `"Upload capacity reached — retry shortly."` |
+
+The byte cap is enforced while the body is received, before any parsing starts, so chunked uploads without a `Content-Length` header are bounded too. The cell cap is enforced during parsing: QWED reads the CSV in chunks and aborts with `413` the moment the accumulated row × column count crosses the budget, so a compact but very wide file cannot allocate an oversized DataFrame. Empty or column-less CSVs return `400`.
+
+On `503`, retry after a short delay. On `413`, reduce the file size or split the dataset — the limit cannot be raised per request.
+
+### LLM provider call timeout
+
+Every outbound LLM provider call (translation and codegen for natural-language verification) is pinned to a 30-second HTTP timeout with SDK retries disabled. A stalled provider surfaces as a bounded verification failure instead of holding the request open. Implement retries in your client if you need them; see [best practices](#best-practices).
+
+### Consensus deadline
+
+`/verify/consensus` runs all engines under a single 30-second aggregate deadline. Engines that miss the deadline are returned as explicit `BLOCKED` results rather than hanging the request or returning HTTP 500. See [Consensus engine — execution deadlines](/engines/consensus#execution-deadlines-and-partial-results).
+
+### Math expression compute-cost bounds
+
+Math expressions whose exact evaluation would be unboundedly expensive (huge integer literals, oversized exponents, power towers, large factorials) are rejected before evaluation. See [Math engine — compute-cost bounds](/engines/math#compute-cost-bounds).
+
 ## Per-IP limits on authentication endpoints
 
 Anonymous `/auth/*` routes such as `POST /auth/signup` and `POST /auth/signin` carry no API key, so the per-key limiter cannot apply. As of v7.2, these routes are rate limited per client IP instead. This blocks password-guessing and prevents unauthenticated requests from saturating the service with expensive password hashing.
