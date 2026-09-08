@@ -26,6 +26,21 @@ All notable changes to the QWED platform, listed by release.
 Deployments that scrape the Prometheus endpoint (`/metrics/prometheus`) without the operator allowlist and valid scraper credentials will start receiving 401/403 after upgrading. Create a dedicated operator account, mint it an API key, and add its user ID to `QWED_METRICS_OPERATOR_USER_IDS` before deploying. The `deploy/prometheus.yml` in the [qwed-verification repository](https://github.com/QWED-AI/qwed-verification) documents the scrape bootstrap steps. See [Security Hardening](/advanced/security-hardening#all-tenant-metrics-authorization).
 </Warning>
 
+## QWED Verification — float precision advisory for math and stats verification
+
+**Released: September 3, 2026** · [GitHub PR #348](https://github.com/QWED-AI/qwed-verification/pull/348) · Closes [issue #347](https://github.com/QWED-AI/qwed-verification/issues/347)
+
+> Math and stats inputs may contain binary floating-point constants (`0.1 + 0.2`, `1e9`) whose evaluation can be inexact relative to decimal arithmetic. A new advisory surfaces that signal without gating anything: it is a precision advisory, never a rejection, because execution-safety gates decide what may run, not what is exact.
+
+### What changed
+
+- **`precision.float-constants` advisory.** When an expression or generated statistics code contains float or complex constants, the result carries an `AdvisoryCheck` in `developer_fields.advisory_checks` listing the offending constants and suggesting `decimal.Decimal` or exact SymPy rationals.
+- **`/verify/math`.** The advisory is attached on all result branches. The submitted expression is checked lexically, so equations (`0.1 + 0.2 = 0.3`, `0.5x = 0.5x`) and collapsing forms retain their float literals even when symbolic simplification would eliminate them. Scientific notation and complex literals (`1.0j`) are flagged too.
+- **Stats verification.** The completed-analysis result carries the advisory when the generated code uses floats — the expected shape for numpy/pandas code, so it flags without disrupting.
+- **Structurally non-verdict-affecting.** `AdvisoryCheck` enforces `advisory_only=True` at construction. The advisory cannot change the verification `status` or `proof_ref`. Unparsable input yields no advisory; parse failures belong to the security gates.
+
+See [Math engine — Float precision advisory](/engines/math#float-precision-advisory) and [Stats engine — Float precision advisory](/engines/stats#float-precision-advisory).
+
 ## QWED Verification — structural math parser and sandbox gate hardening (security release)
 
 **Released: September 3, 2026** · [GitHub PR #344](https://github.com/QWED-AI/qwed-verification/pull/344) · [GitHub PR #346](https://github.com/QWED-AI/qwed-verification/pull/346)

@@ -433,6 +433,42 @@ result = client.verify_math(
 
 When `use_decimal=True` (the default), the engine uses `Decimal` internally regardless of whether you pass a `float` or `Decimal`.
 
+## Float precision advisory
+
+When an expression submitted to `POST /verify/math` contains binary floating-point constants (`0.1`, `1e9`, `1.0j`), the response carries a precision advisory in `developer_fields.advisory_checks`. Binary floats can be inexact relative to decimal arithmetic, so the advisory lists the offending constants and suggests `decimal.Decimal` or exact SymPy rationals (`sympy.Rational`) where exactness matters.
+
+The advisory is informational only. It is an [`AdvisoryCheck`](/advanced/diagnostics), which enforces `advisory_only=True` at construction, so it structurally cannot change the verification `status` or `proof_ref`. Expressions with floats still verify normally.
+
+```json
+{
+  "advisory_checks": [
+    {
+      "name": "floating-point-constants",
+      "advisory_only": true,
+      "constraint_id": "precision.float-constants",
+      "details": {
+        "constants": ["0.1", "0.2"],
+        "note": "Binary floating-point values can be inexact; results may differ from exact decimal arithmetic.",
+        "suggestion": "Use decimal.Decimal or SymPy exact rationals (sympy.Rational) where exact arithmetic matters."
+      }
+    }
+  ]
+}
+```
+
+When the advisory appears:
+
+| Input | Advisory |
+| --- | --- |
+| Float constant (`0.1 + 0.2`, `1000 * (1 + 0.05)**2`) | Yes — `details.constants` lists each distinct constant |
+| Scientific notation (`1e9`, `1e3*x`) | Yes |
+| Complex constant (`1.0j`) | Yes — complex literals are binary-float-based |
+| Equation input (`0.1 + 0.2 = 0.3`, `0.5x = 0.5x`) | Yes — both sides are parsed lexically, so float literals are flagged even when symbolic simplification would collapse them |
+| Integers and exact rationals only (`2 + 2`, `1/3`) | No |
+| Unparsable input | No — parse failures are handled by the security gates, not the advisory |
+
+The engine checks the expression exactly as you submitted it, before symbolic simplification. Implicit multiplication (`0.5x`) is normalized for parsing but does not hide the float literal.
+
 ## Tolerance settings
 
 For floating-point comparisons, you can specify a tolerance:
@@ -647,6 +683,7 @@ These rules are structural security guarantees, not style preferences. Attribute
 | Ambiguous mode (multimodal data) | Returns "BLOCKED" with `ambiguous_modes` — only a unique mode can verify |
 | Incomplete or over-complete eigenvalue claim | Returns "CORRECTION_NEEDED" with `calculated_count`/`claimed_count` |
 | IRR with multi-root, derivative stall, or non-convergence | Returns "BLOCKED" — no best-effort iterate is returned |
+| Float or complex constants in the expression | Verdict unchanged — a `precision.float-constants` advisory is attached to `advisory_checks` |
 
 ---
 
