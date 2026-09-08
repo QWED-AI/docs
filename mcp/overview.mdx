@@ -94,7 +94,7 @@ QWED-MCP exposes **deterministic verification** to AI assistants through a singl
 All tool calls pass through the [`RiskBasedExecutionGateway`](/mcp/tools#riskbasedexecutiongateway-governance) before dispatch. The gateway validates arguments, runs code safety analysis, and enforces admin policy. The gateway blocks unknown tools by default.
 
 <Info>
-  In v0.1.x, QWED-MCP exposed individual tools like `verify_math`, `verify_logic`, `verify_code`, and `verify_sql`. These were consolidated into `execute_python_code` in v0.2.0 to solve context bloat (RFC-9728 compatibility). See [migration guide](/mcp/tools#migrating-from-v01x).
+  In v0.1.x, QWED-MCP exposed individual tools like `verify_math`, `verify_logic`, `verify_code`, and `verify_sql`. These were consolidated into `execute_python_code` in v0.2.0 to solve context bloat (RFC-9728 compatibility). See [migration guide](/mcp/tools#migrating-from-v0-1-x).
 </Info>
 
 ---
