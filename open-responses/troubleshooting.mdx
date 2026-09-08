@@ -46,7 +46,7 @@ pip install langchain langchain-openai
 
 ### "No guards configured"
 
-**Cause:** `verify()` was called with zero guards. Verification fails closed: `verified=False`, and `blocked=True` in strict mode. Earlier versions returned `verified=True` here.
+**Cause:** `verify()` was called with zero guards. Verification fails closed: `verified=False`, and `blocked=True` in strict mode. Earlier versions returned `verified=True` here. `VerifiedOpenAI` created without guards also emits a `UserWarning` at construction for the same reason.
 
 **Solution:** Configure at least one guard.
 
@@ -60,6 +60,44 @@ verifier = ResponseVerifier(default_guards=[ToolGuard(), SafetyGuard()])
 
 # Or pass guards per call
 result = verifier.verify(response, guards=[ToolGuard()])
+```
+
+---
+
+### "verify_structured_output requires a JSON schema or at least one guard"
+
+**Cause:** `verify_structured_output()` was called with neither `schema` nor `guards`. It raises `ValueError` because the call would verify nothing.
+
+**Solution:** Pass a schema, at least one guard, or both. An explicit empty schema `{}` is accepted and matches anything.
+
+```python
+result = verifier.verify_structured_output(
+    output=my_output,
+    schema=my_schema,  # or guards=[SchemaGuard(schema=my_schema)]
+)
+```
+
+---
+
+### "Cannot parse JSON response of type ... Expected object"
+
+**Cause:** `verify()` received a string that parses to a JSON scalar, array, or `null`. These are rejected with `ValueError` because an array or scalar payload would bypass per-item guard inspection. Plain non-JSON strings are still accepted and wrapped as text.
+
+**Solution:** Pass the response as a JSON object (or a string that parses to one). Wrap arrays in an object envelope such as `{"output": [...]}`.
+
+---
+
+### Verification passed but `warnings` is non-empty
+
+**Cause:** A guard returned a warning-severity result. Warnings pass the guard and do not fail `verified` on their own. They surface in `result.warnings` as a separate visible state.
+
+**Solution:** This is expected. To escalate warnings to failures, create the verifier with `allow_warnings=False`.
+
+```python
+verifier = ResponseVerifier(
+    default_guards=[MathGuard(), SafetyGuard()],
+    allow_warnings=False,  # warnings now fail (and block in strict mode)
+)
 ```
 
 ---
@@ -126,6 +164,23 @@ tool_guard = ToolGuard(
 **Cause:** A `tool_calls`, `choices`, or `content` collection contains a non-object item, or the response mixes a direct tool call (`type=tool_call`/`function_call`) with a sibling collection. Ambiguous envelopes are blocked because validating one side would let the other escape policy checks.
 
 **Fix:** Every entry in a tool-call collection must be an object with a non-blank string tool name, and a response must carry its tool calls in exactly one place.
+
+---
+
+### "MathGuard: No verifiable math found in response"
+
+**Cause:** The response contains no verifiable math shape. Prose, plain strings, and objects without recognized total, percentage, or inline-calculation fields no longer pass MathGuard vacuously. The guard fails with a warning-severity result, which blocks in strict mode.
+
+**Options:**
+1. Remove MathGuard from stacks that verify non-math responses
+2. Keep the default `allow_warnings=True` on the verifier so the warning surfaces in `result.warnings` without failing verification
+3. Add a custom rule so the response shape becomes verifiable
+
+```python
+# Only run MathGuard where math is expected
+math_verifier = ResponseVerifier(default_guards=[MathGuard()])
+text_verifier = ResponseVerifier(default_guards=[SafetyGuard()])
+```
 
 ---
 
@@ -316,11 +371,14 @@ math_guard = MathGuard(tolerance=0.01)  # Allow 1 cent difference
 | Error | Guard | Cause | Fix |
 |-------|-------|-------|-----|
 | "No guards configured" | Verifier | Zero guards passed | Configure at least one guard |
+| "Cannot parse JSON response" | Verifier | String parsed to scalar/array/null | Send a JSON object |
+| "requires a JSON schema or at least one guard" | Verifier | `verify_structured_output` with neither | Pass a schema or guards |
 | "Missing required field" | Schema | Output missing field | Check schema |
 | "Tool in blocklist" | Tool | Dangerous tool called | Review blocklist |
 | "Unrecognized format" | Tool | Tool-like content in unknown shape | Use a recognized envelope |
 | "Malformed tool-call entry" | Tool | Non-object entry or hybrid envelope | Fix response structure |
 | "Calculation mismatch" | Math | LLM math wrong | This is intentional! |
+| "No verifiable math found" | Math | Response has no math shape | Scope MathGuard to math responses |
 | "PII detected" | Safety | SSN/email in output | Redact or edit prompt |
 | "Invalid transition" | State | Bad state flow | Fix state machine |
 | "Budget exceeded" | Safety | Too many calls | Increase limit |

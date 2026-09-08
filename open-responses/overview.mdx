@@ -123,7 +123,7 @@ pip install qwed-open-responses[all]
 ## Quick start
 
 <Warning>
-Calling `verify()` with no guards configured fails closed. `ResponseVerifier()` without `default_guards` (or `VerifiedOpenAI` without `guards`) returns `verified=False` with the reason "No guards configured", and blocks the response in strict mode. Earlier versions returned `verified=True` in this case. Always configure at least one guard.
+Calling `verify()` with no guards configured fails closed. `ResponseVerifier()` without `default_guards` (or `VerifiedOpenAI` without `guards`) returns `verified=False` with the reason "No guards configured", and blocks the response in strict mode. Earlier versions returned `verified=True` in this case. Constructing `VerifiedOpenAI` without guards also emits a `UserWarning`, because fail-closed verification would block every response. Always configure at least one guard.
 </Warning>
 
 ### Basic verification
@@ -179,6 +179,8 @@ result = verifier.verify_structured_output(
     guards=[SchemaGuard(schema=order_schema)]
 )
 ```
+
+`verify_structured_output` requires a `schema` or at least one guard. Calling it with neither raises `ValueError`, because the call would verify nothing. An explicitly supplied empty schema `{}` is honored as a valid JSON Schema that matches anything.
 
 ---
 

@@ -39,6 +39,19 @@ response = client.chat.completions.create(
 print(response._qwed_verification.verified)
 ```
 
+<Warning>
+Always pass at least one guard. `VerifiedOpenAI` without `guards` emits a `UserWarning` at construction: verification is fail-closed, so with zero guards every response fails verification and either raises `ResponseBlocked` (`block_on_failure=True`) or is returned unverified (`block_on_failure=False`).
+</Warning>
+
+The attached `_qwed_verification` result also exposes:
+
+- `warnings`: guard results that passed with warning severity
+- `request_id`: correlation ID when a `request_id` was supplied in the verification context
+- `binding` and `verify_binding()`: tamper-evidence tying the result to the exact response and guard list
+- `timestamp`: timezone-aware UTC timestamp with the `+00:00` offset
+
+See the [guards reference](/open-responses/guards#combining-guards) for details.
+
 ---
 
 ## Structured outputs
