@@ -6,7 +6,7 @@ icon: "shield-check"
 ---
 
 <Note>
-**QWED v7.1.0** is now live — Verification Context v1.0 rollout: one proof-bound contract across every engine and SDK. [See what's new →](/releases)
+**QWED v7.2.0 is live** — you get fail-closed security hardening across expression parsing, auth, sandbox, and event loop, plus a new float-precision advisory. No breaking wire changes. [See what's new →](/releases)
 </Note>
 
 ## What is QWED?
@@ -77,11 +77,11 @@ flowchart LR
 <CodeGroup>
 
 ```bash pip
-pip install qwed==6.0.0
+pip install qwed==7.2.0
 ```
 
 ```bash docker
-docker pull qwedai/qwed-verification:6.0.0
+docker pull qwedai/qwed-verification:7.2.0
 ```
 
 </CodeGroup>
@@ -135,20 +135,14 @@ qwed verify-logic "(AND (GT x 5) (LT y 10))"
   Explore core, analysis, and specialized engines.
 </Card>
 
-## What's new in v6.0.0
+## What's new in v7.2.0
 
 <AccordionGroup>
-  <Accordion title="Trust Boundary Completion" icon="shield-check" defaultOpen>
-    All 12/12 sub-issues closed in Epic #263. Every `/verify/*` API pathway returns `DiagnosticResult` and routes through mandatory `enforce_trust_decision`. VERIFIED is a protocol guarantee backed by a non-empty, deterministic `proof_ref`. [Learn more →](/releases)
+  <Accordion title="Security hardening batch" icon="shield-check" defaultOpen>
+    v7.2.0 hardens expression parsing, auth, sandbox containment, and event-loop safety against RCE, auth DoS, and resource exhaustion — with no breaking wire changes. [Learn more →](/releases)
   </Accordion>
-  <Accordion title="Unified DiagnosticResult Schema" icon="brackets-curly">
-    Observation vs Admission architecture codified: `/verify/*` endpoints return the 3-layer `DiagnosticResult` (`status` / `agent_message` / `developer_fields` / `proof_ref`). [Learn more →](/advanced/diagnostics)
-  </Accordion>
-  <Accordion title="Logic & Fact Engine Conformance" icon="microchip">
-    `LogicVerifier` and `FactVerifier` migrated to `DiagnosticResult` with attestation-backed verdicts and advisory checks.
-  </Accordion>
-  <Accordion title="TOCTOU & Tenant Isolation Hardening" icon="lock">
-    Developer fields snapshotted recursively to prevent alias windows in `enforce_trust_decision`, and `VerificationCache` key namespacing by normalized `tenant_id`.
+  <Accordion title="Precision advisory" icon="microchip">
+    When you verify expressions with binary floating-point constants, you will see a `precision.float-constants` advisory in `developer_fields.advisory_checks`. It never affects your verdict.
   </Accordion>
 </AccordionGroup>
 
