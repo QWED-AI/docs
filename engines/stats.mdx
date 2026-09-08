@@ -50,6 +50,29 @@ On `UNVERIFIABLE`, the full execution evidence is retained in `developer_fields`
 
 `agent_message` is sanitized — raw subprocess output, sandbox identifiers, and error strings never reach the agent-facing layer. Blocked results carry no `proof_ref` and cannot be mistaken for a verdict.
 
+### Float precision advisory
+
+When the generated statistics code contains binary floating-point constants, the completed-analysis result also carries `developer_fields.advisory_checks` with a `precision.float-constants` advisory. Generated numpy/pandas code is float-native, so this is the expected shape for most analyses. The advisory flags the constants for exactness-sensitive consumers and suggests `decimal.Decimal` or exact SymPy arithmetic.
+
+```json
+{
+  "advisory_checks": [
+    {
+      "name": "floating-point-constants",
+      "advisory_only": true,
+      "constraint_id": "precision.float-constants",
+      "details": {
+        "constants": ["0.05"],
+        "note": "Binary floating-point values can be inexact; results may differ from exact decimal arithmetic.",
+        "suggestion": "Use decimal.Decimal or SymPy exact rationals (sympy.Rational) where exact arithmetic matters."
+      }
+    }
+  ]
+}
+```
+
+The advisory is an [`AdvisoryCheck`](/advanced/diagnostics) with `advisory_only=True` enforced at construction. It structurally cannot change the `status` or `proof_ref` — a completed analysis remains `UNVERIFIABLE` with or without it. The same advisory appears on `POST /verify/math` responses; see [Math engine — Float precision advisory](/engines/math#float-precision-advisory).
+
 ## Usage
 
 ```python
