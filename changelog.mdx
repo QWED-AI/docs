@@ -5,6 +5,93 @@ description: "Release notes for the QWED Protocol: version history, new guards, 
 
 All notable changes to the QWED platform, listed by release.
 
+Jump to: [v7.2.0](#v7-2-0-—-precision-advisory-and-security-hardening-batch) · [v7.1.0](#v7-1-0-—-verification-context-v1-0-rollout) · [v7.0.0](#v7-0-0-—-full-diagnosticresult-engine-conformance)
+
+---
+
+## v7.2.0 — Precision advisory and security hardening batch
+
+**Released: September 7, 2026** · [GitHub Release ↗](https://github.com/QWED-AI/qwed-verification/releases/tag/v7.2.0) · [GitHub PR #362](https://github.com/QWED-AI/qwed-verification/pull/362)
+
+> v7.2.0 unifies the precision advisory capability and the security hardening batch across all SDKs. One additive capability — an advisory flag for binary floating-point constants in math and stats verification — plus fail-closed fixes: bounded engine-call waits, sandbox containment, and event-loop offload. The release is a semver minor with no breaking wire changes.
+
+### Precision advisory (new capability)
+
+Math and stats verification inputs may contain binary floating-point constants (`0.1 + 0.2`, `1e9`) whose evaluation can be inexact relative to decimal arithmetic. v7.2.0 surfaces that signal as a [`DiagnosticResult` advisory](/advanced/diagnostics#advisory-checks) without ever affecting the verdict (PR #348):
+
+- **`AdvisoryCheck.float_precision()`** parses the verification source and, when float or complex constants are present, returns an advisory with `constraint_id: "precision.float-constants"` listing the offending constants and suggesting `decimal.Decimal` or SymPy exact rationals where exact arithmetic matters.
+- **`/verify/math`** attaches the advisory to the result on all branches, before trust enforcement.
+- **`StatsVerifier.verify_stats`** carries the advisory on completed analyses when the generated code uses floats — the expected shape for numpy/pandas code, so it flags without disrupting.
+- **Advisory, never a gate.** Execution-safety gates decide what may run, not what is exact. Documented inputs like `1000 * (1 + 0.05)**2` legitimately contain floats and still verify. Unparsable input returns no advisory; parse failures belong to the security gates.
+
+```json
+{
+  "developer_fields": {
+    "advisory_checks": [
+      {
+        "name": "floating-point-constants",
+        "advisory_only": true,
+        "constraint_id": "precision.float-constants",
+        "details": {
+          "constants": ["0.1", "0.2"],
+          "note": "Binary floating-point values can be inexact; results may differ from exact decimal arithmetic.",
+          "suggestion": "Use decimal.Decimal or SymPy exact rationals (sympy.Rational) where exact arithmetic matters."
+        }
+      }
+    ]
+  }
+}
+```
+
+### Engine-call bounds (PR #354)
+
+Every engine-call wait is now bounded so a single request cannot stall or exhaust the service:
+
+- **SymPy compute-cost gate.** The safe expression parser adds a computational-cost layer: integer-literal cap (10^300), static exponent bound (10^4), exact-expansion bounds on `factorial`/`binomial` calls, caret-chain fold bounds, and a nested-power base-magnitude budget. Expressions like `2**factorial(10000)` or `((9**9)**9999)**9999` are rejected before they can reach SymPy's eager exact expansion. All cost comparisons use exact arithmetic, never binary floats.
+- **Provider HTTP timeouts.** All six LLM provider clients are pinned to a 30-second timeout with zero SDK-level retries. The previous SDK defaults allowed roughly 30 minutes per stalled call. Retry policy belongs to the caller.
+- **Stats upload cap.** `/verify/stats` gains a byte-counting body-limit middleware with a 30-second read deadline and an in-flight concurrency cap, a 10 MB file cap with header preflight, and an early abort at 1 million cells.
+
+### Sandbox containment (PR #351)
+
+The Docker code-execution sandbox can no longer leak host resources (CWE-400/401):
+
+- **Log rotation and process caps.** Sandbox containers run with json-file log rotation (10 MB, single file) and `pids_limit=128`.
+- **Guaranteed container removal.** Containers are force-removed in a `finally` block covering the whole post-creation lifecycle, with create-then-start ordering so start failures cannot leak, one retry for transient daemon races, and a warn-only fallback so cleanup failure never discards a valid verification result.
+- **Result size caps.** `result.json` is capped at 2 MB both inside the container wrapper (streamed, aborts at cap) and at host read-back before parsing. `observed_result` and every `VerificationLog.result` site are bounded by a shared pre-encode traversal with per-string caps, an aggregate budget, and cycle markers, and remain valid JSON for the audit integrity verifier.
+
+### Event-loop offload (PR #352)
+
+`/verify/consensus` and `/verify/stats` declared `async def` but ran synchronous verification chains inline on the event loop, so a single low-rate tenant could stall the whole service:
+
+- **Consensus** now awaits an async path with a per-call executor sized to the engine list, one aggregate deadline, and per-engine timeouts. Timed-out, errored, or circuit-open engines degrade to partial `BLOCKED` results with correct circuit-breaker recording instead of hanging the request.
+- **Stats** offloads CSV parsing and the verification chain to a worker thread, and every Docker daemon call is bounded at 30 seconds.
+
+### Version bumps
+
+| Surface | From | To |
+|---|---|---|
+| `qwed` (PyPI) | `7.1.0` | `7.2.0` |
+| `qwed_sdk` (Python) | `7.1.0` | `7.2.0` |
+| `@qwed-ai/sdk` (npm) | `7.1.0` | `7.2.0` |
+| `qwed` (crates.io) | `7.1.0` | `7.2.0` |
+| API version marker | `7.1.0` | `7.2.0` |
+
+### Included PRs
+
+| PR | Summary |
+|---|---|
+| [#348](https://github.com/QWED-AI/qwed-verification/pull/348) | Advisory flag for binary floating-point constants |
+| [#351](https://github.com/QWED-AI/qwed-verification/pull/351) | Sandbox containment: log rotation, pids_limit, container removal, result size caps |
+| [#352](https://github.com/QWED-AI/qwed-verification/pull/352) | Consensus and stats verification offloaded from the event loop |
+| [#354](https://github.com/QWED-AI/qwed-verification/pull/354) | Bounded engine-call waits: sympy compute-cost gate, provider timeouts, stats upload cap |
+| [#362](https://github.com/QWED-AI/qwed-verification/pull/362) | v7.2.0 release preparation |
+
+The v7.2.0 release also rolls up the security fixes released individually since v7.1.0. See the entries below for the [metrics operator allowlist](#qwed-verification-—-all-tenant-metrics-restricted-to-explicit-platform-operators-security-release), the [math parser and sandbox gate hardening](#qwed-verification-—-structural-math-parser-and-sandbox-gate-hardening-security-release), and the [API-key lookup migration](#qwed-verification-—-api-key-lookup-migration-and-per-ip-auth-throttling).
+
+### Upgrading
+
+No action required for the changes in this entry: the precision advisory is additive, and the hardening fixes restore intended behavior with no wire changes. Requests that previously stalled or over-consumed resources — unbounded exponent expressions, oversized stats uploads, oversized sandbox results — now return `BLOCKED` or `413`-class rejections instead. If you upgrade from v7.1.0 directly, also review the API-key migration notes in the [September 2 entry](#qwed-verification-—-api-key-lookup-migration-and-per-ip-auth-throttling).
+
 ---
 
 ## QWED Verification — all-tenant metrics restricted to explicit platform operators (security release)
