@@ -74,6 +74,30 @@ print(result.developer_fields["observed_result"])         # 150.0
 print(result.developer_fields["constraint_id"])           # "stats_verifier.claim_not_verified"
 ```
 
+## Upload limits
+
+`/verify/stats` bounds both the CSV transfer and the parsed dataset. QWED enforces the byte cap while the body is received, before any parse work starts, and enforces the cell cap chunk by chunk during parsing.
+
+| Limit | Value | Response when exceeded |
+| ----- | ----- | ---------------------- |
+| Upload size | 10 MB | `413` |
+| Expanded dataset size | 1,000,000 cells (rows × columns) | `413` |
+| Body read deadline | 30 seconds | `408 Request Timeout` |
+| Concurrent uploads (per process) | 8 in flight | `503` — retry shortly |
+| Empty or column-less CSV | — | `400` |
+
+The cell cap counts rows × columns, so a compact but very wide CSV is rejected even when the file is small. If your dataset exceeds a limit, split it or pre-aggregate before uploading — the limits cannot be raised per request.
+
+The CSV parse, code generation, and Docker execution all run off the API event loop, so a large-but-valid upload slows only its own request rather than the whole service.
+
+## Bounded results
+
+Sandbox output is size-capped end to end, so a runaway computation cannot exhaust memory or flood the audit log:
+
+- The sandbox result file is capped at 2 MB. The cap is enforced both inside the container as the result is serialized and again at host read-back. An oversized result fails the execution rather than being partially returned.
+- `observed_result` in `developer_fields` is bounded before it is returned: long strings are truncated with markers and deeply nested structures are cut off at a traversal budget.
+- The copy of the result stored in the verification audit log is capped at 64,000 characters and always remains valid JSON, so the audit integrity verifier can still parse capped entries.
+
 ## Execution model
 
 All generated statistical code is executed inside a Docker container with enforced memory and CPU limits. The engine does not fall back to in-process execution under any circumstances.

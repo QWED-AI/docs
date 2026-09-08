@@ -85,6 +85,30 @@ print(health)
 client.reset_circuit_breakers()
 ```
 
+## Execution deadlines and partial results
+
+Consensus verification runs under a single 30-second aggregate deadline that covers all engines. No engine call can hold a request open indefinitely, and `/verify/consensus` never hangs or returns HTTP 500 because one engine stalled.
+
+How the deadline applies:
+
+- **One aggregate budget, not per-engine stacking.** All selected engines share the same 30-second wall clock. Sequential per-engine waits cannot accumulate beyond it.
+- **Timed-out engines become explicit `BLOCKED` results.** An engine that misses the deadline is recorded in `verification_chain` as a `BLOCKED` `EngineResult` with the timeout in its `error` field (for example, `"Engine timed out after 30s"`). The failure is also recorded with the circuit breaker.
+- **Circuit-open engines are recorded too.** An engine skipped because its circuit breaker is open appears as a `BLOCKED` result rather than being silently dropped.
+- **Partial results still aggregate.** Engines that finished within the deadline contribute normally. The consensus verdict is computed from the results that arrived, with the fail-closed [status propagation](#status-propagation) rules applied — a `BLOCKED` engine result caps the consensus at `UNVERIFIABLE`.
+- **Off the event loop.** Engine execution runs in a dedicated per-call executor, so a slow consensus request degrades only itself, not other API traffic.
+
+```python
+result = client.verify_with_consensus(query="2 + 2 = 4", mode="maximum")
+
+for engine in result.verification_chain:
+    if engine.status == "BLOCKED" and "timed out" in (engine.error or ""):
+        print(f"{engine.engine_name} missed the 30s deadline")
+```
+
+<Note>
+A consensus response that includes timed-out engines is a valid partial result, not an error. Check `verification_chain` to see which engines contributed and treat the aggregate `status` as authoritative.
+</Note>
+
 ## Async failure handling
 
 When an unexpected error occurs during async engine aggregation, the Consensus Engine records the failure as a dedicated `EngineResult` entry rather than silently dropping it. This ensures that:

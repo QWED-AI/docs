@@ -225,6 +225,15 @@ If the Docker daemon is unreachable, the affected endpoints return HTTP 503 rath
 
 This design ensures that a Docker outage is surfaced as a visible service disruption rather than silently downgrading security.
 
+#### Sandbox containment limits
+
+Every sandbox container runs with hard resource and output bounds, and is always removed after execution:
+
+- **Process cap** — `pids_limit: 128` prevents fork bombs from exhausting kernel PIDs, alongside the existing memory and CPU limits.
+- **Log rotation** — container logs use the `json-file` driver with `max-size: 10m` and `max-file: 1`, so a log-flooding payload cannot fill the host disk.
+- **Guaranteed cleanup** — the container is force-removed in a `finally` block covering the whole post-creation lifecycle, including start failures, with one retry for transient daemon races. A cleanup failure is logged as a warning and never discards a valid verification result.
+- **Result size cap** — the sandbox result file is capped at 2 MB, enforced both inside the container during serialization and at host read-back. Result payloads stored in the verification audit log are additionally capped and always remain valid JSON, so the audit integrity verifier can parse capped entries.
+
 #### Fail-closed when `CodeVerifier` is unavailable or failing
 
 <Info>Updated May 2, 2026</Info>
