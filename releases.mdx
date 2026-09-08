@@ -5,8 +5,8 @@ description: "QWED Protocol release history with download links, installation in
 
 ## Current release
 
-<Card title="v7.1.0 — Verification Context v1.0 Rollout" icon="shield-check" href="/changelog#v7-1-0-%E2%80%94-verification-context-v10-rollout">
-  Verification Context (VC) v1.0 shipped end-to-end: a formal spec with JSON Schema, public `proof_ref` generation and resolution, `to_verification_context()` on all 13 verifiers, API endpoints, CLI commands, SDK re-exports, and Docker-action VC outputs. Additive minor — no breaking wire changes.
+<Card title="v7.2.0 — Security Hardening Batch + Precision Advisory" icon="shield-check" href="/changelog#v7-2-0-—-precision-advisory-and-security-hardening-batch">
+  Fail-closed security hardening (expression, auth, sandbox, event loop) plus a new float-precision advisory. Additive minor — no breaking wire changes.
 </Card>
 
 ### Install
@@ -14,23 +14,23 @@ description: "QWED Protocol release history with download links, installation in
 <CodeGroup>
 
 ```bash pip
-pip install qwed==7.1.0
+pip install qwed==7.2.0
 ```
 
 ```bash docker
-docker pull qwedai/qwed-verification:7.1.0
+docker pull qwedai/qwed-verification:7.2.0
 ```
 
 ```bash npm
-npm install @qwed-ai/sdk@7.1.0
+npm install @qwed-ai/sdk@7.2.0
 ```
 
 ```bash cargo
-cargo add qwed@7.1.0
+cargo add qwed@7.2.0
 ```
 
 ```bash go
-go get github.com/QWED-AI/qwed-verification/sdk-go@v7.1.0
+go get github.com/QWED-AI/qwed-verification/sdk-go@v7.2.0
 ```
 
 </CodeGroup>
@@ -41,7 +41,12 @@ go get github.com/QWED-AI/qwed-verification/sdk-go@v7.1.0
 
 <AccordionGroup>
 
-<Accordion title="v7.1.0 — Verification Context v1.0 Rollout (August 16, 2026)" icon="shield-check" defaultOpen>
+<Accordion title="v7.2.0 — Precision advisory and security hardening batch (September 7, 2026)" icon="shield-check" defaultOpen>
+  **Fail-closed hardening batch + one additive capability.** Expression/auth/sandbox/event-loop security fixes restoring intended behavior, plus a new advisory flag for binary floating-point constants.
+
+  [Full Release Notes →](/changelog#v7-2-0-—-precision-advisory-and-security-hardening-batch) · [GitHub Release](https://github.com/QWED-AI/qwed-verification/releases/tag/v7.2.0)
+</Accordion>
+<Accordion title="v7.1.0 — Verification Context v1.0 Rollout (August 16, 2026)" icon="shield-check">
   **Verification Context (VC) v1.0 shipped end-to-end (PRs #302–#316).** A formal specification with a machine-readable JSON Schema, a typed document model with fail-closed invariants, public [`proof_ref`](/api/endpoints#verification-context-endpoints) generation and resolution, `to_verification_context()` on all 13 verifiers, dedicated API endpoints, the `qwed context` CLI group, SDK re-exports on the Python client, and Docker-action VC outputs. Additive semver minor — no breaking wire changes.
 
   <Info>**Fail-closed conversion:** a `VERIFIED` diagnostic without a valid attestation demotes to `UNVERIFIABLE` in the VC document; malformed diagnostics convert to `BLOCKED` instead of crashing.</Info>
