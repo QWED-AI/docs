@@ -317,7 +317,7 @@ endpoint = "https://api.example.com/list?page=1&limit=10"
 
 Engine `pattern_scan` · category `secret_exposure` · base action `BLOCK` · source: `PATTERN_RULES`
 
-Credential material embedded in URL path segment (/bearer/<token>, /reset/<secret>).
+Credential material embedded in URL path segment (/bearer/\<token>, /reset/\<secret>).
 
 ```regex
 [\"\\\'][a-z][a-z0-9+.-]*://[^\s\"\\\'?#]*?/(?i:(?:bearer|reset|access|secret|password|passwd|credential|signature|api[_-]?key|token))s?/(?=[A-Za-z0-9_\-]*[a-z])(?=[A-Za-z0-9_\-]*[A-Z])(?=[A-Za-z0-9_\-]*[0-9])[A-Za-z0-9_\-]{20,}(?:[\"\\\']|/|[?#])
