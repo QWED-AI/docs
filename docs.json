@@ -501,7 +501,7 @@
   },
   "description": "Official documentation for QWED. Learn deterministic verification for LLMs and AI agents using formal methods, symbolic execution, and policy guards.",
   "banner": {
-    "content": "\u2b50 If you find QWED helpful, consider [giving us a star on GitHub](https://github.com/QWED-AI/qwed-verification)!",
+    "content": "**QWED is now a GitHub Technology Partner** — QWED Security and verification, natively integrated with GitHub. [Browse the Marketplace listing](https://github.com/marketplace/qwed-security)",
     "dismissible": true
   },
   "integrations": {
