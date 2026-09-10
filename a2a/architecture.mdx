@@ -23,7 +23,7 @@ flowchart LR
 
 | Stage | Component | What it does |
 |-------|-----------|-------------|
-| **1. Schema** | Pydantic `AgentMessage` | Validates sender/receiver IDs, payload type, timestamp, optional signature |
+| **1. Schema** | Pydantic `AgentMessage` | Validates sender/receiver IDs, payload type, timestamp. Over HTTP, the authenticated API-key identity overrides `sender_agent_id` before this stage. |
 | **2. Trust** | `TrustBoundary` | Checks blocklists, allowlists, pair blocks, rate limits — deny-all by default |
 | **3. Engine** | `_route_to_engine()` | Routes to `finance_guard`, `logic_guard`, or `code_guard`. `GENERAL` and `DATA_QUERY` payload types have no engine and return an `unverifiable` result. |
 | **4. Attestation** | `A2ACryptoService` | Signs `forwarded`, `blocked`, and `heuristic_pass` verdicts with an ES256 JWT (payload hash, trace ID, engine used). `unverifiable` verdicts carry **no JWT**. |
@@ -168,7 +168,6 @@ classDiagram
         +PayloadType payload_type
         +Dict payload
         +datetime timestamp
-        +str? signature
         +Dict? metadata
     }
 

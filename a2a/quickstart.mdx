@@ -182,7 +182,7 @@ See [Crypto attestations](/a2a/crypto-attestations) for key rotation and multi-r
 
 ## Run the FastAPI gateway
 
-QWED A2A includes a ready-to-use HTTP gateway:
+QWED A2A includes a ready-to-use HTTP gateway. Every call to `POST /a2a/intercept` must authenticate with a per-agent API key in the `X-API-Key` header. Configure keys through the `QWED_A2A_API_KEYS` environment variable, a JSON object mapping each key to its agent ID. There is no anonymous access: if no keys are configured, the endpoint denies every request with `401`.
 
 ```python
 from fastapi import FastAPI
@@ -191,7 +191,9 @@ from qwed_a2a.protocol.endpoints import router
 app = FastAPI(title="QWED A2A Gateway")
 app.include_router(router)
 
-# Run with: uvicorn main:app --host 0.0.0.0 --port 8000
+# Run with:
+# QWED_A2A_API_KEYS='{"key-for-A": "agent-A"}' \
+#   uvicorn main:app --host 0.0.0.0 --port 8000
 ```
 
 Test it:
@@ -199,6 +201,7 @@ Test it:
 ```bash
 curl -X POST http://localhost:8000/a2a/intercept \
   -H "Content-Type: application/json" \
+  -H "X-API-Key: key-for-A" \
   -d '{
     "sender_agent_id": "agent-A",
     "receiver_agent_id": "agent-B",
@@ -206,6 +209,10 @@ curl -X POST http://localhost:8000/a2a/intercept \
     "payload": {"message": "Hello!"}
   }'
 ```
+
+<Warning>
+The `X-API-Key` header selects the caller. The gateway processes and attests the message as the key's agent even if `sender_agent_id` in the body names someone else. Missing, unknown, or unconfigured keys return `401`. See [Gateway authentication](/a2a/deployment#gateway-authentication) for key format and rotation.
+</Warning>
 
 Response:
 

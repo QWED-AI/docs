@@ -25,6 +25,10 @@ verdict = await interceptor.intercept(message, trace_id="a2a_trace_001")
 The `trace_id` parameter is **required** and must be provided by the caller. This ensures all verdicts and JWT attestations are deterministic and auditable. The HTTP gateway (`POST /a2a/intercept`) generates this automatically.
 </Info>
 
+<Warning>
+**Sender identity is bound by the caller, not the message.** Over HTTP, the gateway authenticates each request with a per-agent [API key](/a2a/deployment#gateway-authentication) and overrides `message.sender_agent_id` with the authenticated agent before calling `intercept()`. Direct library callers get no such override: you own identity binding and must never pass an untrusted `sender_agent_id` to `intercept()`.
+</Warning>
+
 ---
 
 ## Verification pipeline
@@ -38,7 +42,7 @@ The `trace_id` parameter is **required** and must be provided by the caller. Thi
     - Timestamps are timezone-aware UTC
   </Step>
   <Step title="Trust Boundary">
-    The trust boundary evaluates the sender→receiver pair:
+    The trust boundary evaluates the sender→receiver pair. Over HTTP the sender is the authenticated API-key identity, never the body-declared `sender_agent_id`:
     - Global blocklist check
     - Pair-level block check
     - Allowlist check (in strict mode)
