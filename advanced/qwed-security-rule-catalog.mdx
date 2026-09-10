@@ -1,0 +1,2485 @@
+---
+title: "QWED Security Rule Catalog"
+description: "Every QWED Security rule: definition, regex, trip example, and pass example — generated from the engine so it cannot drift."
+---
+
+# QWED Security Rule Catalog
+
+Generated from `scan_rules.py` at rule set **qwed-security-ruleset/5**. Every rule ID used in a QWED annotation anchors here as `#<rule-id>`.
+
+This page intentionally contains live trip strings. Findings on it are covered by narrowly scoped base-branch policy entries (see .qwed.yml) — NOT by inline markers: on introduced lines the pipeline voids inline suppressions as self-suppression, and a voided inline marker then shadows the policy entry that would otherwise apply. Never add qwed-ignore to generated trip lines.
+
+## Policy: non-downgradable categories
+
+These categories are never downgraded to INFO for sitting in a non-executable context (comment, docstring, test, demo):
+
+| Category | Why it cannot be downgraded |
+|----------|------------------------------|
+| `code_generation` | Dynamic code generation in tests and fixtures executes during CI — "it's only a test" is not a trust boundary (#10). |
+| `disk_write` | Direct disk writes in tests and fixtures execute during CI and can destroy runner or mounted state (#10). |
+| `dynamic_execution` | Tests, examples, and fixtures execute in CI (pytest collection, conftest import chains), so dynamic execution primitives in them are real attack surface — "it's only a test" is not a trust boundary (#10). |
+| `filesystem_destruction` | Destructive filesystem operations in tests and fixtures execute during CI (pytest collection, conftest import chains) — "it's only a test" is not a trust boundary (#10). |
+| `privilege_escalation` | Privilege-escalation primitives in tests and fixtures execute during CI and can grant a compromised job lasting access (#10). |
+| `release_boundary_violation` | Release-boundary violations determine what actually ships in published artifacts; downgrading them in tests or docs would hide material that reaches production registries. |
+| `secret_exposure` | Credentials are not inert text anywhere: a secret pasted into a comment, docstring, or README is as leaked as one committed in source — the leak medium is the git history, not the file's execution context (#47). |
+| `shell_execution` | Shell execution in tests and fixtures runs during CI with the same privileges as production jobs — "it's only a test" is not a trust boundary (#10). |
+| `unsafe_deserialization` | Deserialization of untrusted state in tests and fixtures executes with the CI job's privileges (#10). |
+
+## Rule reference
+
+### eval-call
+
+Engine `pattern_scan` · category `dynamic_execution` · base action `BLOCK` · source: `PATTERN_RULES`
+
+eval() executes untrusted code. In agentic pipelines, LLM- or caller-controlled expressions reach this sink.
+
+```regex
+(?<![.\w])eval\s*\(
+```
+
+Trips:
+
+```python
+result = eval(user_expr)
+```
+
+Passes:
+
+```python
+result = evaluate(user_expr)
+```
+
+### exec-call
+
+Engine `pattern_scan` · category `dynamic_execution` · base action `BLOCK` · source: `PATTERN_RULES`
+
+exec() executes untrusted code. In agentic pipelines, LLM- or caller-controlled expressions reach this sink.
+
+```regex
+(?<![.\w])exec\s*\(
+```
+
+Trips:
+
+```python
+exec(payload)
+```
+
+Passes:
+
+```python
+executor.submit(job)
+```
+
+### dynamic-import
+
+Engine `pattern_scan` · category `dynamic_import` · base action `WARNING` · source: `PATTERN_RULES`
+
+Dynamic __import__() call should be reviewed.
+
+```regex
+\b__import__\s*\(
+```
+
+Trips:
+
+```python
+mod = __import__("os")
+```
+
+Passes:
+
+```python
+import os
+```
+
+### compile-call
+
+Engine `pattern_scan` · category `code_generation` · base action `WARNING` · source: `PATTERN_RULES`
+
+compile() can be part of dynamic code generation.
+
+```regex
+(?<!re\.)(?<!regex\.)(?<!pattern\.)(?<!\.)\bcompile\s*\(
+```
+
+Trips:
+
+```python
+code = compile(src, "<s>", "exec")
+```
+
+Passes:
+
+```python
+pattern = re.compile(r"\d+")
+```
+
+### os-system
+
+Engine `pattern_scan` · category `shell_execution` · base action `BLOCK` · source: `PATTERN_RULES`
+
+os.system() shell execution primitive detected.
+
+```regex
+os\.system\s*\(
+```
+
+Trips:
+
+```python
+os.system("ls")
+```
+
+Passes:
+
+```python
+subprocess.run(["ls"], check=True)
+```
+
+### subprocess-call
+
+Engine `pattern_scan` · category `external_process` · base action `WARNING` · source: `PATTERN_RULES`
+
+subprocess invocation detected.
+
+```regex
+subprocess\.(call|run|Popen|check_output)\s*\(
+```
+
+Trips:
+
+```python
+subprocess.run(cmd)
+```
+
+Passes:
+
+```python
+process.run(cmd)
+```
+
+### os-popen
+
+Engine `pattern_scan` · category `shell_execution` · base action `BLOCK` · source: `PATTERN_RULES`
+
+os.popen() shell execution primitive detected.
+
+```regex
+os\.popen\s*\(
+```
+
+Trips:
+
+```python
+out = os.popen("uname -a")
+```
+
+Passes:
+
+```python
+out = os.path.join(a, b)
+```
+
+### path-traversal
+
+Engine `pattern_scan` · category `path_traversal` · base action `BLOCK` · source: `PATTERN_RULES`
+
+Path traversal sequence detected.
+
+```regex
+\.\./\.\./\.\./
+```
+
+Trips:
+
+```python
+open("../../../../etc/passwd")
+```
+
+Passes:
+
+```python
+open("data/file.txt")
+```
+
+### hardcoded-secret
+
+Engine `pattern_scan` · category `secret_exposure` · base action `BLOCK` · source: `PATTERN_RULES`
+
+Hardcoded credential-like material detected.
+
+```regex
+(?i)\b(\w*)(password|passwd|pwd|secret|key|token|auth|uri|dsn|connstring|conn_string|url)(\w*)\s*=\s*[fFrRbBuU]{0,2}[\"\\\'][^\"\\\s]{16,}[\"\\\']
+```
+
+Trips:
+
+```python
+password = "Zq9vTt2mLpXwR8sK1234"
+```
+
+Passes:
+
+```python
+TOKEN_TYPE = "qwed-a2a-attestation+jwt"
+```
+
+### hardcoded-secret-dict
+
+Engine `pattern_scan` · category `secret_exposure` · base action `BLOCK` · source: `PATTERN_RULES`
+
+Hardcoded credential-like material in dictionary/config literal detected.
+
+```regex
+(?i)[\"\\\']\w*(password|passwd|pwd|secret|key|token|auth|uri|dsn|connstring|conn_string|url)\w*[\"\\\']\s*:\s*[fFrRbBuU]{0,2}[\"\\\'][^\"\\\s]{16,}[\"\\\']
+```
+
+Trips:
+
+```python
+config = {"password": "Zq9vTt2mLpXwR8sK1234"}
+```
+
+Passes:
+
+```python
+config = {"token_type": "qwed-a2a-attestation+jwt"}
+```
+
+### url-embedded-credential
+
+Engine `pattern_scan` · category `secret_exposure` · base action `BLOCK` · source: `PATTERN_RULES`
+
+Credential embedded in URL userinfo (user:pass@) — the value is a connection string, not a reference.
+
+```regex
+(?i)[\"\\\'][a-z][a-z0-9+.-]*://[^\s\"\\\'@]*:[^\s\"\\\'@]+@[^\s\"\\\']*[\"\\\']
+```
+
+Trips:
+
+```python
+db = "postgres://admin:hunter2@prod.db.internal/main"
+```
+
+Passes:
+
+```python
+db = "postgres://db.internal:5432/main"
+```
+
+### url-query-credential
+
+Engine `pattern_scan` · category `secret_exposure` · base action `BLOCK` · source: `PATTERN_RULES`
+
+Credential in URL query or fragment parameter (?token=…, #password=…).
+
+```regex
+(?i)[\"\\\'][a-z][a-z0-9+.-]*://[^\s\"\\\']*[?&#](?:api[_-]?key|apikey|token|secret|password|passwd|pwd|access[_-]?token|auth|credential|sig|signature|private[_-]?key)=[^&\"\\\'&]+(?:[\"\\\'&]|$)
+```
+
+Trips:
+
+```python
+endpoint = "https://api.example.com/v1?api_key=sk1234567890abcdef"
+```
+
+Passes:
+
+```python
+endpoint = "https://api.example.com/v1?page=2&limit=10"
+```
+
+### url-unknown-param-credential
+
+Engine `pattern_scan` · category `secret_exposure` · base action `BLOCK` · source: `PATTERN_RULES`
+
+Credential-shaped value on an unknown URL parameter — unknown names with key-material values are secrets.
+
+```regex
+[\"\\\'][a-z][a-z0-9+.-]*://[^\s\"\\\']*[?&#][A-Za-z0-9_\-]+=[A-Za-z0-9_\-=%+./]{16,}(?:[\"\\\'&]|$)
+```
+
+Trips:
+
+```python
+endpoint = "https://api.example.com/session?s=a1B2c3D4e5F6g7H8"
+```
+
+Passes:
+
+```python
+endpoint = "https://api.example.com/list?page=1&limit=10"
+```
+
+### url-path-credential
+
+Engine `pattern_scan` · category `secret_exposure` · base action `BLOCK` · source: `PATTERN_RULES`
+
+Credential material embedded in URL path segment (/bearer/<token>, /reset/<secret>).
+
+```regex
+[\"\\\'][a-z][a-z0-9+.-]*://[^\s\"\\\'?#]*?/(?i:(?:bearer|reset|access|secret|password|passwd|credential|signature|api[_-]?key|token))s?/(?=[A-Za-z0-9_\-]*[a-z])(?=[A-Za-z0-9_\-]*[A-Z])(?=[A-Za-z0-9_\-]*[0-9])[A-Za-z0-9_\-]{20,}(?:[\"\\\']|/|[?#])
+```
+
+Trips:
+
+```python
+endpoint = "https://api.internal/v1/bearer/a1B2c3D4e5F6g7H8i9J0k1"
+```
+
+Passes:
+
+```python
+endpoint = "https://api.internal/v1/users/12345"
+```
+
+### openai-secret
+
+Engine `pattern_scan` · category `secret_exposure` · base action `BLOCK` · source: `PATTERN_RULES`
+
+OpenAI-style secret token detected.
+
+```regex
+(?i)sk-[a-zA-Z0-9]{20,}
+```
+
+Trips:
+
+```python
+client = OpenAI(api_key="sk-a1B2c3D4e5F6g7H8i9J0k1")
+```
+
+Passes:
+
+```python
+client = OpenAI(api_key=os.environ["OPENAI_KEY"])
+```
+
+### github-secret
+
+Engine `pattern_scan` · category `secret_exposure` · base action `BLOCK` · source: `PATTERN_RULES`
+
+GitHub token-like secret detected.
+
+```regex
+(?i)ghp_[a-zA-Z0-9]{36}
+```
+
+Trips:
+
+```python
+token = "ghp_a1B2c3D4e5F6g7H8i9J0k1L2m3N4o5P6q7R8"
+```
+
+Passes:
+
+```python
+token = os.environ["GH_TOKEN"]
+```
+
+### github-fine-grained-pat
+
+Engine `pattern_scan` · category `secret_exposure` · base action `BLOCK` · source: `PATTERN_RULES`
+
+GitHub fine-grained personal access token detected.
+
+```regex
+github_pat_[A-Za-z0-9_]{22,}
+```
+
+Trips:
+
+```python
+token = "github_pat_a1B2c3D4e5F6g7H8i9J0k1"
+```
+
+Passes:
+
+```python
+token = os.environ["GH_FINE_TOKEN"]
+```
+
+### github-oauth-token
+
+Engine `pattern_scan` · category `secret_exposure` · base action `BLOCK` · source: `PATTERN_RULES`
+
+GitHub OAuth/server-to-server token detected.
+
+```regex
+gh[ousr]_[A-Za-z0-9]{36,}
+```
+
+Trips:
+
+```python
+token = "ghs_a1B2c3D4e5F6g7H8i9J0k1L2m3N4o5P6q7R8"
+```
+
+Passes:
+
+```python
+token = os.environ["GH_APP_TOKEN"]
+```
+
+### gitlab-pat
+
+Engine `pattern_scan` · category `secret_exposure` · base action `BLOCK` · source: `PATTERN_RULES`
+
+GitLab personal access token detected.
+
+```regex
+glpat-[A-Za-z0-9_\-]{20,}
+```
+
+Trips:
+
+```python
+token = "glpat-a1B2c3D4e5F6g7H8i9J0"
+```
+
+Passes:
+
+```python
+token = os.environ["GITLAB_TOKEN"]
+```
+
+### slack-token
+
+Engine `pattern_scan` · category `secret_exposure` · base action `BLOCK` · source: `PATTERN_RULES`
+
+Slack token detected.
+
+```regex
+xox[baprs]-[A-Za-z0-9\-]{10,}
+```
+
+Trips:
+
+```python
+token = "xoxb-a1B2c3D4e5F6g7H8i9J0"
+```
+
+Passes:
+
+```python
+token = os.environ["SLACK_TOKEN"]
+```
+
+### stripe-live-key
+
+Engine `pattern_scan` · category `secret_exposure` · base action `BLOCK` · source: `PATTERN_RULES`
+
+Stripe live secret key detected.
+
+```regex
+[sr]k_live_[A-Za-z0-9]{16,}
+```
+
+Trips:
+
+```python
+key = "sk_live_a1B2c3D4e5F6g7H8"
+```
+
+Passes:
+
+```python
+key = os.environ["STRIPE_KEY"]
+```
+
+### anthropic-key
+
+Engine `pattern_scan` · category `secret_exposure` · base action `BLOCK` · source: `PATTERN_RULES`
+
+Anthropic API key detected.
+
+```regex
+sk-ant-[A-Za-z0-9_\-]{20,}
+```
+
+Trips:
+
+```python
+key = "sk-ant-a1B2c3D4e5F6g7H8i9J0"
+```
+
+Passes:
+
+```python
+key = os.environ["ANTHROPIC_KEY"]
+```
+
+### google-api-key
+
+Engine `pattern_scan` · category `secret_exposure` · base action `BLOCK` · source: `PATTERN_RULES`
+
+Google API key detected.
+
+```regex
+AIza[0-9A-Za-z_\-]{35}
+```
+
+Trips:
+
+```python
+key = "AIzaSyA1bC2dE3fG4hI5jK6lM7nO8pQ9rS0tU1v"
+```
+
+Passes:
+
+```python
+key = os.environ["GOOGLE_KEY"]
+```
+
+### jwt-token
+
+Engine `pattern_scan` · category `secret_exposure` · base action `WARNING` · source: `PATTERN_RULES`
+
+JWT-like token detected; verify it is not a live credential.
+
+```regex
+eyJ[A-Za-z0-9_\-]{10,}\.[A-Za-z0-9_\-]{10,}\.[A-Za-z0-9_\-]{5,}
+```
+
+Trips:
+
+```python
+token = "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.a1B2c3D4e5F6"
+```
+
+Passes:
+
+```python
+token = os.environ["JWT_TOKEN"]
+```
+
+### aws-secret
+
+Engine `pattern_scan` · category `secret_exposure` · base action `BLOCK` · source: `PATTERN_RULES`
+
+AWS access-key-like secret detected.
+
+```regex
+(?i)AKIA[A-Z0-9]{16}
+```
+
+Trips:
+
+```python
+aws_key = "AKIAIOSFODNN7EXAMPLE"
+```
+
+Passes:
+
+```python
+aws_key = os.environ["AWS_ACCESS_KEY_ID"]
+```
+
+### private-key-block
+
+Engine `pattern_scan` · category `secret_exposure` · base action `BLOCK` · source: `PATTERN_RULES`
+
+Private key material detected — a committed PEM/DER key block is a credential, whatever the file's name or extension.
+
+```regex
+-----BEGIN (?:RSA |EC |DSA |OPENSSH |PGP )?PRIVATE KEY(?: BLOCK)?-----
+```
+
+Trips:
+
+```python
+key = "-----BEGIN RSA PRIVATE KEY-----"
+```
+
+Passes:
+
+```python
+cert = "-----BEGIN CERTIFICATE-----"
+```
+
+### sql-fstring-select
+
+Engine `pattern_scan` · category `sql_injection` · base action `WARNING` · source: `PATTERN_RULES`
+
+Potential SQL query interpolation via f-string.
+
+```regex
+f[\"'].*SELECT.*\{
+```
+
+Trips:
+
+```python
+query = f"SELECT * FROM users WHERE id = {uid}"
+```
+
+Passes:
+
+```python
+query = "SELECT * FROM users WHERE id = ?"
+```
+
+### sql-fstring-insert
+
+Engine `pattern_scan` · category `sql_injection` · base action `WARNING` · source: `PATTERN_RULES`
+
+Potential SQL query interpolation via f-string.
+
+```regex
+f[\"'].*INSERT.*\{
+```
+
+Trips:
+
+```python
+query = f"INSERT INTO users VALUES ({uid})"
+```
+
+Passes:
+
+```python
+query = "INSERT INTO users VALUES (?)"
+```
+
+### sql-fstring-delete
+
+Engine `pattern_scan` · category `sql_injection` · base action `WARNING` · source: `PATTERN_RULES`
+
+Potential SQL query interpolation via f-string.
+
+```regex
+f[\"'].*DELETE.*\{
+```
+
+Trips:
+
+```python
+query = f"DELETE FROM users WHERE id = {uid}"
+```
+
+Passes:
+
+```python
+query = "DELETE FROM users WHERE id = ?"
+```
+
+### sql-fstring-update
+
+Engine `pattern_scan` · category `sql_injection` · base action `WARNING` · source: `PATTERN_RULES`
+
+Potential SQL query interpolation via f-string.
+
+```regex
+f[\"'].*UPDATE.*\{
+```
+
+Trips:
+
+```python
+query = f"UPDATE users SET name = {name}"
+```
+
+Passes:
+
+```python
+query = "UPDATE users SET name = ?"
+```
+
+### pickle-load
+
+Engine `pattern_scan` · category `unsafe_deserialization` · base action `BLOCK` · source: `PATTERN_RULES`
+
+pickle deserialization executes embedded code — treat pickle input as code execution, especially in agent pipelines.
+
+```regex
+pickle\.loads?\s*\(
+```
+
+Trips:
+
+```python
+pickle.loads(blob)
+```
+
+Passes:
+
+```python
+obj = json.loads(text)
+```
+
+### yaml-load
+
+Engine `pattern_scan` · category `unsafe_deserialization` · base action `WARNING` · source: `PATTERN_RULES`
+
+yaml.load without an explicit Loader is unsafe — and raises TypeError on PyYAML >= 6.0.1. Use yaml.safe_load.
+
+```regex
+yaml\.load\s*\((?!.*Loader)
+```
+
+Trips:
+
+```python
+cfg = yaml.load(stream)
+```
+
+Passes:
+
+```python
+cfg = yaml.safe_load(stream)
+```
+
+### marshal-load
+
+Engine `pattern_scan` · category `unsafe_deserialization` · base action `BLOCK` · source: `PATTERN_RULES`
+
+marshal deserialization can execute untrusted state.
+
+```regex
+marshal\.loads?\s*\(
+```
+
+Trips:
+
+```python
+marshal.loads(data)
+```
+
+Passes:
+
+```python
+obj = json.loads(data)
+```
+
+### shelve-open
+
+Engine `pattern_scan` · category `unsafe_deserialization` · base action `WARNING` · source: `PATTERN_RULES`
+
+shelve uses pickle under the hood and needs trust review.
+
+```regex
+shelve\.open\s*\(
+```
+
+Trips:
+
+```python
+db = shelve.open("cache.db")
+```
+
+Passes:
+
+```python
+db = sqlite3.connect("app.db")
+```
+
+### bind-all-interfaces
+
+Engine `pattern_scan` · category `network_binding` · base action `WARNING` · source: `PATTERN_RULES`
+
+Binding to 0.0.0.0 exposes the service broadly.
+
+```regex
+0\.0\.0\.0
+```
+
+Trips:
+
+```python
+app.run(host="0.0.0.0")
+```
+
+Passes:
+
+```python
+app.run(host="127.0.0.1")
+```
+
+### weak-random
+
+Engine `pattern_scan` · category `insecure_random` · base action `WARNING` · source: `PATTERN_RULES`
+
+Non-cryptographic random usage detected.
+
+```regex
+random\.(random|randint|choice|shuffle)\s*\(
+```
+
+Trips:
+
+```python
+token = random.randint(0, 2**32)
+```
+
+Passes:
+
+```python
+token = secrets.randbelow(2**32)
+```
+
+### mktemp
+
+Engine `pattern_scan` · category `insecure_tempfile` · base action `WARNING` · source: `PATTERN_RULES`
+
+tempfile.mktemp() is vulnerable to race conditions.
+
+```regex
+tempfile\.mktemp\s*\(
+```
+
+Trips:
+
+```python
+tmp = tempfile.mktemp()
+```
+
+Passes:
+
+```python
+fd, tmp = tempfile.mkstemp()
+```
+
+### assert-validation
+
+Engine `pattern_scan` · category `weak_assert_validation` · base action `WARNING` · source: `PATTERN_RULES`
+
+assert should not be the only input-validation boundary.
+
+```regex
+^\s*assert\s+.*\b(request|input|param|arg|user|data|payload)\b
+```
+
+Trips:
+
+```python
+assert request.params["q"] != ""
+```
+
+Passes:
+
+```python
+assert total > 0
+```
+
+### config-password
+
+Engine `secret_scan` · category `secret_exposure` · base action `BLOCK` · source: `SECRET_RULES`
+
+Password-like secret found in configuration.
+
+```regex
+(?i)(password|passwd|pwd)\s*[:=]\s*[\"']?(?![\"']?\$)\S+
+```
+
+Trips:
+
+```text
+DB_PASSWORD=supersecret123
+```
+
+Passes:
+
+```text
+DB_PASSWORD=$DB_PASSWORD
+```
+
+### config-secret
+
+Engine `secret_scan` · category `secret_exposure` · base action `BLOCK` · source: `SECRET_RULES`
+
+Secret-like material found in configuration.
+
+```regex
+(?i)(secret|api[_-]?key|token|auth)\s*[:=]\s*[\"']?(?![\"']?\$)\S{8,}
+```
+
+Trips:
+
+```text
+API_KEY=abcd1234efgh5678
+```
+
+Passes:
+
+```text
+API_KEY=${VAULT_API_KEY}
+```
+
+### config-private-key
+
+Engine `secret_scan` · category `secret_exposure` · base action `BLOCK` · source: `SECRET_RULES`
+
+Private key material found in configuration.
+
+```regex
+(?i)BEGIN\s+(RSA|DSA|EC|OPENSSH)\s+PRIVATE\s+KEY
+```
+
+Trips:
+
+```text
+-----BEGIN RSA PRIVATE KEY-----
+```
+
+Passes:
+
+```text
+-----BEGIN CERTIFICATE-----
+```
+
+### config-db-creds
+
+Engine `secret_scan` · category `secret_exposure` · base action `BLOCK` · source: `SECRET_RULES`
+
+Database URL contains embedded credentials.
+
+```regex
+(?i)(mysql|postgres|mongodb|redis)://\S+:\S+@
+```
+
+Trips:
+
+```text
+DATABASE_URL=postgres://admin:hunter2@db:5432/app
+```
+
+Passes:
+
+```text
+DATABASE_URL=postgres://db.internal:5432/app
+```
+
+### config-github-pat
+
+Engine `secret_scan` · category `secret_exposure` · base action `BLOCK` · source: `SECRET_RULES`
+
+GitHub fine-grained personal access token in configuration.
+
+```regex
+github_pat_[A-Za-z0-9_]{22,}
+```
+
+Trips:
+
+```text
+GH_TOKEN=github_pat_a1B2c3D4e5F6g7H8i9J0k1
+```
+
+Passes:
+
+```text
+GH_TOKEN=${GH_TOKEN}
+```
+
+### config-gitlab-pat
+
+Engine `secret_scan` · category `secret_exposure` · base action `BLOCK` · source: `SECRET_RULES`
+
+GitLab personal access token in configuration.
+
+```regex
+glpat-[A-Za-z0-9_\-]{20,}
+```
+
+Trips:
+
+```text
+GITLAB_TOKEN=glpat-a1B2c3D4e5F6g7H8i9J0
+```
+
+Passes:
+
+```text
+GITLAB_TOKEN=${GITLAB_TOKEN}
+```
+
+### config-slack-token
+
+Engine `secret_scan` · category `secret_exposure` · base action `BLOCK` · source: `SECRET_RULES`
+
+Slack token in configuration.
+
+```regex
+xox[baprs]-[A-Za-z0-9\-]{10,}
+```
+
+Trips:
+
+```text
+SLACK_TOKEN=xoxb-a1B2c3D4e5F6g7H8i9J0
+```
+
+Passes:
+
+```text
+SLACK_TOKEN=${SLACK_TOKEN}
+```
+
+### config-stripe-live
+
+Engine `secret_scan` · category `secret_exposure` · base action `BLOCK` · source: `SECRET_RULES`
+
+Stripe live secret key in configuration.
+
+```regex
+[sr]k_live_[A-Za-z0-9]{16,}
+```
+
+Trips:
+
+```text
+STRIPE_KEY=sk_live_a1B2c3D4e5F6g7H8
+```
+
+Passes:
+
+```text
+STRIPE_KEY=${STRIPE_KEY}
+```
+
+### fail-open-guard
+
+Engine `verification_integrity` · category `fail_open` · base action `WARNING` · source: `VERIFICATION_INTEGRITY_RULES`
+
+Multi-condition guard may be implicitly fail-open: if a middle field is None/missing, the entire check is skipped. Prefer checking each field independently.
+
+```regex
+if\s+\w+\s+and\s+\w+\s+and\s+(?:not\s+)?\w+
+```
+
+Trips:
+
+```python
+if user and token and scope:
+```
+
+Passes:
+
+```python
+if user and token:
+```
+
+### exception-info-leak
+
+Engine `verification_integrity` · category `information_disclosure` · base action `WARNING` · source: `VERIFICATION_INTEGRITY_RULES`
+
+str(exc) may leak internal stack traces, file paths, or credentials to API clients. Use a sanitized error message instead.
+
+```regex
+str\s*\(\s*(?:exc|exception|err|error)\s*\)
+```
+
+Trips:
+
+```python
+return {"error": str(exc)}
+```
+
+Passes:
+
+```python
+return {"error": "internal error"}
+```
+
+### empty-except-pass
+
+Engine `verification_integrity` · category `error_suppression` · base action `WARNING` · source: `VERIFICATION_INTEGRITY_RULES`
+
+Empty except block silently swallows errors. This can hide security failures and verification boundary violations.
+
+> Known engine gap: the live pattern scanner matches line-by-line, so this multi-line shape is currently undetectable in production (tracked in issue #88). The trip below documents the rule definition, not a live detection.
+
+```regex
+except\s+\w[\w.]*\s*:\s*\n\s*pass
+```
+
+Trips:
+
+```python
+except ValueError:
+    pass
+```
+
+Passes:
+
+```python
+except ValueError:
+    logger.exception("failed")
+```
+
+### codeguard-getattr-builtins
+
+Engine `codeguard` · category `dynamic_execution` · base action `BLOCK` · source: `CODEGUARD_RULES`
+
+getattr() on builtins enables sandbox escape and hidden code execution. Note: __builtins__ is a dict at module scope, a module in __main__ — both forms signal evasion.
+
+```regex
+getattr\s*\(\s*(?:__builtins__|builtins)
+```
+
+Trips:
+
+```python
+fn = getattr(__builtins__, name)
+```
+
+Passes:
+
+```python
+fn = getattr(obj, name)
+```
+
+### codeguard-builtins-dict
+
+Engine `codeguard` · category `dynamic_execution` · base action `BLOCK` · source: `CODEGUARD_RULES`
+
+Direct __builtins__.__dict__ access enables hidden function lookup.
+
+```regex
+__builtins__\s*\.\s*__dict__\s*\[
+```
+
+Trips:
+
+```python
+fn = __builtins__.__dict__["eval"]
+```
+
+Passes:
+
+```python
+ns = vars(module)
+```
+
+### codeguard-b64-payload
+
+Engine `codeguard` · category `obfuscation` · base action `WARNING` · source: `CODEGUARD_RULES`
+
+base64-decoded payload detected; decoded content is unscannable and requires review.
+
+```regex
+(?:base64\s*\.\s*)?b64decode\s*\(
+```
+
+Trips:
+
+```python
+data = base64.b64decode(payload)
+```
+
+Passes:
+
+```python
+data = base64.b64encode(raw)
+```
+
+### codeguard-chr-obfuscation
+
+Engine `codeguard` · category `obfuscation` · base action `WARNING` · source: `CODEGUARD_RULES`
+
+chr() string concatenation is a common obfuscation technique.
+
+```regex
+chr\s*\(\s*\d+\s*\)\s*\+\s*chr\s*\(
+```
+
+Trips:
+
+```python
+s = chr(104) + chr(101) + chr(108)
+```
+
+Passes:
+
+```python
+s = chr(104)
+```
+
+### curl-pipe-shell
+
+Engine `shell_safety` · category `shell_execution` · base action `BLOCK` · source: `SHELL_RULES`
+
+Pipe-to-shell pattern detected.
+
+```regex
+curl\s+.*\|\s*(bash|sh|zsh)
+```
+
+Trips:
+
+```bash
+curl https://install.example.sh | bash
+```
+
+Passes:
+
+```bash
+curl https://api.example.com -o out.json
+```
+
+### wget-pipe-shell
+
+Engine `shell_safety` · category `shell_execution` · base action `BLOCK` · source: `SHELL_RULES`
+
+Pipe-to-shell pattern detected.
+
+```regex
+wget\s+.*\|\s*(bash|sh|zsh)
+```
+
+Trips:
+
+```bash
+wget -qO- https://install.example.sh | sh
+```
+
+Passes:
+
+```bash
+wget https://example.com/file.tar.gz
+```
+
+### chmod-777
+
+Engine `shell_safety` · category `permission_broadening` · base action `WARNING` · source: `SHELL_RULES`
+
+chmod 777 grants overly broad permissions.
+
+```regex
+chmod\s+777
+```
+
+Trips:
+
+```bash
+chmod 777 /var/www
+```
+
+Passes:
+
+```bash
+chmod 755 /var/www
+```
+
+### chmod-setuid
+
+Engine `shell_safety` · category `privilege_escalation` · base action `BLOCK` · source: `SHELL_RULES`
+
+setuid bit can introduce privilege-escalation paths.
+
+```regex
+chmod\s+\+s
+```
+
+Trips:
+
+```bash
+chmod +s /usr/bin/tool
+```
+
+Passes:
+
+```bash
+chmod +x deploy.sh
+```
+
+### dd-disk-write
+
+Engine `shell_safety` · category `disk_write` · base action `BLOCK` · source: `SHELL_RULES`
+
+Direct disk write detected.
+
+```regex
+dd\s+if=.*of=/dev/
+```
+
+Trips:
+
+```bash
+dd if=image.img of=/dev/sda
+```
+
+Passes:
+
+```bash
+dd if=image.img of=disk-copy.img
+```
+
+### js-eval
+
+Engine `js_patterns` · category `dynamic_execution` · base action `BLOCK` · source: `JS_PATTERN_RULES`
+
+DYNAMIC_EXECUTION_BOUNDARY violation: eval in JavaScript enables arbitrary code execution.
+
+```regex
+\beval\s*\(
+```
+
+Trips:
+
+```javascript
+eval(userInput)
+```
+
+Passes:
+
+```javascript
+JSON.parse(userInput)
+```
+
+### js-innerhtml
+
+Engine `js_patterns` · category `xss` · base action `BLOCK` · source: `JS_PATTERN_RULES`
+
+XSS_BOUNDARY violation: innerHTML assignment enables XSS attacks.
+
+```regex
+\.innerHTML\s*=
+```
+
+Trips:
+
+```javascript
+el.innerHTML = userHtml
+```
+
+Passes:
+
+```javascript
+el.textContent = userText
+```
+
+### js-document-write
+
+Engine `js_patterns` · category `xss` · base action `WARNING` · source: `JS_PATTERN_RULES`
+
+XSS_BOUNDARY violation: document.write can introduce XSS.
+
+```regex
+document\.write\s*\(
+```
+
+Trips:
+
+```javascript
+document.write(html)
+```
+
+Passes:
+
+```javascript
+el.append(node)
+```
+
+### js-dangerously-set
+
+Engine `js_patterns` · category `xss` · base action `BLOCK` · source: `JS_PATTERN_RULES`
+
+XSS_BOUNDARY violation: React dangerouslySetInnerHTML bypasses XSS protection.
+
+```regex
+dangerouslySetInnerHTML
+```
+
+Trips:
+
+```javascript
+<div dangerouslySetInnerHTML={{ __html: html }} />
+```
+
+Passes:
+
+```javascript
+<div>{html}</div>
+```
+
+### js-proto-pollution
+
+Engine `js_patterns` · category `prototype_pollution` · base action `BLOCK` · source: `JS_PATTERN_RULES`
+
+PROTOTYPE_POLLUTION_BOUNDARY violation: prototype pollution vector detected.
+
+```regex
+__proto__
+```
+
+Trips:
+
+```javascript
+obj.__proto__ = payload
+```
+
+Passes:
+
+```javascript
+Object.assign(target, patch)
+```
+
+### js-constructor-proto
+
+Engine `js_patterns` · category `prototype_pollution` · base action `WARNING` · source: `JS_PATTERN_RULES`
+
+PROTOTYPE_POLLUTION_BOUNDARY violation: prototype pollution via constructor.
+
+```regex
+constructor\s*\[\s*[\x27\x22]prototype
+```
+
+Trips:
+
+```javascript
+obj.constructor["prototype"] = x
+```
+
+Passes:
+
+```javascript
+obj.constructor.name
+```
+
+### js-new-function
+
+Engine `js_patterns` · category `dynamic_execution` · base action `BLOCK` · source: `JS_PATTERN_RULES`
+
+DYNAMIC_EXECUTION_BOUNDARY violation: new Function is equivalent to eval.
+
+```regex
+new\s+Function\s*\(
+```
+
+Trips:
+
+```javascript
+const fn = new Function(code)
+```
+
+Passes:
+
+```javascript
+const fn = () => code
+```
+
+### js-settimeout-string
+
+Engine `js_patterns` · category `dynamic_execution` · base action `WARNING` · source: `JS_PATTERN_RULES`
+
+setTimeout with a string arg evaluates code (and throws TypeError in Node.js — pass a function callback).
+
+```regex
+setTimeout\s*\(\s*[\x27\x22]
+```
+
+Trips:
+
+```javascript
+setTimeout("doThing()", 100)
+```
+
+Passes:
+
+```javascript
+setTimeout(doThing, 100)
+```
+
+### js-setinterval-string
+
+Engine `js_patterns` · category `dynamic_execution` · base action `WARNING` · source: `JS_PATTERN_RULES`
+
+DYNAMIC_EXECUTION_BOUNDARY violation: setInterval with string arg executes code.
+
+```regex
+setInterval\s*\(\s*[\x27\x22]
+```
+
+Trips:
+
+```javascript
+setInterval("tick()", 1000)
+```
+
+Passes:
+
+```javascript
+setInterval(tick, 1000)
+```
+
+### js-child-process
+
+Engine `js_patterns` · category `shell_execution` · base action `WARNING` · source: `JS_PATTERN_RULES`
+
+SHELL_EXECUTION_BOUNDARY violation: child_process module enables shell execution.
+
+```regex
+child_process
+```
+
+Trips:
+
+```javascript
+const { exec } = require("child_process")
+```
+
+Passes:
+
+```javascript
+const { Worker } = require("worker_threads")
+```
+
+### js-exec-concat
+
+Engine `js_patterns` · category `shell_execution` · base action `BLOCK` · source: `JS_PATTERN_RULES`
+
+child_process exec with string concatenation or template interpolation enables command injection.
+
+```regex
+\bexec(?:Sync)?\s*\(\s*(?:[^)]*\+|[^)]*\$\{)
+```
+
+Trips:
+
+```javascript
+exec("ls " + dir)
+```
+
+Passes:
+
+```javascript
+exec("ls")
+```
+
+### js-require-fs
+
+Engine `js_patterns` · category `path_traversal` · base action `WARNING` · source: `JS_PATTERN_RULES`
+
+PATH_TRAVERSAL_BOUNDARY violation: direct fs require enables file system access.
+
+```regex
+require\s*\(\s*[\x27\x22]fs[\x27\x22]\s*\)
+```
+
+Trips:
+
+```javascript
+const fs = require("fs")
+```
+
+Passes:
+
+```javascript
+const fs = require("node:fs/promises")
+```
+
+### go-exec-shell
+
+Engine `go_patterns` · category `shell_execution` · base action `BLOCK` · source: `GO_PATTERN_RULES`
+
+SHELL_EXECUTION_BOUNDARY violation: exec.Command invoking a shell interpreter enables command injection.
+
+```regex
+\bexec\.Command(?:Context)?\s*\(\s*(?:\"|`)\s*(?:sh|bash|zsh|cmd|powershell)(?:\"|`)\s*,
+```
+
+Trips:
+
+```go
+exec.Command("sh", "-c", script)
+```
+
+Passes:
+
+```go
+exec.Command("git", "status")
+```
+
+### go-exec-command
+
+Engine `go_patterns` · category `external_process` · base action `WARNING` · source: `GO_PATTERN_RULES`
+
+EXTERNAL_PROCESS_BOUNDARY: exec.Command launches an external process; verify arguments are not attacker-controlled.
+
+```regex
+\bexec\.Command(?:Context)?\s*\(
+```
+
+Trips:
+
+```go
+exec.Command("git", "status")
+```
+
+Passes:
+
+```go
+cmd := buildCommand(args)
+```
+
+### go-unsafe-import
+
+Engine `go_patterns` · category `low_level_module` · base action `WARNING` · source: `GO_PATTERN_RULES`
+
+LOW_LEVEL_BOUNDARY: importing "unsafe" disables Go type-safety guarantees.
+
+```regex
+import\s+(?:\w+\s+)?\"unsafe\"
+```
+
+Trips:
+
+```go
+import "unsafe"
+```
+
+Passes:
+
+```go
+import "fmt"
+```
+
+### go-unsafe-pointer
+
+Engine `go_patterns` · category `low_level_module` · base action `WARNING` · source: `GO_PATTERN_RULES`
+
+LOW_LEVEL_BOUNDARY: unsafe.Pointer bypasses type safety; requires memory-safety review.
+
+```regex
+\bunsafe\.Pointer\b
+```
+
+Trips:
+
+```go
+p := unsafe.Pointer(&x)
+```
+
+Passes:
+
+```go
+p := &x
+```
+
+### go-sql-concat
+
+Engine `go_patterns` · category `sql_injection` · base action `WARNING` · source: `GO_PATTERN_RULES`
+
+SQL_INJECTION_BOUNDARY: SQL built by string concatenation; use parameterized queries.
+
+```regex
+\.(?:Query|QueryRow|Exec)(?:Context)?\s*\(\s*[^)]*\+
+```
+
+Trips:
+
+```go
+db.Query("SELECT * FROM t WHERE id = " + id)
+```
+
+Passes:
+
+```go
+db.Query("SELECT * FROM t WHERE id = ?", id)
+```
+
+### go-sql-sprintf
+
+Engine `go_patterns` · category `sql_injection` · base action `WARNING` · source: `GO_PATTERN_RULES`
+
+SQL_INJECTION_BOUNDARY: SQL built with fmt.Sprintf; use parameterized queries.
+
+```regex
+\.(?:Query|QueryRow|Exec)(?:Context)?\s*\(\s*fmt\.Sprintf\s*\(
+```
+
+Trips:
+
+```go
+db.Exec(fmt.Sprintf("INSERT INTO t VALUES (%s)", v))
+```
+
+Passes:
+
+```go
+db.Exec("INSERT INTO t VALUES (?)", v)
+```
+
+### go-tls-skip-verify
+
+Engine `go_patterns` · category `network_binding` · base action `BLOCK` · source: `GO_PATTERN_RULES`
+
+NETWORK_BOUNDARY: TLS certificate verification disabled; enables man-in-the-middle attacks.
+
+```regex
+InsecureSkipVerify\s*:\s*true
+```
+
+Trips:
+
+```go
+tls.Config{InsecureSkipVerify: true}
+```
+
+Passes:
+
+```go
+tls.Config{MinVersion: tls.VersionTLS12}
+```
+
+### go-weak-md5
+
+Engine `go_patterns` · category `insecure_random` · base action `WARNING` · source: `GO_PATTERN_RULES`
+
+MD5 is cryptographically broken; use SHA-256 or stronger for security purposes.
+
+```regex
+import\s+\"crypto/md5\"|\bmd5\.New\s*\(
+```
+
+Trips:
+
+```go
+h := md5.New()
+```
+
+Passes:
+
+```go
+h := sha256.New()
+```
+
+### go-weak-sha1
+
+Engine `go_patterns` · category `insecure_random` · base action `WARNING` · source: `GO_PATTERN_RULES`
+
+SHA-1 is cryptographically weak; use SHA-256 or stronger for security purposes.
+
+```regex
+import\s+\"crypto/sha1\"|\bsha1\.New\s*\(
+```
+
+Trips:
+
+```go
+h := sha1.New()
+```
+
+Passes:
+
+```go
+h := sha256.New()
+```
+
+### go-template-html
+
+Engine `go_patterns` · category `xss` · base action `WARNING` · source: `GO_PATTERN_RULES`
+
+XSS_BOUNDARY: template.HTML marks content as safe and bypasses auto-escaping; verify it is not user-controlled.
+
+```regex
+\btemplate\.HTML\s*\(
+```
+
+Trips:
+
+```go
+t1 := template.HTML(userContent)
+```
+
+Passes:
+
+```go
+template.HTMLEscapeString(userContent)
+```
+
+### go-hardcoded-secret
+
+Engine `go_patterns` · category `secret_exposure` · base action `BLOCK` · source: `GO_PATTERN_RULES`
+
+SECRET_EXPOSURE_BOUNDARY: hardcoded credential-like material detected.
+
+```regex
+(?i)\b\w*(password|passwd|secret|api_?key|auth_?token)\w*\s*[:=]\s*\"[^\"]{16,}\"
+```
+
+Trips:
+
+```go
+password = "hunter2stretch16x"
+```
+
+Passes:
+
+```go
+password := os.Getenv("DB_PASSWORD")
+```
+
+### rust-unsafe-block
+
+Engine `rust_patterns` · category `low_level_module` · base action `WARNING` · source: `RUST_PATTERN_RULES`
+
+LOW_LEVEL_BOUNDARY: unsafe block disables Rust memory-safety guarantees; audit for UB.
+
+```regex
+\bunsafe\s*\{
+```
+
+Trips:
+
+```rust
+unsafe { *ptr = v }
+```
+
+Passes:
+
+```rust
+let cell = RefCell::new(0);
+```
+
+### rust-unsafe-fn
+
+Engine `rust_patterns` · category `low_level_module` · base action `WARNING` · source: `RUST_PATTERN_RULES`
+
+LOW_LEVEL_BOUNDARY: unsafe fn/impl/trait shifts safety proof obligations to every caller.
+
+```regex
+\bunsafe\s+(?:fn|impl|trait)\b
+```
+
+Trips:
+
+```rust
+unsafe fn deref(p: *const u8) -> u8
+```
+
+Passes:
+
+```rust
+fn deref(p: &u8) -> u8
+```
+
+### rust-command-shell
+
+Engine `rust_patterns` · category `shell_execution` · base action `BLOCK` · source: `RUST_PATTERN_RULES`
+
+SHELL_EXECUTION_BOUNDARY violation: Command::new invoking a shell interpreter enables command injection.
+
+```regex
+Command::new\s*\(\s*(?:\"|')(?:sh|bash|zsh|cmd|powershell)(?:\"|')\s*\)
+```
+
+Trips:
+
+```rust
+Command::new("sh")
+```
+
+Passes:
+
+```rust
+Command::new("git")
+```
+
+### rust-command
+
+Engine `rust_patterns` · category `external_process` · base action `WARNING` · source: `RUST_PATTERN_RULES`
+
+EXTERNAL_PROCESS_BOUNDARY: Command::new launches an external process; verify arguments are not attacker-controlled.
+
+```regex
+\b(?:std::process::)?Command::new\s*\(
+```
+
+Trips:
+
+```rust
+Command::new("git")
+```
+
+Passes:
+
+```rust
+buildCommand(args)
+```
+
+### rust-transmute
+
+Engine `rust_patterns` · category `low_level_module` · base action `WARNING` · source: `RUST_PATTERN_RULES`
+
+LOW_LEVEL_BOUNDARY: mem::transmute reinterprets memory across types; requires unsafe and careful review.
+
+```regex
+\b(?:std::mem::)?transmute\s*(?:::|<|\()
+```
+
+Trips:
+
+```rust
+let r = std::mem::transmute::<i64, u64>(x)
+```
+
+Passes:
+
+```rust
+let r = x as u64
+```
+
+### rust-sql-format
+
+Engine `rust_patterns` · category `sql_injection` · base action `WARNING` · source: `RUST_PATTERN_RULES`
+
+SQL_INJECTION_BOUNDARY: SQL built with format!; use parameterized queries.
+
+```regex
+\.(?:execute|query|fetch\w*|prepare)?\s*\(\s*&?\s*format!\s*\(
+```
+
+Trips:
+
+```rust
+conn.query(format!("SELECT {}", id))
+```
+
+Passes:
+
+```rust
+conn.query("SELECT 1")
+```
+
+### rust-sql-concat
+
+Engine `rust_patterns` · category `sql_injection` · base action `WARNING` · source: `RUST_PATTERN_RULES`
+
+SQL_INJECTION_BOUNDARY: SQL built by string concatenation; use parameterized queries.
+
+```regex
+\.(?:execute|query|fetch\w*)\s*\(\s*[^)]*\+\s*
+```
+
+Trips:
+
+```rust
+conn.execute("SELECT " + cond)
+```
+
+Passes:
+
+```rust
+conn.execute(sql, params)
+```
+
+### rust-weak-md5
+
+Engine `rust_patterns` · category `insecure_random` · base action `WARNING` · source: `RUST_PATTERN_RULES`
+
+MD5 is cryptographically broken; use SHA-256 or stronger for security purposes.
+
+```regex
+\bmd5::|\bMd5\b|extern\s+crate\s+md5
+```
+
+Trips:
+
+```rust
+let h = md5::compute(data);
+```
+
+Passes:
+
+```rust
+let h = sha256::compute(data);
+```
+
+### rust-weak-sha1
+
+Engine `rust_patterns` · category `insecure_random` · base action `WARNING` · source: `RUST_PATTERN_RULES`
+
+SHA-1 is cryptographically weak; use SHA-256 or stronger for security purposes.
+
+```regex
+\bsha1::|\bSha1\b|extern\s+crate\s+sha1
+```
+
+Trips:
+
+```rust
+let h = sha1::compute(data);
+```
+
+Passes:
+
+```rust
+let h = sha256::compute(data);
+```
+
+### rust-deref-raw
+
+Engine `rust_patterns` · category `low_level_module` · base action `WARNING` · source: `RUST_PATTERN_RULES`
+
+LOW_LEVEL_BOUNDARY: raw pointer operation; requires unsafe and memory-safety review.
+
+```regex
+\bptr::(?:read|write)\b|\*\s*(?:const|mut)\s+\w
+```
+
+Trips:
+
+```rust
+let v = ptr::read(ptr);
+```
+
+Passes:
+
+```rust
+let v = *ptr;
+```
+
+### rust-hardcoded-secret
+
+Engine `rust_patterns` · category `secret_exposure` · base action `BLOCK` · source: `RUST_PATTERN_RULES`
+
+SECRET_EXPOSURE_BOUNDARY: hardcoded credential-like material detected.
+
+```regex
+(?i)\b(?:let\s+(?:mut\s+)?\w*(password|passwd|secret|api_?key|auth_?token)\w*\s*[:=]|const\s+\w*(PASSWORD|SECRET|API_?KEY|TOKEN)\w*\s*[:=])\s*\"[^\"]{16,}\"
+```
+
+Trips:
+
+```rust
+let api_key = "a1B2c3D4e5F6g7H8";
+```
+
+Passes:
+
+```rust
+let api_key = env::var("API_KEY")?;
+```
+
+### docker-run-root
+
+Engine `docker_scan` · category `privilege_escalation` · base action `WARNING` · source: `DOCKER_RULES`
+
+PRIVILEGE_ESCALATION_BOUNDARY violation: container runs as root user.
+
+```regex
+^USER\s+root
+```
+
+Trips:
+
+```dockerfile
+USER root
+```
+
+Passes:
+
+```dockerfile
+USER appuser
+```
+
+### docker-latest-tag
+
+Engine `docker_scan` · category `supply_chain` · base action `WARNING` · source: `DOCKER_RULES`
+
+SUPPLY_CHAIN_BOUNDARY violation: using :latest tag, pin to specific version.
+
+```regex
+FROM\s+\S+:latest
+```
+
+Trips:
+
+```dockerfile
+FROM python:latest
+```
+
+Passes:
+
+```dockerfile
+FROM python:3.12-slim
+```
+
+### docker-malformed-from
+
+Engine `docker_scan` · category `supply_chain` · base action `WARNING` · source: `DOCKER_RULES`
+
+Malformed FROM reference: multiple tags in one image line. Use a single tag or a digest.
+
+```regex
+^FROM\s+\S+:\S+:
+```
+
+Trips:
+
+```dockerfile
+FROM python:3.12:latest
+```
+
+Passes:
+
+```dockerfile
+FROM python:3.12-slim
+```
+
+### docker-add-remote
+
+Engine `docker_scan` · category `supply_chain` · base action `BLOCK` · source: `DOCKER_RULES`
+
+SUPPLY_CHAIN_BOUNDARY violation: ADD from remote URL, use COPY + verified download.
+
+```regex
+ADD\s+https?://
+```
+
+Trips:
+
+```dockerfile
+ADD https://example.com/app.jar /app/
+```
+
+Passes:
+
+```dockerfile
+COPY app.jar /app/
+```
+
+### docker-env-secret
+
+Engine `docker_scan` · category `secret_exposure` · base action `BLOCK` · source: `DOCKER_RULES`
+
+SECRET_EXPOSURE_BOUNDARY violation: secret hardcoded in Dockerfile ENV.
+
+```regex
+ENV\s+\S*(?:SECRET|PASSWORD|TOKEN|KEY)\s*=\s*\S+
+```
+
+Trips:
+
+```dockerfile
+ENV DB_PASSWORD=supersecret123
+```
+
+Passes:
+
+```dockerfile
+ENV PATH=/usr/local/bin:$PATH
+```
+
+### docker-expose-22
+
+Engine `docker_scan` · category `network_binding` · base action `WARNING` · source: `DOCKER_RULES`
+
+NETWORK_BINDING_BOUNDARY violation: SSH port exposed in container.
+
+```regex
+EXPOSE\s+22\b
+```
+
+Trips:
+
+```dockerfile
+EXPOSE 22
+```
+
+Passes:
+
+```dockerfile
+EXPOSE 8080
+```
+
+### ci-unpinned-action
+
+Engine `ci_scan` · category `supply_chain` · base action `WARNING` · source: `CI_RULES`
+
+SUPPLY_CHAIN_BOUNDARY violation: GitHub Action pinned to branch, not SHA.
+
+```regex
+uses:\s+\S+@(?:main|master|latest)\b
+```
+
+Trips:
+
+```yaml
+uses: actions/checkout@main
+```
+
+Passes:
+
+```yaml
+uses: actions/checkout@8f4b7f84864484a7bf31766abe9204da3cbe65b3 # v4.1.7
+```
+
+### ci-script-injection
+
+Engine `ci_scan` · category `code_injection` · base action `BLOCK` · source: `CI_RULES`
+
+CODE_INJECTION_BOUNDARY violation: potential script injection via github.event context.
+
+```regex
+\$\{\{\s*github\.event\.
+```
+
+Trips:
+
+```yaml
+run: echo "${{ github.event.head_commit.message }}"
+```
+
+Passes:
+
+```yaml
+run: echo "hello"
+```
+
+### ci-pull-request-target
+
+Engine `ci_scan` · category `privilege_escalation` · base action `WARNING` · source: `CI_RULES`
+
+PRIVILEGE_ESCALATION_BOUNDARY violation: pull_request_target gives write access to forks.
+
+```regex
+pull_request_target
+```
+
+Trips:
+
+```yaml
+on: pull_request_target
+```
+
+Passes:
+
+```yaml
+on: pull_request
+```
+
+### ci-permissions-write-all
+
+Engine `ci_scan` · category `privilege_escalation` · base action `WARNING` · source: `CI_RULES`
+
+PRIVILEGE_ESCALATION_BOUNDARY violation: overly broad CI permissions.
+
+```regex
+permissions:\s*write-all
+```
+
+Trips:
+
+```yaml
+permissions: write-all
+```
+
+Passes:
+
+```yaml
+permissions: contents: read
+```
+
+### ci-curl-pipe
+
+Engine `ci_scan` · category `shell_execution` · base action `BLOCK` · source: `CI_RULES`
+
+SHELL_EXECUTION_BOUNDARY violation: curl pipe to shell in CI workflow.
+
+```regex
+curl\s+.*\|\s*(?:bash|sh)
+```
+
+Trips:
+
+```yaml
+run: curl -sSL https://example.sh | bash
+```
+
+Passes:
+
+```yaml
+run: curl -sSL -o setup.sh https://example.sh
+```
+
+### high-entropy-secret
+
+Engine `entropy_scan` · category `secret_exposure` · base action `BLOCK` · source: `ENTROPY_ASSIGNMENT_REGEX`
+
+High-entropy credential-like value assigned to a sensitive variable name (>= 4.5 bits/char).
+
+Generic assignment of a long random-looking string to a credential-named variable; the value must clear 4.5 bits/char Shannon entropy to BLOCK.
+
+```regex
+(?i)(secret|token|api[_-]?key|password|credential|auth[_-]?key)\s*[:=]\s*[\"']([A-Za-z0-9+/=_\-]{20,})[\"']
+```
+
+Trips:
+
+```python
+api_key = "vQ8mK2pX7wZ4nR6tY1uJ3hF5dS0aL9"
+```
+
+Passes:
+
+```python
+api_key = os.environ["PROD_API_KEY"]
+```
+
+### qwed-sdk-mock-no-direct
+
+Engine `verification_integrity` · category `weak_test_coverage` · base action `WARNING` · source: `detect_qwed_sdk_mock() (structural detector)`
+
+QWED SDK client/verifier is mocked without any direct SDK invocation in the same context. The test verifies the mock contract, not the real verification boundary. Prefer an integration test against the local engine or assert on the mock's call arguments.
+
+Trips:
+
+```python
+monkeypatch.setattr("qwed.QWEDClient.verify_math", lambda *a: True)
+```
+
+Passes:
+
+```python
+client = qwed.QWEDClient(key=k)
+out = client.verify_math("2+2")
+```
+
+### qwed-disabled-env
+
+Engine `verification_integrity` · category `fail_open` · base action `WARNING` · source: `detect_disabled_guard() (structural detector)`
+
+QWED_ENABLED=false disables the QWED verification boundary. If this is a permanent production configuration it violates the fail-closed trust model.
+
+Trips:
+
+```python
+QWED_ENABLED = "false"
+```
+
+Passes:
+
+```python
+QWED_ENABLED = "true"
+```
+
+### qwed-disable-call
+
+Engine `verification_integrity` · category `fail_open` · base action `WARNING` · source: `detect_disabled_guard() (structural detector)`
+
+qwed.disable() turns off the verification boundary at runtime. Confirm this is intentional and scoped to non-production paths only.
+
+Trips:
+
+```python
+qwed.disable()
+```
+
+Passes:
+
+```python
+qwed.enable()
+```
+
+### qwed-guard-disabled
+
+Engine `verification_integrity` · category `fail_open` · base action `WARNING` · source: `detect_disabled_guard() (structural detector)`
+
+A QWED guard is explicitly disabled. Review whether the guard can be safely bypassed for this code path.
+
+Trips:
+
+```python
+QwEDGuard.enabled = False
+```
+
+Passes:
+
+```python
+guard.enabled = True
+```
+
+### qwed-suppression-fatigue
+
+Engine `verification_integrity` · category `suppression_abuse` · base action `WARNING` · source: `detect_suppression_fatigue() (structural detector)`
+
+5+ qwed-ignore suppressions in this file. High suppression density indicates the verification boundary is being systematically silenced. Review whether the suppressions are justified or indicate a systemic issue.
+
+Trips:
+
+```python
+a = 1  # qwed-ignore
+b = 2  # qwed-ignore
+c = 3  # qwed-ignore
+d = 4  # qwed-ignore
+e = 5  # qwed-ignore
+```
+
+Passes:
+
+```python
+a = 1  # qwed-ignore
+b = 2
+```
+
+### developer-field-promotion-leak
+
+Engine `verification_integrity` · category `release_boundary_violation` · base action `BLOCK` · source: `detect_developer_fields_token_leak() (structural detector)`
+
+Credential-like key in developer_fields will be merged into the public API response payload by merge_diagnostic_result, exposing the credential to clients. Store such material in enforcement function args (not response metadata) and expose only proof_ref to the response consumer.
+
+Block: storing attestation/jwt/token material in developer_fields when
+
+Trips:
+
+```python
+developer_fields["attestation_token"] = token
+merge_diagnostic_result(dr)
+```
+
+Passes:
+
+```python
+developer_fields["proof_ref"] = proof_ref
+merge_diagnostic_result(dr)
+```
+
+### round-in-verification-evidence
+
+Engine `verification_integrity` · category `artifact_boundary_ambiguity` · base action `WARNING` · source: `detect_round_in_verification_fields() (structural detector)`
+
+round(..., n) inside verification metadata (developer_fields/evidence) preserves floating-point semantics incompatible with QWED SYMBOLIC MATH contracts. Serialize via Decimal or string with ROUND_HALF_UP instead.
+
+Informational: developer_fields populated with round(..., n) violates
+
+Trips:
+
+```python
+developer_fields = {"confidence": round(confidence, 3)}
+```
+
+Passes:
+
+```python
+result = round(value, 3)
+```
+
+### mocked-verifier-no-direct
+
+Engine `verification_integrity` · category `weak_test_coverage` · base action `WARNING` · source: `detect_mocked_verifier_no_execution() (structural detector)`
+
+Verifier engine is mocked but never executed in this test. The test regression boundary has zero coverage against the engine branch. Assert on the branch-specific output fields not generic status fallbacks.
+
+Hits when test file mocks a verifier engine without direct execution.
+
+Trips:
+
+```python
+from app import FactVerifier; monkeypatch.setattr("app.fact_verifier", Mock())
+```
+
+Passes:
+
+```python
+verifier = FactVerifier()
+out = verifier.verify_fact(text)
+```
+
+---
+
+_Generated by `generate_rule_catalog.py` from `scan_rules.py`. Regenerate with `python generate_rule_catalog.py`; CI fails on drift._
