@@ -1,13 +1,13 @@
 ---
-title: "QWED Security Rule Catalog"
+title: "QWED Security rule catalog"
 description: "Every QWED Security rule: definition, regex, trip example, and pass example — generated from the engine so it cannot drift."
 ---
 
-# QWED Security Rule Catalog
+# QWED Security rule catalog
 
 Generated from `scan_rules.py` at rule set **qwed-security-ruleset/5**. Every rule ID used in a QWED annotation anchors here as `#<rule-id>`.
 
-This page intentionally contains live trip strings. Findings on it are covered by narrowly scoped base-branch policy entries (see .qwed.yml) — NOT by inline markers: on introduced lines the pipeline voids inline suppressions as self-suppression, and a voided inline marker then shadows the policy entry that would otherwise apply. Never add qwed-ignore to generated trip lines.
+This page intentionally contains live trip strings. Findings on it are covered by narrowly scoped base-branch policy entries (see `.qwed.yml`) — NOT by inline markers: on introduced lines the pipeline voids inline suppression comments as self-suppression, and a voided inline marker then shadows the policy entry that would otherwise apply. Never add `qwed-ignore` to generated trip lines.
 
 ## Policy: non-downgradable categories
 
@@ -1958,7 +1958,7 @@ SQL_INJECTION_BOUNDARY: SQL built by string concatenation; use parameterized que
 Trips:
 
 ```rust
-conn.execute("SELECT " + cond)
+conn.execute(sql + cond)
 ```
 
 Passes:
