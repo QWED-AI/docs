@@ -9,6 +9,49 @@ Jump to: [v7.2.0](#v7-2-0-—-precision-advisory-and-security-hardening-batch) �
 
 ---
 
+## QWED-A2A — `/a2a/intercept` requires per-agent API keys (breaking)
+
+**Released: September 9, 2026** · [GitHub PR #106](https://github.com/qwed-ai/qwed-a2a/pull/106)
+
+> The FastAPI gateway's `POST /a2a/intercept` endpoint previously trusted the body-declared `sender_agent_id` — any caller could impersonate any agent for trust evaluation, rate limits, and attestation. The endpoint now authenticates every request with a per-agent API key in the `X-API-Key` header, validated against the `QWED_A2A_API_KEYS` environment variable. The authenticated identity overrides the body's `sender_agent_id` everywhere it matters. The dead `AgentMessage.signature` field, which was never verified, is removed.
+
+<Warning>
+**Fail-closed behavior change.** Deployments that do not set `QWED_A2A_API_KEYS` now deny every `/a2a/intercept` request with `401 API authentication is not configured for this service.` There is no anonymous access and no opt-out. Configure a key for each calling agent before upgrading.
+</Warning>
+
+### What changed
+
+- **Per-agent API-key authentication** — `QWED_A2A_API_KEYS` holds a JSON object mapping each key to its agent ID, e.g. `{"key-abc123": "procurement-agent"}`. Missing, unknown, or unconfigured keys return `401`. Keys are compared in constant time.
+- **Authenticated identity wins** — trust-boundary evaluation, token-bucket rate limiting, telemetry, and the attestation JWT all bind to the key's agent ID. If the body's `sender_agent_id` differs, the gateway logs a warning and overrides it. Direct library callers of `intercept()` get no override and own identity binding themselves.
+- **No-restart key rotation** — the key map is read fresh on every request. Update the environment variable and old keys stop matching immediately.
+- **Agent-ID normalization** — map entries are trimmed and validated against the `AgentMessage` contract (max 256 chars, no control characters); invalid entries are dropped and their keys denied.
+- **`AgentMessage.signature` removed** — the optional field was documented as "JWT signature for tamper detection" but was never read by any verification path. Attestation integrity comes from the verdict JWT, not a caller-supplied field.
+
+### Migration
+
+Before (now returns `401`):
+
+```bash
+curl -X POST http://localhost:8000/a2a/intercept \
+  -H "Content-Type: application/json" \
+  -d '{"sender_agent_id": "agent-A", "receiver_agent_id": "agent-B", "payload_type": "general", "payload": {"message": "Hello!"}}'
+```
+
+After — configure a key map on the gateway and send the header:
+
+```bash
+export QWED_A2A_API_KEYS='{"key-for-A": "agent-A"}'
+
+curl -X POST http://localhost:8000/a2a/intercept \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: key-for-A" \
+  -d '{"sender_agent_id": "agent-A", "receiver_agent_id": "agent-B", "payload_type": "general", "payload": {"message": "Hello!"}}'
+```
+
+If any client still sends `signature` in the message body, remove the field. See [Gateway authentication](/a2a/deployment#gateway-authentication) for the full key format and rotation guidance.
+
+---
+
 ## v7.2.0 — Precision advisory and security hardening batch
 
 **Released: September 7, 2026** · [GitHub Release ↗](https://github.com/QWED-AI/qwed-verification/releases/tag/v7.2.0) · [GitHub PR #362](https://github.com/QWED-AI/qwed-verification/pull/362)

@@ -53,6 +53,7 @@ openssl ecparam -name prime256v1 -genkey -noout \
 export QWED_A2A_SIGNING_KEY_PEM="$(cat qwed_a2a_signing_key.pem)"
 export QWED_A2A_DEPLOYMENT_ID="prod-us-east-1"
 export QWED_A2A_TRUSTED_AGENTS="procurement-agent,treasury-agent"
+export QWED_A2A_API_KEYS='{"key-abc123": "procurement-agent", "key-def456": "treasury-agent"}'
 ```
 
 <Warning>
@@ -150,12 +151,42 @@ services:
 
 ## Available endpoints
 
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/a2a/intercept` | POST | Primary verification gateway — accepts `AgentMessage`, returns `VerificationVerdict` |
-| `/a2a/health` | GET | Service health check with version |
-| `/a2a/metrics` | GET | Aggregated intercept metrics |
-| `/.well-known/jwks.json` | GET | Public signing key in JWKS format for external attestation verification |
+| Endpoint | Method | Auth | Description |
+|----------|--------|------|-------------|
+| `/a2a/intercept` | POST | `X-API-Key` header (required) | Primary verification gateway — accepts `AgentMessage`, returns `VerificationVerdict` |
+| `/a2a/health` | GET | None | Service health check with version |
+| `/a2a/metrics` | GET | None | Aggregated intercept metrics |
+| `/.well-known/jwks.json` | GET | None | Public signing key in JWKS format for external attestation verification |
+
+### Gateway authentication
+
+`POST /a2a/intercept` requires a per-agent API key in the `X-API-Key` header. Keys are configured through `QWED_A2A_API_KEYS`, a JSON object mapping each API key to the agent ID it authenticates:
+
+```bash
+export QWED_A2A_API_KEYS='{"key-abc123": "procurement-agent", "key-def456": "treasury-agent"}'
+```
+
+```bash
+curl -X POST http://localhost:8000/a2a/intercept \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: key-abc123" \
+  -d '{
+    "sender_agent_id": "procurement-agent",
+    "receiver_agent_id": "treasury-agent",
+    "payload_type": "financial_transaction",
+    "payload": {"data": {"claimed_total": 100.00, "line_items": [{"amount": 100.00, "quantity": 1}]}}
+  }'
+```
+
+The authentication is fail-closed:
+
+- A missing or unknown `X-API-Key` returns `401 Invalid or missing API key.`
+- If `QWED_A2A_API_KEYS` is unset, malformed, or contains no usable entries, every request returns `401 API authentication is not configured for this service.` A deployment without configured keys denies all traffic.
+- Agent IDs in the map are normalized to the `AgentMessage` contract (trimmed, max 256 characters, no control characters). Entries that violate it are dropped and their keys denied.
+
+The key's agent ID is the identity the gateway trusts. Trust-boundary evaluation, rate limiting, telemetry, and the attestation JWT all bind to the authenticated agent. If the body's `sender_agent_id` names a different agent, the gateway logs a warning and overrides it with the authenticated identity.
+
+**Key rotation.** The gateway reads `QWED_A2A_API_KEYS` fresh on every request, so rotating keys takes effect without a restart. Update the environment variable (for example through your secrets manager) and old keys stop matching immediately.
 
 ### Health check response
 
@@ -218,6 +249,7 @@ See [Crypto attestations](/a2a/crypto-attestations) for the full JWT structure a
 | `QWED_A2A_SIGNING_KEY_PEM` | Unencrypted PKCS#8 EC P-256 private key used to sign attestation JWTs. **Required** — the service fails closed if unset. | *(none)* |
 | `QWED_A2A_DEPLOYMENT_ID` | Stable identifier shared by all replicas in the same logical deployment. **Required** — import fails without it. | *(none)* |
 | `QWED_A2A_TRUSTED_AGENTS` | Trust allowlist. Comma-separated agent IDs (unrestricted) or a JSON array of scoped [trust entries](/a2a/trust-boundary#scoped-trust-grants) with `allowed_receivers`, `allowed_payload_types`, and `valid_until`. | *(none — deny all)* |
+| `QWED_A2A_API_KEYS` | JSON object mapping per-agent API keys to agent IDs, e.g. `{"key-abc123": "procurement-agent"}`. Read on every request, so rotation needs no restart. **Required for `/a2a/intercept`** — with no usable keys the endpoint returns `401` for every request. | *(none — deny all)* |
 | `SENTRY_DSN` | Sentry error tracking DSN | *(disabled)* |
 | `QWED_LOG_LEVEL` | Logging level (`DEBUG`, `INFO`, `WARNING`, `ERROR`) | `INFO` |
 | `QWED_A2A_BLOCK_ON_ERROR` | Block on internal errors (`true`/`false`) | `true` |
