@@ -1,0 +1,33 @@
+# QWED Security repository policy.
+#
+# Maintainer-approved suppression (base-branch config — trusted per #9/#30:
+# inline qwed-ignore cannot suppress findings on lines a change introduces,
+# base-branch config suppressions ARE the maintainer approval mechanism).
+#
+# Generated rule catalog page (#281): advanced/qwed-security-rule-catalog.mdx
+# intentionally contains live trip strings (examples that trip each rule by
+# design). Entries below were enumerated by scanning the page: every BLOCK
+# decision on it. Trust basis: the page is byte-generated from the scanner
+# engine (drift tests fail CI on divergence in QWED-AI/qwed-security), the
+# trip values are synthetic fixtures, and the generator source scans clean.
+# Scoped to the exact generated page + pattern.
+suppressions:
+  - pattern=hardcoded-secret path=advanced/qwed-security-rule-catalog.mdx reason=false-positive
+  - pattern=hardcoded-secret-dict path=advanced/qwed-security-rule-catalog.mdx reason=false-positive
+  - pattern=url-embedded-credential path=advanced/qwed-security-rule-catalog.mdx reason=false-positive
+  - pattern=url-query-credential path=advanced/qwed-security-rule-catalog.mdx reason=false-positive
+  - pattern=url-unknown-param-credential path=advanced/qwed-security-rule-catalog.mdx reason=false-positive
+  - pattern=url-path-credential path=advanced/qwed-security-rule-catalog.mdx reason=false-positive
+  - pattern=openai-secret path=advanced/qwed-security-rule-catalog.mdx reason=false-positive
+  - pattern=github-secret path=advanced/qwed-security-rule-catalog.mdx reason=false-positive
+  - pattern=github-fine-grained-pat path=advanced/qwed-security-rule-catalog.mdx reason=false-positive
+  - pattern=github-oauth-token path=advanced/qwed-security-rule-catalog.mdx reason=false-positive
+  - pattern=gitlab-pat path=advanced/qwed-security-rule-catalog.mdx reason=false-positive
+  - pattern=google-api-key path=advanced/qwed-security-rule-catalog.mdx reason=false-positive
+  - pattern=high-entropy-secret path=advanced/qwed-security-rule-catalog.mdx reason=false-positive
+  - pattern=private-key-block path=advanced/qwed-security-rule-catalog.mdx reason=false-positive
+  - pattern=slack-token path=advanced/qwed-security-rule-catalog.mdx reason=false-positive
+  - pattern=stripe-live-key path=advanced/qwed-security-rule-catalog.mdx reason=false-positive
+  - pattern=anthropic-key path=advanced/qwed-security-rule-catalog.mdx reason=false-positive
+  - pattern=aws-secret path=advanced/qwed-security-rule-catalog.mdx reason=false-positive
+  - pattern=jwt-token path=advanced/qwed-security-rule-catalog.mdx reason=false-positive
