@@ -50,6 +50,33 @@ curl -X POST http://localhost:8000/a2a/intercept \
 
 If any client still sends `signature` in the message body, remove the field. See [Gateway authentication](/a2a/deployment#gateway-authentication) for the full key format and rotation guidance.
 
+## QWED-A2A — cross-deployment trusted issuers and jti replay lifecycle (security release)
+
+**Released: September 9, 2026** · [GitHub PR #108](https://github.com/QWED-AI/qwed-a2a/pull/108) · [GitHub PR #109](https://github.com/QWED-AI/qwed-a2a/pull/109) · Closes [issue #84](https://github.com/QWED-AI/qwed-a2a/issues/84) and [issue #85](https://github.com/QWED-AI/qwed-a2a/issues/85)
+
+> Two fixes to `A2ACryptoService` attestation verification. Peer deployments can now be registered as trusted issuers, so verifying another deployment's attestations no longer tempts operators into sharing one private key across deployments. And the jti replay registry now separates issuance from consumption: an issuer can verify its own token once, duplicate `trace_id`s are rejected at signing, and the consumption registry is injectable for cross-worker replay protection.
+
+### Cross-deployment verification (PR #108)
+
+- **Trusted issuers.** `verify_attestation` accepts an optional `trusted_issuers` mapping of issuer IDs to `{"deployment_id": ..., "jwks": ...}`, with the `QWED_A2A_TRUSTED_ISSUERS` environment variable as fallback. Register a peer by copying its `/.well-known/jwks.json` entry verbatim. The env var is re-read on every verification, so key rotation needs no restart.
+- **Fail-closed on every mismatch.** Unknown issuers, `kid` mismatches, and `deployment_id` mismatches all deny. Routing never trusts unverified claims: header and payload are read only after a candidate key verifies the signature, and one public key registered under two issuer identities keeps only the first identity.
+- **Verifier-only nodes.** A node with no local signing key can verify peer tokens against trusted issuers. Only signing, JWKS publishing, and the interceptor still require `QWED_A2A_SIGNING_KEY_PEM`. With neither a local key nor trusted issuers, verification returns `No verification keys available` instead of raising.
+- **Peer jti namespacing.** Replay tracking for peer tokens is namespaced per issuer, so two deployments reusing the same trace ID never shadow each other.
+
+### jti registry lifecycle (PR #109)
+
+- **Issuance/consumption split.** `sign_verdict` records the `trace_id` in a separate per-instance issuance record instead of the consumption registry, so an issuer can verify its own token once — the second presentation is a replay.
+- **Duplicate trace IDs rejected at signing.** Reusing a `trace_id` within its validity window raises `ValueError` at `sign_verdict` instead of minting two tokens under one `jti`.
+- **Injectable consumption registry.** `A2ACryptoService(jti_registry=...)` accepts a shared registry (Redis, database) for cross-worker replay protection. The default remains process-local: two workers in two processes share nothing. Injected registries must provide atomic insert-if-absent, retention covering token lifetime, and a numeric `ttl_seconds` at least `validity_seconds` — anything less raises `ValueError` at construction.
+
+### Upgrading
+
+<Warning>
+**Behavior changes.** Code that relied on signing twice with the same `trace_id` now gets `ValueError` at the second `sign_verdict`. Code that verified the same token twice on one instance now gets `Replay detected: jti already seen` on the second call — previously issuers could not self-verify at all, while consumers could sometimes replay. Verifier-only nodes that expected `verify_attestation` to raise `RuntimeError` without a signing key now get a `(False, None, ...)` tuple or, with trusted issuers configured, successful peer verification. Multi-worker deployments should inject a shared `jti_registry` — the default registry does not detect replays across processes.
+</Warning>
+
+See [Crypto attestations](/a2a/crypto-attestations#cross-deployment-verification-trusted-issuers) for configuration and the full replay-scope documentation.
+
 ---
 
 ## v7.2.0 — Precision advisory and security hardening batch

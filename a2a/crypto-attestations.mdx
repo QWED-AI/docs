@@ -128,12 +128,25 @@ print(token)
 # eyJhbGciOiJFUzI1NiIsInR5cCI6InF3ZWQtYTJhLWF0dGVzdGF0aW9uK2p3dCIs...
 ```
 
+Each `trace_id` becomes the token's `jti` and must be unique per instance: signing the same `trace_id` again within its validity window raises `ValueError`. See [Replay protection](#replay-protection-jti-lifecycle).
+
 ---
 
 ## Verifying an attestation
 
+`verify_attestation` checks the token against an `AttestationContext` — the sender, receiver, and payload you expect the attestation to cover. A valid signature alone is not enough: the token must also be bound to the provided context.
+
 ```python
-is_valid, claims, error = crypto.verify_attestation(token)
+from qwed_a2a.security.crypto import A2ACryptoService, AttestationContext
+
+context = AttestationContext(
+    sender_agent_id="procurement-agent",
+    receiver_agent_id="treasury-agent",
+    payload='{"claimed_total": 150.00, "line_items": [...]}',
+    session_id=None,  # optional — bound when provided
+)
+
+is_valid, claims, error = crypto.verify_attestation(token, context)
 
 if is_valid:
     print(f"Verdict: {claims['qwed_a2a']['verdict']}")
@@ -143,13 +156,21 @@ else:
     print(f"Invalid: {error}")
 ```
 
+Verification tries every configured key until one verifies the signature: the local key first (when configured), then each [trusted peer issuer's](#cross-deployment-verification-trusted-issuers) keys. The token's header and payload are only read after a candidate key verifies the signature, and the verified `iss` and `kid` are bound to the key that verified them — routing never trusts unverified claims.
+
 ### Verification outcomes
 
 | Result | Meaning |
 |--------|---------|
-| `(True, claims, None)` | Valid attestation — claims are trustworthy |
+| `(True, claims, None)` | Valid attestation — claims are trustworthy and bound to the context |
 | `(False, None, "Attestation has expired")` | Token past its `exp` time |
-| `(False, None, "Invalid token: ...")` | Signature mismatch, tampering, or wrong key |
+| `(False, None, "Invalid token: no trusted key verified the signature")` | Signature mismatch, tampering, or unknown issuer |
+| `(False, None, "Key id mismatch for trusted issuer")` | A registered key verified the signature but the token's `kid` doesn't match the key's registered `kid` |
+| `(False, None, "Deployment context mismatch: ...")` | Token's `deployment_id` doesn't match this instance (self-issued) or the registered peer deployment |
+| `(False, None, "Attestation sender/receiver/session mismatch: ...")` | Token claims don't match the `AttestationContext` |
+| `(False, None, "Attestation payload hash mismatch — detached attestation rejected")` | The context payload's hash doesn't match the `sub` claim |
+| `(False, None, "Replay detected: jti already seen")` | This instance already consumed a token with the same `jti` |
+| `(False, None, "No verification keys available (no local key, no trusted issuers)")` | Neither a local signing key nor any trusted issuer is configured |
 
 ---
 
@@ -202,13 +223,109 @@ service_b = A2ACryptoService(issuer_id="did:qwed:a2a:production")
 
 token = service_a.sign_verdict(...)
 
-is_valid, claims, _ = service_b.verify_attestation(token)
+is_valid, claims, _ = service_b.verify_attestation(token, context)
 # is_valid = True — shared key pair
 ```
+
+Sharing a PEM is only for replicas of **one** logical deployment. To verify tokens from a different deployment, use [trusted issuers](#cross-deployment-verification-trusted-issuers) instead of sharing private keys.
 
 <Tip>
 If you rotate `QWED_A2A_SIGNING_KEY_PEM`, attestations signed with the previous key become unverifiable once the new JWKS is served — the endpoint only publishes the current key. To avoid rejecting in-flight attestations during rotation, keep the previous key accessible until all tokens signed with it expire (check their `exp` claim). Future releases may add multi-key JWKS support for seamless rotation.
 </Tip>
+
+---
+
+## Cross-deployment verification (trusted issuers)
+
+By default an attestation verifies only against the issuing deployment's own key. A token from another deployment fails closed as an unknown issuer, so sharing one private key across deployments — which would let any agent mint attestations as any other — is never required and never works.
+
+To verify attestations from a peer deployment, register the peer as a **trusted issuer** with its deployment ID and public JWKS. Copy the JWKS entry verbatim from the peer's [`/.well-known/jwks.json`](/a2a/deployment#jwks-endpoint) endpoint:
+
+```bash
+export QWED_A2A_TRUSTED_ISSUERS='{
+  "did:qwed:a2a:peer": {
+    "deployment_id": "peer-deploy",
+    "jwks": {"keys": [{"kty": "EC", "crv": "P-256", "kid": "<peer-kid>", "x": "<base64url-x>", "y": "<base64url-y>"}]}
+  }
+}'
+```
+
+Replace the `kid`/`x`/`y` placeholders with the peer's real values. The environment variable is re-read on every verification, so key rotation takes effect without a restart.
+
+You can also pass the mapping directly to `verify_attestation` — the explicit argument takes precedence over the environment variable:
+
+```python
+is_valid, claims, error = crypto.verify_attestation(
+    peer_token,
+    context,
+    trusted_issuers={
+        "did:qwed:a2a:peer": {
+            "deployment_id": "peer-deploy",
+            "jwks": {"keys": [peer_jwk]},
+        }
+    },
+)
+```
+
+Trusted-issuer verification fails closed on every mismatch:
+
+| Condition | Result |
+|-----------|--------|
+| Token issuer not in the trusted-issuer mapping (and not self-issued) | `Invalid token: no trusted key verified the signature` |
+| Token `kid` doesn't match the registered key's `kid` | `Key id mismatch for trusted issuer` |
+| Token `deployment_id` doesn't match the registered `deployment_id` | `Deployment context mismatch` |
+| Same public key registered under two issuer identities | The later entry is skipped with a warning — one key must never verify as two issuers |
+| `QWED_A2A_TRUSTED_ISSUERS` is malformed JSON or has no usable entries | Peer verification disabled; a warning is logged (at most once per minute) |
+
+### Verifier-only nodes
+
+A node that only verifies peer attestations doesn't need a signing key of its own. With `QWED_A2A_SIGNING_KEY_PEM` unset and trusted issuers configured, `verify_attestation` verifies peer tokens normally — only `sign_verdict`, `get_public_key_jwk`, and the interceptor still require the local key. With neither a local key nor trusted issuers, verification returns `No verification keys available (no local key, no trusted issuers)`.
+
+---
+
+## Replay protection (jti lifecycle)
+
+Each attestation's `jti` (the `trace_id`) can be consumed **once per verifying instance**. `A2ACryptoService` keeps two separate records:
+
+- **Issuance record** — `trace_id` values this instance has signed. Signing a duplicate `trace_id` within its validity window raises `ValueError` at `sign_verdict`: each attestation needs a unique `jti`, and minting two tokens under one `jti` would poison every consumer's replay registry.
+- **Consumption registry** — `jti` values this instance has verified. The first verification of a token succeeds; presenting the same token again returns `Replay detected: jti already seen`.
+
+Because issuance and consumption are tracked separately, an issuer can verify its own token once — signing no longer consumes the replay slot. Peer-issued tokens are namespaced by issuer in the consumption registry, so two deployments legitimately reusing the same trace ID never shadow each other.
+
+```python
+crypto = A2ACryptoService(issuer_id="did:qwed:a2a:production")
+
+token = crypto.sign_verdict(trace_id="a2a_audit_001", ...)
+
+crypto.verify_attestation(token, context)   # (True, claims, None) — first consumption
+crypto.verify_attestation(token, context)   # (False, None, "Replay detected: jti already seen")
+
+crypto.sign_verdict(trace_id="a2a_audit_001", ...)  # ValueError — duplicate trace_id
+```
+
+### Replay scope and multi-worker deployments
+
+<Warning>
+The default consumption registry is **process-local**. Two service instances in one process each keep their own registry; two workers in two processes share nothing. A token replayed against a *different* worker is not detected by the default registry.
+</Warning>
+
+For cross-worker replay protection, inject a shared registry via the `jti_registry` constructor argument:
+
+```python
+crypto = A2ACryptoService(
+    issuer_id="did:qwed:a2a:production",
+    jti_registry=shared_registry,  # e.g. Redis- or database-backed
+)
+```
+
+An injected registry must satisfy the `ReplayRegistry` contract:
+
+- `check_and_register(jti, now=..., *, valid_until=...)` with **atomic** insert-if-absent semantics — two workers racing on the same `jti` must not both be accepted.
+- Retention covering each token's full lifetime: honor `valid_until` and never evict a live token's slot.
+- Thread safety for in-process concurrent use.
+- A `ttl_seconds` property reporting the retention window.
+
+The constructor fails closed on unverifiable retention: a registry whose `ttl_seconds` is missing, non-numeric, non-finite, or shorter than `validity_seconds` raises `ValueError` at construction.
 
 ---
 
@@ -218,7 +335,7 @@ QWED A2A treats missing or invalid signing keys as an unrecoverable configuratio
 
 | Condition | Behavior |
 |-----------|----------|
-| `QWED_A2A_SIGNING_KEY_PEM` not set | `sign_verdict`, `verify_attestation`, `get_public_key_jwk`, and `interceptor.intercept()` raise `RuntimeError` |
+| `QWED_A2A_SIGNING_KEY_PEM` not set | `sign_verdict`, `get_public_key_jwk`, and `interceptor.intercept()` raise `RuntimeError`. `verify_attestation` still works against [trusted peer issuers](#verifier-only-nodes); with no trusted issuers either, it returns `(False, None, "No verification keys available ...")` |
 | PEM is not a valid EC private key | `RuntimeError` at first key access |
 | PEM uses a curve other than `SECP256R1` (P-256) | `RuntimeError` at first key access |
 | `cryptography` or `PyJWT` not installed | `RuntimeError` at first key access |
