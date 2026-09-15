@@ -333,6 +333,11 @@ result = guard.verify_cap(
     claimed_cap=15_000_000,
 )
 
+if not result.verified:
+    # Fail closed — reject / route to human review.
+    # Never use computed_cap / difference here (they are None).
+    raise SystemExit(result.message)
+
 print(result.verified)      # False
 print(result.computed_cap)  # None
 print(result.difference)    # None
@@ -427,6 +432,14 @@ Broader extraction is coverage, not proof — ClauseGuard remains a `PARTIAL / H
 - Lists containing empty or whitespace-only strings
 
 Downstream consumers must not treat an `invalid_input` result as verified consistency. The GitHub Action fails when clause consistency is not established, so unsupported or invalid inputs surface as an action failure rather than a silent pass.
+
+```python
+result = guard.check_consistency([])
+
+if not result.consistent:
+    # Fail closed — reject / route to human review.
+    raise SystemExit(result.message)
+```
 
 ### Z3-based verification
 
@@ -694,6 +707,10 @@ result = guard.verify(
     incident_date="2020-06-01",
     filing_date="2019-01-15",  # before the incident
 )
+
+if not result.verified:
+    # Fail closed — reject / route to human review.
+    raise SystemExit(result.message)
 
 print(result.status)     # "UNVERIFIABLE"
 print(result.verified)   # False
