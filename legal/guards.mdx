@@ -313,7 +313,7 @@ print(result.difference)    # 5,000,000
 
 ### Fail-closed behavior on non-finite and out-of-range inputs
 
-`verify_cap`, `verify_indemnity_limit`, and `verify_tiered_liability` reject inputs that cannot be safely quantized. All numeric fields on `LiabilityResult` and `TieredLiabilityResult` are now `Optional[Decimal]` — the guard returns `None` for those fields instead of fabricating zeros when it cannot compute.
+`verify_cap`, `verify_indemnity_limit`, and `verify_tiered_liability` reject inputs that cannot be safely quantized. All numeric fields on `LiabilityResult` and `TieredLiabilityResult` are now `Optional[Decimal]` — the guard returns `None` for those fields instead of fabricating zeros when it cannot compute. (Unreleased on `main`, post-`0.4.0` — on published `0.4.0` these inputs raise instead of fail-closed.)
 
 Inputs that fail closed as `UNVERIFIABLE`:
 
@@ -334,9 +334,9 @@ result = guard.verify_cap(
 )
 
 if not result.verified:
-    # Fail closed — reject / route to human review.
-    # Never use computed_cap / difference here (they are None).
-    raise SystemExit(result.message)
+    # Fail-closed gate: reject this input / route to human review.
+    # Do not use computed_cap / difference here (they are None).
+    pass  # your reject path here
 
 print(result.verified)      # False
 print(result.computed_cap)  # None
@@ -437,8 +437,8 @@ Downstream consumers must not treat an `invalid_input` result as verified consis
 result = guard.check_consistency([])
 
 if not result.consistent:
-    # Fail closed — reject / route to human review.
-    raise SystemExit(result.message)
+    # Fail-closed gate: reject this input / route to human review.
+    pass  # your reject path here
 ```
 
 ### Z3-based verification
@@ -682,6 +682,8 @@ print(result.days_remaining)    # -867 (negative = expired)
 
 ### Result status taxonomy
 
+> `StatuteResult.status` and the fail-closed behaviors below track `qwed-legal` `main` (unreleased, post-`0.4.0`). Against the published `0.4.0` package, `status` is absent — gate on `verified` instead.
+
 `StatuteResult.status` disambiguates the four outcomes previously conflated under `verified`:
 
 | `status` | Meaning | `verified` |
@@ -709,8 +711,8 @@ result = guard.verify(
 )
 
 if not result.verified:
-    # Fail closed — reject / route to human review.
-    raise SystemExit(result.message)
+    # Fail-closed gate: reject this input / route to human review.
+    pass  # your reject path here
 
 print(result.status)     # "UNVERIFIABLE"
 print(result.verified)   # False
