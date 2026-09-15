@@ -35,6 +35,57 @@ serialized = trace_to_dict(result.verification_trace)  # JSON-safe list of dicts
 
 Use `trace_to_dict()` to export a trace into audit logs. Non-serializable input values are stringified (no silent data loss).
 
+<Info>
+`VerificationStep` and every guard result dataclass are `frozen=True`. Nested evidence containers (`VerificationStep.inputs`, `verification_trace`, `conflicts`, `tiers`, `parsed_components`, `components`) are deep-frozen — mappings become mutation-disabled proxies (in-place union `|=` also blocked), lists become tuples, and sets become sorted tuples. Code that previously mutated a result to flip `DETERMINISTIC → HEURISTIC` after issuance no longer works — the mutation raises rather than silently rewriting authority.
+</Info>
+
+## Structured diagnostics and proof references
+
+Every guard result exposes `to_diagnostic(claim_inputs=...)`, which returns a frozen `LegalDiagnosticResult` implementing the ecosystem [3-layer diagnostic contract](/advanced/diagnostics):
+
+- **Layer 1 — `agent_message`**: agent-safe summary (the guard's existing message).
+- **Layer 2 — `developer_fields`**: `claim_inputs`, the full `verification_trace`, and a result snapshot.
+- **Layer 3 — `proof_ref`**: SHA-256 hash over the RFC 8785 (JCS) canonical JSON of the proof evidence, present only when `status == VERIFIED`.
+
+The status is one of `VERIFIED` / `UNVERIFIABLE` / `BLOCKED`. Downstream gates check `diagnostic.is_authoritative` (equivalent to `proof_ref is not None`) — see [the per-guard mapping table in Overview](/legal/overview) for which guards can ever return `VERIFIED` (`CitationGuard`, `ClauseGuard` heuristic paths, `FairnessGuard`, `JurisdictionGuard`, and `ProvenanceGuard` never do — their strongest positive result is `UNVERIFIABLE`).
+
+### Computing and resolving proof references
+
+```python
+from qwed_legal import DeadlineGuard
+from qwed_legal.diagnostics import (
+    LegalDiagnosticStatus,
+    compute_proof_ref,
+    resolve_proof_ref,
+)
+
+claim_inputs = {
+    "signing_date": "2026-01-15",
+    "term": "30 business days",
+    "claimed_deadline": "2026-02-27",
+}
+result = DeadlineGuard().verify(**claim_inputs)
+
+diag = result.to_diagnostic(claim_inputs=claim_inputs)
+assert diag.status is LegalDiagnosticStatus.VERIFIED
+assert diag.proof_ref.startswith("sha256:")
+
+# The same evidence recomputes to the same hash.
+evidence = {
+    "claim_inputs": diag.developer_fields["claim_inputs"],
+    "trace":        diag.developer_fields["verification_trace"],
+    "result":       diag.developer_fields["result"],
+}
+assert compute_proof_ref(evidence) == diag.proof_ref
+assert resolve_proof_ref(diag.proof_ref, evidence) is True
+```
+
+Any consumer that retains the evidence dict can detect **post-issuance tampering** — trace mutations, claim alteration, or `evidence_type` flips — by recomputing the hash. `resolve_proof_ref` returns `False` on any mismatch and on any canonicalization failure (fail-closed).
+
+<Warning>
+The RFC 8785 canonicalizer only accepts the JSON data-model subset the guards emit: `str`, `int`, `bool`, `null`, `list`, `dict`. **Floats fail closed** rather than hashing loosely — the diagnostic adapter coerces trace floats to deterministic strings before hashing. Integers outside the IEEE 754 safe range and lone surrogates in strings also raise, and non-string mapping keys are rejected instead of coerced (so `{1: "a"}` and `{"1": "a"}` no longer collide).
+</Warning>
+
 ## 1. DeadlineGuard
 
 **Status:** `DETERMINISTIC`

@@ -94,6 +94,75 @@ for step in result.verification_trace:
 serialized = trace_to_dict(result.verification_trace)
 ```
 
+## Structured diagnostics
+
+Every guard result exposes `to_diagnostic(claim_inputs=...)`, which returns a `LegalDiagnosticResult` — the same 3-layer contract described in [Verification Diagnostics](/advanced/diagnostics). The status is one of:
+
+| Status | Meaning | `proof_ref` | Control flow |
+|--------|---------|-------------|-------------|
+| `VERIFIED` | Claim compared against deterministic computation and matches | Required (`sha256:` + 64 hex) | May admit |
+| `UNVERIFIABLE` | Claim could not be proven (no claim supplied, ambiguous input, heuristic-only pass, self-declared attestation, citation authority) | Must be `None` | Must reject |
+| `BLOCKED` | Guard deterministically rejected the claim (contradiction, mismatch, tampered evidence, invalid format, impossible timeline) | Must be `None` | Must reject |
+
+The `LegalDiagnosticResult` dataclass is frozen and enforces the authority contract in `__post_init__`:
+
+- `VERIFIED` requires a non-empty `proof_ref` matching `sha256:[0-9a-f]{64}`.
+- `UNVERIFIABLE` and `BLOCKED` reject `proof_ref` entirely.
+- `agent_message` must be a non-empty string.
+
+Attempting to construct a result that violates these rules raises `ValueError` — "VERIFIED without proof" or "BLOCKED with proof" are not caller conventions, they are unrepresentable.
+
+### Per-guard status mapping
+
+Not every guard can ever return `VERIFIED`. Guards whose evidence is inherently non-authoritative (citation format, heuristic clause checks, fairness, self-declared provenance) map their passing outcomes to `UNVERIFIABLE` on purpose:
+
+| Guard | `VERIFIED` when… | `UNVERIFIABLE` when… | `BLOCKED` when… |
+|-------|------------------|----------------------|-----------------|
+| `DeadlineGuard` | Computed deadline matches the claim | Uninterpretable term, or fallback calendar used (`is_computable=False`) | Computed deadline differs from the claim |
+| `LiabilityGuard` | Computed cap/tier matches the claim | No claim supplied (computed-only) or numeric input cannot be parsed | Computed amount differs from the claim |
+| `JurisdictionGuard` | **Never** — evidence is `PARSED`/`INFERRED` only | Unsupported jurisdiction, unrecognized governing law, or empty-party placeholder trace | Recognized-law conflict backed by analysis evidence (e.g. US-state law with a non-US forum) |
+| `StatuteOfLimitationsGuard` | `CLAIM_VERIFIED` — claim matches deterministic date arithmetic | `COMPUTED_ONLY` (no claim) or unsupported jurisdiction/claim type | `CLAIM_INCORRECT` |
+| `CitationGuard` | **Never** — citation authority is not verifiable from format | Format matches a supported reporter | Format invalid |
+| `ClauseGuard` | Z3 UNSAT proves no contradiction over modeled constraints | Heuristic pass over `INFERRED` evidence | Deterministic contradiction (Z3 SAT with a witness, or modeled conflict) |
+| `FairnessGuard` | **Never** — fairness is not deterministically provable | Any pass | Any deterministic failure |
+| `ProvenanceGuard` | **Never** — `SELF_DECLARED` metadata is not external authority | Pass, or input-format failures (`INVALID_PROVENANCE`, `INCOMPLETE_PROVENANCE`, `MISSING_DISCLOSURE`, `INVALID_TIMESTAMP`) | Content tampered (`CONTENT_TAMPERED`) or unauthorized model (`UNAUTHORIZED_MODEL`) |
+| `ContradictionGuard` | Z3 UNSAT over modeled clause categories | Unmodeled clause categories | Z3 SAT witness or explicit modeled conflict |
+
+Guards where `VERIFIED` is documented as "Never" are an honesty contract: their strongest positive result is still non-authoritative, so downstream gates that key on `proof_ref` will correctly refuse to admit.
+
+### Proof references
+
+For `VERIFIED` results, `proof_ref` is a SHA-256 hash over the RFC 8785 (JCS) canonical JSON of the proof evidence — the claim inputs, the full `verification_trace` (with `evidence_type` on every step), and a snapshot of the guard result. See [Verification Diagnostics — Proof references](/advanced/diagnostics) for the full API (`compute_proof_ref`, `resolve_proof_ref`) and the tamper-detection contract.
+
+```python
+from qwed_legal import DeadlineGuard
+from qwed_legal.diagnostics import resolve_proof_ref
+
+result = DeadlineGuard().verify(
+    signing_date="2026-01-15",
+    term="30 business days",
+    claimed_deadline="2026-02-27",
+)
+
+diag = result.to_diagnostic(claim_inputs={
+    "signing_date": "2026-01-15",
+    "term": "30 business days",
+    "claimed_deadline": "2026-02-27",
+})
+
+print(diag.status)             # LegalDiagnosticStatus.VERIFIED
+print(diag.proof_ref)          # "sha256:..."
+print(diag.is_authoritative)   # True
+
+# Later — detect any tampering with the retained evidence
+evidence = {
+    "claim_inputs": diag.developer_fields["claim_inputs"],
+    "trace": diag.developer_fields["verification_trace"],
+    "result": diag.developer_fields["result"],
+}
+assert resolve_proof_ref(diag.proof_ref, evidence) is True
+```
+
 ## Quick example
 
 ### Verify a deadline calculation
