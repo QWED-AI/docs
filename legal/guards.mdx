@@ -103,12 +103,16 @@ print(result.difference_days)    # 13
 
 `DeadlineGuard` does **not** invent deadlines from vague legal language. If the term cannot be parsed into a deterministic `(quantity, unit)` pair, the guard returns a fail-closed result with `verified=False`, `is_computable=False`, and `computed_deadline=None`.
 
-A term is treated as `UNVERIFIABLE` when either:
+A term is treated as `UNVERIFIABLE` when any of the following apply:
 
 - It contains **no numeric quantity** (e.g., `"forthwith"`, `"promptly after notice"`, `"within a reasonable period"`, `"as soon as practicable"`, `"without undue delay"`).
 - It contains a number but **no recognized time unit** (e.g., `"30"` alone, `"15 intervals"`).
+- It contains **more than one time expression** (e.g., `"30 days and 2 months"`, `"30 or 60 days"`). Compound terms are ambiguous and require human interpretation.
+- It contains a **numeric token not adjacent to a time unit** (e.g., a clause reference like `"pursuant to section 4.2, within 10 days"` may still parse, but `"30 days per section 90"` fails closed because `90` is an unpaired quantity).
+- The `business`/`working`/`work` qualifier is **not adjacent** to the unit (e.g., `"30 business days"` parses; `"30 days business"` does not).
+- The parsed quantity exceeds an internal bound (~100,000 units after normalization) or produces an out-of-range date. This prevents crashes and unbounded business-day loops on inputs like `"999999999 business days"`.
 
-Recognized time units are `day`/`calendar`, `week`, `month`, and `year`, with optional `business`/`working`/`work` qualifiers for business-day arithmetic.
+Recognized time units are `day`/`calendar`, `week`, `month`, and `year`, with optional `business`/`working`/`work` qualifiers for business-day arithmetic. Business/working qualifiers are only valid on `day` units — `"6 business months"` fails closed rather than silently computing a calendar period.
 
 ```python
 from qwed_legal import DeadlineGuard
@@ -248,13 +252,45 @@ print(result.difference)    # 5,000,000
 
 | Field | Type | Description |
 | --- | --- | --- |
-| `verified` | `bool` | Whether the claimed cap matches the computed cap |
-| `contract_value` | `Decimal` | The contract value used |
-| `cap_percentage` | `Decimal` | The percentage used |
-| `claimed_cap` | `Decimal` | The cap claimed by the LLM |
-| `computed_cap` | `Decimal` | The correct cap computed by the guard |
-| `difference` | `Decimal` | Absolute difference between claimed and computed |
-| `message` | `str` | Human-readable verification message |
+| `verified` | `bool` | Whether the claimed cap matches the computed cap. Always `False` on `UNVERIFIABLE` inputs. |
+| `contract_value` | `Optional[Decimal]` | The contract value used. `None` when the input was non-finite, out of range, or malformed. |
+| `cap_percentage` | `Optional[Decimal]` | The percentage used. `None` on unverifiable inputs. |
+| `claimed_cap` | `Optional[Decimal]` | The cap claimed by the LLM. `None` on unverifiable inputs. |
+| `computed_cap` | `Optional[Decimal]` | The correct cap computed by the guard. `None` on unverifiable inputs. |
+| `difference` | `Optional[Decimal]` | Absolute difference between claimed and computed. `None` on unverifiable inputs. |
+| `message` | `str` | Human-readable verification message. Starts with `⚠️ UNVERIFIABLE` when inputs cannot be evaluated. |
+
+### Fail-closed behavior on non-finite and out-of-range inputs
+
+`verify_cap`, `verify_indemnity_limit`, and `verify_tiered_liability` reject inputs that cannot be safely quantized. All numeric fields on `LiabilityResult` and `TieredLiabilityResult` are now `Optional[Decimal]` — the guard returns `None` for those fields instead of fabricating zeros when it cannot compute.
+
+Inputs that fail closed as `UNVERIFIABLE`:
+
+- **Non-finite values.** `math.inf`, `-math.inf`, and `math.nan` for any numeric input.
+- **Finite but extreme magnitudes** that overflow `Decimal` arithmetic (e.g., `1e308`).
+- **Tiered inputs** where any tier's `base` or `percentage` is non-finite. The failure message names the offending tier keys.
+
+```python
+import math
+from qwed_legal import LiabilityGuard
+
+guard = LiabilityGuard()
+
+result = guard.verify_cap(
+    contract_value=math.inf,
+    cap_percentage=200,
+    claimed_cap=15_000_000,
+)
+
+print(result.verified)      # False
+print(result.computed_cap)  # None
+print(result.difference)    # None
+print(result.message)       # "⚠️ UNVERIFIABLE: ..."
+```
+
+<Warning>
+  Callers that previously assumed `computed_cap`, `difference`, or `total_computed` were always populated must handle `None`. Non-finite inputs previously raised `decimal.InvalidOperation`; they now fail closed with populated echo of the original inputs where possible and `None` for computed fields.
+</Warning>
 
 ### Additional methods
 
@@ -320,6 +356,26 @@ print(result.conflicts)
 | **Termination** | Notice period vs minimum term |
 | **Permission/Prohibition** | "May" vs "May not" |
 | **Exclusivity** | Multiple exclusive rights |
+
+### Day-count extraction
+
+The internal `_extract_days` helper picks the day-expression closest to the context word (`notice`, `before`, etc.). It first tries directional patterns (e.g., `"within 30 days after signing"`), and if none match, applies a **proximity fallback**: any day-expression within 40 characters of the context word. This resolves clauses that would previously return `None`:
+
+- `"give notice within 10 days of discovery"` now extracts `10` (the older directional-only extractor missed it).
+- Multiple linked durations with different values (e.g., `"breach notice within 10 days; termination notice within 120 days"`) remain unresolved on purpose — the guard refuses to pick between them rather than silently choosing document order.
+
+Broader extraction is coverage, not proof — ClauseGuard remains a `PARTIAL / HEURISTIC` guard.
+
+### Input validation
+
+`check_consistency()` fails closed on inputs it cannot analyze. All four cases return `consistent=False`, `status="invalid_input"`, and a message that begins with `INVALID INPUT (LIMITED COVERAGE)`:
+
+- Empty list `[]`
+- Non-list values (dict, string, `None`)
+- Lists containing non-string elements
+- Lists containing empty or whitespace-only strings
+
+Downstream consumers must not treat an `invalid_input` result as verified consistency. The GitHub Action fails when clause consistency is not established, so unsupported or invalid inputs surface as an action failure rather than a silent pass.
 
 ### Z3-based verification
 
@@ -428,6 +484,15 @@ print(result.format_valid)  # True (format only — not proof the statute exists
 print(result.parsed_components)
 # {'title': 42, 'code': 'U.S.C.', 'section': '1983'}
 ```
+
+The `US_CODE` pattern accepts an **optional** section symbol. Both of the following are format-valid — the `§` is legitimate drafting when present and legitimate drafting when omitted:
+
+```python
+guard.check_statute_citation("12 U.S.C. § 2605")  # format_valid=True
+guard.check_statute_citation("12 U.S.C. 2605")    # format_valid=True
+```
+
+The section identifier must still start with a digit. Prose like `"12 U.S.C. provides that..."` is rejected, as are non-`U.S.C.` codes.
 
 ---
 
@@ -545,9 +610,43 @@ result = guard.verify(
     filing_date="2026-06-01"
 )
 
-print(result.verified)          # False - 4 year limit exceeded!
+print(result.verified)          # False - claim not supplied, so verified is False by contract
+print(result.status)            # "COMPUTED_ONLY" - period was computed, no claim to verify against
 print(result.expiration_date)   # 2024-01-15
 print(result.days_remaining)    # -867 (negative = expired)
+```
+
+### Result status taxonomy
+
+`StatuteResult.status` disambiguates the four outcomes previously conflated under `verified`:
+
+| `status` | Meaning | `verified` |
+| --- | --- | --- |
+| `CLAIM_VERIFIED` | Caller supplied `claimed_within_period` and it matches the computed result | `True` |
+| `CLAIM_INCORRECT` | Caller supplied `claimed_within_period` and it contradicts the computed result | `False` |
+| `COMPUTED_ONLY` | Period and expiration were computed; no `claimed_within_period` was supplied | `False` (by contract — no claim to verify) |
+| `UNVERIFIABLE` | Input class rejection (unknown jurisdiction/claim type, unparseable dates, impossible timeline) | `False` |
+
+`verified` is reserved for claim comparison. An expired-but-correctly-evaluated claim is `COMPUTED_ONLY` — it is no longer indistinguishable from an unverifiable result. Branch on `status` when you need to distinguish "we computed the answer and you did not ask us to compare" from "we could not compute the answer".
+
+### Impossible timelines fail closed
+
+A filing date that precedes the incident date is a factually impossible timeline. The guard rejects it as `UNVERIFIABLE` before the period computation runs — a time-travel claim can no longer be recorded as within-period.
+
+- Same-day filing (date-only inputs, both parse to midnight) is still allowed.
+- When both inputs carry a time-of-day, the guard compares full timestamps: a 09:00 filing against a 15:00 incident on the same calendar date is impossible and fails closed.
+
+```python
+result = guard.verify(
+    claim_type="breach_of_contract",
+    jurisdiction="California",
+    incident_date="2020-06-01",
+    filing_date="2019-01-15",  # before the incident
+)
+
+print(result.status)     # "UNVERIFIABLE"
+print(result.verified)   # False
+print(result.message)    # "⚠️ UNVERIFIABLE: Filing timestamp ... precedes incident timestamp ..."
 ```
 
 ### Fail-closed behavior
@@ -599,7 +698,11 @@ print(result.message)
 ### StatuteResult fields
 
 <ResponseField name="verified" type="bool">
-  `True` only when the jurisdiction and claim type are recognized and the filing falls within the limitation period (and matches `claimed_within_period`, if supplied).
+  `True` only when `claimed_within_period` was supplied and matches the computed result (`status="CLAIM_VERIFIED"`). `False` in all other cases — including `COMPUTED_ONLY`, where the period was computed but there was no claim to verify against. Always branch on `status` when you need the underlying reason.
+</ResponseField>
+
+<ResponseField name="status" type="str">
+  One of `CLAIM_VERIFIED`, `CLAIM_INCORRECT`, `COMPUTED_ONLY`, or `UNVERIFIABLE`. See the status taxonomy above.
 </ResponseField>
 
 <ResponseField name="claim_type" type="str">
@@ -938,6 +1041,22 @@ The `Clause` dataclass requires:
 | `DURATION` | Conflicting term lengths (exact vs min/max) |
 | `LIABILITY` | Cap vs penalty contradictions |
 
+### Value provenance and word-boundary matching
+
+Each encoded clause records a `value_provenance` tag in its `verification_trace` step so callers can tell text-parsed values apart from caller-asserted numbers:
+
+| `value_provenance` | Meaning |
+| --- | --- |
+| `parsed_from_text` | The numeric operand was extracted from `clause.text` (e.g., `"capped at 10000"` → `10000`). Encoded step is `DETERMINISTIC`. |
+| `caller_asserted` | The operand came from `clause.value` only; the text did not evidence it. Encoded step is `INFERRED`. |
+
+A `sat` result over clauses whose values are only caller-asserted is reported as `partial_coverage` with `verified=False`. This prevents `Clause(text="exactly 1 month", value=999)` from encoding `var==999` and having Z3 "prove" consistency of an invented number. The result message notes how many values were caller-asserted.
+
+Keyword and value matching are both **word-boundary aware**:
+
+- Keyword matching: `"cap"` no longer matches inside `"capability"`, so unmodeled prose falls through to partial coverage instead of encoding a spurious liability cap.
+- Value token matching: `value=1` is no longer evidenced by `"12 months"`. Numeric operands must sit on their own token boundary.
+
 ### Z3 vs ClauseGuard
 
 | Feature | ClauseGuard | ContradictionGuard |
@@ -951,9 +1070,13 @@ The `Clause` dataclass requires:
 
 ## 10. ProvenanceGuard
 
-**Status:** `DETERMINISTIC`
+**Status:** `DETERMINISTIC` (self-declared assurance only)
 
-**Purpose:** Verify AI-generated content carries proper provenance metadata and disclosure markers. All checks are deterministic (SHA-256 hashing, regex pattern matching, datetime validation).
+**Purpose:** Verify the internal consistency of a caller-supplied AI-generated content declaration. All checks are deterministic (SHA-256 hashing, regex pattern matching, datetime validation).
+
+<Warning>
+  **Trust model: self-declared.** Every field in the provenance record — including `human_reviewed` and `reviewer_id` — is caller-supplied. A well-formed record with fabricated review metadata will pass every check. Every `ProvenanceGuard` result carries `assurance: "SELF_DECLARED"` to reflect this. External assurance that a human actually reviewed the content requires out-of-band reviewer signatures, which are outside this guard's scope. Use this guard to catch tampering, missing disclosures, and unauthorized models; do not use it as proof that a human review occurred.
+</Warning>
 
 ### The problem
 
@@ -984,6 +1107,7 @@ provenance = {
 result = guard.verify_provenance(content, provenance)
 
 print(result["verified"])        # True or False
+print(result["assurance"])       # "SELF_DECLARED" — every result carries this
 print(result["checks_passed"])   # ["metadata_completeness", "hash_integrity", ...]
 print(result["checks_failed"])   # []
 print(result["risk"])            # "" if verified, e.g. "CONTENT_TAMPERED" if not
@@ -1000,7 +1124,11 @@ ProvenanceGuard runs up to six checks. The first three always run; the last thre
 | **Timestamp validity** | ISO-8601 format, not in the future | Yes |
 | **Disclosure compliance** | Content includes an AI-generation disclosure statement | If `require_disclosure=True` |
 | **Model allowlist** | `model_id` is in the approved list | If `allowed_models` is set |
-| **Human review** | `human_reviewed` is `True` in provenance | If `require_human_review=True` |
+| **Human review (declared)** | `human_reviewed` is exactly `True` in provenance. Reported as `human_review_declared` in `checks_passed` / `checks_failed`. | If `require_human_review=True` |
+
+<Info>
+  The human-review check is named `human_review_declared` to make the trust boundary explicit: the guard only checks that the caller declared `human_reviewed=True`, not that a review actually happened. Truthy non-Boolean values (`"true"`, `1`) fail closed — only the literal `True` passes. The legacy `human_review` token is emitted alongside `human_review_declared` in `checks_passed` / `checks_failed` during a deprecation window; migrate consumers to the new name.
+</Info>
 
 ### Constructor parameters
 
@@ -1063,7 +1191,7 @@ When verification fails, the `risk` field indicates the type of failure:
 | `INVALID_TIMESTAMP` | Timestamp is malformed or in the future |
 
 <Info>
-  ProvenanceGuard is fully deterministic — no LLM calls required. All checks use SHA-256 hashing, regex pattern matching, and datetime validation.
+  ProvenanceGuard is fully deterministic — no LLM calls required. All checks use SHA-256 hashing, regex pattern matching, and datetime validation. The guard verifies the internal consistency of a caller-supplied declaration; every result carries `assurance="SELF_DECLARED"`. External assurance (that a human actually reviewed, that the recorded model actually produced the content) requires out-of-band reviewer signatures.
 </Info>
 
 ---
@@ -1099,9 +1227,25 @@ augmented = sac.generate_sac_chunks(
 
 # Each chunk now includes global context
 print(augmented[0])
-# DOCUMENT CONTEXT [NDA-2026-001]: NDA between Acme Corp and Beta Inc...
+# DOCUMENT CONTEXT [NDA-2026-001] (deterministic hash: 3f9c…) [AI-GENERATED SUMMARY — UNTRUSTED CONTENT]: NDA between Acme Corp and Beta Inc...
 # CHUNK CONTENT [1/10]: Original chunk text here...
 ```
+
+### Untrusted fingerprint labeling
+
+The document-fingerprint header is labeled `[AI-GENERATED SUMMARY — UNTRUSTED CONTENT]` and is always paired with the deterministic SHA-256 document hash — even when a caller-supplied `document_id` is provided. The hash is computable and verifiable; the LLM summary is not.
+
+The LLM summary is sanitized before it is embedded in every chunk:
+
+- Flattened to a single line (newlines and control characters stripped).
+- Forged `CHUNK CONTENT` and `DOCUMENT CONTEXT` markers are removed, so a compromised summarizer cannot forge chunk structure.
+- Raw responses are size-capped before sanitization.
+- If a summary sanitizes to empty (for example, an all-marker response), the fingerprint falls back to the deterministic hash rather than embedding an empty summary.
+
+<Warning>
+  Treat the summary as untrusted content in retrieval and downstream prompts. The deterministic hash is the only fingerprint field with an authenticity guarantee.
+</Warning>
+
 
 ### Configuration
 
