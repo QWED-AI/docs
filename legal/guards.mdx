@@ -333,15 +333,16 @@ result = guard.verify_cap(
     claimed_cap=15_000_000,
 )
 
-if not result.verified:
-    # Fail-closed gate: reject this input / route to human review.
-    # Do not use computed_cap / difference here (they are None).
-    pass  # your reject path here
-
 print(result.verified)      # False
 print(result.computed_cap)  # None
 print(result.difference)    # None
 print(result.message)       # "⚠️ UNVERIFIABLE: ..."
+
+if not result.verified:
+    # Fail-closed gate: reject this input / route to human review.
+    # ValueError (catchable per-request), not SystemExit (kills the host).
+    # Never reach computed_cap / difference here (they are None).
+    raise ValueError(result.message)
 ```
 
 <Warning>
@@ -438,7 +439,8 @@ result = guard.check_consistency([])
 
 if not result.consistent:
     # Fail-closed gate: reject this input / route to human review.
-    pass  # your reject path here
+    # ValueError (catchable per-request), not SystemExit (kills the host).
+    raise ValueError(result.message)
 ```
 
 ### Z3-based verification
@@ -675,9 +677,12 @@ result = guard.verify(
 )
 
 print(result.verified)          # False - claim not supplied, so verified is False by contract
-print(result.status)            # "COMPUTED_ONLY" - period was computed, no claim to verify against
 print(result.expiration_date)   # 2024-01-15
 print(result.days_remaining)    # -867 (negative = expired)
+
+# On unreleased main, result.status == "COMPUTED_ONLY" here
+# (period computed, no claim to verify against). Published 0.4.0
+# has no status field — gate on verified instead.
 ```
 
 ### Result status taxonomy
@@ -710,13 +715,14 @@ result = guard.verify(
     filing_date="2019-01-15",  # before the incident
 )
 
-if not result.verified:
-    # Fail-closed gate: reject this input / route to human review.
-    pass  # your reject path here
-
 print(result.status)     # "UNVERIFIABLE"
 print(result.verified)   # False
 print(result.message)    # "⚠️ UNVERIFIABLE: Filing timestamp ... precedes incident timestamp ..."
+
+if not result.verified:
+    # Fail-closed gate: reject this input / route to human review.
+    # ValueError (catchable per-request), not SystemExit (kills the host).
+    raise ValueError(result.message)
 ```
 
 ### Fail-closed behavior
