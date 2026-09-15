@@ -5,7 +5,7 @@ description: "Release notes for the QWED Protocol: version history, new guards, 
 
 All notable changes to the QWED platform, listed by release.
 
-Jump to: [v7.2.0](#v7-2-0-—-precision-advisory-and-security-hardening-batch) · [v7.1.0](#v7-1-0-—-verification-context-v1-0-rollout) · [v7.0.0](#v7-0-0-—-full-diagnosticresult-engine-conformance)
+Jump to: [v7.2.1](#v7-2-1-—-math-answer-comparison-security-patch) · [v7.2.0](#v7-2-0-—-precision-advisory-and-security-hardening-batch) · [v7.1.0](#v7-1-0-—-verification-context-v1-0-rollout) · [v7.0.0](#v7-0-0-—-full-diagnosticresult-engine-conformance)
 
 ---
 
@@ -76,6 +76,33 @@ If any client still sends `signature` in the message body, remove the field. See
 </Warning>
 
 See [Crypto attestations](/a2a/crypto-attestations#cross-deployment-verification-trusted-issuers) for configuration and the full replay-scope documentation.
+
+---
+
+## v7.2.1 — Math answer comparison security patch
+
+**Released: September 14, 2026** · [GitHub Release ↗](https://github.com/QWED-AI/qwed-verification/releases/tag/v7.2.1) · [GitHub PR #365](https://github.com/QWED-AI/qwed-verification/pull/365) · Advisory [GHSA-xmm6-8r3x-j567](https://github.com/QWED-AI/qwed-verification/security/advisories/GHSA-xmm6-8r3x-j567)
+
+> v7.2.1 is a fail-closed security patch. The math answer comparison path previously fed the untrusted model answer to raw `sympy.sympify`, which is an eval sink that can execute dunder-traversal gadgets smuggled in the answer turn. The answer is now parsed only through the hardened `safe_parse_expr`, and unparseable input fails closed. No new capability and no breaking wire changes. Upgrade is recommended for any deployment on `v6.0.0` through `v7.2.0`.
+
+### Security fix
+
+- **Hardened answer parsing.** `QWEDLocal._math_answers_match` no longer calls `sympy.sympify` on the model's answer. It now parses through `safe_parse_expr`, which applies a character allow-list, an AST allow-list, strips builtins, and enforces the compute-cost bounds introduced in v7.2.0. Unparseable answers and a missing parser both return `False`, so the comparison never treats an attacker-controlled string as "equal" by accident.
+- **Release boundary gate covers the SDK.** `scripts/check_boundary.py` now scans `qwed_sdk/` and forbids raw `sympify` outside approved wrappers, so the eval sink cannot reappear in a future refactor.
+
+### Version bumps
+
+| Surface | From | To |
+|---|---|---|
+| `qwed` (PyPI) | `7.2.0` | `7.2.1` |
+| `qwed_sdk` (Python) | `7.2.0` | `7.2.1` |
+| `@qwed-ai/sdk` (npm) | `7.2.0` | `7.2.1` |
+| `qwed` (crates.io) | `7.2.0` | `7.2.1` |
+| API version marker | `7.2.0` | `7.2.1` |
+
+### Upgrading
+
+Patch release with no code changes required. Pin `qwed>=7.2.1` on PyPI, `@qwed-ai/sdk@^7.2.1` on npm, and `qwed = "7.2.1"` on crates.io, then redeploy. Wire formats and public APIs are unchanged.
 
 ---
 
