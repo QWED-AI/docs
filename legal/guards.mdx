@@ -112,7 +112,7 @@ A term is treated as `UNVERIFIABLE` when any of the following apply:
 - The `business`/`working`/`work` qualifier is **not adjacent** to the unit (e.g., `"30 business days"` parses; `"30 days business"` does not).
 - The parsed quantity exceeds an internal bound (~100,000 units after normalization) or produces an out-of-range date. This prevents crashes and unbounded business-day loops on inputs like `"999999999 business days"`.
 
-Recognized time units are `day`/`calendar`, `week`, `month`, and `year`, with optional `business`/`working`/`work` qualifiers for business-day arithmetic. Business/working qualifiers are only valid on `day` units — `"6 business months"` fails closed rather than silently computing a calendar period.
+Recognized time units are `day`/`calendar`, `week`, `month`, and `year`, with optional `business`/`working`/`work` qualifiers for business-day arithmetic. Business/working qualifiers are only valid on `day` and `week` units (`week` counts as 5 business days) — `"6 business months"` fails closed rather than silently computing a calendar period.
 
 ```python
 from qwed_legal import DeadlineGuard
@@ -1043,14 +1043,14 @@ The `Clause` dataclass requires:
 
 ### Value provenance and word-boundary matching
 
-Each encoded clause records a `value_provenance` tag in its `verification_trace` step so callers can tell text-parsed values apart from caller-asserted numbers:
+Each encoded clause records text-derived operands in its `verification_trace` step — the solver encodes only operands parsed from `clause.text`, never the caller's declared `clause.value`:
 
-| `value_provenance` | Meaning |
+| Trace field | Meaning |
 | --- | --- |
-| `parsed_from_text` | The numeric operand was extracted from `clause.text` (e.g., `"capped at 10000"` → `10000`). Encoded step is `DETERMINISTIC`. |
-| `caller_asserted` | The operand came from `clause.value` only; the text did not evidence it. Encoded step is `INFERRED`. |
+| `value_provenance: "parsed_from_text"` | Legacy constant tag — the numeric operand was extracted from `clause.text` (e.g., `"capped at 10000"` → `10000`). Encoded step is `DETERMINISTIC`. |
+| `caller_value` / `caller_value_agrees` | The caller's declared `clause.value` and whether any text-derived operand matches it. Recorded for disclosure only — it never enters the Z3 model. |
 
-A `sat` result over clauses whose values are only caller-asserted is reported as `partial_coverage` with `verified=False`. This prevents `Clause(text="exactly 1 month", value=999)` from encoding `var==999` and having Z3 "prove" consistency of an invented number. The result message notes how many values were caller-asserted.
+A `sat` result with unmodeled clauses or unsupported categories is reported as `partial_coverage` with `verified=False`. Since only text-evidenced operands are encoded, `Clause(text="exactly 1 month", value=999)` encodes `var==1` (not `999`) — the solver can never "prove" consistency of an invented caller number. The trace also records `disagreed_values` when the caller declaration differs from the text.
 
 Keyword and value matching are both **word-boundary aware**:
 
