@@ -136,7 +136,7 @@ qwed init \
 | `--skip-tests` | Skip the engine smoke tests | `false` |
 
 <Note>
-API keys are never logged or displayed in full. The `.env` file is written atomically with owner-only permissions (`0600` on Unix) and symlink protection. `qwed init` also auto-generates two server secrets on first run — `QWED_JWT_SECRET_KEY` (used to sign JWTs) and `QWED_API_KEY_LOOKUP_SECRET` (used to derive the HMAC-SHA256 digests the server uses to look up API keys). Both are threaded into the local server it starts, so the fail-closed import check at server boot no longer trips on a fresh install.
+API keys are never logged or displayed in full. The `.env` file is written atomically with owner-only permissions (`0600` on Unix) and symlink protection. `qwed init` auto-generates two server secrets on first run. `QWED_JWT_SECRET_KEY` signs JWTs. `QWED_API_KEY_LOOKUP_SECRET` derives the HMAC-SHA256 digests the server uses to look up API keys. Both are passed into the local server it starts. The fail-closed import check at server boot no longer trips on a fresh install.
 </Note>
 
 **Local server runtime directory:**
