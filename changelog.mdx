@@ -25,7 +25,7 @@ Jump to: [Signed secret-scanning webhook](#qwed-verification-—-signed-secret-s
 - **Fail-closed status separation.** `401` for missing headers, `403` for a proven-bad signature against a fresh anchor, `503` for any state where verification was impossible (signing-key service down, anchor unusable, rotation retry throttled). `413` for over-cap bodies (1 MiB) or batches (500 matches); `400` for a malformed envelope. Tokens never appear in logs.
 - **Optional keys-fetch token.** `GITHUB_KEYS_TOKEN` (or `GITHUB_TOKEN` as a fallback) can be set to raise the outbound rate limit on the keys request. Neither token grants any authority over the incoming webhook — only the signature does.
 
-See [Security hardening — Secret-scanning webhook intake](/advanced/security-hardening#7-secret-scanning-webhook-intake) for the full trust model and operator configuration.
+See [Security hardening — Secret-scanning webhook intake](/advanced/security-hardening#6-secret-scanning-webhook-intake) for the full trust model and operator configuration.
 
 ---
 

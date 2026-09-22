@@ -1324,9 +1324,9 @@ A non-empty JSON array of match objects. Extra fields on each item are ignored s
 ```json
 [
   {
-    "token": "qwed_abc123…",
-    "type": "qwed_api_key",
-    "url": "https://github.com/example/repo/blob/main/config.py",
+    "token": "qwed_live_7F3a9B2e…",
+    "type": "qwed_live_api_key",
+    "url": "https://github.com/acme-corp/billing-api/blob/main/config.py",
     "source": "commit"
   }
 ]
@@ -1367,5 +1367,5 @@ A 200 acknowledges a **verified receipt**, not that downstream revocation has fi
 All signature-failure responses share a single generic detail (`"invalid webhook signature"`) so the failing verification step is not observable to the caller.
 
 <Note>
-Configure your scanner (or a GitHub partner-program registration) to POST to `https://<your-qwed-host>/webhooks/secret-scanning`. No API key or bearer token is provisioned on QWED's side — the signature over the raw body is the sole credential, and QWED fetches the public keys from GitHub on demand. See [Security hardening — Secret-scanning webhook intake](/advanced/security-hardening#7-secret-scanning-webhook-intake) for the trust model and operator configuration.
+Configure your scanner (or a GitHub partner-program registration) to POST to `https://<your-qwed-host>/webhooks/secret-scanning`. No API key or bearer token is provisioned on QWED's side — the signature over the raw body is the sole credential, and QWED fetches the public keys from GitHub on demand. See [Security hardening — Secret-scanning webhook intake](/advanced/security-hardening#6-secret-scanning-webhook-intake) for the trust model and operator configuration.
 </Note>
