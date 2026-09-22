@@ -1299,3 +1299,73 @@ Generate a custom badge with configurable label, message, color, and logo.
 | `message` | string | `verified` | Right side message |
 | `color` | string | — | Hex color (e.g., `#00C853`) |
 | `logo` | boolean | `true` | Include QWED logo |
+
+---
+
+## Webhook endpoints
+
+### POST /webhooks/secret-scanning
+
+Receive signed secret-leak notifications from GitHub secret scanning (or any GitHub-compatible partner scanner). The endpoint is the intake side of the leaked-QWED-key revocation pipeline: authenticated reports of leaked tokens are handed to the revocation sink after signature verification succeeds.
+
+The endpoint is **intentionally unauthenticated** — it must be reachable by external scanners that have no QWED credentials. The ECDSA signature over the raw request body is the only credential; nothing in the payload is parsed, logged, or persisted until the signature is verified against GitHub's published public keys.
+
+**Request headers:**
+
+| Header | Required | Description |
+|--------|----------|-------------|
+| `Github-Public-Key-Identifier` | Yes | Key identifier (`key_identifier`) of the signing key from `https://api.github.com/meta/public_keys/secret_scanning` |
+| `Github-Public-Key-Signature` | Yes | Base64-encoded ASN.1/DER ECDSA-NIST-P256V1-SHA256 signature over the raw request body |
+
+**Request body:**
+
+A non-empty JSON array of match objects. Extra fields on each item are ignored so scanners can add informational fields over time.
+
+```json
+[
+  {
+    "token": "qwed_live_KEY",
+    "type": "qwed_live_api_key",
+    "url": "https://github.com/acme-corp/billing-api/blob/main/config.py",
+    "source": "commit"
+  }
+]
+```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `token` | string | Yes | The leaked token (1–512 characters). Never logged. |
+| `type` | string | Yes | Scanner-declared token type (1–128 characters) |
+| `url` | string | No | Location where the token was found (max 4096 characters) |
+| `source` | string | No | Scanner-declared source (max 64 characters). Defaults to `"unknown"` |
+
+**Envelope caps:**
+
+- Request body: 1 MiB. The stream is bounded incrementally — an over-cap body is rejected the moment the cap is exceeded and never fully buffered.
+- Matches per request: 500.
+- Signature header: 1024 characters before base64 decode.
+
+**Response (200):**
+
+```json
+{"received": 3}
+```
+
+A 200 acknowledges a **verified receipt**, not that downstream revocation has finished. Verified matches are handed to a background sink after the response is sent.
+
+**Status codes:**
+
+| Status | Meaning |
+|--------|---------|
+| 200 | Signature verified; matches queued for background handling |
+| 400 | Malformed envelope (non-JSON body, wrong shape, or a match object failed validation) |
+| 401 | Missing `Github-Public-Key-Identifier` or `Github-Public-Key-Signature` header |
+| 403 | Signature invalid, forged, tampered, or signed by an unknown key against a fresh trust anchor |
+| 413 | Body exceeds 1 MiB or the batch exceeds 500 matches |
+| 503 | Signing-key service unavailable, or the key that signed the request cannot be resolved after a rotation retry — the scanner should redeliver |
+
+All signature-failure responses share a single generic detail (`"invalid webhook signature"`) so the failing verification step is not observable to the caller.
+
+<Note>
+Configure your scanner (or a GitHub partner-program registration) to POST to `https://<your-qwed-host>/webhooks/secret-scanning`. No API key or bearer token is provisioned on QWED's side — the signature over the raw body is the sole credential, and QWED fetches the public keys from GitHub on demand. See [Security hardening — Secret-scanning webhook intake](/advanced/security-hardening#6-secret-scanning-webhook-intake) for the trust model and operator configuration.
+</Note>

@@ -365,7 +365,46 @@ For related deployment controls, see [Architecture overview](/architecture), [SD
 
 ---
 
-## 6. Reporting a vulnerability
+## 6. Secret-scanning webhook intake
+
+<Info>New in v7.3.0</Info>
+
+The `POST /webhooks/secret-scanning` endpoint accepts signed reports of leaked QWED API keys from GitHub secret scanning and compatible partner scanners. Because the endpoint must be reachable by external scanners with no QWED credentials, it is unauthenticated at the transport layer — the ECDSA signature over the raw request body is the only credential, and the intake is fail-closed at every step.
+
+### Trust model
+
+- **Raw-body signature verification.** The signature is verified over the exact request bytes, in the exact order they arrived, before any JSON parsing, logging, or database work. Reformatting the payload would break the signature, so QWED never re-serializes the body.
+- **P-256 pinning at key-load.** Signing keys fetched from `https://api.github.com/meta/public_keys/secret_scanning` are pinned to `secp256r1` (`ECDSA-NIST-P256V1-SHA256`) when the PEM is loaded, not at verify time. A future keys-list entry on another curve is dropped at load, never silently trusted.
+- **6h key cache with one-shot rotation refetch.** Signing keys are cached in-process for 6 hours. A conditional (`ETag` / `If-None-Match`) refetch keeps a stable key list quiet. If verification fails against an unknown `key_identifier`, QWED refetches the list exactly once (throttled to at most one forced refetch per 60 seconds after a success, 10 seconds after a failure) and retries; anything still unknown fails closed.
+- **Timing-safe verdict comparison.** Signature success and failure paths run through `hmac.compare_digest` on a fixed-shape verdict so the two branches are not distinguishable by timing. Every failure — missing headers, malformed base64, unknown key, off-spec curve, bad signature — returns the same generic 401/403 detail.
+- **Tokens never logged.** The receipt log line records the match count and the per-source breakdown only. Token values never appear in logs, error messages, or metrics.
+- **Fail-closed status separation.** `401` is missing headers, `403` is a proven-bad signature against a fresh trust anchor, and `503` is any state where verification was impossible (signing-key service unreachable, cached anchor unusable, rotation retry throttled). The scanner should redeliver on `503`.
+
+### Envelope limits
+
+Bounded work is enforced before and after the crypto:
+
+- Request body capped at 1 MiB, checked incrementally on read (an over-cap body is rejected the instant the cap is exceeded — the endpoint never buffers an unbounded unsigned body).
+- Matches per request capped at 500.
+- Individual `token` field capped at 512 characters.
+- Signature header capped at 1024 characters before base64 decode.
+
+### Configuration
+
+The endpoint works with no configuration — QWED fetches GitHub's public keys anonymously. Two optional environment variables raise the rate limit on the outbound keys request by attaching a bearer token:
+
+| Environment Variable | Default | Description |
+|----------------------|---------|-------------|
+| `GITHUB_KEYS_TOKEN` | empty | Personal access token used for the outbound `GET /meta/public_keys/secret_scanning` request. Not required, and never used to authenticate the incoming webhook. |
+| `GITHUB_TOKEN` | empty | Fallback used if `GITHUB_KEYS_TOKEN` is not set. |
+
+Neither token grants any authority on the incoming request; only the ECDSA signature does.
+
+See the [`POST /webhooks/secret-scanning`](/api/endpoints#post-webhooks-secret-scanning) reference for the request/response contract and the full status-code table.
+
+---
+
+## 7. Reporting a vulnerability
 
 If you discover a security vulnerability in QWED, do **not** report it through public GitHub issues, pull requests, or discussions.
 
