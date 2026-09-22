@@ -5,7 +5,27 @@ description: "Release notes for the QWED Protocol: version history, new guards, 
 
 All notable changes to the QWED platform, listed by release.
 
-Jump to: [v7.2.1](#v7-2-1-—-math-answer-comparison-security-patch) · [v7.2.0](#v7-2-0-—-precision-advisory-and-security-hardening-batch) · [v7.1.0](#v7-1-0-—-verification-context-v1-0-rollout) · [v7.0.0](#v7-0-0-—-full-diagnosticresult-engine-conformance)
+Jump to: [Signed secret-scanning webhook](#qwed-verification-—-signed-secret-scanning-webhook-endpoint) · [v7.2.1](#v7-2-1-—-math-answer-comparison-security-patch) · [v7.2.0](#v7-2-0-—-precision-advisory-and-security-hardening-batch) · [v7.1.0](#v7-1-0-—-verification-context-v1-0-rollout) · [v7.0.0](#v7-0-0-—-full-diagnosticresult-engine-conformance)
+
+---
+
+## QWED Verification — signed secret-scanning webhook endpoint
+
+**Released: September 20, 2026** · [GitHub PR #374](https://github.com/QWED-AI/qwed-verification/pull/374) · Closes [issue #367](https://github.com/QWED-AI/qwed-verification/issues/367)
+
+> New `POST /webhooks/secret-scanning` endpoint receives signed reports of leaked QWED API keys from GitHub secret scanning and compatible partner scanners. The endpoint is unauthenticated at the transport layer by design — external scanners have no QWED credentials — and the ECDSA-NIST-P256V1-SHA256 signature over the raw request body is the only credential. Verification runs before any JSON parsing, logging, or database work, and every failure mode fails closed to a distinct status code.
+
+### What changed
+
+- **New public endpoint.** `POST /webhooks/secret-scanning` accepts a JSON array of leaked-token matches, verifies the `Github-Public-Key-Identifier` and `Github-Public-Key-Signature` headers against GitHub's published signing keys, and hands verified batches to the revocation sink in the background. See [`POST /webhooks/secret-scanning`](/api/endpoints#post-webhooks-secret-scanning) for the full request/response contract.
+- **Raw-body signature verification.** The signature is verified over the exact bytes received; the body is never re-serialized. Nothing in the payload is parsed or logged until the signature is proven genuine.
+- **P-256 pinning at key-load.** Signing keys are pinned to `secp256r1` when the PEM is loaded, so a future keys-list entry on another curve is dropped at load rather than silently trusted at verify time.
+- **6-hour key cache with rotation retry.** Signing keys are cached in-process for 6 hours with an `ETag`-conditional refetch. On an unknown `key_identifier`, QWED refetches the list exactly once (throttled to one forced refetch per 60 s after a success, 10 s after a failure) and retries. A dead or throttled key service fails closed to `503`.
+- **Timing-safe verdict comparison.** Success and failure branches run through `hmac.compare_digest` on a fixed-shape verdict, and every failure returns the same generic detail so the failing step is not observable.
+- **Fail-closed status separation.** `401` for missing headers, `403` for a proven-bad signature against a fresh anchor, `503` for any state where verification was impossible (signing-key service down, anchor unusable, rotation retry throttled). `413` for over-cap bodies (1 MiB) or batches (500 matches); `400` for a malformed envelope. Tokens never appear in logs.
+- **Optional keys-fetch token.** `GITHUB_KEYS_TOKEN` (or `GITHUB_TOKEN` as a fallback) can be set to raise the outbound rate limit on the keys request. Neither token grants any authority over the incoming webhook — only the signature does.
+
+See [Security hardening — Secret-scanning webhook intake](/advanced/security-hardening#7-secret-scanning-webhook-intake) for the full trust model and operator configuration.
 
 ---
 
