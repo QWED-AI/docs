@@ -9,6 +9,23 @@ Jump to: [v7.2.1](#v7-2-1-—-math-answer-comparison-security-patch) · [v7.2.0]
 
 ---
 
+## QWED Verification — `qwed init` provisions `QWED_API_KEY_LOOKUP_SECRET`
+
+**Released: September 21, 2026** · [GitHub PR #375](https://github.com/QWED-AI/qwed-verification/pull/375) · Closes [issue #372](https://github.com/QWED-AI/qwed-verification/issues/372)
+
+> Fresh `qwed init` runs no longer crash the child server at boot on the fail-closed `QWED_API_KEY_LOOKUP_SECRET` import check. The CLI now generates the lookup secret alongside `QWED_JWT_SECRET_KEY`, writes it to `.env`, and threads it into the local server it starts.
+
+### What changed
+
+- **Auto-provisioned on first run.** `qwed init` generates a URL-safe random `QWED_API_KEY_LOOKUP_SECRET` (at least 48 bytes) whenever one is not already set, persists it to `.env` with the same `0600` permissions as other credentials, and exports it into the child server's environment.
+- **Retained on re-runs, never rotated.** If `.env`, the process environment, or the project-root `.env` already holds a value, `qwed init` reuses it verbatim. Rotating this secret invalidates every stored API-key lookup digest, so the CLI will not do it for you.
+- **Refuses to persist an unbootable value.** If the existing `QWED_API_KEY_LOOKUP_SECRET` equals `QWED_JWT_SECRET_KEY`, `qwed init` exits with an error instead of writing a value the server would refuse to start with. Remove the offending line (a fresh distinct value is generated) or set a distinct value manually.
+- **Stale-secret guard around the local server.** If `qwed init` regenerates a missing secret but a QWED server is already running with older values, the CLI stops before bootstrapping a new API key — issuing one against a server that cannot verify it would produce a key that dies on the next restart.
+
+See [`qwed init`](/advanced/cli#qwed-init-onboarding-and-bootstrap) and [API key storage and migration](/api/authentication#api-key-storage-and-migration-v7-2) for the full contract.
+
+---
+
 ## QWED-A2A — `/a2a/intercept` requires per-agent API keys (breaking)
 
 **Released: September 9, 2026** · [GitHub PR #106](https://github.com/qwed-ai/qwed-a2a/pull/106)
