@@ -55,7 +55,7 @@ QWED API keys use a fixed prefix followed by a fixed-length body. The prefix tel
 | v2 | Current, checksummed | `qwed_live_[A-Za-z0-9]{36}` | 30 random Base62 characters (~178.6 bits of entropy) followed by a 6-character checksum |
 | v1 | Legacy, still accepted | `qwed_live_[A-Za-z0-9_-]{43}` | 43 base64url characters (32 random bytes, padding stripped, 256 bits of entropy). No checksum. |
 
-QWED issues new keys in the v2 format. Existing v1 keys keep working and are never force-rotated.
+QWED issues new keys in the v2 format. Existing v1 keys keep working and are never force-rotated. `qwed_test_` keys use the same body versions; a test key can be a structurally valid v2 (checksummed) key, so treat the prefix—not the shape—as the production/non-production signal.
 
 The v2 checksum is CRC32 (IEEE, as in `zlib`) over the ASCII encoding of the first 30 body characters. QWED Base62-encodes the result with the alphabet `0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz` and zero-pads it to a width of 6. You can validate a v2 key offline: split the body into the first 30 and last 6 characters, recompute the checksum, and accept only on an exact match. This reduces random false-positive matches to about 2^-32 without a database call.
 
@@ -127,7 +127,7 @@ qwed_live_********************************wDHo
 Scanner and SDK authors can consume the canonical format directly:
 
 - [`spec/api-key-format.json`](https://github.com/QWED-AI/qwed-verification/blob/main/spec/api-key-format.json): prefixes, full and anchored patterns, checksum parameters, and excluded prefixes.
-- [`spec/api-key-test-vectors.json`](https://github.com/QWED-AI/qwed-verification/blob/main/spec/api-key-test-vectors.json): synthetic, non-functional valid and invalid keys with expected classifications (`v2`, `v1`, or `invalid`). None of these values authenticate.
+- [`spec/api-key-test-vectors.json`](https://github.com/QWED-AI/qwed-verification/blob/main/spec/api-key-test-vectors.json): synthetic, non-functional valid and invalid keys with expected classifications (`v2`, `v1`, `invalid`, or `excluded` for test-prefix keys that are shape-valid but must never alert). None of these values authenticate.
 - [`docs/API_KEY_FORMAT.md`](https://github.com/QWED-AI/qwed-verification/blob/main/docs/API_KEY_FORMAT.md): the human-readable specification.
 
 Run your validator against every vector before shipping.
