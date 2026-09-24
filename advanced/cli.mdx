@@ -93,7 +93,7 @@ Step 3/3: Generate QWED API Key
   [ok] Server identity verified
   [ok] Organization created
 
-  Your API key: qwed_xxxxxxxxxxxxxxxx
+  Your API key: qwed_live_xxxxxxxx...xxxxxxx
   Warning: Save this key. It is shown only once.
 
 -----------------------------------------
@@ -101,7 +101,7 @@ QWED is ready.
 
 Verify an output:
   curl -X POST http://localhost:8000/verify/math \
-    -H "x-api-key: qwed_xxxxxxxxxxxxxxxx" \
+    -H "x-api-key: qwed_live_xxxxxxxx...xxxxxxx" \
     -H "Content-Type: application/json" \
     -d '{"expression": "2+2=4"}'
 
@@ -159,12 +159,12 @@ Before bootstrapping an API key, `qwed init` proves that the server answering on
 
 The handshake runs on both paths: when `qwed init` reuses an already-running server, and when it spawns a fresh one.
 
-1. `qwed init` generates a fresh random nonce for each run.
+1. `qwed init` generates a fresh random nonce for each run (24 random bytes, URL-safe Base64).
 2. It calls [`GET /health/identity`](/api/endpoints#get-health-identity) with that nonce.
 3. The server returns HMAC-SHA256 proofs over the nonce, one under `QWED_JWT_SECRET_KEY` and one under `QWED_API_KEY_LOOKUP_SECRET`.
 4. `qwed init` computes the expected proofs from its local secrets and compares them in constant time.
 
-The secrets themselves never leave the server. Because each proof is bound to a one-time nonce, a captured response cannot be replayed in a later handshake.
+The secrets themselves never leave the server. Because each proof is bound to a one-time nonce, a captured response cannot be replayed in a later handshake. A narrow residual race is accepted by design: a local process that rebinds the port in the moment between the proof and the bootstrap can bypass the check, but an attacker able to do that already reads this project's secrets at rest, which is outside the accidental-staleness threat model this handshake addresses.
 
 The handshake fails closed. `qwed init` prints `[x] Server identity check failed: <reason>`, exits with status `1`, and does not bootstrap a key when:
 
