@@ -8,7 +8,7 @@ How to authenticate with the QWED API.
 
 ## API keys
 
-All requests require an API key.
+All requests require an API key, except `GET /health` and `GET /health/identity`, which are unauthenticated by design — `qwed init` calls the identity endpoint before it has a key to send.
 
 ### Header authentication
 

@@ -18,7 +18,7 @@ http://localhost:8000
 
 ## Authentication
 
-All requests require an API key:
+All verification requests require an API key. The health endpoints (`GET /health`, `GET /health/identity`) are unauthenticated by design:
 
 ```bash
 curl -H "X-API-Key: qwed_your_key" https://api.qwedai.com/v1/health
@@ -29,6 +29,7 @@ curl -H "X-API-Key: qwed_your_key" https://api.qwedai.com/v1/health
 | Method | Endpoint | Description |
 | --- | --- | --- |
 | GET | `/health` | Health check (no auth required) |
+| GET | `/health/identity` | Server identity handshake for `qwed init` (no auth required) |
 | POST | `/verify/natural_language` | Natural language verification |
 | POST | `/verify/math` | Math expression/equation verification |
 | POST | `/verify/logic` | Logic constraint verification |
