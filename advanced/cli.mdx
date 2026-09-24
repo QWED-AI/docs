@@ -93,7 +93,7 @@ Step 3/3: Generate QWED API Key
   [ok] Server identity verified
   [ok] Organization created
 
-  Your API key: qwed_live_xxxxxxxx...xxxxxxx
+  Your API key: qwed_live_********************************wDHo
   Warning: Save this key. It is shown only once.
 
 -----------------------------------------
@@ -101,13 +101,15 @@ QWED is ready.
 
 Verify an output:
   curl -X POST http://localhost:8000/verify/math \
-    -H "x-api-key: qwed_live_xxxxxxxx...xxxxxxx" \
+    -H "x-api-key: qwed_live_********************************wDHo" \
     -H "Content-Type: application/json" \
     -d '{"expression": "2+2=4"}'
 
 Documentation: https://docs.qwedai.com
 -----------------------------------------
 ```
+
+The key above is shown in QWED's documented [masked form](/api/authentication#masking-keys) — a real `qwed init` run prints the full v2 key (`qwed_live_` + 36 characters) once, at that moment.
 
 #### Non-interactive mode (CI/CD)
 
