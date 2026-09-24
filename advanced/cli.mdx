@@ -171,9 +171,9 @@ The handshake fails closed. `qwed init` prints `[x] Server identity check failed
 | Condition | Remediation |
 |---|---|
 | Local `QWED_JWT_SECRET_KEY` or `QWED_API_KEY_LOOKUP_SECRET` is empty | Re-run `qwed init` so fresh secrets are generated and persisted |
-| The identity endpoint is unreachable | Restart the local server, then re-run `qwed init` |
+| The identity endpoint is unreachable | Start (or restart) the local server, then re-run `qwed init` |
 | The server returns `404` — an older server without the endpoint | Upgrade the server to a version that exposes `GET /health/identity`, then re-run `qwed init` |
-| The server returns `503` — it is running with no secrets configured | Set `QWED_JWT_SECRET_KEY` and `QWED_API_KEY_LOOKUP_SECRET` in the server's environment, then re-run `qwed init` |
+| The server returns `503` — it is running with no secrets configured | Set `QWED_JWT_SECRET_KEY` and `QWED_API_KEY_LOOKUP_SECRET` in the server's environment, restart the server so it loads them, then re-run `qwed init` |
 | The server returns any other non-`200` status | Restart the local server, then re-run `qwed init` |
 | The response body is malformed | Restart the local server, then re-run `qwed init` |
 | One or both proofs don't match | Restart the server so it loads this project's `.env` secrets, then re-run `qwed init` |
