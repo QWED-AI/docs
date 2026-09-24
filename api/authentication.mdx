@@ -93,6 +93,7 @@ If you build a secret scanner, leak detector, or pre-commit hook, use these rule
 - **Match only `qwed_live_`.** Exclude `qwed_test_` from high-confidence production-secret matching. QWED's revocation pipeline never acts on test keys.
 - **Anchor with lookarounds, not `\b`.** A v1 body can end in `-`, which no word boundary borders. Use charset-complement lookarounds so a match ends exactly where the body alphabet stops.
 - **Post-process v2 matches.** Recompute the checksum and discard matches that fail. For v1, enforce the exact shape only.
+- **With the RE2 patterns below, use the capture group.** Send group 1 as the token and resume scanning after it; the whole match includes surrounding delimiter characters.
 
 ```text
 # v2 (current)
@@ -102,14 +103,14 @@ If you build a secret scanner, leak detector, or pre-commit hook, use these rule
 (?<![A-Za-z0-9_-])qwed_live_[A-Za-z0-9_-]{43}(?![A-Za-z0-9_-])
 ```
 
-On regex engines without lookaround support (for example, RE2), use an explicit delimiter class instead:
+On regex engines without lookaround support (for example, RE2), use an explicit delimiter class instead. The key is wrapped in a capture group; the surrounding `(?:^|[^...])` and `(?:[^...]|$)` delimiters match characters that are not part of the key, so always read the match's **group 1** as the token, never the whole match. Submitting the whole match sends one or two extra characters around the key, which breaks checksum validation and the revocation lookup. Group 1 also lets a global scan continue from the end of the key rather than the end of the whole match, so back-to-back keys separated by a single delimiter are not skipped:
 
 ```text
 # v2 (current)
-(?:^|[^A-Za-z0-9])qwed_live_[A-Za-z0-9]{36}(?:[^A-Za-z0-9]|$)
+(?:^|[^A-Za-z0-9])(qwed_live_[A-Za-z0-9]{36})(?:[^A-Za-z0-9]|$)
 
 # v1 (legacy)
-(?:^|[^A-Za-z0-9_-])qwed_live_[A-Za-z0-9_-]{43}(?:[^A-Za-z0-9_-]|$)
+(?:^|[^A-Za-z0-9_-])(qwed_live_[A-Za-z0-9_-]{43})(?:[^A-Za-z0-9_-]|$)
 ```
 
 The registered pattern names are `QWED_LIVE_API_KEY` (v2) and `QWED_LIVE_API_KEY_V1` (v1). QWED receives signed leak reports for these patterns at [`POST /webhooks/secret-scanning`](/api/endpoints#post-webhooks-secret-scanning).
