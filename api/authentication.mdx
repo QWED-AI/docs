@@ -90,7 +90,7 @@ def is_valid_v2(key: str) -> bool:
 
 If you build a secret scanner, leak detector, or pre-commit hook, use these rules:
 
-- **Match only `qwed_live_`.** Exclude `qwed_test_` from high-confidence production-secret matching. QWED's revocation pipeline never acts on test keys.
+- **Match only `qwed_live_`.** Exclude `qwed_test_` from high-confidence production-secret matching. Registered scanner patterns require the `qwed_live_` prefix, so test keys are never reported to QWED; the revocation sink itself applies no prefix filter.
 - **Anchor with lookarounds, not `\b`.** A v1 body can end in `-`, which no word boundary borders. Use charset-complement lookarounds so a match ends exactly where the body alphabet stops.
 - **Post-process v2 matches.** Recompute the checksum and discard matches that fail. For v1, enforce the exact shape only.
 - **With the RE2 patterns below, use the capture group.** Send group 1 as the token and resume scanning after it; the whole match includes surrounding delimiter characters.
