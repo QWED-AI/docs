@@ -29,7 +29,7 @@ The wizard runs three steps:
 
 1. **Engine readiness** — checks that core verification engines (SymPy, Z3, AST, SQLGlot) are installed, then runs deterministic smoke tests to confirm they work correctly
 2. **LLM provider setup** — select a provider, enter credentials with masked input, validate the key format, and test the connection with retry support
-3. **API key bootstrap** — starts a local QWED server, creates an organization, and generates a one-time API key you can use immediately
+3. **API key bootstrap** — starts a local QWED server, verifies the server's identity, creates an organization, and generates a one-time API key you can use immediately
 
 **Supported providers:**
 
@@ -90,9 +90,10 @@ Step 3/3: Generate QWED API Key
 -----------------------------------------
   Starting local server...
   [ok] Local server initialized
+  [ok] Server identity verified
   [ok] Organization created
 
-  Your API key: qwed_xxxxxxxxxxxxxxxx
+  Your API key: qwed_live_********************************wDHo
   Warning: Save this key. It is shown only once.
 
 -----------------------------------------
@@ -100,13 +101,15 @@ QWED is ready.
 
 Verify an output:
   curl -X POST http://localhost:8000/verify/math \
-    -H "x-api-key: qwed_xxxxxxxxxxxxxxxx" \
+    -H "x-api-key: qwed_live_********************************wDHo" \
     -H "Content-Type: application/json" \
     -d '{"expression": "2+2=4"}'
 
 Documentation: https://docs.qwedai.com
 -----------------------------------------
 ```
+
+The key above is shown in QWED's documented [masked form](/api/authentication#masking-keys) — a real `qwed init` run prints the full v2 key (`qwed_live_` + 36 characters) once, at that moment.
 
 #### Non-interactive mode (CI/CD)
 
@@ -151,6 +154,35 @@ The server process starts with its working directory set to this runtime directo
 <Note>
 If you previously encountered `sqlite3.OperationalError: attempt to write a readonly database` during `qwed init`, upgrade to v4.0.0 or later. The fix automatically resolves a writable directory so Step 3 succeeds regardless of where you run the command.
 </Note>
+
+**Server identity handshake:**
+
+Before bootstrapping an API key, `qwed init` proves that the server answering on `--server-url` holds this project's secrets. A healthy `GET /health` only shows that something answers on the port. A foreign process, or a stale QWED server started with older secret values, would otherwise receive the bootstrap request and issue a key that the intended server cannot resolve after a restart.
+
+The handshake runs on both paths: when `qwed init` reuses an already-running server, and when it spawns a fresh one.
+
+1. `qwed init` generates a fresh random nonce for each run (24 random bytes, URL-safe Base64).
+2. It calls [`GET /health/identity`](/api/endpoints#get-health-identity) with that nonce.
+3. The server returns HMAC-SHA256 proofs over the nonce, one under `QWED_JWT_SECRET_KEY` and one under `QWED_API_KEY_LOOKUP_SECRET`.
+4. `qwed init` computes the expected proofs from its local secrets and compares them in constant time.
+
+The secrets themselves never leave the server. Because each proof is bound to a one-time nonce, a captured response cannot be replayed in a later handshake. A narrow residual race is accepted by design: a local process that binds the port after it is released between the proof and the bootstrap could receive the key without holding either secret. Defending against that active local attacker is out of scope — the handshake addresses accidental staleness — so bootstrap only on hosts you control.
+
+The handshake fails closed. `qwed init` prints `[x] Server identity check failed: <reason>`, exits with status `1`, and does not bootstrap a key when:
+
+| Condition | Remediation |
+|---|---|
+| Local `QWED_JWT_SECRET_KEY` or `QWED_API_KEY_LOOKUP_SECRET` is empty | Re-run `qwed init` so fresh secrets are generated and persisted |
+| The identity endpoint is unreachable | Start (or restart) the local server, then re-run `qwed init` |
+| The server returns `404` — an older server without the endpoint | Upgrade the server to a version that exposes `GET /health/identity`, then re-run `qwed init` |
+| The server returns `503` — it is running with no secrets configured | Set `QWED_JWT_SECRET_KEY` and `QWED_API_KEY_LOOKUP_SECRET` in the server's environment, restart the server so it loads them, then re-run `qwed init` |
+| The server returns any other non-`200` status | Restart the local server, then re-run `qwed init` |
+| The response body is malformed | Restart the local server, then re-run `qwed init` |
+| One or both proofs don't match | Restart the server so it loads this project's `.env` secrets, then re-run `qwed init` |
+
+<Warning>
+Never bootstrap API keys against a server you don't recognize. If the identity check fails, stop whatever process holds the port before you re-run `qwed init`.
+</Warning>
 
 **Security guarantees:**
 

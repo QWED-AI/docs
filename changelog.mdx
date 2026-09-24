@@ -5,7 +5,24 @@ description: "Release notes for the QWED Protocol: version history, new guards, 
 
 All notable changes to the QWED platform, listed by release.
 
-Jump to: [Leaked key auto-revocation](#qwed-verification-—-leaked-api-key-auto-revocation-and-false-positive-feedback) · [Signed secret-scanning webhook](#qwed-verification-—-signed-secret-scanning-webhook-endpoint) · [v7.2.1](#v7-2-1-—-math-answer-comparison-security-patch) · [v7.2.0](#v7-2-0-—-precision-advisory-and-security-hardening-batch) · [v7.1.0](#v7-1-0-—-verification-context-v1-0-rollout) · [v7.0.0](#v7-0-0-—-full-diagnosticresult-engine-conformance)
+Jump to: [`qwed init` server identity handshake](#qwed-verification-—-qwed-init-server-identity-handshake) · [Leaked key auto-revocation](#qwed-verification-—-leaked-api-key-auto-revocation-and-false-positive-feedback) · [API-key format spec](#qwed-verification-—-canonical-api-key-format-spec) · [Signed secret-scanning webhook](#qwed-verification-—-signed-secret-scanning-webhook-endpoint) · [v7.2.1](#v7-2-1-—-math-answer-comparison-security-patch) · [v7.2.0](#v7-2-0-—-precision-advisory-and-security-hardening-batch) · [v7.1.0](#v7-1-0-—-verification-context-v1-0-rollout) · [v7.0.0](#v7-0-0-—-full-diagnosticresult-engine-conformance)
+
+---
+
+## QWED Verification — `qwed init` server identity handshake
+
+**Released: September 23, 2026** · [GitHub PR #388](https://github.com/QWED-AI/qwed-verification/pull/388) · Closes [issue #376](https://github.com/QWED-AI/qwed-verification/issues/376)
+
+> `qwed init` now proves that the local server holds this project's secrets before it bootstraps an API key. Previously, a healthy `/health` only proved that something answered on the port. A foreign process or a stale server running older secret values could receive the bootstrap and issue a key that stops working after a restart.
+
+### What changed
+
+- **New `GET /health/identity` endpoint.** Takes a caller-supplied `nonce` (1–128 characters) and returns HMAC-SHA256 proofs over it under `QWED_JWT_SECRET_KEY` and `QWED_API_KEY_LOOKUP_SECRET`. Returns `400` for a missing or oversized nonce and `503` when server secrets aren't configured. The secrets never leave the server. See [`GET /health/identity`](/api/endpoints#get-health-identity).
+- **Nonce-bound, replay-safe handshake.** `qwed init` generates a fresh nonce on every run and compares the proofs against locally computed values in constant time. A captured response is useless for any later handshake.
+- **Runs on reused and freshly spawned servers.** A reused server can be foreign or stale even when secrets were retained. A fresh spawn can lose a port race after the health poll.
+- **Fails closed.** A mismatch, a `404` from an older server, any other non-`200` status, a malformed response, an unreachable server, or missing local secrets stops `qwed init` with exit status `1` before any key is issued. Each message tells you to restart the local server or re-run `qwed init`.
+
+See [`qwed init`](/advanced/cli#qwed-init-onboarding-and-bootstrap) and [troubleshooting](/troubleshooting#qwed-init-fails-with-server-identity-check-failed).
 
 ---
 
@@ -19,10 +36,29 @@ Jump to: [Leaked key auto-revocation](#qwed-verification-—-leaked-api-key-auto
 
 - **Automatic revocation.** A verified match against an active key sets `is_active=False` and `revoked_at`, and writes a `SECRET_LEAK_AUTO_REVOKED` security event. The event records only the `key_preview`. The plaintext token is never persisted, logged, or emailed.
 - **Owner notification.** QWED emails the key's user, falling back to the organization's first active owner or admin. SMTP phases time out after 10 seconds. Revocation is committed first and is never rolled back if notification fails.
-- **Idempotent handling.** Already-revoked keys and unknown tokens are not acted on. Redelivered or concurrent reports revoke and notify exactly once. `qwed_test_` keys are excluded from scanning and never acted on.
+- **Idempotent handling.** Already-revoked keys and unknown tokens are not acted on. Redelivered or concurrent reports revoke and notify exactly once. Registered scanner patterns cover `qwed_live_` keys only, so `qwed_test_` keys are never reported.
 - **False-positive feedback reporter (opt-in).** Set `QWED_LEAK_FEEDBACK_ENABLED=true` and `QWED_LEAK_FEEDBACK_URL` to POST one label per match after the revocation attempt. Items carry SHA-256 token hashes by default. `QWED_LEAK_FEEDBACK_SEND_RAW=true` is a separate explicit opt-in to send plaintext tokens, and only works with an HTTPS URL.
 
 See [Security hardening — Automatic revocation of leaked keys](/advanced/security-hardening#automatic-revocation-of-leaked-keys) for the full behavior and configuration.
+
+---
+
+## QWED Verification — canonical API-key format spec
+
+**Released: September 22, 2026** · [GitHub PR #387](https://github.com/QWED-AI/qwed-verification/pull/387) · Closes [issue #370](https://github.com/QWED-AI/qwed-verification/issues/370)
+
+> QWED now publishes a canonical, machine-readable specification of its API-key formats, with lookaround-anchored scanning regexes and synthetic test vectors. Use it to build secret scanners, leak detectors, and SDK-side format validators.
+
+### What changed
+
+- **v2 checksummed format documented.** Current keys match `qwed_live_[A-Za-z0-9]{36}`: 30 random Base62 characters followed by a 6-character Base62 CRC32 checksum that you can validate offline.
+- **Legacy v1 still accepted.** Keys matching `qwed_live_[A-Za-z0-9_-]{43}` keep working and are never force-rotated.
+- **`qwed_test_` exclusion.** Scanners must exclude test keys from high-confidence production-secret matching.
+- **Lookaround-anchored regexes.** Published patterns use charset-complement lookarounds instead of `\b`, because a v1 body can end in `-`. RE2-compatible delimiter-class alternatives are included.
+- **Masking guidance.** Masked previews show the prefix, asterisks, and only the last 4 characters.
+- **Machine-readable spec and test vectors.** `spec/api-key-format.json` and `spec/api-key-test-vectors.json` in the `qwed-verification` repository.
+
+See [API key format](/api/authentication#api-key-format) for patterns, checksum details, and scanning rules.
 
 ---
 

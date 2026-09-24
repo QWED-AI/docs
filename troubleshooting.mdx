@@ -145,6 +145,32 @@ qwed init
 
 ---
 
+### `qwed init` fails with "Server identity check failed"
+
+```text
+  [x] Server identity check failed: server identity check failed: the running server holds a different jwt and lookup secret(s) than this project. ...
+```
+
+This error occurs during Step 3 of `qwed init`. Before bootstrapping an API key, the CLI asks the server on `--server-url` to prove it holds this project's `QWED_JWT_SECRET_KEY` and `QWED_API_KEY_LOOKUP_SECRET` through [`GET /health/identity`](/api/endpoints#get-health-identity). The check fails closed in any of these cases:
+
+- The proofs don't match.
+- The server returns `404` (an older server without the endpoint) or another non-`200` status.
+- The response is malformed.
+- The server is unreachable.
+- The local secrets are missing.
+
+**Solution** — the first step depends on which reason the message reports:
+
+- **"...holds a different jwt and/or lookup secret(s)..."** — a stale QWED server (started with different secrets) or an unrelated process is listening on the port. Stop that process, then re-run `qwed init`; it starts a fresh server with the secrets from your `.env`.
+- **"...the server did not prove its secrets..." (non-`200`)** — a `404` means the server predates this endpoint: upgrade it. A `503` means the intended server is running with no secrets configured: set `QWED_JWT_SECRET_KEY` and `QWED_API_KEY_LOOKUP_SECRET` in its environment, then restart. Any other status can indicate a foreign listener: stop whatever holds the port and re-run `qwed init`.
+- **"...could not reach the identity endpoint..."** — no server is listening (or it died after the health check), or `--server-url` points at the wrong host/port. Re-run `qwed init` so it starts a fresh server, or point `--server-url` at the running one.
+- **"...unreadable identity response..."** — a live-but-broken server is answering, and a plain re-run of `qwed init` reuses a healthy-looking running server, so the same check fails again. Stop or restart the responding process, then re-run `qwed init`.
+- **Local secrets are missing** — re-run `qwed init`; it generates and persists fresh secrets before the handshake.
+
+See [`qwed init`](/advanced/cli#qwed-init-onboarding-and-bootstrap).
+
+---
+
 ## Gemini provider issues
 
 ### Missing `google-generativeai` package

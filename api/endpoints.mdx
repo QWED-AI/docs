@@ -31,6 +31,48 @@ curl https://api.qwedai.com/v1/health
 }
 ```
 
+### GET /health/identity
+
+Challenge-response proof that the server holds a given secret set. `qwed init` calls this endpoint before bootstrapping an API key to confirm it's talking to the right local server. See [`qwed init`](/advanced/cli#qwed-init-onboarding-and-bootstrap). No authentication required.
+
+**Query parameters:**
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `nonce` | string | Yes | Caller-generated random value, 1–128 characters. Use a fresh nonce for every request. |
+
+```bash
+# Fresh random value per request, e.g. Python's secrets.token_urlsafe(24)
+curl http://localhost:8000/health/identity?nonce=Vh8Qm2xT-0pLw6KdYs3rZbNf_5JtAe1X
+```
+
+**Response:**
+
+```json
+{
+  "identity": {
+    "jwt_hmac": "9f2c...e41a",
+    "lookup_hmac": "b07d...5c13"
+  }
+}
+```
+
+| Field | Description |
+|-------|-------------|
+| `identity.jwt_hmac` | Hex HMAC-SHA256 under `QWED_JWT_SECRET_KEY` of the message `qwed-server-identity-v1:jwt:<nonce>` |
+| `identity.lookup_hmac` | Hex HMAC-SHA256 under `QWED_API_KEY_LOOKUP_SECRET` of the message `qwed-server-identity-v1:lookup:<nonce>` |
+
+To verify, compute the same HMACs with your local secrets and compare them in constant time. The secrets themselves are never returned.
+
+**Error responses:**
+
+| Status | Detail | Cause |
+|--------|--------|-------|
+| `400` | `nonce is required (max 128 characters)` | `nonce` is missing, empty, or longer than 128 characters |
+| `503` | `server secrets not configured` | The server has no `QWED_JWT_SECRET_KEY` or `QWED_API_KEY_LOOKUP_SECRET` set |
+
+Servers released before this endpoint existed return `404`.
+
 ---
 
 ## Verification endpoints
