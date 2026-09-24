@@ -1395,6 +1395,16 @@ A non-empty JSON array of match objects. Extra fields on each item are ignored s
 
 A 200 acknowledges a **verified receipt**, not that downstream revocation has finished. Verified matches are handed to a background sink after the response is sent.
 
+**Background handling of verified matches:**
+
+- **Active key:** revoked immediately (`is_active=False`, `revoked_at` set). QWED writes a `SECRET_LEAK_AUTO_REVOKED` security event that carries only the `key_preview`, never the token.
+- **Owner email:** sent to the key's user, or to the organization's first active owner or admin as a fallback. SMTP has a 10-second timeout. A failed notification never rolls back the revocation.
+- **Already-revoked key or unknown token:** no revocation or owner notification. Redeliveries are idempotent and never send a second email. When false-positive feedback is enabled (next bullet), QWED still reports a label for the match — for an unknown token, `false_positive`.
+- **Test keys:** registered scanner patterns cover `qwed_live_` keys only, so `qwed_test_` keys are not reported. The revocation sink itself does not filter by prefix.
+- **False-positive feedback (opt-in):** when `QWED_LEAK_FEEDBACK_ENABLED=true`, QWED sends a `true_positive` or `false_positive` label per match to `QWED_LEAK_FEEDBACK_URL` after the revocation attempt. Items carry SHA-256 token hashes unless `QWED_LEAK_FEEDBACK_SEND_RAW=true` is set with an HTTPS URL.
+
+See [Automatic revocation of leaked keys](/advanced/security-hardening#automatic-revocation-of-leaked-keys) and [False-positive feedback reporter](/advanced/security-hardening#false-positive-feedback-reporter) for details.
+
 **Status codes:**
 
 | Status | Meaning |

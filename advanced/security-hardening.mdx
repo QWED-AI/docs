@@ -400,6 +400,67 @@ The endpoint works with no configuration — QWED fetches GitHub's public keys a
 
 Neither token grants any authority on the incoming request; only the ECDSA signature does.
 
+### Automatic revocation of leaked keys
+
+After a report passes signature verification, QWED returns `200` to the scanner and processes the verified matches in the background. For each reported token, QWED computes the API-key lookup digest and acts on the result:
+
+| Lookup result | What QWED does |
+|---------------|----------------|
+| Active key found | Revokes the key immediately: sets `is_active=False` and `revoked_at` to the current UTC time. Writes a `SECRET_LEAK_AUTO_REVOKED` security event (severity `high`) and emails the key owner. |
+| Key already revoked | No-op. The key is not revoked again and the owner is not emailed again. |
+| No matching key | No action. The match is counted as a candidate false positive. |
+
+Handling is idempotent. If the same leak is redelivered, or two deliveries race, exactly one revokes the key and sends the email. The other is treated as already revoked. Scanners report only `qwed_live_` keys — the [API key format spec](/api/authentication#api-key-format) excludes `qwed_test_` keys from detection — so test keys never reach revocation. The revocation sink itself does not filter by prefix.
+
+Revoked keys stop authenticating right away. The owner must issue a replacement key and rotate every service that used the old one.
+
+**Audit trail.** The `SECRET_LEAK_AUTO_REVOKED` security event records the key's `key_preview`, the scanner `source`, and the reported URL. The plaintext token is never written to the database, logs, or email. If the scanner echoes the token inside the URL or other metadata, QWED redacts it to `[REDACTED]` first.
+
+**Owner notification.** QWED sends the email to the user who owns the key. If that user is inactive or has no email address, QWED falls back to the first active `owner` or `admin` of the key's organization. The email subject is `[QWED Security] QWED API key auto-revoked after public exposure`. The body includes the key preview, key name, where the key was found, and the report source. Notification uses the SMTP settings from `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, and `SMTP_PASSWORD`, with a 10-second timeout on every SMTP phase. Owner emails are never throttled, because each revocation is a distinct event.
+
+<Warning>
+Revocation is committed before the notification is attempted. If SMTP is not configured, no owner can be resolved, or delivery fails or times out, QWED logs the failure and the key stays revoked. A notification failure never rolls back a revocation.
+</Warning>
+
+Each revocation is committed separately, so one failing row cannot undo revocations for other keys in the same batch. If any row fails, QWED still processes the remaining matches, then logs the batch as failed.
+
+### False-positive feedback reporter
+
+QWED can report a label for each verified match back to the scanning service. Scanners use these labels to improve detection quality over time. The reporter is opt-in and disabled by default.
+
+A match is labeled `true_positive` when its lookup digest matches a real API key (active or revoked), and `false_positive` when nothing matches. QWED computes the labels with a single read-only lookup before revocation. It sends them after the revocation step, whether that step succeeded or failed. The feedback request never delays revocation. It uses a 5-second timeout, and delivery failures are logged and dropped.
+
+By default, each item carries the SHA-256 hash of the token, never the plaintext:
+
+```json
+[
+  {
+    "token_type": "qwed_live_api_key",
+    "label": "true_positive",
+    "token_hash": "<sha256 hex digest of the leaked token>"
+  }
+]
+```
+
+Each item contains either `token_hash` or `token_raw`, never both.
+
+| Environment Variable | Default | Description |
+|----------------------|---------|-------------|
+| `QWED_LEAK_FEEDBACK_ENABLED` | `false` | Set to `true` to turn on the feedback reporter. |
+| `QWED_LEAK_FEEDBACK_URL` | empty | Endpoint that receives the labeled matches as a JSON `POST`. If the reporter is enabled but this is unset, QWED logs a warning and drops the batch. |
+| `QWED_LEAK_FEEDBACK_SEND_RAW` | `false` | Set to `true` to send the plaintext token in `token_raw` instead of `token_hash`. Only takes effect with an `https://` feedback URL. Over any other scheme, QWED drops the batch. |
+
+```bash
+QWED_LEAK_FEEDBACK_ENABLED=true
+QWED_LEAK_FEEDBACK_URL=https://scanner.example.com/feedback
+# Leave unset to send SHA-256 hashes only (recommended)
+# QWED_LEAK_FEEDBACK_SEND_RAW=true
+```
+
+<Note>
+Raw mode transmits live secrets back out of your deployment. Enable `QWED_LEAK_FEEDBACK_SEND_RAW` only when the receiving scanner requires plaintext tokens. In raw mode, QWED emits no feedback log lines, so delivery results are not logged.
+</Note>
+
 See the [`POST /webhooks/secret-scanning`](/api/endpoints#post-webhooks-secret-scanning) reference for the request/response contract and the full status-code table.
 
 ---
