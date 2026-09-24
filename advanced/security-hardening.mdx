@@ -410,7 +410,7 @@ After a report passes signature verification, QWED returns `200` to the scanner 
 | Key already revoked | No-op. The key is not revoked again and the owner is not emailed again. |
 | No matching key | No action. The match is counted as a candidate false positive. |
 
-Handling is idempotent. If the same leak is redelivered, or two deliveries race, exactly one revokes the key and sends the email. The other is treated as already revoked. Test keys with the `qwed_test_` prefix are excluded from scanning, so they never trigger revocation.
+Handling is idempotent. If the same leak is redelivered, or two deliveries race, exactly one revokes the key and sends the email. The other is treated as already revoked. Scanners report only `qwed_live_` keys — the [API key format spec](/api/authentication#api-key-format) excludes `qwed_test_` keys from detection — so test keys never reach revocation. The revocation sink itself does not filter by prefix.
 
 Revoked keys stop authenticating right away. The owner must issue a replacement key and rotate every service that used the old one.
 
@@ -437,7 +437,7 @@ By default, each item carries the SHA-256 hash of the token, never the plaintext
   {
     "token_type": "qwed_live_api_key",
     "label": "true_positive",
-    "token_hash": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"
+    "token_hash": "<sha256 hex digest of the leaked token>"
   }
 ]
 ```
