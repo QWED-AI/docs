@@ -42,8 +42,8 @@ Challenge-response proof that the server holds a given secret set. `qwed init` c
 | `nonce` | string | Yes | Caller-generated random value, 1–128 characters. Use a fresh nonce for every request. |
 
 ```bash
-# Use fresh random bytes per request, e.g. Python's secrets.token_urlsafe(24)
-curl "http://localhost:8000/health/identity?nonce=example-nonce-replace-me"
+# Fresh random value per request, e.g. Python's secrets.token_urlsafe(24)
+curl http://localhost:8000/health/identity?nonce=Vh8Qm2xT-0pLw6KdYs3rZbNf_5JtAe1X
 ```
 
 **Response:**

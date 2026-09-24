@@ -159,12 +159,14 @@ This error occurs during Step 3 of `qwed init`. Before bootstrapping an API key,
 - The server is unreachable.
 - The local secrets are missing.
 
-**Solution:**
+**Solution** — the first step depends on which reason the message reports:
 
-1. Stop the process currently listening on the server port. It's either a stale QWED server started with different secrets or an unrelated process.
-2. Re-run `qwed init`. It starts a fresh server with the secrets from your `.env`.
+- **"...holds a different jwt and/or lookup secret(s)..."** — a stale QWED server (started with different secrets) or an unrelated process is listening on the port. Stop that process, then re-run `qwed init`; it starts a fresh server with the secrets from your `.env`.
+- **"...the server did not prove its secrets..." (non-`200`)** — a `404` means the server predates this endpoint: upgrade it. A `503` means the intended server is running with no secrets configured: set `QWED_JWT_SECRET_KEY` and `QWED_API_KEY_LOOKUP_SECRET` in its environment, then restart. Any other status can indicate a foreign listener: stop whatever holds the port and re-run `qwed init`.
+- **"...could not reach the identity endpoint..."** — no server is listening (or it died after the health check), or `--server-url` points at the wrong host/port. Re-run `qwed init` so it starts a fresh server, or point `--server-url` at the running one.
+- **"...unreadable identity response..." or local secrets missing** — re-run `qwed init`; it regenerates and persists fresh secrets and starts a fresh server.
 
-If the message says local secrets are missing, re-run `qwed init` so it generates and persists fresh secrets. See [`qwed init`](/advanced/cli#qwed-init-onboarding-and-bootstrap).
+See [`qwed init`](/advanced/cli#qwed-init-onboarding-and-bootstrap).
 
 ---
 

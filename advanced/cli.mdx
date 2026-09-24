@@ -164,7 +164,7 @@ The handshake runs on both paths: when `qwed init` reuses an already-running ser
 3. The server returns HMAC-SHA256 proofs over the nonce, one under `QWED_JWT_SECRET_KEY` and one under `QWED_API_KEY_LOOKUP_SECRET`.
 4. `qwed init` computes the expected proofs from its local secrets and compares them in constant time.
 
-The secrets themselves never leave the server. Because each proof is bound to a one-time nonce, a captured response cannot be replayed in a later handshake. A narrow residual race is accepted by design: a local process that rebinds the port in the moment between the proof and the bootstrap can bypass the check, but an attacker able to do that already reads this project's secrets at rest, which is outside the accidental-staleness threat model this handshake addresses.
+The secrets themselves never leave the server. Because each proof is bound to a one-time nonce, a captured response cannot be replayed in a later handshake. A narrow residual race is accepted by design: a local process that binds the port after it is released between the proof and the bootstrap could receive the key without holding either secret. Defending against that active local attacker is out of scope — the handshake addresses accidental staleness — so bootstrap only on hosts you control.
 
 The handshake fails closed. `qwed init` prints `[x] Server identity check failed: <reason>`, exits with status `1`, and does not bootstrap a key when:
 
@@ -172,7 +172,9 @@ The handshake fails closed. `qwed init` prints `[x] Server identity check failed
 |---|---|
 | Local `QWED_JWT_SECRET_KEY` or `QWED_API_KEY_LOOKUP_SECRET` is empty | Re-run `qwed init` so fresh secrets are generated and persisted |
 | The identity endpoint is unreachable | Restart the local server, then re-run `qwed init` |
-| The server returns a non-`200` status, such as `404` from an older server without the endpoint or `503` from a server with no secrets configured | Restart the local server, then re-run `qwed init` |
+| The server returns `404` — an older server without the endpoint | Upgrade the server to a version that exposes `GET /health/identity`, then re-run `qwed init` |
+| The server returns `503` — it is running with no secrets configured | Set `QWED_JWT_SECRET_KEY` and `QWED_API_KEY_LOOKUP_SECRET` in the server's environment, then re-run `qwed init` |
+| The server returns any other non-`200` status | Restart the local server, then re-run `qwed init` |
 | The response body is malformed | Restart the local server, then re-run `qwed init` |
 | One or both proofs don't match | Restart the server so it loads this project's `.env` secrets, then re-run `qwed init` |
 
