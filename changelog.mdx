@@ -5,7 +5,7 @@ description: "Release notes for the QWED Protocol: version history, new guards, 
 
 All notable changes to the QWED platform, listed by release.
 
-Jump to: [`qwed init` server identity handshake](#qwed-verification-—-qwed-init-server-identity-handshake) · [Signed secret-scanning webhook](#qwed-verification-—-signed-secret-scanning-webhook-endpoint) · [v7.2.1](#v7-2-1-—-math-answer-comparison-security-patch) · [v7.2.0](#v7-2-0-—-precision-advisory-and-security-hardening-batch) · [v7.1.0](#v7-1-0-—-verification-context-v1-0-rollout) · [v7.0.0](#v7-0-0-—-full-diagnosticresult-engine-conformance)
+Jump to: [`qwed init` server identity handshake](#qwed-verification-—-qwed-init-server-identity-handshake) · [API-key format spec](#qwed-verification-—-canonical-api-key-format-spec) · [Signed secret-scanning webhook](#qwed-verification-—-signed-secret-scanning-webhook-endpoint) · [v7.2.1](#v7-2-1-—-math-answer-comparison-security-patch) · [v7.2.0](#v7-2-0-—-precision-advisory-and-security-hardening-batch) · [v7.1.0](#v7-1-0-—-verification-context-v1-0-rollout) · [v7.0.0](#v7-0-0-—-full-diagnosticresult-engine-conformance)
 
 ---
 
@@ -23,6 +23,25 @@ Jump to: [`qwed init` server identity handshake](#qwed-verification-—-qwed-ini
 - **Fails closed.** A mismatch, a `404` from an older server, any other non-`200` status, a malformed response, an unreachable server, or missing local secrets stops `qwed init` with exit status `1` before any key is issued. Each message tells you to restart the local server or re-run `qwed init`.
 
 See [`qwed init`](/advanced/cli#qwed-init-onboarding-and-bootstrap) and [troubleshooting](/troubleshooting#qwed-init-fails-with-server-identity-check-failed).
+
+---
+
+## QWED Verification — canonical API-key format spec
+
+**Released: September 22, 2026** · [GitHub PR #387](https://github.com/QWED-AI/qwed-verification/pull/387) · Closes [issue #370](https://github.com/QWED-AI/qwed-verification/issues/370)
+
+> QWED now publishes a canonical, machine-readable specification of its API-key formats, with lookaround-anchored scanning regexes and synthetic test vectors. Use it to build secret scanners, leak detectors, and SDK-side format validators.
+
+### What changed
+
+- **v2 checksummed format documented.** Current keys match `qwed_live_[A-Za-z0-9]{36}`: 30 random Base62 characters followed by a 6-character Base62 CRC32 checksum that you can validate offline.
+- **Legacy v1 still accepted.** Keys matching `qwed_live_[A-Za-z0-9_-]{43}` keep working and are never force-rotated.
+- **`qwed_test_` exclusion.** Scanners must exclude test keys from high-confidence production-secret matching.
+- **Lookaround-anchored regexes.** Published patterns use charset-complement lookarounds instead of `\b`, because a v1 body can end in `-`. RE2-compatible delimiter-class alternatives are included.
+- **Masking guidance.** Masked previews show the prefix, asterisks, and only the last 4 characters.
+- **Machine-readable spec and test vectors.** `spec/api-key-format.json` and `spec/api-key-test-vectors.json` in the `qwed-verification` repository.
+
+See [API key format](/api/authentication#api-key-format) for patterns, checksum details, and scanning rules.
 
 ---
 
