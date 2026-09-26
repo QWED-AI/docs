@@ -170,8 +170,19 @@ Show them:
 4. **Proof Steps** — Symbolic derivation of truth
 5. **Receipt Signature** — Keyed tamper evidence (HMAC)
 
-Receipts carry no embedded `signature` field; `get_signature()` computes
-it on demand from the full receipt and the verifier's key.
+Receipts carry no embedded `signature` field; `get_signature(signing_key)`
+computes it on demand from the full receipt. Export both artifacts so an
+auditor can verify the receipt later:
+
+```python
+from pathlib import Path
+
+signature = receipt.get_signature(signing_key)
+
+# Store the signature beside the exported receipt
+Path("receipt.json").write_text(receipt.to_json())
+Path("receipt.sig").write_text(signature)
+```
 
 ```json
 {
@@ -198,6 +209,11 @@ it on demand from the full receipt and the verifier's key.
   "metadata": {}
 }
 ```
+
+To verify an export later, parse `receipt.json`, recompute
+`receipt.get_signature(signing_key)`, and compare with the stored
+`receipt.sig` using `hmac.compare_digest` as shown in
+[Cryptographic signature](#cryptographic-signature) above.
 
 ---
 
