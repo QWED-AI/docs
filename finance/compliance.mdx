@@ -1,16 +1,16 @@
 ---
 sidebar_position: 3
 title: "Compliance and auditing"
-description: "How QWED-Finance generates cryptographic verification receipts with tamper-proof ES256 signatures and audit trails for SOX, MiFID II, and banking compliance."
+description: "How QWED-Finance generates verification receipts with tamper-evident keyed signatures and audit trails for SOX, MiFID II, and banking compliance."
 ---
 
-QWED-Finance generates **cryptographic proof** of every verification for regulatory compliance.
+QWED-Finance generates a **tamper-evident receipt** for every verification, supporting audit and regulatory workflows.
 
-> "If an AI makes a mistake, the algorithm isn't sued—the bank is. Your `input_hash` and `signature` provide **Non-Repudiation**."
+> "If an AI makes a mistake, the algorithm isn't sued—the bank is. Your `input_hash` and keyed `signature` provide **tamper evidence**."
 
 ## Verification receipts
 
-Every verification generates a tamper-proof receipt:
+Every verification generates a tamper-evident receipt:
 
 ```python
 from qwed_finance import ReceiptGenerator, VerificationEngine
@@ -28,35 +28,52 @@ print(receipt.to_json())
 
 ### Receipt fields
 
+Every field below is part of the signed payload.
+
 | Field | Description | Example |
 | --- | --- | --- |
 | `receipt_id` | Unique identifier | `"a1b2c3d4-..."` |
 | `timestamp` | ISO 8601 UTC | `"2026-01-18T14:30:00Z"` |
 | `input_hash` | SHA-256 of LLM output | `"7f83b1657..."` |
+| `input_preview` | First 100 chars of the input | `"Transaction approved"` |
+| `guard_name` | Guard that ran | `"ComplianceGuard.verify_aml_flag"` |
 | `engine_used` | Verification engine | `"Z3"` |
+| `status` | Outcome: `verified`, `rejected`, `insufficient_data`, `error` | `"verified"` |
 | `verified` | Pass/fail | `true/false` |
+| `computed_value` | Deterministically computed value | `"flag_required=True"` |
+| `llm_value` | LLM output when ≤ 50 chars, else `null` | `"Transaction approved"` |
+| `difference` | `computed_value` vs expected | `null` |
 | `proof_steps` | Symbolic derivation | `["amount=15000", "threshold=10000", "15000>=10000"]` |
+| `formula_used` | Formula applied | `"llm_flagged == flag_required"` |
+| `violations` | Rule violations | `[]` |
+| `metadata` | Extra context | `{"rule": "AML_CTR"}` |
 
 ### Cryptographic signature
 
-Signatures are keyed HMAC-SHA256 over the **full** canonical receipt
-(all fields, sorted compact JSON). The verifier instance holds the key;
-there is no default key.
+Signatures are keyed HMAC-SHA256 over the **full** canonical receipt —
+every field in the table above, as sorted compact JSON. The verifier
+holds the key; there is no default key.
 
 ```python
-# Sign the full receipt (key held by the verifier)
-key = b"<verifier-held key>"
-signature = receipt.get_signature(key)
+import hmac
+import secrets
+
+# Generate a key once per verifier and keep it outside the receipt
+signing_key = secrets.token_bytes(32)
+
+signature = receipt.get_signature(signing_key)
 # "b4d30b8e..."
 
-# Verify the receipt has not been modified
-assert receipt.get_signature(key) == signature  # Proof of integrity
+# Verify the receipt has not been modified (constant-time comparison)
+same = hmac.compare_digest(receipt.get_signature(signing_key), signature)
 ```
 
 Mutating any field after signing — `computed_value`, `violations`,
-`status`, `proof_steps` — produces a different signature. This is tamper
-evidence for holders of the key; it does not establish issuer identity
-or third-party verifiability.
+`status`, `proof_steps`, anything in the table — produces a different
+signature. This is tamper evidence for holders of the key: it does not
+establish issuer identity, third-party verifiability, or
+non-repudiation. Public-key attestation (ES256) is planned separately —
+see [qwed-finance#37](https://github.com/QWED-AI/qwed-finance/issues/37).
 
 ---
 
@@ -151,16 +168,24 @@ Show them:
 2. **Timestamp** — When verification occurred
 3. **Engine Signature** — Which solver verified (Z3/SymPy)
 4. **Proof Steps** — Symbolic derivation of truth
-5. **Receipt Signature** — Tamper-proof integrity
+5. **Receipt Signature** — Keyed tamper evidence (HMAC)
+
+Receipts carry no embedded `signature` field; `get_signature()` computes
+it on demand from the full receipt and the verifier's key.
 
 ```json
 {
   "receipt_id": "abc-123",
   "timestamp": "2026-01-18T14:30:00Z",
   "input_hash": "7f83b1657ff1fc53b92dc18148a1d65dfc2d4b1fa3d677284addd200126d9069",
+  "input_preview": "Transaction approved",
   "guard_name": "ComplianceGuard.verify_aml_flag",
   "engine_used": "Z3",
+  "status": "verified",
   "verified": true,
+  "computed_value": "flag_required=True",
+  "llm_value": "Transaction approved",
+  "difference": null,
   "proof_steps": [
     "amount = 15000",
     "threshold = 10000",
@@ -168,7 +193,9 @@ Show them:
     "llm_flagged = True",
     "llm_flagged == flag_required → COMPLIANT"
   ],
-  "signature": "8f14e45f..."
+  "formula_used": "llm_flagged == flag_required",
+  "violations": [],
+  "metadata": {}
 }
 ```
 
