@@ -216,10 +216,10 @@ The exported `receipt-abc-123.json` contains the full receipt:
 }
 ```
 
-To verify an export later, re-canonicalize the parsed JSON exactly as
+To verify an export later, re-canonicalize each parsed JSON exactly as
 `get_signature(signing_key)` does and compare it with the stored
-signature — the auditor works from the files alone, no original
-in-memory receipt needed:
+signature — every pair in the transfer is checked, so no receipt can go
+unaudited, and the auditor works from the files alone:
 
 ```python
 import hashlib
@@ -227,29 +227,33 @@ import hmac
 import json
 from pathlib import Path
 
-# Select an exported pair from the directory the transfer arrived in
+# Audit every exported pair in the directory the transfer arrived in
 pairs = sorted(Path(".").glob("receipt-*.json"))
 if not pairs:
     raise SystemExit("no exported receipts to audit")
-base = pairs[-1].stem  # e.g. "receipt-<receipt_id>"
 
-try:
-    receipt_json = Path(f"{base}.json").read_text(encoding="utf-8")
-    stored = Path(f"{base}.sig").read_text(encoding="utf-8")
-    canonical = json.dumps(
-        json.loads(receipt_json),
-        sort_keys=True,
-        separators=(",", ":"),
-        allow_nan=False,
-    )
-except (OSError, json.JSONDecodeError) as exc:
-    audited_ok = False
-    print(f"verification failed: {base}: {exc}")
-else:
-    audited_ok = hmac.compare_digest(
-        hmac.new(signing_key, canonical.encode("utf-8"), hashlib.sha256).hexdigest(),
-        stored,
-    )
+results = {}
+for json_path in pairs:
+    base = json_path.stem  # "receipt-<receipt_id>"
+    try:
+        receipt_json = json_path.read_text(encoding="utf-8")
+        stored = Path(f"{base}.sig").read_text(encoding="utf-8")
+        canonical = json.dumps(
+            json.loads(receipt_json),
+            sort_keys=True,
+            separators=(",", ":"),
+            allow_nan=False,
+        )
+    except (OSError, json.JSONDecodeError) as exc:
+        results[base] = False
+        print(f"verification failed: {base}: {exc}")
+    else:
+        results[base] = hmac.compare_digest(
+            hmac.new(signing_key, canonical.encode("utf-8"), hashlib.sha256).hexdigest(),
+            stored,
+        )
+
+audited_ok = all(results.values())
 ```
 
 ---
