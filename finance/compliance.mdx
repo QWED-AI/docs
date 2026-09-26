@@ -39,22 +39,24 @@ print(receipt.to_json())
 
 ### Cryptographic signature
 
+Signatures are keyed HMAC-SHA256 over the **full** canonical receipt
+(all fields, sorted compact JSON). The verifier instance holds the key;
+there is no default key.
+
 ```python
-# Get tamper-proof signature
-signature = receipt.get_signature()
-# "8f14e45f..."
+# Sign the full receipt (key held by the verifier)
+key = b"<verifier-held key>"
+signature = receipt.get_signature(key)
+# "b4d30b8e..."
 
-# Verify hasn't been modified
-expected = hashlib.sha256(json.dumps({
-    "receipt_id": receipt.receipt_id,
-    "timestamp": receipt.timestamp,
-    "input_hash": receipt.input_hash,
-    "verified": receipt.verified,
-    "engine_used": receipt.engine_used.value
-}, sort_keys=True).encode()).hexdigest()
-
-assert signature == expected  # Proof of integrity
+# Verify the receipt has not been modified
+assert receipt.get_signature(key) == signature  # Proof of integrity
 ```
+
+Mutating any field after signing — `computed_value`, `violations`,
+`status`, `proof_steps` — produces a different signature. This is tamper
+evidence for holders of the key; it does not establish issuer identity
+or third-party verifiability.
 
 ---
 
