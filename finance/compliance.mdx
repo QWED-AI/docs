@@ -227,18 +227,29 @@ import hmac
 import json
 from pathlib import Path
 
-base = "receipt-abc-123"  # from the exported filename
-canonical = json.dumps(
-    json.loads(Path(f"{base}.json").read_text(encoding="utf-8")),
-    sort_keys=True,
-    separators=(",", ":"),
-    allow_nan=False,
-)
-stored = Path(f"{base}.sig").read_text(encoding="utf-8")
-audited_ok = hmac.compare_digest(
-    hmac.new(signing_key, canonical.encode("utf-8"), hashlib.sha256).hexdigest(),
-    stored,
-)
+# Select an exported pair from the directory the transfer arrived in
+pairs = sorted(Path(".").glob("receipt-*.json"))
+if not pairs:
+    raise SystemExit("no exported receipts to audit")
+base = pairs[-1].stem  # e.g. "receipt-<receipt_id>"
+
+try:
+    receipt_json = Path(f"{base}.json").read_text(encoding="utf-8")
+    stored = Path(f"{base}.sig").read_text(encoding="utf-8")
+    canonical = json.dumps(
+        json.loads(receipt_json),
+        sort_keys=True,
+        separators=(",", ":"),
+        allow_nan=False,
+    )
+except (OSError, json.JSONDecodeError) as exc:
+    audited_ok = False
+    print(f"verification failed: {base}: {exc}")
+else:
+    audited_ok = hmac.compare_digest(
+        hmac.new(signing_key, canonical.encode("utf-8"), hashlib.sha256).hexdigest(),
+        stored,
+    )
 ```
 
 ---
