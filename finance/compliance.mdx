@@ -1,16 +1,16 @@
 ---
 sidebar_position: 3
 title: "Compliance and auditing"
-description: "How QWED-Finance generates cryptographic verification receipts with tamper-proof ES256 signatures and audit trails for SOX, MiFID II, and banking compliance."
+description: "How QWED-Finance generates verification receipts with tamper-evident keyed signatures and audit trails for SOX, MiFID II, and banking compliance."
 ---
 
-QWED-Finance generates **cryptographic proof** of every verification for regulatory compliance.
+QWED-Finance generates a **tamper-evident receipt** for every verification, supporting audit and regulatory workflows.
 
-> "If an AI makes a mistake, the algorithm isn't sued—the bank is. Your `input_hash` and `signature` provide **Non-Repudiation**."
+> "If an AI makes a mistake, the algorithm isn't sued—the bank is. Your `input_hash` and keyed `signature` provide **tamper evidence**."
 
 ## Verification receipts
 
-Every verification generates a tamper-proof receipt:
+Every verification generates a tamper-evident receipt:
 
 ```python
 from qwed_finance import ReceiptGenerator, VerificationEngine
@@ -28,33 +28,52 @@ print(receipt.to_json())
 
 ### Receipt fields
 
+Every field below is part of the signed payload.
+
 | Field | Description | Example |
 | --- | --- | --- |
 | `receipt_id` | Unique identifier | `"a1b2c3d4-..."` |
 | `timestamp` | ISO 8601 UTC | `"2026-01-18T14:30:00Z"` |
 | `input_hash` | SHA-256 of LLM output | `"7f83b1657..."` |
+| `input_preview` | First 100 chars of the input | `"Transaction approved"` |
+| `guard_name` | Guard that ran | `"ComplianceGuard.verify_aml_flag"` |
 | `engine_used` | Verification engine | `"Z3"` |
+| `status` | Outcome: `verified`, `rejected`, `insufficient_data`, `error` | `"verified"` |
 | `verified` | Pass/fail | `true/false` |
+| `computed_value` | Deterministically computed value | `"flag_required=True"` |
+| `llm_value` | LLM output when ≤ 50 chars, else `null` | `"Transaction approved"` |
+| `difference` | `computed_value` vs expected | `null` |
 | `proof_steps` | Symbolic derivation | `["amount=15000", "threshold=10000", "15000>=10000"]` |
+| `formula_used` | Formula applied | `"llm_flagged == flag_required"` |
+| `violations` | Rule violations | `[]` |
+| `metadata` | Extra context | `{"rule": "AML_CTR"}` |
 
 ### Cryptographic signature
 
+Signatures are keyed HMAC-SHA256 over the **full** canonical receipt —
+every field in the table above, as sorted compact JSON. The verifier
+holds the key; there is no default key.
+
 ```python
-# Get tamper-proof signature
-signature = receipt.get_signature()
-# "8f14e45f..."
+import hmac
+import secrets
 
-# Verify hasn't been modified
-expected = hashlib.sha256(json.dumps({
-    "receipt_id": receipt.receipt_id,
-    "timestamp": receipt.timestamp,
-    "input_hash": receipt.input_hash,
-    "verified": receipt.verified,
-    "engine_used": receipt.engine_used.value
-}, sort_keys=True).encode()).hexdigest()
+# Generate a key once per verifier and keep it outside the receipt
+signing_key = secrets.token_bytes(32)
 
-assert signature == expected  # Proof of integrity
+signature = receipt.get_signature(signing_key)
+# "b4d30b8e..."
+
+# Verify the receipt has not been modified (constant-time comparison)
+same = hmac.compare_digest(receipt.get_signature(signing_key), signature)
 ```
+
+Mutating any field after signing — `computed_value`, `violations`,
+`status`, `proof_steps`, anything in the table — produces a different
+signature. This is tamper evidence for holders of the key: it does not
+establish issuer identity, third-party verifiability, or
+non-repudiation. Public-key attestation (ES256) is planned separately —
+see [qwed-finance#37](https://github.com/QWED-AI/qwed-finance/issues/37).
 
 ---
 
@@ -149,16 +168,41 @@ Show them:
 2. **Timestamp** — When verification occurred
 3. **Engine Signature** — Which solver verified (Z3/SymPy)
 4. **Proof Steps** — Symbolic derivation of truth
-5. **Receipt Signature** — Tamper-proof integrity
+5. **Receipt Signature** — Keyed tamper evidence (HMAC)
+
+Receipts carry no embedded `signature` field; `get_signature(signing_key)`
+computes it on demand from the full receipt. Export both artifacts under
+unique paths — one pair per receipt — so no export overwrites an earlier
+audit record:
+
+```python
+from pathlib import Path
+
+signature = receipt.get_signature(signing_key)
+base = f"receipt-{receipt.receipt_id}"
+
+try:
+    Path(f"{base}.json").write_text(receipt.to_json(), encoding="utf-8")
+    Path(f"{base}.sig").write_text(signature, encoding="utf-8")
+except OSError as exc:
+    raise RuntimeError(f"receipt export failed, pair incomplete: {exc}") from exc
+```
+
+The exported `receipt-abc-123.json` contains the full receipt:
 
 ```json
 {
   "receipt_id": "abc-123",
   "timestamp": "2026-01-18T14:30:00Z",
   "input_hash": "7f83b1657ff1fc53b92dc18148a1d65dfc2d4b1fa3d677284addd200126d9069",
+  "input_preview": "Transaction approved",
   "guard_name": "ComplianceGuard.verify_aml_flag",
   "engine_used": "Z3",
+  "status": "verified",
   "verified": true,
+  "computed_value": "flag_required=True",
+  "llm_value": "Transaction approved",
+  "difference": null,
   "proof_steps": [
     "amount = 15000",
     "threshold = 10000",
@@ -166,8 +210,57 @@ Show them:
     "llm_flagged = True",
     "llm_flagged == flag_required → COMPLIANT"
   ],
-  "signature": "8f14e45f..."
+  "formula_used": "llm_flagged == flag_required",
+  "violations": [],
+  "metadata": {}
 }
+```
+
+To verify an export later, re-canonicalize each parsed JSON exactly as
+`get_signature(signing_key)` does and compare it with the stored
+signature — every pair present in the directory is checked, one failure
+never stops the rest, and the auditor works from the files alone:
+
+```python
+import hashlib
+import hmac
+import json
+from pathlib import Path
+
+# Verify every pair present in the directory the transfer arrived in
+pairs = sorted(Path(".").glob("receipt-*.json"))
+if not pairs:
+    raise SystemExit("no exported receipts to audit")
+
+results = {}
+failures = []
+for json_path in pairs:
+    base = json_path.stem  # "receipt-<receipt_id>"
+    try:
+        receipt_json = json_path.read_text(encoding="utf-8")
+        stored = Path(f"{base}.sig").read_text(encoding="utf-8")
+        canonical = json.dumps(
+            json.loads(receipt_json),
+            sort_keys=True,
+            separators=(",", ":"),
+            allow_nan=False,
+        )
+        results[base] = hmac.compare_digest(
+            hmac.new(signing_key, canonical.encode("utf-8"), hashlib.sha256).hexdigest(),
+            stored,
+        )
+    except (OSError, ValueError, TypeError) as exc:
+        # unreadable/invalid UTF-8, malformed or NaN JSON, non-ASCII signature
+        results[base] = False
+        failures.append(f"{base}: {exc}")
+    else:
+        if not results[base]:
+            failures.append(f"{base}: signature mismatch")
+
+for failure in failures:
+    print(f"verification failed: {failure}")
+
+audited_ok = all(results.values())
 ```
 
 ---
