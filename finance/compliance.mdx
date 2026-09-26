@@ -171,18 +171,24 @@ Show them:
 5. **Receipt Signature** — Keyed tamper evidence (HMAC)
 
 Receipts carry no embedded `signature` field; `get_signature(signing_key)`
-computes it on demand from the full receipt. Export both artifacts so an
-auditor can verify the receipt later:
+computes it on demand from the full receipt. Export both artifacts under
+unique paths — one pair per receipt — so no export overwrites an earlier
+audit record:
 
 ```python
 from pathlib import Path
 
 signature = receipt.get_signature(signing_key)
+base = f"receipt-{receipt.receipt_id}"
 
-# Store the signature beside the exported receipt
-Path("receipt.json").write_text(receipt.to_json())
-Path("receipt.sig").write_text(signature)
+try:
+    Path(f"{base}.json").write_text(receipt.to_json(), encoding="utf-8")
+    Path(f"{base}.sig").write_text(signature, encoding="utf-8")
+except OSError as exc:
+    raise RuntimeError(f"receipt export failed, pair incomplete: {exc}") from exc
 ```
+
+The exported `receipt-abc-123.json` contains the full receipt:
 
 ```json
 {
@@ -210,10 +216,30 @@ Path("receipt.sig").write_text(signature)
 }
 ```
 
-To verify an export later, parse `receipt.json`, recompute
-`receipt.get_signature(signing_key)`, and compare with the stored
-`receipt.sig` using `hmac.compare_digest` as shown in
-[Cryptographic signature](#cryptographic-signature) above.
+To verify an export later, re-canonicalize the parsed JSON exactly as
+`get_signature(signing_key)` does and compare it with the stored
+signature — the auditor works from the files alone, no original
+in-memory receipt needed:
+
+```python
+import hashlib
+import hmac
+import json
+from pathlib import Path
+
+base = "receipt-abc-123"  # from the exported filename
+canonical = json.dumps(
+    json.loads(Path(f"{base}.json").read_text(encoding="utf-8")),
+    sort_keys=True,
+    separators=(",", ":"),
+    allow_nan=False,
+)
+stored = Path(f"{base}.sig").read_text(encoding="utf-8")
+audited_ok = hmac.compare_digest(
+    hmac.new(signing_key, canonical.encode("utf-8"), hashlib.sha256).hexdigest(),
+    stored,
+)
+```
 
 ---
 
