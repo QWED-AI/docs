@@ -218,8 +218,8 @@ The exported `receipt-abc-123.json` contains the full receipt:
 
 To verify an export later, re-canonicalize each parsed JSON exactly as
 `get_signature(signing_key)` does and compare it with the stored
-signature — every pair in the transfer is checked, so no receipt can go
-unaudited, and the auditor works from the files alone:
+signature — every pair present in the directory is checked, one failure
+never stops the rest, and the auditor works from the files alone:
 
 ```python
 import hashlib
@@ -227,12 +227,13 @@ import hmac
 import json
 from pathlib import Path
 
-# Audit every exported pair in the directory the transfer arrived in
+# Verify every pair present in the directory the transfer arrived in
 pairs = sorted(Path(".").glob("receipt-*.json"))
 if not pairs:
     raise SystemExit("no exported receipts to audit")
 
 results = {}
+failures = []
 for json_path in pairs:
     base = json_path.stem  # "receipt-<receipt_id>"
     try:
@@ -244,14 +245,20 @@ for json_path in pairs:
             separators=(",", ":"),
             allow_nan=False,
         )
-    except (OSError, json.JSONDecodeError) as exc:
-        results[base] = False
-        print(f"verification failed: {base}: {exc}")
-    else:
         results[base] = hmac.compare_digest(
             hmac.new(signing_key, canonical.encode("utf-8"), hashlib.sha256).hexdigest(),
             stored,
         )
+    except (OSError, ValueError, TypeError) as exc:
+        # unreadable/invalid UTF-8, malformed or NaN JSON, non-ASCII signature
+        results[base] = False
+        failures.append(f"{base}: {exc}")
+    else:
+        if not results[base]:
+            failures.append(f"{base}: signature mismatch")
+
+for failure in failures:
+    print(f"verification failed: {failure}")
 
 audited_ok = all(results.values())
 ```
