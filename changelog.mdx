@@ -5,7 +5,38 @@ description: "Release notes for the QWED Protocol: version history, new guards, 
 
 All notable changes to the QWED platform, listed by release.
 
-Jump to: [`qwed init` server identity handshake](#qwed-verification-—-qwed-init-server-identity-handshake) · [Leaked key auto-revocation](#qwed-verification-—-leaked-api-key-auto-revocation-and-false-positive-feedback) · [API-key format spec](#qwed-verification-—-canonical-api-key-format-spec) · [Signed secret-scanning webhook](#qwed-verification-—-signed-secret-scanning-webhook-endpoint) · [v7.2.1](#v7-2-1-—-math-answer-comparison-security-patch) · [v7.2.0](#v7-2-0-—-precision-advisory-and-security-hardening-batch) · [v7.1.0](#v7-1-0-—-verification-context-v1-0-rollout) · [v7.0.0](#v7-0-0-—-full-diagnosticresult-engine-conformance)
+Jump to: [QWED-Legal fail-closed hardening](#qwed-legal-—-fail-closed-hardening-for-guards-diagnostics-and-github-action) · [`qwed init` server identity handshake](#qwed-verification-—-qwed-init-server-identity-handshake) · [Leaked key auto-revocation](#qwed-verification-—-leaked-api-key-auto-revocation-and-false-positive-feedback) · [API-key format spec](#qwed-verification-—-canonical-api-key-format-spec) · [Signed secret-scanning webhook](#qwed-verification-—-signed-secret-scanning-webhook-endpoint) · [v7.2.1](#v7-2-1-—-math-answer-comparison-security-patch) · [v7.2.0](#v7-2-0-—-precision-advisory-and-security-hardening-batch) · [v7.1.0](#v7-1-0-—-verification-context-v1-0-rollout) · [v7.0.0](#v7-0-0-—-full-diagnosticresult-engine-conformance)
+
+---
+
+## QWED-Legal — fail-closed hardening for guards, diagnostics, and GitHub Action
+
+**Merged: September 29, 2026** (unreleased on `main`, post-`0.4.0`) · [GitHub PR #83](https://github.com/QWED-AI/qwed-legal/pull/83) · [GitHub PR #84](https://github.com/QWED-AI/qwed-legal/pull/84) · [GitHub PR #85](https://github.com/QWED-AI/qwed-legal/pull/85) · [GitHub PR #87](https://github.com/QWED-AI/qwed-legal/pull/87) · [GitHub PR #88](https://github.com/QWED-AI/qwed-legal/pull/88)
+
+> Five QWED-Legal paths that could report success over empty, blank, or unclassified input now fail closed. The QWED Legal GitHub Action now passes only on deterministic proofs.
+
+<Warning>
+**Breaking change for the QWED Legal GitHub Action.** Every block is now gated on `to_diagnostic().status == VERIFIED`. These runs previously passed and now fail with `verified=false` and a non-zero exit:
+
+- Unknown or misspelled `mode` values.
+- Runs where missing inputs mean zero checks execute.
+- Clause runs, including heuristic `"consistent"` results and single-clause inputs (now `insufficient_input`, `consistent=False`).
+- Citation runs, including format-valid citations.
+
+**Before:** `mode: citation` with a well-formed citation, or `mode: clause` with no detected conflicts, returned `verified=true`.
+
+**After:** Only deterministic deadline and liability exact matches keep `verified=true`. If limited coverage is acceptable for your workflow, branch on the `results` JSON output explicitly. Use `results.citation.valid` for citation format checks and `results.clause.status` for clause results. Use `verify_using_z3()` from the Python API for formal clause proofs.
+</Warning>
+
+### What changed
+
+- **`LiabilityGuard.verify_tiered_liability`: empty tier lists.** `tiers=[]` returns `UNVERIFIABLE` with `total_computed=None` and no `proof_ref`, whether `claimed_total` is zero or not.
+- **`ProvenanceGuard`: strict required fields.** `content_hash`, `model_id`, and `generation_timestamp` must be non-empty strings. `None`, `0`, `False`, `[]`, and whitespace now give `INCOMPLETE_PROVENANCE`. Checks that cannot run are recorded as `hash_integrity_skipped`, `timestamp_valid_skipped`, and `model_allowed_skipped` instead of `CONTENT_TAMPERED` or `UNAUTHORIZED_MODEL`.
+- **`JurisdictionGuard`: blank party entries.** `check_convention_applicability()` returns `UNVERIFIABLE` for blank entries such as `[""]`. Genuine negatives such as `["XX"]` stay deterministic.
+- **`JurisdictionGuard`: three-way `contract_type` classification for CISG.** Goods contracts (separator and case variants accepted, bare `"sale"` excluded) get the CISG warning. Declared non-goods contracts such as `"services"` get no CISG warning. Missing, blank, or unknown values get a partial-coverage warning and are not verified. The US and non-US party pair no longer triggers the CISG warning by itself. The classification is recorded in trace inputs.
+- **Diagnostics: no `proof_ref` without a deterministic step.** `LegalDiagnosticResult.verified()` raises unless the evidence trace has a `DETERMINISTIC` step. Traceless or transport-stripped `"consistent"` verdicts and empty `claim_texts` are demoted to `UNVERIFIABLE`. Blank messages fall back to defaults instead of crashing.
+
+See [LiabilityGuard](/legal/guards#fail-closed-behavior-on-non-finite-and-out-of-range-inputs), [CISG detection](/legal/guards#cisg-detection), [ProvenanceGuard](/legal/guards#verification-checks), [ClauseGuard input validation](/legal/guards#input-validation), and [No proof without a deterministic step](/legal/guards#no-proof-without-a-deterministic-step).
 
 ---
 

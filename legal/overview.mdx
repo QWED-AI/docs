@@ -112,6 +112,8 @@ The `LegalDiagnosticResult` dataclass is frozen and enforces the authority contr
 
 Attempting to construct a result that violates these rules raises `ValueError` — "VERIFIED without proof" or "BLOCKED with proof" are not caller conventions, they are unrepresentable.
 
+`LegalDiagnosticResult.verified()` also refuses to mint a `proof_ref` unless the evidence trace contains at least one `DETERMINISTIC` step. Direct calls over traceless or non-deterministic evidence raise `ValueError`. Guard adapters demote those verdicts to `UNVERIFIABLE` instead. This covers traceless or transport-stripped `"consistent"` verdicts and `consistent` verdicts with empty `claim_texts`. Blank agent messages fall back to status-specific defaults instead of crashing. See [No proof without a deterministic step](/legal/guards#no-proof-without-a-deterministic-step).
+
 ### Per-guard status mapping
 
 Not every guard can ever return `VERIFIED`. Guards whose evidence is inherently non-authoritative (citation format, heuristic clause checks, fairness, self-declared provenance) map their passing outcomes to `UNVERIFIABLE` on purpose:
@@ -119,14 +121,14 @@ Not every guard can ever return `VERIFIED`. Guards whose evidence is inherently 
 | Guard | `VERIFIED` when… | `UNVERIFIABLE` when… | `BLOCKED` when… |
 |-------|------------------|----------------------|-----------------|
 | `DeadlineGuard` | Computed deadline matches the claim | Uninterpretable term, or fallback calendar used (`is_computable=False`) | Computed deadline differs from the claim |
-| `LiabilityGuard` | Computed cap/tier matches the claim | No claim supplied (computed-only) or numeric input cannot be parsed | Computed amount differs from the claim |
-| `JurisdictionGuard` | **Never** — evidence is `PARSED`/`INFERRED` only | Unsupported jurisdiction, unrecognized governing law, or empty-party placeholder trace | Recognized-law conflict backed by analysis evidence (e.g. US-state law with a non-US forum) |
+| `LiabilityGuard` | Computed cap/tier matches the claim | No claim supplied (computed-only), numeric input cannot be parsed, or empty tier list | Computed amount differs from the claim |
+| `JurisdictionGuard` | **Never** — evidence is `PARSED`/`INFERRED` only | Unsupported jurisdiction, unrecognized governing law, empty or blank party entries, or unclassified `contract_type` on a cross-border contract | Recognized-law conflict backed by analysis evidence (e.g. US-state law with a non-US forum) |
 | `StatuteOfLimitationsGuard` | `CLAIM_VERIFIED` — claim matches deterministic date arithmetic | `COMPUTED_ONLY` (no claim) or unsupported jurisdiction/claim type | `CLAIM_INCORRECT` |
 | `CitationGuard` | **Never** — citation authority is not verifiable from format | Format matches a supported reporter | Format invalid |
-| `ClauseGuard` | Z3 SAT proves constraints satisfiable (no contradiction over modeled constraints) | Heuristic pass over `INFERRED` evidence | Deterministic contradiction (Z3 UNSAT, or modeled heuristic conflict) |
+| `ClauseGuard` | Z3 SAT proves constraints satisfiable (no contradiction over modeled constraints) | Heuristic pass over `INFERRED` evidence, or fewer than two clauses (`insufficient_input`) | Deterministic contradiction (Z3 UNSAT, or modeled heuristic conflict) |
 | `FairnessGuard` | **Never** — fairness is not deterministically provable | Any pass | Any deterministic failure |
-| `ProvenanceGuard` | **Never** — `SELF_DECLARED` metadata is not external authority | Pass, or input-format failures (`INVALID_PROVENANCE`, `INCOMPLETE_PROVENANCE`, `MISSING_DISCLOSURE`, `INVALID_TIMESTAMP`) | Content tampered (`CONTENT_TAMPERED`) or unauthorized model (`UNAUTHORIZED_MODEL`) |
-| `ContradictionGuard` | Z3 SAT over modeled clause categories (consistent) | Unmodeled clause categories | Z3 UNSAT (contradiction) or explicit modeled conflict |
+| `ProvenanceGuard` | **Never** — `SELF_DECLARED` metadata is not external authority | Pass, or input-format failures (`INVALID_PROVENANCE`, `INCOMPLETE_PROVENANCE`, `MISSING_DISCLOSURE`, `INVALID_TIMESTAMP`). Non-string or blank required fields give `INCOMPLETE_PROVENANCE` with `*_skipped` checks. | Content tampered (`CONTENT_TAMPERED`) or unauthorized model (`UNAUTHORIZED_MODEL`) |
+| `ContradictionGuard` | Z3 SAT over modeled clause categories (consistent) | Unmodeled clause categories, traceless `consistent` verdicts, or empty `claim_texts` | Z3 UNSAT (contradiction) or explicit modeled conflict |
 
 Guards where `VERIFIED` is documented as "Never" are an honesty contract: their strongest positive result is still non-authoritative, so downstream gates that key on `proof_ref` will correctly refuse to admit.
 
