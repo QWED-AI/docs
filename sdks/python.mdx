@@ -188,7 +188,7 @@ All three methods are available on both `QWEDClient` and `QWEDAsyncClient` and c
 
 #### create_verification_context_from_diagnostic(diagnostic, query, verifier)
 
-Create a schema-valid Verification Context document from a [`DiagnosticResult`](/advanced/diagnostics) dict. Optional keyword arguments: `verifier_version` and `attestation_token`. A `VERIFIED` diagnostic without a valid attestation token is demoted to `UNVERIFIABLE` (fail-closed).
+Create a schema-valid Verification Context document from a [`DiagnosticResult`](/advanced/diagnostics) dict. Optional keyword arguments: `verifier_version` and `attestation_token`. A `VERIFIED` diagnostic without a valid attestation token fails closed to `BLOCKED` (fail-closed).
 
 ```python
 document = client.create_verification_context_from_diagnostic(

@@ -214,7 +214,7 @@ print(doc.verdict.value)                     # VERIFIED
 print(doc.context.decision.admission.value)  # ADMIT
 ```
 
-Without `attestation_token`, a `VERIFIED` result demotes to `UNVERIFIABLE`/`DENY`. A forged, expired, revoked, or non-matching token produces `BLOCKED`/`DENY`.
+Without `attestation_token`, a `VERIFIED` result fails closed to `BLOCKED`/`DENY`. A forged, expired, revoked, or non-matching token produces `BLOCKED`/`DENY`.
 
 ## 9. Consuming VC documents downstream
 
