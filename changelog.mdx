@@ -590,7 +590,7 @@ See the [guards reference](/infra/guards) and [usage examples](/infra/examples) 
 
 ### Fail-closed behavior
 
-- A `VERIFIED` diagnostic without a valid attestation token fails closed to `BLOCKED` (`trust_gate.mandatory_attestation_missing`) when converted to a VC document — attestation is enforced through the same trust boundary as `/verify/*`.
+- A `VERIFIED` diagnostic without an attestation token fails closed to `BLOCKED` (`trust_gate.mandatory_attestation_missing`) when converted to a VC document — attestation is enforced through the same trust boundary as `/verify/*`.
 - Malformed diagnostic payloads convert to `BLOCKED` documents instead of crashing, so the audit trail records the failure.
 - `resolve` returns `true` only for a schema-valid `VERIFIED` document whose stored `proof_ref` matches the re-derived commitment.
 
