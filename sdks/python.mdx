@@ -271,9 +271,17 @@ assert resolve_document_proof_ref(document)
 Every verification engine that defines `to_verification_context()` maps its `DiagnosticResult` to a Verification Context document: the Code, Consensus, DSL Logic, Fact, Graph Fact, Image, Logic, Reasoning, Schema, SQL, Stats, and Symbolic verifier classes, plus the `BatchFactVerifier` and `MultiVLMVerifier` helpers. Math and the secure code executor do not define the method — pass their `DiagnosticResult` to [`create_verification_context_from_diagnostic()`](#create_verification_context_from_diagnosticdiagnostic-query-verifier) instead:
 
 ```python
-document = verifier.to_verification_context(result, query="x**2 + 2*x + 1 = (x+1)**2")
+# Verifiers that define the method (SQLVerifier shown here)
+document = sql_verifier.to_verification_context(
+    result, query="SELECT id, total FROM orders WHERE customer_id = 42"
+)
 document.validate()
 print(document.to_dict()["verdict"])
+
+# Math and the secure code executor have no such method — convert through the client
+document = client.create_verification_context_from_diagnostic(
+    diagnostic=result.to_dict(), query="x**2 + 2*x + 1 = (x+1)**2", verifier="math"
+)
 ```
 
 The mapping preserves the fail-closed invariants: `VERIFIED` documents carry a `sha256` `proof_ref`, while `UNVERIFIABLE` and `BLOCKED` documents carry `proof_ref: null` with admission `DENY`.
