@@ -180,7 +180,7 @@ For `math` items, supply equality claims (e.g., `"x + x = 2*x"`) to receive proo
 
 <Info>New in v7.1.0</Info>
 
-The SDK exposes [Verification Context v1.0](/specs/verification-context) — the standardized JSON record of a verification — as client methods, re-exported types, and a `to_verification_context()` method on every verifier.
+The SDK exposes [Verification Context v1.0](/specs/verification-context) — the standardized JSON record of a verification — as client methods, re-exported types, and a `to_verification_context()` method on the verifier classes.
 
 ### Client methods
 
@@ -268,7 +268,7 @@ assert resolve_document_proof_ref(document)
 
 ### to_verification_context() on verifiers
 
-Every verification engine (all 13 verifiers, including Math, Logic, Symbolic, SQL, Code, Schema, Fact, Image, Graph, Reasoning, Stats, and Consensus) exposes `to_verification_context()`, which maps the engine's `DiagnosticResult` to a Verification Context document:
+Every verification engine that defines `to_verification_context()` maps its `DiagnosticResult` to a Verification Context document: the Code, Consensus, DSL Logic, Fact, Graph Fact, Image, Logic, Reasoning, Schema, SQL, Stats, and Symbolic verifier classes, plus the `BatchFactVerifier` and `MultiVLMVerifier` helpers. Math and the secure code executor do not define the method — pass their `DiagnosticResult` to [`create_verification_context_from_diagnostic()`](#create_verification_context_from_diagnosticdiagnostic-query-verifier) instead:
 
 ```python
 document = verifier.to_verification_context(result, query="x**2 + 2*x + 1 = (x+1)**2")

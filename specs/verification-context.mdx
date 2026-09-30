@@ -115,7 +115,7 @@ An implementation conforms to this specification if it:
 Verification Context v1.0 is exposed across every QWED surface as of v7.1.0:
 
 - **API** — [`POST /verification-context/from-diagnostic`, `/validate`, and `/resolve`](/api/endpoints#verification-context-endpoints).
-- **Python SDK** — client methods and re-exported types on `qwed_sdk`, plus `to_verification_context()` on all 13 verifiers. See the [Python SDK](/sdks/python#verification-context).
+- **Python SDK** — client methods and re-exported types on `qwed_sdk`, plus `to_verification_context()` on the verifier classes (Math and the secure code executor convert through `create_verification_context_from_diagnostic()`). See the [Python SDK](/sdks/python#verification-context).
 - **CLI** — the [`qwed context`](/advanced/cli#qwed-context-verification-context-utilities) command group.
 - **GitHub Action** — `verdict`, `admission`, `proof_ref`, and `verification_context` [outputs](/advanced/github-action#outputs).
 
