@@ -214,7 +214,7 @@ print(doc.verdict.value)                     # VERIFIED
 print(doc.context.decision.admission.value)  # ADMIT
 ```
 
-Without `attestation_token`, a `VERIFIED` result fails closed to `BLOCKED`/`DENY`. A forged, expired, revoked, or non-matching token produces `BLOCKED`/`DENY`.
+For a `qwed-infra` guard's `to_verification_context()`, a `VERIFIED` result without `attestation_token` demotes to `UNVERIFIABLE`/`DENY`. A forged, expired, revoked, or non-matching token produces `BLOCKED`/`DENY`. (This differs from the qwed-verification `POST /verification-context/from-diagnostic` path, which returns `BLOCKED`/`DENY` for a missing token — see the [fail-closed matrix](/advanced/attestations#fail-closed-matrix).)
 
 ## 9. Consuming VC documents downstream
 
