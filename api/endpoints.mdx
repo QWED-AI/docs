@@ -889,7 +889,7 @@ Convert a [`DiagnosticResult`](/advanced/diagnostics) into a schema-valid Verifi
 **Fail-closed behavior:**
 
 - A malformed `diagnostic` payload is converted to a `BLOCKED` document instead of being rejected, so the audit trail records the failure.
-- A `VERIFIED` diagnostic without a valid `attestation_token` is demoted to `UNVERIFIABLE`. Attestation is enforced through the same trust boundary as `/verify/*`.
+- A `VERIFIED` diagnostic without an `attestation_token` fails closed to `BLOCKED` (`trust_gate.mandatory_attestation_missing`). A supplied invalid token fails closed to `BLOCKED` (`trust_gate.invalid_attestation_token`); a valid token with mismatched claims uses the corresponding `trust_gate.claims_*` code. Attestation is enforced through the same trust boundary as `/verify/*`.
 
 | Status | Description |
 |--------|-------------|

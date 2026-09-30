@@ -573,7 +573,7 @@ qwed context from-diagnostic \
 | `--verifier-version` | No | Engine version. Defaults to the installed `qwed` version |
 | `--attestation-token` | No | Signed attestation. Required to keep a `VERIFIED` status |
 
-A malformed diagnostic file produces a `BLOCKED` document rather than a crash. A `VERIFIED` diagnostic without a valid attestation token is demoted to `UNVERIFIABLE` (fail-closed).
+A malformed diagnostic file produces a `BLOCKED` document rather than a crash. A `VERIFIED` diagnostic without a valid attestation token fails closed to `BLOCKED` (fail-closed).
 
 ---
 
