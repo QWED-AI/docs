@@ -443,12 +443,12 @@ Broader extraction is coverage, not proof — ClauseGuard remains a `PARTIAL / H
 - Lists containing non-string elements
 - Lists containing empty or whitespace-only strings
 
-A list with fewer than two clauses returns `consistent=False` and `status="insufficient_input"`. A single clause has no pair to compare, so it is not evidence of consistency.
+A **single-clause** list returns `consistent=False` and `status="insufficient_input"`: one clause has no pair to compare, so it is not evidence of consistency. Note that this branch is only reached for a non-empty list — an empty list is caught above as `invalid_input` ("No clauses were provided"), not `insufficient_input`.
 
 Downstream consumers must not treat an `invalid_input` or `insufficient_input` result as verified consistency.
 
 <Warning>
-  The QWED Legal GitHub Action gates every block on `to_diagnostic().status == VERIFIED`. Only deterministic deadline and liability exact matches keep the action green. Heuristic `check_consistency()` results never pass the action, including plain `"consistent"`. Contradictions, `invalid_input`, `insufficient_input`, and `heuristic_pass_limited` results also fail. Citation runs never pass either; read `results.citation.valid` from the `results` output for the format check. Unknown modes and runs that execute zero checks because inputs are missing fail with `verified=false` and a non-zero exit. Z3 clause proofs attest only through the Python API (`verify_using_z3()`), not through the Action.
+  The QWED Legal GitHub Action gates every block on `to_diagnostic().status == VERIFIED`. Only deterministic deadline and liability exact matches keep the action green. Heuristic `check_consistency()` results never pass the action, including plain `"consistent"`. Contradictions, `invalid_input`, `insufficient_input`, and `heuristic_pass_limited` results also fail. Citation runs never pass either; to branch on `results.citation.valid` from the `results` output you must let the step finish, since GitHub skips later steps after a non-zero exit — mark the QWED Legal step `continue-on-error: true` (or run the step that reads the output with `if: always()`) and gate on `steps.<id>.outputs.results` rather than the exit code. Unknown modes and runs that execute zero checks because inputs are missing fail with `verified=false` and a non-zero exit. Z3 clause proofs attest only through the Python API (`verify_using_z3()`), not through the Action.
 </Warning>
 
 ```python

@@ -25,7 +25,7 @@ Jump to: [QWED-Legal fail-closed hardening](#qwed-legal-—-fail-closed-hardenin
 
 **Before:** `mode: citation` with a well-formed citation, or `mode: clause` with no detected conflicts, returned `verified=true`.
 
-**After:** Only deterministic deadline and liability exact matches keep `verified=true`. If limited coverage is acceptable for your workflow, branch on the `results` JSON output explicitly. Use `results.citation.valid` for citation format checks and `results.clause.status` for clause results. Use `verify_using_z3()` from the Python API for formal clause proofs.
+**After:** Only deterministic deadline and liability exact matches keep `verified=true`. A failed Action step skips the steps after it by default, so you cannot inspect the output of a step that exited non-zero unless you let it finish: mark the QWED Legal step `continue-on-error: true` (or run the step after it with `if: always()`), then gate on its outputs rather than its exit code. Branch on the `results` JSON for limited-coverage handling — `results.citation.valid` for citation format checks and `results.clause.status` for clause results — using `steps.<id>.outputs.results`. Use `verify_using_z3()` from the Python API for formal clause proofs.
 </Warning>
 
 ### What changed
