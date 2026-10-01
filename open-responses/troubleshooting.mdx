@@ -336,7 +336,7 @@ Requests without a body continue to the next handler. Requests whose body parses
 
 ```typescript
 import express from 'express';
-import { verifyRequestBody } from 'qwed-open-responses';
+import { ToolGuard, verifyRequestBody } from 'qwed-open-responses';
 
 const app = express();
 app.use(express.json());           // Parse the body first
