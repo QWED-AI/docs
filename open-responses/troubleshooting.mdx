@@ -422,7 +422,9 @@ math_guard = MathGuard(tolerance=0.01)  # Allow 1 cent difference
 | "requires a JSON schema or at least one guard" | Verifier | `verify_structured_output` with neither | Pass a schema or guards |
 | "Missing required field" | Schema | Output missing field | Check schema |
 | "Additional properties are not allowed" | Schema | Undeclared root field | Declare it or set `allow_additional_properties=True` |
-| "JSON response exceeds the character limit" | Verifier | JSON over 100,000 chars or 100 levels | Shrink the response |
+| "JSON response exceeds the character limit" | Verifier | JSON over 100,000 chars | Shorten the JSON response |
+| "JSON response exceeds the nesting depth limit" | Verifier | JSON over 100 levels deep | Reduce nesting |
+| "JSON response could not be parsed within safe limits" | Verifier | Oversized integer | Shorten the digit run (split the value or send it as a string) |
 | 422 `QWED_REQUEST_BLOCKED` | Express middleware | Declared body was not parsed | Register a body parser first |
 | "Tool in blocklist" | Tool | Dangerous tool called | Review blocklist |
 | "Unrecognized format" | Tool | Tool-like content in unknown shape | Use a recognized envelope |
