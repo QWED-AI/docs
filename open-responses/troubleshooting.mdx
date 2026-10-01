@@ -122,6 +122,32 @@ except ValidationError as e:
 - Ensure all required fields are present
 - Verify types match schema
 
+SchemaGuard reports only the first validation error, with `total_errors` set to `None` and `errors_truncated` set to `True`. Fix the reported error and verify again to surface the next one.
+
+---
+
+### "SchemaGuard: Additional properties are not allowed"
+
+**Cause:** Since v0.6.0, SchemaGuard adds `additionalProperties: false` to the root object when your schema doesn't set it. Any undeclared top-level field fails validation.
+
+**Fix:** Declare the field in `properties`, set `additionalProperties` explicitly in the schema, or opt out in the constructor:
+
+```python
+guard = SchemaGuard(schema, allow_additional_properties=True)
+```
+
+```typescript
+const guard = new SchemaGuard(schema, { allowAdditionalProperties: true });
+```
+
+---
+
+### "JSON response exceeds the character limit"
+
+**Cause:** `verify()` received a JSON string longer than 100,000 characters. Related messages are "JSON response exceeds the nesting depth limit" (more than 100 levels) and "JSON response could not be parsed within safe limits" (for example, an oversized integer). These come back as failed verdicts, not exceptions.
+
+**Fix:** Reduce the response size or nesting before verification. For oversized integers specifically, shorten the digit run (split the value or send it as a string) — shrinking unrelated content will not clear an integer failure. SafetyGuard has its own bounds: it fails closed above 12 nesting levels, 10,000 nodes, or 100,000 content characters.
+
 ---
 
 ### "ToolGuard: Tool in blocklist"
@@ -300,6 +326,27 @@ response = client.chat.completions.create(
 
 ---
 
+### Express middleware returns 422 "Request verification failed"
+
+**Cause:** In the npm package, `verifyRequestBody` returns HTTP 422 with code `QWED_REQUEST_BLOCKED` when a request declares a body but Express has no parsed body. A request declares a body with a non-zero `Content-Length` or a `Transfer-Encoding` header. This happens even when `blockOnFailure` is `false`, because the middleware can't verify a body it can't see.
+
+Requests without a body continue to the next handler. Requests whose body parses to an empty JSON object also continue.
+
+**Fix:** Register a body parser before the QWED middleware:
+
+```typescript
+import express from 'express';
+import { ToolGuard, verifyRequestBody } from 'qwed-open-responses';
+
+const app = express();
+app.use(express.json());           // Parse the body first
+app.use(verifyRequestBody({ guards: [new ToolGuard()] }));
+```
+
+Also confirm the request's `Content-Type` matches the parser you registered. A body that `express.json()` skips stays unparsed and is blocked.
+
+---
+
 ### Guards not being applied
 
 **Check guard order:**
@@ -374,6 +421,11 @@ math_guard = MathGuard(tolerance=0.01)  # Allow 1 cent difference
 | "Cannot parse JSON response" | Verifier | String parsed to scalar/array/null | Send a JSON object |
 | "requires a JSON schema or at least one guard" | Verifier | `verify_structured_output` with neither | Pass a schema or guards |
 | "Missing required field" | Schema | Output missing field | Check schema |
+| "Additional properties are not allowed" | Schema | Undeclared root field | Declare it or set `allow_additional_properties=True` |
+| "JSON response exceeds the character limit" | Verifier | JSON over 100,000 chars | Shorten the JSON response |
+| "JSON response exceeds the nesting depth limit" | Verifier | JSON over 100 levels deep | Reduce nesting |
+| "JSON response could not be parsed within safe limits" | Verifier | Oversized integer | Shorten the digit run (split the value or send it as a string) |
+| 422 `QWED_REQUEST_BLOCKED` | Express middleware | Declared body was not parsed | Register a body parser first |
 | "Tool in blocklist" | Tool | Dangerous tool called | Review blocklist |
 | "Unrecognized format" | Tool | Tool-like content in unknown shape | Use a recognized envelope |
 | "Malformed tool-call entry" | Tool | Non-object entry or hybrid envelope | Fix response structure |

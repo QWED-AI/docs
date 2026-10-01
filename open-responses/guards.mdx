@@ -35,6 +35,52 @@ result = guard.check({"output": {"name": "John", "age": 30}})
 |--------|------|---------|-------------|
 | `schema` | dict | required | JSON Schema |
 | `strict` | bool | True | Fail on any error |
+| `allow_additional_properties` | bool | False | When `True`, SchemaGuard does not add a default `additionalProperties: false` to the root object. In TypeScript, pass `{ allowAdditionalProperties: true }` as the second constructor argument |
+
+### Undeclared fields are rejected by default
+
+In the upcoming v0.6.0 release, SchemaGuard closes the root object of your schema by adding `additionalProperties: false`. A response with a top-level field that the schema doesn't declare fails validation. An explicit `additionalProperties` value in your schema always takes precedence over this default.
+
+<Warning>
+**Breaking change in the upcoming v0.6.0.** Schemas that don't set `additionalProperties` used to accept extra root-level fields. They now reject them. If your outputs legitimately carry extra fields, declare them, set `additionalProperties` in the schema, or opt out in the constructor.
+
+```python
+schema = {
+    "type": "object",
+    "properties": {"name": {"type": "string"}},
+    "required": ["name"],
+}
+
+# Before v0.6.0: passed
+# v0.6.0 and later: fails because "debug" is not declared
+SchemaGuard(schema).check({"output": {"name": "John", "debug": True}})
+
+# Option 1: allow extra fields in the schema itself
+SchemaGuard({**schema, "additionalProperties": True})
+
+# Option 2: opt out in the constructor
+SchemaGuard(schema, allow_additional_properties=True)
+```
+
+```typescript
+// TypeScript opt-out
+new SchemaGuard(schema, { allowAdditionalProperties: true });
+```
+</Warning>
+
+### Format validation
+
+The Python and npm packages validate the JSON Schema `format` keyword with the same rules for `email`, `uuid`, `date-time`, `uri`, and `ipv4`. A value that one runtime rejects is rejected by the other.
+
+### Error reporting
+
+SchemaGuard stops at the first validation error. The failed result has the message "Schema validation failed (first error shown)" and its details contain:
+
+- `errors`: a list with only the first error
+- `total_errors` (`totalErrors` in TypeScript): `None`/`null`, because the total count is unknown
+- `errors_truncated` (`errorsTruncated` in TypeScript): `True`
+
+Fix the reported error and re-run verification to find any further violations.
 
 ---
 
@@ -60,9 +106,16 @@ result = guard.check({
 
 ### Default blocked tools
 
-Blocklist and allowlist matching is case-insensitive, so `Bash` and `POWERSHELL` are blocked the same as their lowercase forms. The default blocklist covers:
+Blocklist matching normalizes tool names before comparing them. ToolGuard ignores case, surrounding whitespace, dashes, underscores, and camelCase boundaries. `Bash`, ` POWERSHELL `, `Execute-Shell`, and `executeShell` are all blocked the same as `bash`, `powershell`, and `execute_shell`.
+
+Allowlists are stricter. `allowed_tools` matching ignores case and surrounding whitespace, but separators must match exactly as configured. An allowlist entry of `read_file` does not authorize `read-file` or `readFile`, so one registered tool can't authorize another.
+
+`custom_validators` keys are matched the same way as allowlist entries. Keys that differ only in case or surrounding whitespace conflict, and ToolGuard raises `ValueError` at construction. Distinct names like `read_file` and `read-file` stay separate validators.
+
+The default blocklist covers:
 
 - Execution primitives: `execute_shell`, `shell`, `exec`, `eval`
+- Command-tool aliases: `run_command`, `execute_command`, `command_line`, `terminal`
 - Common shells and OS command interpreters: `bash`, `sh`, `ash`, `dash`, `zsh`, `ksh`, `csh`, `tcsh`, `fish`, `cmd`, `powershell`, `pwsh`, plus their `.exe` variants and `osascript`, `wscript`, `cscript`
 - File mutation: `delete_file`, `remove_file`, `write_file`, `modify_file`
 - Side effects: `send_email`, `transfer_money`, `make_payment`
@@ -77,6 +130,16 @@ ToolGuard ships a unified set of 14 dangerous-command patterns, matched case-ins
 - Code execution: `eval(`, `exec(`, `__import__`, `subprocess`, `os.system`
 
 Custom patterns passed via `dangerous_patterns` are also compiled case-insensitively.
+
+ToolGuard runs patterns against the raw parsed argument strings. This includes nested values and arguments of JSON-encoded calls. Because the original string is scanned, a custom pattern like `rm\s+-rf` matches across tabs and newlines. Arguments that are cyclic or nested too deeply to inspect fail closed.
+
+Each string is also scanned in a normalized form that catches common command spellings:
+
+- Comment-separated keywords, such as `DROP/*x*/TABLE`
+- Spaced dots, such as `os . system`
+- Reordered or split `rm` flags, such as `rm -fr`, `rm -r -f`, and `rm --recursive --force`
+
+Normalization also applies to JSON-encoded and base64-encoded arguments.
 
 Argument scanning additionally decodes bounded base64 tokens (7 or more alphabet characters) found inside serialized arguments and scans the decoded text with the same patterns, so a payload like `ZXhlYyg=` (`exec(`) cannot slip through as an encoded string. Pattern scanning is a heuristic, not a security boundary. For real enforcement, prefer `allowed_tools` allowlists plus OS-level sandboxing.
 
@@ -248,7 +311,7 @@ result = guard.check({
 | **Harmful** | API keys, passwords, private keys (including generic PEM headers) |
 | **Budget** | Cost/token limits exceeded |
 
-The Python and TypeScript packages run the same case-insensitive pattern superset. The TypeScript SafetyGuard performs the same harmful-content and IP-address PII checks as Python, and collects all error-severity findings instead of stopping at the first match.
+The Python and TypeScript packages run the same case-insensitive pattern superset. Email PII detection uses a linear-time scan, so long or adversarial input can't trigger catastrophic regex backtracking. The TypeScript SafetyGuard performs the same harmful-content and IP-address PII checks as Python, and collects all error-severity findings instead of stopping at the first match.
 
 Credential detection is value-aware: a bare label like `password: required` or `api_key: not set` passes, while a label followed by a real-looking value is blocked. Injection detection requires instruction-override context after a `system:` marker, so benign text like `Operating system: Linux` is not flagged.
 
@@ -260,7 +323,19 @@ SafetyGuard scans string content nested up to 12 levels deep, not just top-level
 - Anthropic content block envelopes
 - Strings nested inside arbitrary wrapper objects and arrays
 
-Content hidden inside a nested structure is checked for PII, injection, and harmful patterns the same as top-level content. Content nested deeper than 12 levels is **not** scanned — keep payloads you need verified within that bound.
+Content hidden inside a nested structure is checked for PII, injection, and harmful patterns the same as top-level content.
+
+### Resource limits
+
+SafetyGuard scanning is bounded. It fails closed when content exceeds any of these limits:
+
+| Limit | Value |
+|-------|-------|
+| Nesting depth | 12 levels |
+| Nodes scanned | 10,000 |
+| Content length | 100,000 characters |
+
+Keep payloads you need verified within these bounds.
 
 ---
 
@@ -312,6 +387,14 @@ With `strict_mode=True` (the default), any failed guard blocks the response.
 ### Strict response parsing
 
 `verify()` accepts a dict or a JSON string that parses to an object. A string that parses to a JSON scalar, array, or `null` raises `ValueError` instead of verifying content that guards never inspected. A plain non-JSON string is wrapped as `{"type": "text", "content": ...}`. The TypeScript `parseResponse` behaves identically.
+
+JSON string parsing is resource-bounded. `verify()` returns a failed verdict instead of raising an exception when a JSON response:
+
+- Is longer than 100,000 characters
+- Nests deeper than 100 levels
+- Contains an integer too large to convert safely
+
+The failure comes from a `ResponseVerifier` guard result with `severity="error"`, and the result is `blocked=True` in strict mode.
 
 ### Tamper-evident bindings
 

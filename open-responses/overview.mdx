@@ -277,9 +277,11 @@ print(middleware.get_stats())
 ### How it works
 
 1. Non-tool items (text, metadata) pass through unchanged
-2. Items with `type` of `tool_call` or `function_call` are verified against all guards
-3. If verification passes, the original item is yielded
-4. If verification fails and `block_on_failure` is `True`, a `system_intervention` item is yielded instead:
+2. Items with `type` of `tool_call` or `function_call` are verified against all guards in their original shape, before the middleware yields them. The `type` match ignores case and surrounding whitespace, so `" Function_Call "` is verified as a `function_call`
+3. Tool-shaped items that can't be verified unambiguously are blocked. This covers items with an unknown `type`, ambiguous envelopes, and tool calls nested inside other items
+4. `tool_result` and `function_call_output` items pass through; the middleware does not validate their correlation metadata. Results that hide a nested tool call are blocked
+5. If verification passes, the original item is yielded
+6. If verification fails and `block_on_failure` is `True`, a `system_intervention` item is yielded instead:
 
 ```json
 {
@@ -294,6 +296,8 @@ print(middleware.get_stats())
   }
 }
 ```
+
+ArgumentGuard and TaxGuard checks also run on batched and nested tool calls inside a streamed item, not only on the top-level call.
 
 ### Stats methods
 
