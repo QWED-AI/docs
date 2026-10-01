@@ -5,7 +5,48 @@ description: "Release notes for the QWED Protocol: version history, new guards, 
 
 All notable changes to the QWED platform, listed by release.
 
-Jump to: [`qwed init` server identity handshake](#qwed-verification-—-qwed-init-server-identity-handshake) · [Leaked key auto-revocation](#qwed-verification-—-leaked-api-key-auto-revocation-and-false-positive-feedback) · [API-key format spec](#qwed-verification-—-canonical-api-key-format-spec) · [Signed secret-scanning webhook](#qwed-verification-—-signed-secret-scanning-webhook-endpoint) · [v7.2.1](#v7-2-1-—-math-answer-comparison-security-patch) · [v7.2.0](#v7-2-0-—-precision-advisory-and-security-hardening-batch) · [v7.1.0](#v7-1-0-—-verification-context-v1-0-rollout) · [v7.0.0](#v7-0-0-—-full-diagnosticresult-engine-conformance)
+Jump to: [Open Responses v0.6.0](#qwed-open-responses-v0-6-0-—-fail-closed-hardening) · [`qwed init` server identity handshake](#qwed-verification-—-qwed-init-server-identity-handshake) · [Leaked key auto-revocation](#qwed-verification-—-leaked-api-key-auto-revocation-and-false-positive-feedback) · [API-key format spec](#qwed-verification-—-canonical-api-key-format-spec) · [Signed secret-scanning webhook](#qwed-verification-—-signed-secret-scanning-webhook-endpoint) · [v7.2.1](#v7-2-1-—-math-answer-comparison-security-patch) · [v7.2.0](#v7-2-0-—-precision-advisory-and-security-hardening-batch) · [v7.1.0](#v7-1-0-—-verification-context-v1-0-rollout) · [v7.0.0](#v7-0-0-—-full-diagnosticresult-engine-conformance)
+
+---
+
+## QWED Open Responses v0.6.0 — fail-closed hardening
+
+**Released: October 1, 2026** · [PR #48](https://github.com/QWED-AI/qwed-open-responses/pull/48) · [PR #49](https://github.com/QWED-AI/qwed-open-responses/pull/49) · [PR #50](https://github.com/QWED-AI/qwed-open-responses/pull/50) · [PR #51](https://github.com/QWED-AI/qwed-open-responses/pull/51) · [PR #52](https://github.com/QWED-AI/qwed-open-responses/pull/52) · [PR #55](https://github.com/QWED-AI/qwed-open-responses/pull/55)
+
+> SchemaGuard now rejects undeclared root fields by default, verification is resource-bounded, and ToolGuard, the streaming middleware, and the Express middleware close several bypasses. The Python and npm packages both move to 0.6.0.
+
+<Warning>
+**Breaking change.** SchemaGuard adds `additionalProperties: false` to the root object when your schema doesn't set it. Responses with undeclared top-level fields now fail. An explicit `additionalProperties` in your schema still wins. To keep the old behavior, opt out in the constructor:
+
+```python
+# Before: extra root fields passed silently
+SchemaGuard(schema)
+
+# After: opt out explicitly to allow them
+SchemaGuard(schema, allow_additional_properties=True)
+```
+
+```typescript
+new SchemaGuard(schema, { allowAdditionalProperties: true });
+```
+</Warning>
+
+### What changed
+
+- **SchemaGuard cross-language parity.** JSON Schema `format` validation for `email`, `uuid`, `date-time`, `uri`, and `ipv4` now matches across Python and npm.
+- **Resource-bounded verification.** JSON responses over 100,000 characters or 100 nesting levels, and responses with oversized integers, return a failed verdict instead of raising an exception. SafetyGuard scanning fails closed above 10,000 nodes, 100,000 characters, or 12 nesting levels. Email PII detection uses a linear-time scan.
+- **SchemaGuard reports the first error only.** Failed results carry one error, with the total error count reported as unknown (`total_errors=None`, `errors_truncated=True`).
+- **ToolGuard raw argument scanning.** Dangerous patterns run on the raw parsed argument strings, including nested values and JSON-encoded calls, so custom patterns match across tabs and newlines. Cyclic or too-deep arguments still fail closed.
+- **ToolGuard name and command normalization.** Blocked tool names are normalized for case, surrounding whitespace, dashes, underscores, and camelCase. The default blocklist adds `run_command`, `execute_command`, `command_line`, and `terminal`. Command checks catch comment-separated keywords, spaced dots, and reordered `rm` flags, including inside JSON- and base64-encoded arguments. Allowlist entries still require the exact configured separators. Custom validator keys match case and whitespace but don't merge distinct names.
+- **Streaming tool-call verification.** `OpenResponsesMiddleware.verify_stream` verifies each tool item in its original shape before yielding it. Tool-call types are normalized for case and whitespace. Unknown, ambiguous, or nested tool-shaped items are blocked. `tool_result` and `function_call_output` items pass through when their correlation metadata is valid. ArgumentGuard and TaxGuard checks cover batched and nested calls.
+- **Express middleware fails closed on unparsed bodies.** The npm `verifyRequestBody` middleware returns HTTP 422 when a request declares a body but has no parsed body, even with `blockOnFailure: false`. Bodyless requests and parsed empty JSON continue.
+
+### What this means for you
+
+- Review SchemaGuard schemas for responses that carry extra root fields, and declare them or opt out.
+- If you use the Express middleware, register a body parser such as `express.json()` before it.
+
+See the [guards reference](/open-responses/guards), [streaming middleware](/open-responses/overview#streaming-middleware), and [troubleshooting](/open-responses/troubleshooting).
 
 ---
 
