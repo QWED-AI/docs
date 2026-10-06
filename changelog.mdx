@@ -5,7 +5,49 @@ description: "Release notes for the QWED Protocol: version history, new guards, 
 
 All notable changes to the QWED platform, listed by release.
 
-Jump to: [Open Responses v0.6.0](#qwed-open-responses-v0-6-0-—-fail-closed-hardening) · [QWED-Legal fail-closed hardening](#qwed-legal-—-fail-closed-hardening-for-guards-diagnostics-and-github-action) · [`qwed init` server identity handshake](#qwed-verification-—-qwed-init-server-identity-handshake) · [Leaked key auto-revocation](#qwed-verification-—-leaked-api-key-auto-revocation-and-false-positive-feedback) · [API-key format spec](#qwed-verification-—-canonical-api-key-format-spec) · [Signed secret-scanning webhook](#qwed-verification-—-signed-secret-scanning-webhook-endpoint) · [v7.2.1](#v7-2-1-—-math-answer-comparison-security-patch) · [v7.2.0](#v7-2-0-—-precision-advisory-and-security-hardening-batch) · [v7.1.0](#v7-1-0-—-verification-context-v1-0-rollout) · [v7.0.0](#v7-0-0-—-full-diagnosticresult-engine-conformance)
+Jump to: [QWED-Legal date and input bounds](#qwed-legal-—-fail-closed-date-handling-and-input-bounds) · [Open Responses v0.6.0](#qwed-open-responses-v0-6-0-—-fail-closed-hardening) · [QWED-Legal fail-closed hardening](#qwed-legal-—-fail-closed-hardening-for-guards-diagnostics-and-github-action) · [`qwed init` server identity handshake](#qwed-verification-—-qwed-init-server-identity-handshake) · [Leaked key auto-revocation](#qwed-verification-—-leaked-api-key-auto-revocation-and-false-positive-feedback) · [API-key format spec](#qwed-verification-—-canonical-api-key-format-spec) · [Signed secret-scanning webhook](#qwed-verification-—-signed-secret-scanning-webhook-endpoint) · [v7.2.1](#v7-2-1-—-math-answer-comparison-security-patch) · [v7.2.0](#v7-2-0-—-precision-advisory-and-security-hardening-batch) · [v7.1.0](#v7-1-0-—-verification-context-v1-0-rollout) · [v7.0.0](#v7-0-0-—-full-diagnosticresult-engine-conformance)
+
+---
+
+## QWED-Legal — fail-closed date handling and input bounds
+
+**Merged: October 5, 2026** (unreleased on `main`, post-`0.4.0`) · [GitHub PR #89](https://github.com/QWED-AI/qwed-legal/pull/89) · [GitHub PR #90](https://github.com/QWED-AI/qwed-legal/pull/90) · [GitHub PR #91](https://github.com/QWED-AI/qwed-legal/pull/91) · [GitHub PR #92](https://github.com/QWED-AI/qwed-legal/pull/92)
+
+> `DeadlineGuard` and `StatuteOfLimitationsGuard` no longer guess what a date means. Order-ambiguous dates, partial dates, and event-anchored terms now return `UNVERIFIABLE` instead of a confident verdict. `ClauseGuard`, `ContradictionGuard`, and `CitationGuard` gain input bounds.
+
+<Warning>
+**Behavior change.** Some inputs that used to verify now return `UNVERIFIABLE`:
+
+```python
+# Before: "03/04/2026" was read month-first (March 4) and the claim verified.
+# After: UNVERIFIABLE with an AMBIGUITY_NOTED trace step.
+guard.verify(signing_date="03/04/2026", term="30 days", claimed_deadline="2026-04-03")
+
+# Before: computed 30 days from signing.
+# After: UNVERIFIABLE, because the clock starts at receipt, not signing.
+guard.verify(signing_date="2026-01-01", term="30 days after receipt", claimed_deadline="2026-01-31")
+```
+
+Pass ISO `YYYY-MM-DD` dates. ISO year-first and named-month dates still verify.
+</Warning>
+
+### What changed
+
+- **Order-ambiguous numeric dates fail closed (#90).** `DeadlineGuard` and `StatuteOfLimitationsGuard`, including computation-only mode, return `UNVERIFIABLE` with an `AMBIGUITY_NOTED` trace step for dates such as `03/04/2026` that read differently month-first and day-first.
+- **Partial dates fail closed (#91).** Inputs such as `"March 2024"`, `"Friday"`, or `"23:00"` would be completed from the system clock, so both guards reject them. In both cases, parsed datetimes in the result are `None` and the raw strings stay in the trace. `DeadlineGuard.calculate_business_days_between()` raises `ValueError` for these dates.
+- **Event-anchored terms fail closed (#92).** `DeadlineGuard` returns `UNVERIFIABLE` for terms that start the clock at receipt, notice, delivery, occurrence, demand, invoice, breach, termination, service of process, or payment. It no longer computes those deadlines from the signing date.
+- **Deadline comparison by calendar date (#92).** Claimed and computed deadlines are compared by date, not timestamp. Timezone-aware claims are converted to the computed deadline's timezone. Mixed timezone-aware and naive inputs return `UNVERIFIABLE`. `tolerance_days` stays in whole days.
+- **ClauseGuard input bounds (#89).** `check_consistency()` returns `invalid_input` for more than 200 clauses or any clause over 4,096 characters. It reports at most 100 conflict pairs and adds a truncation notice when it stops.
+- **Digit-run bound (#89).** Digit runs longer than 18 characters fail closed in `DeadlineGuard` terms, `ClauseGuard` day counts, and `ContradictionGuard` operands.
+- **Faster US citation patterns (#89).** `CitationGuard` US patterns no longer slow down on adversarial input.
+
+### What this means for you
+
+- Normalize dates to ISO `YYYY-MM-DD` before calling the deadline and statute guards.
+- For event-anchored deadlines, pass the event date as `signing_date` and drop the anchor from the term.
+- Treat `invalid_input` from `check_consistency()` on oversized clause lists as a rejection, not a pass.
+
+See [ambiguous and partial dates](/legal/guards#fail-closed-behavior-on-ambiguous-and-partial-dates), [event-anchored terms](/legal/guards#event-anchored-terms), [date-granularity comparison](/legal/guards#date-granularity-comparison), [StatuteOfLimitationsGuard](/legal/guards#6-statuteoflimitationsguard), and [ClauseGuard input validation](/legal/guards#input-validation).
 
 ---
 

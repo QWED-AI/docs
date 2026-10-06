@@ -131,7 +131,7 @@ print(result.difference_days)    # 13
 ### Parameters
 
 <ParamField path="signing_date" type="str" required>
-  The date the contract was signed (ISO format or natural language).
+  The date the contract was signed. Use an ISO `YYYY-MM-DD` date. Named-month dates such as `"January 15, 2026"` also work. Order-ambiguous numeric dates (`"03/04/2026"`) and partial dates (`"March 2024"`, `"Friday"`) return `UNVERIFIABLE`.
 </ParamField>
 
 <ParamField path="term" type="str" required>
@@ -139,11 +139,11 @@ print(result.difference_days)    # 13
 </ParamField>
 
 <ParamField path="claimed_deadline" type="str" required>
-  The deadline claimed by the LLM.
+  The deadline claimed by the LLM. The same date rules as `signing_date` apply. If you include a timezone, include one on `signing_date` too.
 </ParamField>
 
 <ParamField path="tolerance_days" type="int" default="0">
-  Allow +/- this many days when verifying the deadline. Useful for accommodating minor rounding differences.
+  Allow +/- this many whole calendar days when verifying the deadline. Useful for accommodating minor rounding differences.
 </ParamField>
 
 ### Response fields
@@ -151,11 +151,11 @@ print(result.difference_days)    # 13
 | Field | Type | Description |
 | --- | --- | --- |
 | `verified` | `bool` | Whether the claimed deadline matches the computed deadline. Always `False` when `is_computable` is `False`. |
-| `signing_date` | `datetime` | Parsed signing date |
-| `claimed_deadline` | `datetime` | The deadline claimed by the LLM |
+| `signing_date` | `Optional[datetime]` | Parsed signing date. `None` when a date input is order-ambiguous or partial. |
+| `claimed_deadline` | `Optional[datetime]` | The deadline claimed by the LLM. `None` when a date input is order-ambiguous or partial. |
 | `computed_deadline` | `Optional[datetime]` | The correct deadline computed by the guard. `None` when the term is ambiguous and the guard fails closed. |
 | `term_parsed` | `str` | The original term string, or `"ERROR"` when date parsing fails |
-| `difference_days` | `Optional[int]` | Absolute difference in days between claimed and computed. `None` when no deadline could be computed. |
+| `difference_days` | `Optional[int]` | Absolute difference in calendar days between claimed and computed. `None` when no deadline could be computed. |
 | `message` | `str` | Human-readable verification message. Starts with `⚠️ UNVERIFIABLE` when the term is ambiguous. |
 | `is_computable` | `bool` | `True` when the term parsed into an explicit quantity and unit. `False` when the input was ambiguous, unparseable, or the dates were invalid. |
 | `verification_mode` | `str` | Always `"SYMBOLIC"` for legal verification |
@@ -172,6 +172,8 @@ A term is treated as `UNVERIFIABLE` when any of the following apply:
 - It contains a **numeric token not adjacent to a time unit** (e.g., a clause reference like `"pursuant to section 4.2, within 10 days"` may still parse, but `"30 days per section 90"` fails closed because `90` is an unpaired quantity).
 - The `business`/`working`/`work` qualifier is **not adjacent** to the unit (e.g., `"30 business days"` parses; `"30 days business"` does not).
 - The parsed quantity exceeds an internal bound (~100,000 units after normalization) or produces an out-of-range date. This prevents crashes and unbounded business-day loops on inputs like `"999999999 business days"`.
+- The quantity is a digit run longer than 18 characters. The guard rejects it before converting it to a number.
+- The term is **anchored to an event** rather than the signing date. See [Event-anchored terms](#event-anchored-terms).
 
 Recognized time units are `day`/`calendar`, `week`, `month`, and `year`, with optional `business`/`working`/`work` qualifiers for business-day arithmetic. Business/working qualifiers are only valid on `day` and `week` units (`week` counts as 5 business days) — `"6 business months"` fails closed rather than silently computing a calendar period.
 
@@ -201,6 +203,97 @@ print(result.message)
 </Warning>
 
 Date parsing failures are also fail-closed: if `signing_date` or `claimed_deadline` cannot be parsed, the guard returns `verified=False` and `is_computable=False`.
+
+### Fail-closed behavior on ambiguous and partial dates
+
+`DeadlineGuard` refuses to guess what a date means. It returns `UNVERIFIABLE` (`verified=False`, `is_computable=False`) for two classes of date input:
+
+- **Order-ambiguous numeric dates.** `"03/04/2026"` is March 4 when read month-first and April 3 when read day-first. The guard no longer picks the month-first reading.
+- **Partial dates.** `"March 2024"`, `"Friday"`, and `"23:00"` leave out a year, month, or day. The parser would fill the gap from the system clock, so the same input could verify today and fail tomorrow.
+
+These dates still verify:
+
+- ISO year-first dates: `"2026-04-03"`, `"2026/04/03"`
+- Named-month dates: `"April 3, 2026"`, `"3 April 2026"`
+- Numeric dates that read the same either way: `"04/04/2026"`, `"13/04/2026"`
+- Complete dates with a time of day: `"2026-01-15 23:00"`
+
+In both rejection cases, `signing_date`, `claimed_deadline`, and `computed_deadline` are `None`. The verification trace keeps the raw input strings and ends with an `AMBIGUITY_NOTED` step that names the offending fields.
+
+```python
+from qwed_legal import DeadlineGuard
+
+guard = DeadlineGuard()
+
+result = guard.verify(
+    signing_date="03/04/2026",
+    term="30 days",
+    claimed_deadline="2026-04-03",
+)
+
+# Before: "03/04/2026" was read as March 4, and the claim verified.
+# After:
+print(result.verified)       # False
+print(result.is_computable)  # False
+print(result.signing_date)   # None
+print(result.message)
+# ⚠️ UNVERIFIABLE: signing_date is order-ambiguous (reads differently
+# month-first vs day-first). Supply an ISO year-leading date (YYYY-MM-DD)
+# or an unambiguous written date.
+
+# Fix: supply the intended date in ISO form.
+result = guard.verify(
+    signing_date="2026-03-04",
+    term="30 days",
+    claimed_deadline="2026-04-03",
+)
+print(result.verified)       # True
+```
+
+<Tip>
+  Normalize every date to ISO `YYYY-MM-DD` before you pass it to a QWED-Legal guard. ISO dates are never order-ambiguous or partial.
+</Tip>
+
+### Event-anchored terms
+
+`DeadlineGuard` computes deadlines from `signing_date` only. A term that starts its clock at a later event returns `UNVERIFIABLE` instead of a deadline counted from signing. The guard has no date for the event, so any computed deadline would be wrong.
+
+The guard treats a term as event-anchored when a preposition such as `after`, `following`, `upon`, `from`, or `within`, or a phrase like `days of`, ties the period to one of these events: receipt, notice, delivery, occurrence, demand, invoice, breach, termination, service (for example, service of process), or payment. Conditional wording about acceptance, approval, or payment (`"subject to approval"`) does not count as an anchor. A term that negates the signing date (`"not from signing"`) and names no supported replacement also fails closed.
+
+```python
+result = guard.verify(
+    signing_date="2026-01-01",
+    term="30 days after receipt of notice",
+    claimed_deadline="2026-01-31",
+)
+
+# Before: computed 30 days from signing and returned verified=True.
+# After:
+print(result.verified)           # False
+print(result.computed_deadline)  # None
+print(result.message)
+# ⚠️ UNVERIFIABLE: Term '30 days after receipt of notice' is anchored to an
+# event ('receipt'), not to the signing date. The real deadline is unknowable
+# from these inputs — supply the anchor event's date.
+```
+
+To verify an event-anchored deadline, pass the event's date as `signing_date` and drop the anchor from the term (for example, `term="30 days"`).
+
+### Date-granularity comparison
+
+`DeadlineGuard` compares the claimed and computed deadlines by calendar date. A time of day on the claim does not count as a mismatch. `tolerance_days` stays in whole calendar days.
+
+- When both dates carry a timezone, the guard converts the claimed deadline to the computed deadline's timezone before it compares calendar dates. The same moment written in a different offset is not a mismatch.
+- When one date carries a timezone and the other doesn't, the guard returns `UNVERIFIABLE` with the message `Mixed timezone inputs`. Supply both dates with a timezone, or both without.
+
+```python
+result = guard.verify(
+    signing_date="2026-01-01",
+    term="30 days",
+    claimed_deadline="2026-01-31 17:00",
+)
+print(result.verified)  # True: same calendar date as the computed deadline
+```
 
 ### Features
 
@@ -254,6 +347,8 @@ business_days = guard.calculate_business_days_between(
 
 print(business_days)  # Number of business days excluding weekends and holidays
 ```
+
+`calculate_business_days_between()` raises `ValueError` when either date is order-ambiguous (`"03/04/2026"`) or partial (`"March 2024"`). Pass ISO `YYYY-MM-DD` dates.
 
 ---
 
@@ -436,16 +531,22 @@ Broader extraction is coverage, not proof — ClauseGuard remains a `PARTIAL / H
 
 ### Input validation
 
-`check_consistency()` fails closed on inputs it cannot analyze. All four cases return `consistent=False`, `status="invalid_input"`, and a message that begins with `INVALID INPUT (LIMITED COVERAGE)`:
+`check_consistency()` fails closed on inputs it cannot analyze. All of these cases return `consistent=False`, `status="invalid_input"`, and a message that begins with `INVALID INPUT (LIMITED COVERAGE)`:
 
 - Empty list `[]`
 - Non-list values (dict, string, `None`)
 - Lists containing non-string elements
 - Lists containing empty or whitespace-only strings
+- Lists with more than 200 clauses
+- Lists containing a clause longer than 4,096 characters
 
 A **single-clause** list returns `consistent=False` and `status="insufficient_input"`: one clause has no pair to compare, so it is not evidence of consistency. Note that this branch is only reached for a non-empty list — an empty list is caught above as `invalid_input` ("No clauses were provided"), not `insufficient_input`.
 
 Downstream consumers must not treat an `invalid_input` or `insufficient_input` result as verified consistency.
+
+When a clause contains a day count with more than 18 digits, the guard can't read that value. The result is `status="heuristic_pass_limited"` instead of `"consistent"`.
+
+A `contradiction` result lists at most 100 conflict pairs. When the guard stops at that cap, the message ends with `Conflict list truncated at 100 pairs — additional conflicts may exist.` Treat a truncated list as incomplete.
 
 <Warning>
   The QWED Legal GitHub Action gates every block on `to_diagnostic().status == VERIFIED`. Only deterministic deadline and liability exact matches keep the action green. Heuristic `check_consistency()` results never pass the action, including plain `"consistent"`. Contradictions, `invalid_input`, `insufficient_input`, and `heuristic_pass_limited` results also fail. Citation runs never pass either; to branch on `results.citation.valid` from the `results` output, mark the QWED Legal step `continue-on-error: true` and gate on `steps.<id>.outputs.results` rather than the exit code — a failed step both skips the later steps *and* fails the job, so `if: always()` alone lets a later step read the output but cannot make the run pass. Unknown modes and runs that execute zero checks because inputs are missing fail with `verified=false` and a non-zero exit. Z3 clause proofs attest only through the Python API (`verify_using_z3()`), not through the Action.
@@ -545,6 +646,8 @@ print(result.issues)        # ["Unknown reporter"]
 | **US Federal** | `volume F./F.2d/F.3d page` | `500 F.3d 120` |
 | **UK Neutral** | `[year] court number` | `[2023] UKSC 10` |
 | **India AIR** | `AIR year court page` | `AIR 2020 SC 100` |
+
+The US citation patterns are written to avoid catastrophic regex backtracking, so adversarial input such as long runs of digits or whitespace no longer slows `verify()` down.
 
 ### Batch verification
 
@@ -770,7 +873,7 @@ print(result.days_remaining)    # -867 (negative = expired)
 | `CLAIM_VERIFIED` | Caller supplied `claimed_within_period` and it matches the computed result | `True` |
 | `CLAIM_INCORRECT` | Caller supplied `claimed_within_period` and it contradicts the computed result | `False` |
 | `COMPUTED_ONLY` | Period and expiration were computed; no `claimed_within_period` was supplied | `False` (by contract — no claim to verify) |
-| `UNVERIFIABLE` | Input class rejection (unknown jurisdiction/claim type, unparseable dates, impossible timeline) | `False` |
+| `UNVERIFIABLE` | Input class rejection (unknown jurisdiction/claim type, unparseable, order-ambiguous, or partial dates, impossible timeline) | `False` |
 
 `verified` is reserved for claim comparison. An expired-but-correctly-evaluated claim is `COMPUTED_ONLY` — it is no longer indistinguishable from an unverifiable result. Branch on `status` when you need to distinguish "we computed the answer and you did not ask us to compare" from "we could not compute the answer".
 
@@ -806,6 +909,25 @@ if not result.verified:
 - **Exact match only.** Jurisdiction lookup uses exact string equality (case-insensitive, trimmed). Partial matches such as `"CALIF"` for `"CALIFORNIA"` or `"NEW"` for `"NEW YORK"` are rejected.
 - **Unknown jurisdiction → unverifiable.** If the jurisdiction is not in the supported list, `verify()` returns `verified=False` with `jurisdiction_matched=False`, all date and period fields set to `None`, and a message listing the supported jurisdictions.
 - **Unknown claim type → unverifiable.** If the jurisdiction is supported but the claim type is not modeled for it, `verify()` returns `verified=False` with `claim_type_matched=False`, and a message listing the supported claim types for that jurisdiction.
+- **Ambiguous or partial dates → unverifiable.** If `incident_date` or `filing_date` is an order-ambiguous numeric date (`"03/04/2026"`) or a partial date that the parser would complete from the system clock (`"March 2024"`, `"Friday"`, `"23:00"`), `verify()` returns `status="UNVERIFIABLE"`. This applies in computation-only mode too, when you don't pass `claimed_within_period`. `incident_date`, `filing_date`, `expiration_date`, and `days_remaining` are `None`. The trace keeps the raw strings and records an `AMBIGUITY_NOTED` step. ISO year-first and named-month dates still verify.
+
+```python
+result = guard.verify(
+    claim_type="breach_of_contract",
+    jurisdiction="California",
+    incident_date="03/04/2022",
+    filing_date="2026-01-15",
+)
+
+# Before: read as March 4, 2022, and returned COMPUTED_ONLY.
+# After:
+print(result.status)         # "UNVERIFIABLE"
+print(result.incident_date)  # None
+print(result.message)
+# ⚠️ UNVERIFIABLE: incident_date is order-ambiguous (reads differently
+# month-first vs day-first). Supply an ISO year-leading date (YYYY-MM-DD)
+# or an unambiguous written date.
+```
 
 ```python
 result = guard.verify(
@@ -834,11 +956,11 @@ print(result.message)
 </ParamField>
 
 <ParamField path="incident_date" type="str" required>
-  Date the incident occurred (ISO format).
+  Date the incident occurred. Use ISO `YYYY-MM-DD`. Order-ambiguous and partial dates return `UNVERIFIABLE`.
 </ParamField>
 
 <ParamField path="filing_date" type="str" required>
-  Date the claim was or will be filed (ISO format).
+  Date the claim was or will be filed. Use ISO `YYYY-MM-DD`. Order-ambiguous and partial dates return `UNVERIFIABLE`.
 </ParamField>
 
 <ParamField path="claimed_within_period" type="bool">
@@ -864,11 +986,11 @@ print(result.message)
 </ResponseField>
 
 <ResponseField name="incident_date" type="Optional[datetime]">
-  Parsed incident date, or `None` if date parsing failed.
+  Parsed incident date, or `None` if date parsing failed or a date input was order-ambiguous or partial.
 </ResponseField>
 
 <ResponseField name="filing_date" type="Optional[datetime]">
-  Parsed filing date, or `None` if date parsing failed.
+  Parsed filing date, or `None` if date parsing failed or a date input was order-ambiguous or partial.
 </ResponseField>
 
 <ResponseField name="limitation_period_years" type="Optional[float]">
@@ -1206,6 +1328,8 @@ Keyword and value matching are both **word-boundary aware**:
 
 - Keyword matching: `"cap"` no longer matches inside `"capability"`, so unmodeled prose falls through to partial coverage instead of encoding a spurious liability cap.
 - Value token matching: `value=1` is no longer evidenced by `"12 months"`. Numeric operands must sit on their own token boundary.
+
+A numeric operand longer than 18 digits can't be read. The guard treats the whole clause as unmodeled instead of dropping that operand.
 
 ### Z3 vs ClauseGuard
 
