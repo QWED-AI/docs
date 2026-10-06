@@ -166,6 +166,10 @@ ToolGuard blocks rather than passes when a response cannot be validated unambigu
 - **Ambiguous hybrid envelopes.** A response that mixes a direct tool call (`type=tool_call` or `type=function_call`) with a sibling `tool_calls`, `choices`, or `content` collection is blocked, because validating one side would let the other escape policy checks.
 - **Nameless calls.** A tool call without a non-blank string name is blocked. A blank name can never match blocklist or allowlist checks.
 - **Oversized arguments.** JSON-encoded argument payloads over 10,000 characters or nested deeper than 128 levels are blocked before parsing.
+- **Conflicting tool identities.** A call entry that names its tool in more than one place is blocked. This covers root fields (`tool_name`, `name`, `arguments`) combined with a nested `tool_call` or `function_call` object, more than one nested call object, or either of those combined with a `function: {name, arguments}` wrapper. ToolGuard can't tell which identity the runtime will execute, so it rejects the entry.
+- **Truncated nested scans.** ToolGuard scans wrapper objects and arrays up to 12 levels deep for hidden tool calls. If the scan reaches that limit, the response is blocked instead of reported as "No tool calls".
+
+Configured ToolGuards also inspect `structured_output` responses, including those produced by `verify_structured_output`. A structured output that carries a tool-shaped payload, such as `name` plus `arguments`, goes through the same blocklist and pattern checks as a direct tool call.
 
 ---
 
@@ -313,7 +317,44 @@ result = guard.check({
 
 The Python and TypeScript packages run the same case-insensitive pattern superset. Email PII detection uses a linear-time scan, so long or adversarial input can't trigger catastrophic regex backtracking. The TypeScript SafetyGuard performs the same harmful-content and IP-address PII checks as Python, and collects all error-severity findings instead of stopping at the first match.
 
-Credential detection is value-aware: a bare label like `password: required` or `api_key: not set` passes, while a label followed by a real-looking value is blocked. Injection detection requires instruction-override context after a `system:` marker, so benign text like `Operating system: Linux` is not flagged.
+Credential detection is value-aware: a bare label like `password: required` or `api_key: not set` passes, while a label followed by a real-looking value is blocked. Quoted JSON credentials such as `{"api_key": "sk-live-..."}` are decoded and checked the same way, and documented placeholders like `"<your-api-key>"` stay exempt. Injection detection requires instruction-override context after a `system:` marker, so benign text like `Operating system: Linux` is not flagged.
+
+### Configuration
+
+The Python and TypeScript SafetyGuards accept the same PII allowlist and custom pattern options:
+
+<CodeGroup>
+```python Python
+from qwed_open_responses import SafetyGuard
+
+guard = SafetyGuard(
+    check_pii=True,
+    check_injection=True,
+    check_harmful=True,
+    pii_allow_list={"email"},
+    custom_patterns=[r"internal\s+marker"],
+)
+```
+
+```typescript TypeScript
+import { SafetyGuard } from 'qwed-open-responses';
+
+const guard = new SafetyGuard({
+  checkPii: true,
+  checkInjection: true,
+  checkHarmful: true,
+  piiAllowList: ['email'],
+  customPatterns: ['internal\\s+marker'],
+});
+```
+</CodeGroup>
+
+| Option | Description |
+|--------|-------------|
+| `pii_allow_list` / `piiAllowList` | PII types to skip, such as `email` or `ip_address`. The TypeScript option accepts camelCase and snake_case names, so `ipAddress` and `ip_address` are equivalent. |
+| `custom_patterns` / `customPatterns` | Extra case-insensitive regular expressions to block. Each matched pattern fails the check and adds its own `{"type": "custom_pattern", "severity": "error", "pattern": ...}` finding. |
+
+In TypeScript, an invalid custom pattern throws when you construct the guard. Each pattern runs with a 25 ms execution limit. A pattern that times out fails the safety check closed. Avoid nested or overlapping quantifiers such as `(a+)+$`, which can cause catastrophic backtracking.
 
 ### Content extraction
 
@@ -324,6 +365,8 @@ SafetyGuard scans string content nested up to 12 levels deep, not just top-level
 - Strings nested inside arbitrary wrapper objects and arrays
 
 Content hidden inside a nested structure is checked for PII, injection, and harmful patterns the same as top-level content.
+
+Object field names are scanned too. A payload like `{"ignore previous instructions": true}` or a key that contains an email address is flagged for injection or PII, even when its value is benign. Field names don't count toward the content length limit.
 
 ### Resource limits
 
@@ -419,6 +462,22 @@ print(result.request_id)  # "req_abc123"
 ```
 
 Result timestamps are timezone-aware UTC and carry the `+00:00` offset.
+
+### Passing usage totals for budget checks
+
+SafetyGuard budget limits (`max_cost`, `max_tokens`) compare a response's reported usage against trusted running totals in the context: `total_cost` and `total_tokens`. The `verify_tool_call` and `verify_structured_output` convenience methods accept the same `context` argument as `verify()`:
+
+```python
+verifier = ResponseVerifier(default_guards=[SafetyGuard(max_cost=10.0, max_tokens=50_000)])
+
+result = verifier.verify_tool_call(
+    "search",
+    {"query": "weather"},
+    context={"total_cost": 9.50, "total_tokens": 48_000},
+)
+```
+
+The OpenAI, streaming, LangChain, and LlamaIndex integrations forward the context as well. See the [OpenAI integration](/open-responses/openai#budget-limits-with-verification-context) and [streaming middleware](/open-responses/overview#streaming-middleware).
 
 ### Zero guards fail closed
 
