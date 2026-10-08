@@ -152,6 +152,34 @@ else:
 
 ---
 
+## Budget limits with verification context
+
+Pass `verification_context` to `chat.completions.create()` or `responses.create()` to give guards trusted usage totals, such as the running `total_cost` and `total_tokens` for a session. `VerifiedOpenAI` removes `verification_context` from the request before calling OpenAI, so it never reaches the API. The context is then passed to every guard when the response is verified.
+
+```python
+from qwed_open_responses import SafetyGuard
+from qwed_open_responses.middleware.openai_sdk import VerifiedOpenAI, ResponseBlocked
+
+client = VerifiedOpenAI(
+    api_key="sk-...",
+    guards=[SafetyGuard(max_cost=10.0, max_tokens=50_000)],
+)
+
+try:
+    response = client.chat.completions.create(
+        model="gpt-4",
+        messages=[{"role": "user", "content": "Summarize this report"}],
+        verification_context={"total_cost": 9.50, "total_tokens": 48_000},
+    )
+except ResponseBlocked:
+    # Response pushed the totals past a SafetyGuard budget limit
+    ...
+```
+
+You can also call `client.verify(response, context={...})` directly.
+
+---
+
 ## Responses API (preview)
 
 ```python

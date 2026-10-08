@@ -299,6 +299,24 @@ print(middleware.get_stats())
 
 ArgumentGuard and TaxGuard checks also run on batched and nested tool calls inside a streamed item, not only on the top-level call.
 
+### Budget tracking across a stream
+
+Pass a `context` to `verify_stream` to enforce SafetyGuard budget limits for the whole stream:
+
+```python
+middleware = OpenResponsesMiddleware(
+    guards=[ToolGuard(), SafetyGuard(max_cost=5.0, max_tokens=20_000)],
+)
+
+async for item in middleware.verify_stream(
+    response_stream,
+    context={"total_cost": 1.25, "total_tokens": 4_000},
+):
+    process(item)
+```
+
+The middleware copies the context and adds each item's reported `usage.cost` and `usage.total_tokens` to the running `total_cost` and `total_tokens`. Later tool calls are verified against those totals, so a call that arrives after the budget is spent is blocked. Your original context dictionary is not modified.
+
 ### Stats methods
 
 | Method | Description |

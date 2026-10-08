@@ -53,7 +53,7 @@ See [ambiguous and partial dates](/legal/guards#fail-closed-behavior-on-ambiguou
 
 ## QWED Open Responses v0.6.0 — fail-closed hardening
 
-**Upcoming release (in development — ships after the remaining hardening items).** · [PR #48](https://github.com/QWED-AI/qwed-open-responses/pull/48) · [PR #49](https://github.com/QWED-AI/qwed-open-responses/pull/49) · [PR #50](https://github.com/QWED-AI/qwed-open-responses/pull/50) · [PR #51](https://github.com/QWED-AI/qwed-open-responses/pull/51) · [PR #52](https://github.com/QWED-AI/qwed-open-responses/pull/52) · [PR #55](https://github.com/QWED-AI/qwed-open-responses/pull/55)
+**Released: October 2, 2026** in `qwed-open-responses` 0.6.0 · [PR #48](https://github.com/QWED-AI/qwed-open-responses/pull/48) · [PR #49](https://github.com/QWED-AI/qwed-open-responses/pull/49) · [PR #50](https://github.com/QWED-AI/qwed-open-responses/pull/50) · [PR #51](https://github.com/QWED-AI/qwed-open-responses/pull/51) · [PR #52](https://github.com/QWED-AI/qwed-open-responses/pull/52) · [PR #55](https://github.com/QWED-AI/qwed-open-responses/pull/55) · [PR #57](https://github.com/QWED-AI/qwed-open-responses/pull/57) · [PR #58](https://github.com/QWED-AI/qwed-open-responses/pull/58) · [PR #59](https://github.com/QWED-AI/qwed-open-responses/pull/59)
 
 > SchemaGuard now rejects undeclared root fields by default, verification is resource-bounded, and ToolGuard, the streaming middleware, and the Express middleware close several bypasses. The Python and npm packages both move to 0.6.0.
 
@@ -81,14 +81,20 @@ new SchemaGuard(schema, { allowAdditionalProperties: true });
 - **ToolGuard raw argument scanning.** Dangerous patterns run on the raw parsed argument strings, including nested values and JSON-encoded calls, so custom patterns match across tabs and newlines. Cyclic or too-deep arguments still fail closed.
 - **ToolGuard name and command normalization.** Blocked tool names are normalized for case, surrounding whitespace, dashes, underscores, and camelCase. The default blocklist adds `run_command`, `execute_command`, `command_line`, and `terminal`. Command checks catch comment-separated keywords, spaced dots, and reordered `rm` flags, including inside JSON- and base64-encoded arguments. Allowlist entries still require the exact configured separators. Custom validator keys match case and whitespace but don't merge distinct names.
 - **Streaming tool-call verification.** `OpenResponsesMiddleware.verify_stream` verifies each tool item in its original shape before yielding it. Tool-call types are normalized for case and whitespace. Unknown, ambiguous, or nested tool-shaped items are blocked. `tool_result` and `function_call_output` items pass through when their correlation metadata is valid. ArgumentGuard and TaxGuard checks cover batched and nested calls.
+- **SafetyGuard scans field names and quoted credentials.** Object field names are now checked for PII and prompt injection, not only values. Quoted JSON credentials such as `"api_key": "sk-..."` are blocked. Documented placeholders stay exempt.
+- **npm SafetyGuard configuration parity.** The TypeScript `SafetyGuard` accepts `customPatterns` and `piiAllowList`. Each matched custom pattern blocks and reports its own `custom_pattern` finding. Invalid patterns throw at construction, and a pattern that exceeds its 25 ms execution limit fails the check. `piiAllowList` accepts camelCase and snake_case names, such as `ipAddress` and `ip_address`.
+- **ToolGuard envelope hardening.** Envelopes that carry conflicting tool identities at the root, in a nested call, or in a `function` wrapper are blocked. Configured ToolGuards now check `structured_output` responses too. Nested scans that reach the depth limit block instead of reporting "No tool calls".
+- **Verification context propagation.** A `context` with usage caps now flows through `verify_tool_call`, `verify_structured_output`, and the OpenAI, streaming, LangChain, and LlamaIndex integrations. The OpenAI wrapper takes it as `verification_context` and doesn't send it to OpenAI. The streaming middleware carries running `total_cost` and `total_tokens` forward, so later items can hit SafetyGuard budget limits.
 - **Express middleware fails closed on unparsed bodies.** The npm `verifyRequestBody` middleware returns HTTP 422 when a request declares a body but has no parsed body, even with `blockOnFailure: false`. Bodyless requests and parsed empty JSON continue.
 
 ### What this means for you
 
 - Review SchemaGuard schemas for responses that carry extra root fields, and declare them or opt out.
 - If you use the Express middleware, register a body parser such as `express.json()` before it.
+- If ToolGuard now blocks your structured outputs or wrapped tool calls, give each call a single tool identity.
+- To enforce budgets across a stream or agent run, pass usage totals in the verification context.
 
-See the [guards reference](/open-responses/guards), [streaming middleware](/open-responses/overview#streaming-middleware), and [troubleshooting](/open-responses/troubleshooting).
+See the [guards reference](/open-responses/guards), [streaming middleware](/open-responses/overview#streaming-middleware), [OpenAI integration](/open-responses/openai#budget-limits-with-verification-context), and [troubleshooting](/open-responses/troubleshooting).
 
 ---
 
