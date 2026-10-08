@@ -861,14 +861,14 @@ print(result.verified)          # False - claim not supplied, so verified is Fal
 print(result.expiration_date)   # 2024-01-15
 print(result.days_remaining)    # -867 (negative = expired)
 
-# On unreleased main, result.status == "COMPUTED_ONLY" here
-# (period computed, no claim to verify against). Published 0.4.0
-# has no status field — gate on verified instead.
+# On 0.5.0+, result.status == "COMPUTED_ONLY" here
+# (period computed, no claim to verify against). On 0.4.0 and earlier
+# there is no status field — gate on verified instead.
 ```
 
 ### Result status taxonomy
 
-> `StatuteResult.status` and the fail-closed behaviors below track `qwed-legal` `main` (unreleased, post-`0.4.0`). Against the published `0.4.0` package, `status` is absent — gate on `verified` instead.
+> `StatuteResult.status` and the fail-closed behaviors below track `qwed-legal` 0.5.0+. Against `0.4.0` and earlier, `status` is absent — gate on `verified` instead.
 
 `StatuteResult.status` disambiguates the four outcomes previously conflated under `verified`:
 
