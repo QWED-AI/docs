@@ -800,6 +800,37 @@ print(result.verified)  # False
   Previously, any US and non-US party pair triggered the CISG warning regardless of `contract_type`, and an unrecognized `contract_type` skipped the CISG check silently. Pass `contract_type` explicitly to get a definitive CISG result.
 </Note>
 
+#### TypeScript (npm)
+
+The `@qwed-ai/legal` npm wrapper (0.5.0 and later) accepts the contract type as an optional fourth argument to `JurisdictionVerifier.verifyChoiceOfLaw(partiesCountries, governingLaw, forum?, contractType?)`. The wrapper passes it to the Python guard as `contract_type`, so the same three-way classification applies. The wrapper requires Python 3.10+ with `qwed-legal` installed.
+
+```typescript
+import { JurisdictionVerifier } from '@qwed-ai/legal';
+
+const jurisdiction = new JurisdictionVerifier();
+
+// Pass undefined for forum to set only the contract type
+const result = await jurisdiction.verifyChoiceOfLaw(
+    ['US', 'DE'],
+    'Delaware',
+    undefined,
+    'sale-of-goods'
+);
+
+console.log(result.contractType);           // "sale-of-goods"
+console.log(result.contractClassification); // "goods"
+console.log(result.warnings);               // [..., "International sale of goods may be subject to CISG unless expressly excluded.", ...]
+```
+
+`JurisdictionResult` adds two optional fields:
+
+| Field | Description |
+| --- | --- |
+| `contractType` | The contract type you passed, echoed back. `null` when omitted. |
+| `contractClassification` | The guard's classification from the verification trace: `goods`, `declared_non_goods`, or `unclassified`. `null` when the trace has no classification. |
+
+Use `contractClassification` to tell a `goods` warning apart from an `unclassified` partial-coverage warning without parsing messages. If you omit `contractType`, behavior is unchanged: the result has a partial-coverage warning and is not verified.
+
 ### Verify forum selection
 
 Use `verify_forum_selection` to validate a forum independently, with optional contract value threshold checks for US federal court diversity jurisdiction:
