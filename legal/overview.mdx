@@ -120,10 +120,10 @@ Not every guard can ever return `VERIFIED`. Guards whose evidence is inherently 
 
 | Guard | `VERIFIED` when… | `UNVERIFIABLE` when… | `BLOCKED` when… |
 |-------|------------------|----------------------|-----------------|
-| `DeadlineGuard` | Computed deadline matches the claim | Uninterpretable term, or fallback calendar used (`is_computable=False`) | Computed deadline differs from the claim |
+| `DeadlineGuard` | Computed deadline matches the claim | Uninterpretable term, ambiguous or partial dates, or fallback calendar used (`is_computable=False`) | Computed deadline differs from the claim |
 | `LiabilityGuard` | Computed cap/tier matches the claim | No claim supplied (computed-only), numeric input cannot be parsed, or empty tier list | Computed amount differs from the claim |
 | `JurisdictionGuard` | **Never** — evidence is `PARSED`/`INFERRED` only | Unsupported jurisdiction, unrecognized governing law, empty or blank party entries, or unclassified `contract_type` on a cross-border contract | Recognized-law conflict backed by analysis evidence (e.g. US-state law with a non-US forum) |
-| `StatuteOfLimitationsGuard` | `CLAIM_VERIFIED` — claim matches deterministic date arithmetic | `COMPUTED_ONLY` (no claim) or unsupported jurisdiction/claim type | `CLAIM_INCORRECT` |
+| `StatuteOfLimitationsGuard` | `CLAIM_VERIFIED` — claim matches deterministic date arithmetic | `COMPUTED_ONLY` (no claim), unsupported jurisdiction/claim type, or ambiguous or partial dates | `CLAIM_INCORRECT` |
 | `CitationGuard` | **Never** — citation authority is not verifiable from format | Format matches a supported reporter | Format invalid |
 | `ClauseGuard` | Z3 SAT proves constraints satisfiable (no contradiction over modeled constraints) | Heuristic pass over `INFERRED` evidence, or a single clause (`insufficient_input`) | Deterministic contradiction (Z3 UNSAT, or modeled heuristic conflict) |
 | `FairnessGuard` | **Never** — fairness is not deterministically provable | Any pass | Any deterministic failure |
