@@ -39,10 +39,10 @@ result = guard.check({"output": {"name": "John", "age": 30}})
 
 ### Undeclared fields are rejected by default
 
-In the upcoming v0.6.0 release, SchemaGuard closes the root object of your schema by adding `additionalProperties: false`. A response with a top-level field that the schema doesn't declare fails validation. An explicit `additionalProperties` value in your schema always takes precedence over this default.
+In v0.6.0, SchemaGuard closes the root object of your schema by adding `additionalProperties: false`. A response with a top-level field that the schema doesn't declare fails validation. An explicit `additionalProperties` value in your schema always takes precedence over this default.
 
 <Warning>
-**Breaking change in the upcoming v0.6.0.** Schemas that don't set `additionalProperties` used to accept extra root-level fields. They now reject them. If your outputs legitimately carry extra fields, declare them, set `additionalProperties` in the schema, or opt out in the constructor.
+**Breaking change in v0.6.0.** Schemas that don't set `additionalProperties` used to accept extra root-level fields. They now reject them. If your outputs legitimately carry extra fields, declare them, set `additionalProperties` in the schema, or opt out in the constructor.
 
 ```python
 schema = {

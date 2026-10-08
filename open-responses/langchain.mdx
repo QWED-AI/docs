@@ -93,7 +93,7 @@ callback = QWEDCallbackHandler(
 )
 ```
 
-`QWEDCallbackHandler` reads a `verification_context` keyword argument from LangChain callback events and passes it to the guards. Use it to supply trusted running totals (`total_cost`, `total_tokens`) so `max_cost` and `max_tokens` limits apply across an agent run. The LlamaIndex handler reads `verification_context` from the event keyword arguments or the event payload.
+`QWEDCallbackHandler` forwards `verification_context` only when a callback emitter explicitly supplies that keyword. The standard LangChain agent path does not supply it, so this handler cannot apply trusted `total_cost` or `total_tokens` across an agent run. Do not rely on this callback for run-wide `max_cost` or `max_tokens` enforcement. The LlamaIndex handler reads `verification_context` from the event keyword arguments or the event payload.
 
 ---
 

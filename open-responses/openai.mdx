@@ -158,7 +158,7 @@ Pass `verification_context` to `chat.completions.create()` or `responses.create(
 
 ```python
 from qwed_open_responses import SafetyGuard
-from qwed_open_responses.middleware.openai_sdk import ResponseBlocked
+from qwed_open_responses.middleware.openai_sdk import VerifiedOpenAI, ResponseBlocked
 
 client = VerifiedOpenAI(
     api_key="sk-...",
