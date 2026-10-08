@@ -279,6 +279,10 @@ print(result.message)
 
 To verify an event-anchored deadline, pass the event's date as `signing_date` and drop the anchor from the term (for example, `term="30 days"`).
 
+<Warning>
+The result reports the date you passed as `signing_date` — it cannot tell an event date from a real signing. If you store or share results, keep the contract's actual signing date separately so the record does not misstate when the contract was signed.
+</Warning>
+
 ### Date-granularity comparison
 
 `DeadlineGuard` compares the claimed and computed deadlines by calendar date. A time of day on the claim does not count as a mismatch. `tolerance_days` stays in whole calendar days.

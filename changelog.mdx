@@ -11,9 +11,9 @@ Jump to: [QWED-Legal date and input bounds](#qwed-legal-—-fail-closed-date-han
 
 ## QWED-Legal — fail-closed date handling and input bounds
 
-**Merged: October 5, 2026** (unreleased on `main`, post-`0.4.0`) · [GitHub PR #89](https://github.com/QWED-AI/qwed-legal/pull/89) · [GitHub PR #90](https://github.com/QWED-AI/qwed-legal/pull/90) · [GitHub PR #91](https://github.com/QWED-AI/qwed-legal/pull/91) · [GitHub PR #92](https://github.com/QWED-AI/qwed-legal/pull/92)
+**Released: October 7, 2026** in `qwed-legal` 0.5.0 · [GitHub PR #89](https://github.com/QWED-AI/qwed-legal/pull/89) · [GitHub PR #90](https://github.com/QWED-AI/qwed-legal/pull/90) · [GitHub PR #91](https://github.com/QWED-AI/qwed-legal/pull/91) · [GitHub PR #92](https://github.com/QWED-AI/qwed-legal/pull/92)
 
-> `DeadlineGuard` and `StatuteOfLimitationsGuard` no longer guess what a date means. Order-ambiguous dates, partial dates, and event-anchored terms now return `UNVERIFIABLE` instead of a confident verdict. `ClauseGuard`, `ContradictionGuard`, and `CitationGuard` gain input bounds.
+> `DeadlineGuard` and `StatuteOfLimitationsGuard` no longer guess what a date means. Order-ambiguous dates, partial dates, and event-anchored terms now return `UNVERIFIABLE` instead of a confident verdict. `ClauseGuard` and `ContradictionGuard` gain input bounds.
 
 <Warning>
 **Behavior change.** Some inputs that used to verify now return `UNVERIFIABLE`:
@@ -44,7 +44,7 @@ Pass ISO `YYYY-MM-DD` dates. ISO year-first and named-month dates still verify.
 ### What this means for you
 
 - Normalize dates to ISO `YYYY-MM-DD` before calling the deadline and statute guards.
-- For event-anchored deadlines, pass the event date as `signing_date` and drop the anchor from the term.
+- For event-anchored deadlines, pass the event date as `signing_date` and drop the anchor from the term. The result reports that date as `signing_date`, so keep the real signing date separately.
 - Treat `invalid_input` from `check_consistency()` on oversized clause lists as a rejection, not a pass.
 
 See [ambiguous and partial dates](/legal/guards#fail-closed-behavior-on-ambiguous-and-partial-dates), [event-anchored terms](/legal/guards#event-anchored-terms), [date-granularity comparison](/legal/guards#date-granularity-comparison), [StatuteOfLimitationsGuard](/legal/guards#6-statuteoflimitationsguard), and [ClauseGuard input validation](/legal/guards#input-validation).
