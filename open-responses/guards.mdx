@@ -477,7 +477,7 @@ result = verifier.verify_tool_call(
 )
 ```
 
-The OpenAI, streaming, LangChain, and LlamaIndex integrations forward the context as well. See the [OpenAI integration](/open-responses/openai#budget-limits-with-verification-context) and [streaming middleware](/open-responses/overview#streaming-middleware).
+The OpenAI, streaming, and LlamaIndex integrations forward the context as well. LangChain integrations forward `verification_context` only when a callback emitter explicitly supplies that keyword; the standard LangChain agent path does not supply it. See the [OpenAI integration](/open-responses/openai#budget-limits-with-verification-context) and [streaming middleware](/open-responses/overview#streaming-middleware).
 
 ### Zero guards fail closed
 
