@@ -4,13 +4,13 @@ title: "Compliance and auditing"
 description: "How QWED-Finance generates verification receipts with tamper-evident keyed signatures and audit trails for SOX, MiFID II, and banking compliance."
 ---
 
-QWED-Finance generates a **tamper-evident receipt** for every verification, supporting audit and regulatory workflows.
+QWED-Finance can attach a **tamper-evident receipt** to a verification, supporting audit and regulatory workflows.
 
 > "If an AI makes a mistake, the algorithm isn't sued—the bank is. Your `input_hash` and keyed `signature` provide **tamper evidence**."
 
 ## Verification receipts
 
-Every verification generates a tamper-evident receipt:
+`CrossGuard`, `UCPIntegration`, and the built-in `OpenResponsesIntegration` tools create receipts automatically. Custom Open Responses tools get a receipt only if their `verification_fn` creates one. Direct calls to the other guards (for example `ComplianceGuard.verify_aml_flag`) return a result object without a receipt; create one yourself with `ReceiptGenerator` when you need an audit record:
 
 ```python
 from qwed_finance import ReceiptGenerator, VerificationEngine
@@ -33,7 +33,7 @@ Every field below is part of the signed payload.
 | Field | Description | Example |
 | --- | --- | --- |
 | `receipt_id` | Unique identifier | `"a1b2c3d4-..."` |
-| `timestamp` | ISO 8601 UTC | `"2026-01-18T14:30:00Z"` |
+| `timestamp` | ISO 8601 UTC with microseconds | `"2026-01-18T14:30:00.123456+00:00"` |
 | `input_hash` | SHA-256 of LLM output | `"7f83b1657..."` |
 | `input_preview` | First 100 chars of the input | `"Transaction approved"` |
 | `guard_name` | Guard that ran | `"ComplianceGuard.verify_aml_flag"` |
@@ -50,9 +50,10 @@ Every field below is part of the signed payload.
 
 ### Cryptographic signature
 
-Signatures are keyed HMAC-SHA256 over the **full** canonical receipt —
+Since v3.0.0, signatures are keyed HMAC-SHA256 over the **full** canonical receipt —
 every field in the table above, as sorted compact JSON. The verifier
-holds the key; there is no default key.
+holds the key; there is no default key. The earlier unkeyed
+`get_signature()` (no argument) was removed in v3.0.0.
 
 ```python
 import hmac
@@ -139,7 +140,7 @@ We test against "jailbroken" LLMs:
 
 def test_delete_in_subquery():
     """DELETE hidden in subquery should be caught"""
-    sql = "SELECT * FROM (DELETE FROM users RETURNING *)"
+    sql = "SELECT * FROM (DELETE FROM users WHERE id=1 RETURNING *) AS deleted"
     result = guard.verify_readonly_safety(sql)
     assert result.safe == False  # ✅ Caught
 
@@ -193,7 +194,7 @@ The exported `receipt-abc-123.json` contains the full receipt:
 ```json
 {
   "receipt_id": "abc-123",
-  "timestamp": "2026-01-18T14:30:00Z",
+  "timestamp": "2026-01-18T14:30:00.123456+00:00",
   "input_hash": "7f83b1657ff1fc53b92dc18148a1d65dfc2d4b1fa3d677284addd200126d9069",
   "input_preview": "Transaction approved",
   "guard_name": "ComplianceGuard.verify_aml_flag",
@@ -267,10 +268,12 @@ audited_ok = all(results.values())
 
 ## Related pages
 
-- **Previous:** [The 10 Guards](/finance/guards) — Deep dive into each verification guard
+- **Previous:** [The 11 guards](/finance/guards) — Deep dive into each verification guard
 - **Next:** [QWED UCP: transaction verification for AI commerce](/ucp/overview) — Connect finance verification to AI-driven commerce flows
 - **See Also:** [QWED Open Responses: verified tool calls for AI agents](/open-responses/overview) — Add runtime verification to agent tool calls
 
 ---
 
-:::info GitHub Repository Source code and adversarial tests: [github.com/QWED-AI/qwed-finance](https://github.com/QWED-AI/qwed-finance) :::
+<Info>
+Source code and adversarial tests: [github.com/QWED-AI/qwed-finance](https://github.com/QWED-AI/qwed-finance)
+</Info>

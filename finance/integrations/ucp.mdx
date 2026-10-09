@@ -17,7 +17,7 @@ ucp = UCPIntegration(
 
 # Verify payment token
 result = ucp.verify_payment_token({
-    "amount": 15000,
+    "amount": 5000,
     "currency": "USD",
     "customer_country": "US",
     "kyc_verified": True
@@ -27,6 +27,21 @@ print(result.can_proceed)  # True ✅
 print(result.status)       # PaymentStatus.APPROVED
 ```
 
+Amounts at or above the \$10,000 AML threshold are held for review, even with KYC:
+
+```python
+result = ucp.verify_payment_token({
+    "amount": 15000,
+    "currency": "USD",
+    "customer_country": "US",
+    "kyc_verified": True
+})
+
+print(result.can_proceed)  # False
+print(result.status)       # PaymentStatus.PENDING_REVIEW
+print(result.violations)   # ["AML flag required: ..."]
+```
+
 ---
 
 ## Capability discovery
@@ -34,30 +49,33 @@ print(result.status)       # PaymentStatus.APPROVED
 For UCP's **Dynamic Discovery**, declare your capability:
 
 ```python
-capability = UCPIntegration.get_capability_definition()
+capability = UCPIntegration.get_capability_definition()  # full capability definition
+entry = ucp.get_ucp_json_entry()                           # entry for .well-known/ucp.json
 ```
 
 ### Add to `.well-known/ucp.json`
 
+`get_ucp_json_entry()` returns a `capabilities` block. Publish it without the `verify_loan_terms` operation (see the warning below):
+
 ```json
 {
-  "business": {
-    "name": "Your Bank",
-    "verification": {
-      "qwed-finance": {
-        "enabled": true,
-        "endpoint": "/api/qwed/verify",
-        "version": "1.0.0",
-        "operations": [
-          "verify_payment_token",
-          "verify_iso20022_payment",
-          "verify_loan_terms"
-        ]
-      }
+  "capabilities": {
+    "qwed-finance": {
+      "enabled": true,
+      "endpoint": "/api/qwed/verify",
+      "version": "1.0.0",
+      "operations": [
+        "verify_payment_token",
+        "verify_iso20022_payment"
+      ]
     }
   }
 }
 ```
+
+<Warning>
+In v3.0.1, `get_ucp_json_entry()` and `get_capability_definition()` also list a `verify_loan_terms` operation, but `UCPIntegration` has no such method. Remove it from the entry you publish, as shown above.
+</Warning>
 
 ---
 
@@ -94,7 +112,8 @@ For bank transfers using ISO 20022:
 ```python
 result = ucp.verify_iso20022_payment(
     xml_message=pacs008_xml,
-    sanctions_list=["ACME Corp", "Bad Bank"]
+    sanctions_list=["ACME Corp", "Bad Bank"],
+    kyc_verified=True,  # required to approve when require_kyc=True (the default)
 )
 
 if result.can_proceed:
@@ -123,11 +142,13 @@ else:
                     └─────────────┘
 ```
 
+For ISO 20022 messages, the business limits (`max_transaction_amount`, positive amount, `allowed_currencies`) apply to the amounts and currencies read from the parsed XML (since v3.0.0; hardened in v3.0.1, [GHSA-mrrj-6m2q-jch9](https://github.com/QWED-AI/qwed-finance/security/advisories/GHSA-mrrj-6m2q-jch9)). An empty or missing `sanctions_list` fails closed as unscreened instead of passing.
+
 ---
 
 ## Receipt IDs
 
-Every verification returns receipt IDs for audit:
+Every `verify_payment_token` and `verify_iso20022_payment` result carries receipts for audit:
 
 ```python
 result = ucp.verify_payment_token(token_data)
