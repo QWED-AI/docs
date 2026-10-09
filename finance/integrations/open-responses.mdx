@@ -251,7 +251,7 @@ If your `verification_fn` raises an exception, it will be caught by the error bo
 
 ## Audit trail
 
-Built-in tool calls and rejections for a missing `verification_fn` produce receipts in `qwed.audit_log` automatically. Results returned by a custom `verification_fn` are passed through as-is: they have a receipt, and appear in the audit log, only if your function creates the receipt and logs it.
+Built-in tool calls and rejections for a missing `verification_fn` produce receipts in `qwed.audit_log` automatically. Results returned by a custom `verification_fn` are passed through as-is: they carry a receipt only if your function creates one, and they appear in `qwed.audit_log` only if your function also logs that receipt.
 
 ```python
 # Get all receipts
@@ -266,5 +266,5 @@ Rejected tool calls (missing `verification_fn`) are audited with a receipt conta
 </Tip>
 
 <Warning>
-These outcomes return **no receipt** and are not written to `audit_log`: an unknown tool name, invalid JSON arguments, any result from a custom `verification_fn` that does not log its own receipt (including one that raises), and the `price_option` rejection for non-positive inputs. Log `result.status` and `result.error` yourself if you need a complete trail.
+These outcomes return **no receipt** and are not written to `audit_log`: an unknown tool name, invalid JSON arguments, a custom `verification_fn` that raises, and the `price_option` rejection for non-positive inputs. A custom `verification_fn` can return a receipt without adding it to `audit_log`; create and log the receipt yourself when you need both. Log `result.status` and `result.error` yourself if you need a complete trail.
 </Warning>
