@@ -17,11 +17,11 @@ tools = qwed.get_tools_schema()
 # Handle tool call from LLM
 result = qwed.handle_tool_call(
     tool_name="calculate_npv",
-    arguments={"cashflows": [-1000, 300, 400], "rate": 0.1}
+    arguments={"cashflows": [-1000, 300, 400, 500, 600], "rate": 0.1}
 )
 
 print(result.status)  # ToolCallStatus.COMPUTED
-print(result.result)  # {"npv": "$180.42", "verified": False, "computed": True, ...}
+print(result.result)  # {"npv": "$388.77", "verified": False, "computed": True, "verified_against_llm": False}
 ```
 
 <Warning>
@@ -59,9 +59,10 @@ result = qwed.handle_tool_call("transfer_funds", {"amount": 999})
 | --- | --- | --- |
 | `APPROVED` | Verified against LLM claim and passed | `true` |
 | `COMPUTED` | Computed deterministically, NOT compared to LLM claim | `false` |
-| `REJECTED` | Verification failed or no `verification_fn` registered | N/A (error) |
-| `MODIFIED` | Arguments were corrected before approval | `true` |
-| `ERROR` | System error prevented verification | N/A (error) |
+| `REJECTED` | Verification failed, invalid input, or no `verification_fn` registered | N/A (error) |
+| `ERROR` | Unknown tool, invalid JSON arguments, or a `verification_fn` that raised | N/A (error) |
+
+`ToolCallStatus.MODIFIED` exists in the enum for custom `verification_fn` implementations, but no built-in path returns it.
 
 ---
 
@@ -88,7 +89,7 @@ result = qwed.handle_tool_call("transfer_funds", {"amount": 999})
 2. QWED intercepts and checks for a registered `verification_fn`
 3. If no `verification_fn` → **REJECTED** (fail-closed, audited)
 4. If `verification_fn` exists → execute with error boundary
-5. Returns verified result with cryptographic receipt
+5. Returns the result; executed tools and missing-`verification_fn` rejections carry a receipt
 
 ---
 
@@ -133,7 +134,7 @@ result = qwed.handle_tool_call("price_option", {
     "option_type": "call",
 })
 
-print(result.result["price"])  # e.g. "$10.4506" — mpmath, deterministic
+print(result.result["price"])  # "$10.45" — mpmath, deterministic, rounded to cents
 print(result.result["delta"])  # e.g. "0.6368" — Decimal-quantized string
 ```
 
@@ -160,7 +161,7 @@ item = qwed.format_for_responses_api(result, tool_call_id="call_abc123")
   "tool_use_id": "calculate_npv",
   "content": {
     "mime_type": "application/json",
-    "text": "{\"result\": {\"npv\": \"$180.42\"}, \"verification\": {\"status\": \"computed_only\", \"verified\": false, \"note\": \"Result was computed deterministically but NOT verified against an LLM claim.\", \"engine\": \"SymPy\", \"receipt_id\": \"abc-123\", \"input_hash\": \"...\"}}"
+    "text": "{\"result\": {\"npv\": \"$388.77\", \"verified\": false, \"computed\": true, \"verified_against_llm\": false}, \"verification\": {\"status\": \"computed_only\", \"verified\": false, \"note\": \"Result was computed deterministically but NOT verified against an LLM claim.\", \"engine\": \"SymPy\", \"receipt_id\": \"abc-123\", \"input_hash\": \"...\", \"timestamp\": \"2026-01-18T14:30:00.123456+00:00\"}}"
   },
   "is_error": false
 }
@@ -175,7 +176,7 @@ item = qwed.format_for_responses_api(result, tool_call_id="call_abc123")
   "tool_use_id": "my_custom_tool",
   "content": {
     "mime_type": "application/json",
-    "text": "{\"result\": {...}, \"verification\": {\"status\": \"verified\", \"verified\": true, \"engine\": \"Z3\", \"receipt_id\": \"def-456\", \"input_hash\": \"...\"}}"
+    "text": "{\"result\": {...}, \"verification\": {\"status\": \"verified\", \"verified\": true, \"engine\": \"Z3\", \"receipt_id\": \"def-456\", \"input_hash\": \"...\", \"timestamp\": \"...\"}}"
   },
   "is_error": false
 }
@@ -187,6 +188,7 @@ item = qwed.format_for_responses_api(result, tool_call_id="call_abc123")
 
 ```python
 from openai import OpenAI
+from qwed_finance import OpenResponsesIntegration, ToolCallStatus
 
 client = OpenAI()
 qwed = OpenResponsesIntegration()
@@ -249,7 +251,7 @@ If your `verification_fn` raises an exception, it will be caught by the error bo
 
 ## Audit trail
 
-All tool call outcomes — including rejections — produce cryptographic receipts:
+Executed tool calls and rejections for a missing `verification_fn` produce receipts in `qwed.audit_log`:
 
 ```python
 # Get all receipts
@@ -260,5 +262,9 @@ json_log = qwed.audit_log.export_json()
 ```
 
 <Tip>
-Rejected tool calls (missing `verification_fn`) are also audited with a receipt containing the rejection reason, ensuring complete compliance traceability.
+Rejected tool calls (missing `verification_fn`) are audited with a receipt containing the rejection reason.
 </Tip>
+
+<Warning>
+These outcomes return **no receipt** and are not written to `audit_log`: an unknown tool name, invalid JSON arguments, a `verification_fn` that raises, and the `price_option` rejection for non-positive inputs. Log `result.status` and `result.error` yourself if you need a complete trail.
+</Warning>

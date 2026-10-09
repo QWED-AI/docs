@@ -1,14 +1,17 @@
 ---
 sidebar_position: 4
 title: "QWED Finance GitHub Action for CI/CD"
-description: "Verify NPV, IRR, YTM, and Sharpe calculations in CI with the QWED Finance GitHub Action, including SARIF output for GitHub Advanced Security."
+description: "Verify NPV, IRR, YTM, VaR, and Sharpe calculations in CI with the QWED Finance GitHub Action, including SARIF output for GitHub Advanced Security."
 ---
 
-QWED Finance v2.1.0 includes a production-ready GitHub Action to verify financial logic in your CI/CD pipeline.
+The QWED Finance Guard action (v3.0.1) verifies financial calculations in your CI/CD pipeline. It runs in two modes:
+
+- **`verify`** checks a single value claimed by an LLM against a deterministic computation.
+- **`scan-*`** checks every row of a CSV or JSON file and can write a SARIF report.
 
 ## Usage
 
-### Basic verification
+### Single verification
 
 ```yaml
 jobs:
@@ -16,59 +19,121 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Verify IRR calculation
-        uses: QWED-AI/qwed-finance@v2.1.0
+        id: qwed
+        uses: QWED-AI/qwed-finance@v3.0.1
         with:
           action: verify
           verification_type: irr
           cashflows: "-1000, 300, 400, 500, 600"
           llm_output: "24.89%"
+
+      - name: Show computed value
+        run: echo "QWED computed ${{ steps.qwed.outputs.computed_value }}"
 ```
 
-### SARIF scanning (security dashboard)
+The step fails when the claimed value does not match, unless you set `fail_on_error: false`.
 
-QWED automatically outputs SARIF reports that integrate with GitHub Advanced Security.
+### File scan with SARIF (security dashboard)
+
+Commit a data file with one calculation per row, for example `data/bonds.csv`:
+
+```csv data/bonds.csv
+face_value,coupon_rate,price,years,llm_ytm
+1000,0.05,920,8,6.29%
+1000,0.04,1050,5,5.00%
+```
+
+Then scan it and upload the report:
 
 ```yaml
 jobs:
   scan:
     runs-on: ubuntu-latest
     permissions:
+      contents: read
       security-events: write
     steps:
-      - name: Scan financial models
-        uses: QWED-AI/qwed-finance@v2.1.0
+      - uses: actions/checkout@v4
+
+      - name: Scan bond calculations
+        id: qwed
+        uses: QWED-AI/qwed-finance@v3.0.1
         with:
-          action: scan
-          scan_target: ./models
-          scan_type: npv
-      
+          action: scan-bonds
+          data_file: data/bonds.csv
+          output_format: sarif
+          fail_on_error: false
+
       - name: Upload SARIF
-        uses: github/codeql-action/upload-sarif@v2
+        if: steps.qwed.outputs.sarif_file != ''
+        uses: github/codeql-action/upload-sarif@v3
         with:
-          sarif_file: qwed-results.sarif
+          sarif_file: ${{ steps.qwed.outputs.sarif_file }}
 ```
+
+In this example the second row fails: the computed YTM is `2.9180%`, not `5.00%`.
+
+<Note>
+The SARIF file (`qwed-finance-results.sarif`) is written only when `output_format: sarif` is set **and** the scan finds at least one mismatch. Guard the upload step on the `sarif_file` output, as shown above.
+</Note>
 
 ## Inputs
 
 | Input | Description | Required | Default |
 |-------|-------------|----------|---------|
-| `action` | Mode: `verify` (single check) or `scan` (audit files) | No | `verify` |
-| `verification_type` | `npv`, `irr`, `ytm`, `sharpe` | Yes (for verify) | - |
-| `llm_output` | The value claimed by the LLM (e.g., "15.4%") | Yes (for verify) | - |
-| `scan_target` | Directory to scan for logic files | Yes (for scan) | - |
+| `action` | `verify`, `scan-npv`, `scan-bonds`, `scan-fx`, or `scan-risk` | No | `verify` |
+| `verification_type` | For `verify`: `npv`, `irr`, `monthly_payment`, `ytm`, `duration`, `forward_rate`, `var`, `sharpe` | No | `npv` |
+| `cashflows` | Comma-separated cash flows for `npv` and `irr` (e.g. `-1000,200,300,400`) | For `npv`, `irr` | - |
+| `rate` | Discount rate for `npv`, interest rate for `monthly_payment` (e.g. `0.10`) | For `npv`, `monthly_payment` | - |
+| `llm_output` | The value claimed by the LLM (e.g. `"$71.78"`, `"24.89%"`) | For `verify` | - |
+| `data_file` | Path to a CSV or JSON file, relative to the workspace | For `scan-*` | - |
+| `output_format` | `text`, `json`, or `sarif` (`sarif` applies to scan modes) | No | `text` |
+| `fail_on_error` | Fail the step when a value does not verify | No | `true` |
 
-## Supported verification types
+<Warning>
+`compound` appears in the `verification_type` description in `action.yml` but is not implemented by the action. Use the Python `FinanceVerifier.verify_compound_interest()` API for compound interest.
+</Warning>
 
-| Type | Params (env vars) | Description |
-|------|-------------------|-------------|
-| `npv` | `INPUT_CASHFLOWS`, `INPUT_RATE` | Net present value |
-| `irr` | `INPUT_CASHFLOWS` | Internal rate of return |
+## Outputs
+
+| Output | Description |
+|--------|-------------|
+| `verified` | `true` or `false` (verify mode) |
+| `computed_value` | The value QWED computed (verify mode) |
+| `errors_count` | Number of rows that failed (scan modes) |
+| `sarif_file` | Path to the SARIF report, when one was written |
+| `badge_url` | A QWED verified/failed badge URL |
+
+## Verification types
+
+`npv` and `irr` take their inputs from `cashflows` and `rate`. The other types read extra parameters from environment variables and fall back to built-in defaults when they are not set:
+
+| Type | Parameters | Description |
+|------|------------|-------------|
+| `npv` | `cashflows`, `rate` | Net present value |
+| `irr` | `cashflows` | Internal rate of return |
+| `monthly_payment` | `rate`, `INPUT_PRINCIPAL`, `INPUT_MONTHS` | Loan payment |
 | `ytm` | `INPUT_FACE_VALUE`, `INPUT_COUPON_RATE`, `INPUT_PRICE`, `INPUT_YEARS` | Yield to maturity |
+| `duration` | `INPUT_FACE_VALUE`, `INPUT_COUPON_RATE`, `INPUT_YTM`, `INPUT_YEARS` | Macaulay duration |
+| `forward_rate` | `INPUT_SPOT_RATE`, `INPUT_DOMESTIC_RATE`, `INPUT_FOREIGN_RATE`, `INPUT_DAYS` | FX forward rate |
+| `var` | `INPUT_PORTFOLIO_VALUE`, `INPUT_VOLATILITY`, `INPUT_CONFIDENCE`, `INPUT_DAYS` | Value at Risk |
 | `sharpe` | `INPUT_RETURN`, `INPUT_RISK_FREE`, `INPUT_VOLATILITY` | Sharpe ratio |
 
-:::info Zero-config SARIF
-When running in `scan` mode, the action automatically generates `qwed-results.sarif`. No extra configuration needed.
-:::
+These `INPUT_*` names are not declared action inputs, so they cannot be set with `with:`. For bonds, FX, and risk checks, prefer the scan modes, where every parameter comes from your data file.
+
+## Scan file columns
+
+| Mode | Required columns | Optional columns (default) |
+|------|------------------|----------------------------|
+| `scan-npv` | `cashflows` (comma-separated, quoted in CSV), `llm_npv` | `rate` (0.1) |
+| `scan-bonds` | `face_value`, `llm_ytm` | `coupon_rate` (0.05), `price` (1000), `years` (10) |
+| `scan-fx` | `spot_rate`, `llm_forward` | `domestic_rate` (0.05), `foreign_rate` (0.02), `days` (90) |
+| `scan-risk` | `portfolio_value`, `llm_var` | `volatility` (0.02), `confidence` (0.95), `holding_days` (1) |
+
+<Warning>
+Rows that lack the required columns, or that raise an error while being processed, are skipped with a warning and are **not** counted in `errors_count`. Check the step log for `⚠️ Row` lines, and make sure every row has the required columns.
+</Warning>
+
 ## Related extensions
 
 Use these actions to expand verification coverage across other QWED extensions.

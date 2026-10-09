@@ -5,19 +5,19 @@ sidebarTitle: "Overview"
 description: "QWED Finance uses deterministic verification, SymPy, and Z3 to prevent hallucinations in financial AI, agent workflows, and transaction calculations."
 ---
 
-**Deterministic verification for financial AI (v2.1.0).**
+**Deterministic verification for financial AI (v3.0.1).**
 
 > When an LLM told a customer his Chase card had "$12,889" in rewards, QWED-Finance would have caught the hallucination before it caused a lawsuit.
 
 QWED Finance is a guardrail library that prevents financial hallucinations in LLMs. It combines LLM translation with deterministic solvers (SymPy, Z3, mpmath) and standard financial algorithms.
 
-**New in v2.1.0: Security audit hardening.**
+**New in v3.0.1: security fixes.**
 
-- Fail-closed enforcement across `OpenResponsesIntegration`
-- Unified AML high-risk country list
-- `BondGuard._parse_rate()` returns `Decimal`
-- Full `Decimal`/`mpmath` migration for `BondGuard`, `DerivativesGuard`, and `RiskGuard`
-- Greeks are now Decimal-quantized strings
+- ISO 20022 business rules read amounts and currencies from the parsed XML tree, not from raw text ([GHSA-mrrj-6m2q-jch9](https://github.com/QWED-AI/qwed-finance/security/advisories/GHSA-mrrj-6m2q-jch9))
+- Sanctions screening folds diacritics and look-alike letters and compares separator-free names, so `E.V.I.L. CORP` or `ÉVIL CORP` no longer clears an `EVIL CORP` entry ([GHSA-mv2c-jwm9-pfrq](https://github.com/QWED-AI/qwed-finance/security/advisories/GHSA-mv2c-jwm9-pfrq))
+- `QueryGuard` rejects MySQL `/*! ... */` and MariaDB `/*M! ... */` executable comments ([GHSA-q8r4-6gpp-5fx2](https://github.com/QWED-AI/qwed-finance/security/advisories/GHSA-q8r4-6gpp-5fx2))
+
+**v3.0.0 highlights:** keyed HMAC receipt signatures (`get_signature(key)`), ISO amount and currency limits in receipts and UCP, a fail-closed batch for AML, sanctions, amounts, and message validation, and a breaking change to the npm bridge (stdin JSON with runtime validation). See the [changelog](https://github.com/QWED-AI/qwed-finance/blob/main/CHANGELOG.md) for details.
 
 ## Why QWED Finance?
 
@@ -28,16 +28,16 @@ LLMs struggle with basic math and strict logic. In finance, close enough is not 
 
 ## Key features
 
-- **10 specialized guards:** Compliance, Calendar, Derivatives, Messages, Query, Cross, Bond, FX, Risk, ISO.
-- **GitHub Action v2.0:** Integrated CI/CD verifier with SARIF support for security dashboards.
-- **Audit trails:** Cryptographic attestation of verification results.
+- **11 specialized guards:** Compliance, Calendar, Derivatives, Messages, Query, Cross, Bond, FX, Risk, ISO, Trading.
+- **GitHub Action:** CI/CD verifier with optional SARIF output for security dashboards.
+- **Audit trails:** Verification receipts with keyed HMAC-SHA256 signatures for cross-guard and integration flows.
 - **Deterministic verification:** When deterministic engines apply, results are exact rather than probabilistic.
 
 ## The 4 pillars of banking verification
 
 | Pillar | Guard | Engine | Use case |
 |--------|-------|--------|----------|
-| **Calculation** | Finance + Calendar + Derivatives | SymPy | NPV, IRR, options pricing |
+| **Calculation** | Finance + Calendar + Derivatives + Bond + FX + Risk | SymPy, `Decimal`, mpmath | NPV, IRR, day counts, options pricing, YTM, VaR |
 | **Regulation** | Compliance | Z3 | KYC/AML, OFAC sanctions |
 | **Interoperability** | Message | XML Schema | ISO 20022, SWIFT MT |
 | **Data safety** | Query | SQLGlot | SQL injection prevention |
@@ -57,7 +57,7 @@ result = guard.verify_aml_flag(
 )
 
 print(result.compliant)  # True ✅
-print(result.proof)      # "amount >= 10000 → flag required"
+print(result.proof)      # "Z3: LLM decision matches regulatory requirement"
 ```
 
 ## Architecture
@@ -70,11 +70,11 @@ flowchart TB
         LLM["LLM (GPT-4, Claude)"]
     end
     
-    subgraph QWED["🛡️ QWED-Finance v2.1.0"]
+    subgraph QWED["🛡️ QWED-Finance v3.0.1"]
         direction TB
         subgraph Guards["Verification Guards"]
             CG["Compliance Guard<br/>(Z3 Logic)"]
-            CAL["Calendar Guard<br/>(SymPy)"]
+            CAL["Calendar Guard<br/>(Decimal day counts)"]
             DG["Derivatives Guard<br/>(Black-Scholes)"]
             MG["Message Guard<br/>(XML Schema)"]
             QG["Query Guard<br/>(SQLGlot AST)"]
@@ -130,14 +130,14 @@ graph TB
         
         subgraph "Layer 2: Engines"
             E1["🔬 Z3 SMT Solver"]
-            E2["📐 SymPy Symbolic Math"]
+            E2["📐 Decimal Day-Count Arithmetic"]
             E3["📊 Black-Scholes Calculus"]
             E4["📄 XML Schema Validation"]
             E5["🗃️ SQLGlot AST Parser"]
         end
         
         subgraph "Layer 3: Audit"
-            A1["Verification Receipt"]
+            A1["Verification Receipt<br/>(CrossGuard, UCP, Open Responses)"]
             A2["Audit Log"]
         end
     end
@@ -246,7 +246,7 @@ result = verifier.verify_compound_interest(
     rate=0.05,
     periods=10,
     compounding="monthly",
-    llm_amount="$16,470.09",
+    llm_output="$16,470.09",
 )
 
 # ❌ Unknown frequency — fail-closed
@@ -255,7 +255,7 @@ verifier.verify_compound_interest(
     rate=0.05,
     periods=10,
     compounding="weekly",  # not supported
-    llm_amount="$16,470.09",
+    llm_output="$16,470.09",
 )
 # raises ValueError:
 #   Unknown compounding frequency: 'weekly'.
@@ -266,7 +266,7 @@ If you need a frequency outside this list, compute the equivalent rate yourself 
 
 ## Next steps
 
-- [The 10 guards](/finance/guards) - Deep dive into each verification guard
+- [The 11 guards](/finance/guards) - Deep dive into each verification guard
 - [Compliance and auditing](/finance/compliance) - Receipts and regulatory proof
 - [QWED UCP: transaction verification for AI commerce](/ucp/overview) - Connect finance verification to commerce transactions
 - [QWED Open Responses: verified tool calls for AI agents](/open-responses/overview) - Verify finance-related agent actions before execution
