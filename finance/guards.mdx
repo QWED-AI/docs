@@ -131,11 +131,11 @@ result = guard.verify_black_scholes(
 
 ```python
 # Before
-greeks["delta"] * notional  # 0.3772 * notional
+greeks["delta"] * notional  # TypeError: str * int
 
 # After
 from decimal import Decimal
-Decimal(greeks["delta"]) * Decimal(notional)  # "0.3772" → exact
+Decimal(greeks["delta"]) * Decimal(str(notional))  # "0.3772" → exact; str() avoids float noise
 ```
 </Warning>
 

@@ -7,7 +7,7 @@ description: "Verify NPV, IRR, YTM, VaR, and Sharpe calculations in CI with the 
 The QWED Finance Guard action (v3.0.1) verifies financial calculations in your CI/CD pipeline. It runs in two modes:
 
 - **`verify`** checks a single value claimed by an LLM against a deterministic computation.
-- **`scan-*`** checks every row of a CSV or JSON file and can write a SARIF report.
+- **`scan-*`** checks the rows of a CSV or JSON file that have the required columns, and can write a SARIF report. Rows it skips are not counted as errors; see [Scan file columns](#scan-file-columns).
 
 ## Usage
 
@@ -106,7 +106,7 @@ The SARIF file (`qwed-finance-results.sarif`) is written only when `output_forma
 
 ## Verification types
 
-`npv` and `irr` take their inputs from `cashflows` and `rate`. The other types read extra parameters from environment variables and fall back to built-in defaults when they are not set:
+`npv` takes its inputs from `cashflows` and `rate`, and `irr` from `cashflows` only. The other types read extra parameters from environment variables and fall back to built-in defaults when they are not set:
 
 | Type | Parameters | Description |
 |------|------------|-------------|
