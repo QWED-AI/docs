@@ -87,7 +87,7 @@ The SARIF file (`qwed-finance-results.sarif`) is written only when `output_forma
 | `rate` | Discount rate for `npv`, interest rate for `monthly_payment` (e.g. `0.10`) | For `npv`, `monthly_payment` | - |
 | `llm_output` | The value claimed by the LLM (e.g. `"$71.78"`, `"24.89%"`) | For `verify` | - |
 | `data_file` | Path to a CSV or JSON file, relative to the workspace | For `scan-*` | - |
-| `output_format` | `text`, `json`, or `sarif` (`sarif` applies to scan modes) | No | `text` |
+| `output_format` | `text`, `json` (verify mode only), or `sarif` (scan modes only) | No | `text` |
 | `fail_on_error` | Fail the step when a value does not verify | No | `true` |
 
 <Warning>
@@ -131,7 +131,12 @@ These `INPUT_*` names are not declared action inputs, so they cannot be set with
 | `scan-risk` | `portfolio_value`, `llm_var` | `volatility` (0.02), `confidence` (0.95), `holding_days` (1) |
 
 <Warning>
-Rows that lack the required columns, or that raise an error while being processed, are skipped with a warning and are **not** counted in `errors_count`. Check the step log for `⚠️ Row` lines, and make sure every row has the required columns.
+Scan modes do not count every row they skip:
+
+- Rows that lack a required column are skipped **silently**: no `⚠️ Row` line is printed and `errors_count` does not change.
+- Rows that raise an error while being processed are skipped with a `⚠️ Row` line, and are also not counted in `errors_count`.
+
+A scan that reports zero errors therefore does not prove that every row was checked. Validate that every row has the required columns before the scan step, and treat the scan as complete only after that check passes.
 </Warning>
 
 ## Related extensions

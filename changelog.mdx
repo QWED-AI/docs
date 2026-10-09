@@ -5,7 +5,30 @@ description: "Release notes for the QWED Protocol: version history, new guards, 
 
 All notable changes to the QWED platform, listed by release.
 
-Jump to: [QWED-Legal date and input bounds](#qwed-legal-—-fail-closed-date-handling-and-input-bounds) · [Open Responses v0.6.0](#qwed-open-responses-v0-6-0-—-fail-closed-hardening) · [QWED-Legal fail-closed hardening](#qwed-legal-—-fail-closed-hardening-for-guards-diagnostics-and-github-action) · [`qwed init` server identity handshake](#qwed-verification-—-qwed-init-server-identity-handshake) · [Leaked key auto-revocation](#qwed-verification-—-leaked-api-key-auto-revocation-and-false-positive-feedback) · [API-key format spec](#qwed-verification-—-canonical-api-key-format-spec) · [Signed secret-scanning webhook](#qwed-verification-—-signed-secret-scanning-webhook-endpoint) · [v7.2.1](#v7-2-1-—-math-answer-comparison-security-patch) · [v7.2.0](#v7-2-0-—-precision-advisory-and-security-hardening-batch) · [v7.1.0](#v7-1-0-—-verification-context-v1-0-rollout) · [v7.0.0](#v7-0-0-—-full-diagnosticresult-engine-conformance)
+Jump to: [QWED-Finance v3.0.1](#qwed-finance-v3-0-1-—-iso-20022-sanctions-and-queryguard-security-fixes) · [QWED-Legal date and input bounds](#qwed-legal-—-fail-closed-date-handling-and-input-bounds) · [Open Responses v0.6.0](#qwed-open-responses-v0-6-0-—-fail-closed-hardening) · [QWED-Legal fail-closed hardening](#qwed-legal-—-fail-closed-hardening-for-guards-diagnostics-and-github-action) · [`qwed init` server identity handshake](#qwed-verification-—-qwed-init-server-identity-handshake) · [Leaked key auto-revocation](#qwed-verification-—-leaked-api-key-auto-revocation-and-false-positive-feedback) · [API-key format spec](#qwed-verification-—-canonical-api-key-format-spec) · [Signed secret-scanning webhook](#qwed-verification-—-signed-secret-scanning-webhook-endpoint) · [v7.2.1](#v7-2-1-—-math-answer-comparison-security-patch) · [v7.2.0](#v7-2-0-—-precision-advisory-and-security-hardening-batch) · [v7.1.0](#v7-1-0-—-verification-context-v1-0-rollout) · [v7.0.0](#v7-0-0-—-full-diagnosticresult-engine-conformance)
+
+---
+
+## QWED-Finance v3.0.1 — ISO 20022, sanctions, and QueryGuard security fixes
+
+**Released: October 9, 2026** in `qwed-finance` 3.0.1 (PyPI, npm `@qwed-ai/finance`, and GitHub Action `QWED-AI/qwed-finance@v3.0.1`) · [Changelog](https://github.com/QWED-AI/qwed-finance/blob/main/CHANGELOG.md)
+
+> `qwed-finance` v3.0.1 is the current release. It fixes three security advisories. Upgrade from v2.1.0 or v3.0.0.
+
+### What changed
+
+- **ISO 20022 business rules read the parsed document** ([GHSA-mrrj-6m2q-jch9](https://github.com/QWED-AI/qwed-finance/security/advisories/GHSA-mrrj-6m2q-jch9)). `CrossGuard.check_business_rules`, `verify_iso20022_with_rules`, and `UCPIntegration.verify_iso20022_payment` take amounts and currencies from the parsed XML tree instead of regex over raw text. Amounts with child nodes, exponents, or grouping separators fail closed.
+- **Sanctions screening resists in-word perturbations** ([GHSA-mv2c-jwm9-pfrq](https://github.com/QWED-AI/qwed-finance/security/advisories/GHSA-mv2c-jwm9-pfrq)). Diacritics and look-alike letters are folded, and separator-free names are compared, so `E.V.I.L. CORP` or `ÉVIL CORP` no longer clears an `EVIL CORP` entry.
+- **QueryGuard rejects MySQL executable comments** ([GHSA-q8r4-6gpp-5fx2](https://github.com/QWED-AI/qwed-finance/security/advisories/GHSA-q8r4-6gpp-5fx2)). Queries containing `/*! ... */` or `/*M! ... */` are unsafe in every QueryGuard check and in `CrossGuard.verify_query_with_pii_protection`.
+
+### Included from v3.0.0 (September 27, 2026)
+
+- **Breaking (npm):** the `@qwed-ai/finance` bridge sends JSON over stdin with runtime validation. Malformed inputs are rejected instead of falling back to defaults.
+- `VerificationReceipt.get_signature(key)`: keyed HMAC-SHA256 over all 15 receipt fields, with no default key. The unkeyed `get_signature()` was removed.
+- ISO currency and amount business limits in receipts and UCP. `UCPIntegration.verify_iso20022_payment` takes `kyc_verified` and requires it to approve.
+- Fail-closed AML, sanctions, amount, and message-validation fixes.
+
+See [QWED Finance overview](/finance/overview), [the 11 guards](/finance/guards), and [GitHub Action](/finance/action).
 
 ---
 

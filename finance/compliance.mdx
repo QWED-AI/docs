@@ -10,7 +10,7 @@ QWED-Finance can attach a **tamper-evident receipt** to a verification, supporti
 
 ## Verification receipts
 
-`CrossGuard`, `OpenResponsesIntegration`, and `UCPIntegration` create receipts automatically. Direct calls to the other guards (for example `ComplianceGuard.verify_aml_flag`) return a result object without a receipt; create one yourself with `ReceiptGenerator` when you need an audit record:
+`CrossGuard`, `UCPIntegration`, and the built-in `OpenResponsesIntegration` tools create receipts automatically. Custom Open Responses tools get a receipt only if their `verification_fn` creates one. Direct calls to the other guards (for example `ComplianceGuard.verify_aml_flag`) return a result object without a receipt; create one yourself with `ReceiptGenerator` when you need an audit record:
 
 ```python
 from qwed_finance import ReceiptGenerator, VerificationEngine

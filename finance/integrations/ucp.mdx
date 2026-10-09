@@ -55,7 +55,7 @@ entry = ucp.get_ucp_json_entry()                           # entry for .well-kno
 
 ### Add to `.well-known/ucp.json`
 
-`get_ucp_json_entry()` returns the `capabilities` block below:
+`get_ucp_json_entry()` returns a `capabilities` block. Publish it without the `verify_loan_terms` operation (see the warning below):
 
 ```json
 {

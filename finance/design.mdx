@@ -311,7 +311,7 @@ Use solvers and exact arithmetic (Z3, SymPy, mpmath, `Decimal`) instead of proba
 
 ### 3. Audit where it matters
 
-Cross-guard and integration flows (`CrossGuard`, `OpenResponsesIntegration`, `UCPIntegration`) generate receipts automatically. Direct guard calls return result objects; wrap them with `ReceiptGenerator` when you need an audit record. Invalid input fails closed instead of passing silently.
+`CrossGuard`, `UCPIntegration`, and the built-in `OpenResponsesIntegration` tools generate receipts automatically. Direct guard calls and custom Open Responses tools return result objects; create a receipt with `ReceiptGenerator` when you need an audit record. Invalid input fails closed instead of passing silently.
 
 ### 4. Defense in depth
 

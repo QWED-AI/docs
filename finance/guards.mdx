@@ -398,7 +398,7 @@ result = guard.verify_currency_conversion(
 # result.computed_value = "EUR 920.00"
 ```
 
-Pass `llm_converted` as a plain number (`"920.00"`) or with a leading currency code (`"EUR 920.00"`).
+Pass `llm_converted` as a plain number (`"920.00"`). A leading currency symbol (`$`, `€`, `£`, `¥`) is stripped, but currency codes such as `"EUR 920.00"` raise `decimal.InvalidOperation`.
 
 ### Methods
 

@@ -30,7 +30,7 @@ LLMs struggle with basic math and strict logic. In finance, close enough is not 
 
 - **11 specialized guards:** Compliance, Calendar, Derivatives, Messages, Query, Cross, Bond, FX, Risk, ISO, Trading.
 - **GitHub Action:** CI/CD verifier with optional SARIF output for security dashboards.
-- **Audit trails:** Verification receipts with keyed HMAC-SHA256 signatures for cross-guard and integration flows.
+- **Audit trails:** Verification receipts for cross-guard and integration flows. Receipts are unsigned by default: call `get_signature(key)` and store the returned HMAC-SHA256 signature separately to get a tamper-evident record.
 - **Deterministic verification:** When deterministic engines apply, results are exact rather than probabilistic.
 
 ## The 4 pillars of banking verification
