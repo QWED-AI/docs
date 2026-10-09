@@ -19,6 +19,30 @@
     {
       "source": "/docs/:slug*",
       "destination": "/:slug*"
+    },
+    {
+      "source": "/finance/guards",
+      "destination": "https://finance.qwedai.com/finance/guards"
+    },
+    {
+      "source": "/finance/design",
+      "destination": "https://finance.qwedai.com/finance/design"
+    },
+    {
+      "source": "/finance/compliance",
+      "destination": "https://finance.qwedai.com/finance/compliance"
+    },
+    {
+      "source": "/finance/action",
+      "destination": "https://finance.qwedai.com/finance/action"
+    },
+    {
+      "source": "/finance/integrations/ucp",
+      "destination": "https://finance.qwedai.com/finance/integrations/ucp"
+    },
+    {
+      "source": "/finance/integrations/open-responses",
+      "destination": "https://finance.qwedai.com/finance/integrations/open-responses"
     }
   ],
   "navigation": {
@@ -133,13 +157,7 @@
               {
                 "group": "QWED Finance",
                 "pages": [
-                  "finance/overview",
-                  "finance/guards",
-                  "finance/design",
-                  "finance/compliance",
-                  "finance/action",
-                  "finance/integrations/ucp",
-                  "finance/integrations/open-responses"
+                  "finance/overview"
                 ]
               },
               {
@@ -456,7 +474,7 @@
           },
           {
             "label": "QWED Finance",
-            "href": "/finance/overview"
+            "href": "https://finance.qwedai.com"
           },
           {
             "label": "QWED Legal",
