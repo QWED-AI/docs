@@ -131,7 +131,7 @@ result = guard.verify_black_scholes(
 
 ```python
 # Before
-greeks["delta"] * notional  # TypeError: str * int
+greeks["delta"] * notional  # str: an int notional repeats the text ("0.3772" * 2 == "0.37720.3772"), a float raises TypeError
 
 # After
 from decimal import Decimal
