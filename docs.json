@@ -3,13 +3,22 @@
   "theme": "aspen",
   "name": "QWED Documentation",
   "colors": {
-    "primary": "#26463C",
-    "light": "#8FBBA6",
-    "dark": "#1E3830"
+    "primary": "#111111",
+    "light": "#F2F2F2",
+    "dark": "#616161"
+  },
+  "fonts": {
+    "heading": {
+      "family": "Bricolage Grotesque",
+      "weight": 700
+    },
+    "body": {
+      "family": "Instrument Sans"
+    }
   },
   "favicon": {
-    "light": "/images/qwed-mark-ink-32.png",
-    "dark": "/images/qwed-mark-ink-32.png"
+    "light": "/images/brand/favicon-ink.png",
+    "dark": "/images/brand/favicon-white.png"
   },
   "redirects": [
     {
@@ -394,12 +403,16 @@
     ]
   },
   "logo": {
-    "light": "/images/qwed-mark-pine.svg",
-    "dark": "/images/qwed-mark-pine.svg",
+    "light": "/images/brand/qwed-lockup.svg",
+    "dark": "/images/brand/qwed-lockup-white.svg",
     "href": "https://docs.qwedai.com"
   },
   "navbar": {
     "links": [
+      {
+        "label": "qwedai.com",
+        "href": "https://qwedai.com"
+      },
       {
         "label": "Support",
         "href": "mailto:rahul@qwedai.com"
@@ -531,7 +544,7 @@
     "indexing": "all",
     "metatags": {
       "canonical": "https://docs.qwedai.com",
-      "og:image": "https://qwedai.com/og-docs.png",
+      "og:image": "https://docs.qwedai.com/images/brand/og-docs.png",
       "og:site_name": "QWED Documentation",
       "og:type": "website",
       "twitter:card": "summary_large_image"
@@ -542,9 +555,8 @@
   },
   "background": {
     "color": {
-      "dark": "#0B0E13",
-      "light": "#E7E4DA"
-    },
-    "decoration": "windows"
+      "dark": "#0C0C0C",
+      "light": "#FFFFFF"
+    }
   }
 }
