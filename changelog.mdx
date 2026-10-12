@@ -34,7 +34,7 @@ See [QWED Finance overview](/finance/overview), [the 11 guards](https://finance.
 
 ## QWED-Legal — fail-closed date handling and input bounds
 
-**Released: October 7, 2026** in `qwed-legal` 0.5.0 · [GitHub PR #89](https://github.com/QWED-AI/qwed-legal/pull/89) · [GitHub PR #90](https://github.com/QWED-AI/qwed-legal/pull/90) · [GitHub PR #91](https://github.com/QWED-AI/qwed-legal/pull/91) · [GitHub PR #92](https://github.com/QWED-AI/qwed-legal/pull/92)
+**Released: October 7, 2026** in `qwed-legal` 0.5.0 · [GitHub PR #89](https://github.com/QWED-AI/qwed-legal/pull/89) · [GitHub PR #90](https://github.com/QWED-AI/qwed-legal/pull/90) · [GitHub PR #91](https://github.com/QWED-AI/qwed-legal/pull/91) · [GitHub PR #92](https://github.com/QWED-AI/qwed-legal/pull/92) · [GitHub PR #93](https://github.com/QWED-AI/qwed-legal/pull/93)
 
 > `DeadlineGuard` and `StatuteOfLimitationsGuard` no longer guess what a date means. Order-ambiguous dates, partial dates, and event-anchored terms now return `UNVERIFIABLE` instead of a confident verdict. `ClauseGuard` and `ContradictionGuard` gain input bounds.
 
@@ -63,6 +63,7 @@ Pass ISO `YYYY-MM-DD` dates. ISO year-first and named-month dates still verify.
 - **ClauseGuard input bounds (#89).** `check_consistency()` returns `invalid_input` for more than 200 clauses or any clause over 4,096 characters. It reports at most 100 conflict pairs and adds a truncation notice when it stops.
 - **Digit-run bound (#89).** Digit runs longer than 18 characters fail closed in `DeadlineGuard` terms, `ClauseGuard` day counts, and `ContradictionGuard` operands.
 - **Faster US citation patterns (#89).** `CitationGuard` US patterns no longer slow down on adversarial input.
+- **Added — npm SDK (#93).** `JurisdictionVerifier.verifyChoiceOfLaw()` in `@qwed-ai/legal` accepts an optional fourth `contractType` argument and passes it to the guard as `contract_type`. `JurisdictionResult` adds optional `contractType` and `contractClassification` (`goods`, `declared_non_goods`, or `unclassified`) fields. Omitting `contractType` keeps the existing partial-coverage warning. The 0.5.0 npm package is published as `@qwed-ai/legal`.
 
 ### What this means for you
 
