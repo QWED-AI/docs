@@ -802,7 +802,7 @@ print(result.verified)  # False
 
 #### TypeScript (npm)
 
-The `@qwed-ai/legal` npm wrapper (0.5.0 and later) accepts the contract type as an optional fourth argument to `JurisdictionVerifier.verifyChoiceOfLaw(partiesCountries, governingLaw, forum?, contractType?)`. The wrapper passes it to the Python guard as `contract_type`, so the same three-way classification applies. The wrapper requires Python 3.10+ with `qwed-legal` installed.
+The `@qwed-ai/legal` npm wrapper (0.5.x) accepts the contract type as an optional fourth argument to `JurisdictionVerifier.verifyChoiceOfLaw(partiesCountries, governingLaw, forum?, contractType?)`. The wrapper passes it to the Python guard as `contract_type`, so the same three-way classification applies. The wrapper requires Python 3.10+ with `qwed-legal` installed.
 
 ```typescript
 import { JurisdictionVerifier } from '@qwed-ai/legal';
