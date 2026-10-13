@@ -11,7 +11,7 @@ icon: "network-wired"
 
 ## What is QWED A2A?
 
-QWED A2A is a **verification interceptor** that sits between autonomous agents communicating via Google's [Agent-to-Agent (A2A) protocol](https://google.github.io/A2A/). It intercepts every payload, runs deterministic verification, and either **forwards** or **blocks** the message — with a signed JWT attestation proving the decision.
+QWED A2A is a **verification interceptor** that sits between autonomous agents communicating via Google's [Agent-to-Agent (A2A) protocol](https://google.github.io/A2A/). It intercepts every payload, runs deterministic verification, and returns a verdict with a signed JWT attestation proving the decision. Only a `verified` verdict is admissible, so only `verified` messages are safe to forward without further checks.
 
 > **"Agents don't trust each other. QWED verifies for them."**
 
@@ -87,7 +87,8 @@ message = AgentMessage(
 
 verdict = await interceptor.intercept(message, trace_id="a2a_demo_001")
 
-print(verdict.status)           # "forwarded" ✅
+print(verdict.status)           # "verified" ✅
+print(verdict.admissible)       # True
 print(verdict.engine_used)      # "finance_guard"
 print(verdict.attestation_jwt)  # "eyJhbGciOiJFUzI1NiIs..."
 ```
@@ -125,7 +126,8 @@ flowchart TB
     end
 
     subgraph Output["📋 Verdict"]
-        FW["✅ Forwarded"]
+        FW["✅ Verified"]
+        HP["⚠️ Heuristic pass / error / unverifiable"]
         BL["❌ Blocked"]
     end
 
@@ -133,7 +135,7 @@ flowchart TB
     TB --> Engines
     Engines --> CR
     CR --> Output
-    Output -->|"forwarded"| A2
+    Output -->|"verified"| A2
     Output -->|"blocked"| A1
     TL -.->|"metrics"| CR
 ```

@@ -5,7 +5,41 @@ description: "Release notes for the QWED Protocol: version history, new guards, 
 
 All notable changes to the QWED platform, listed by release.
 
-Jump to: [QWED-Finance v3.0.1](#qwed-finance-v3-0-1-—-iso-20022-sanctions-and-queryguard-security-fixes) · [QWED-Legal date and input bounds](#qwed-legal-—-fail-closed-date-handling-and-input-bounds) · [Open Responses v0.6.0](#qwed-open-responses-v0-6-0-—-fail-closed-hardening) · [QWED-Legal fail-closed hardening](#qwed-legal-—-fail-closed-hardening-for-guards-diagnostics-and-github-action) · [`qwed init` server identity handshake](#qwed-verification-—-qwed-init-server-identity-handshake) · [Leaked key auto-revocation](#qwed-verification-—-leaked-api-key-auto-revocation-and-false-positive-feedback) · [API-key format spec](#qwed-verification-—-canonical-api-key-format-spec) · [Signed secret-scanning webhook](#qwed-verification-—-signed-secret-scanning-webhook-endpoint) · [v7.2.1](#v7-2-1-—-math-answer-comparison-security-patch) · [v7.2.0](#v7-2-0-—-precision-advisory-and-security-hardening-batch) · [v7.1.0](#v7-1-0-—-verification-context-v1-0-rollout) · [v7.0.0](#v7-0-0-—-full-diagnosticresult-engine-conformance)
+Jump to: [QWED-A2A verdict admissibility](#qwed-a2a-—-verdict-admissibility-contract-and-verified-rename-breaking) · [QWED-Finance v3.0.1](#qwed-finance-v3-0-1-—-iso-20022-sanctions-and-queryguard-security-fixes) · [QWED-Legal date and input bounds](#qwed-legal-—-fail-closed-date-handling-and-input-bounds) · [Open Responses v0.6.0](#qwed-open-responses-v0-6-0-—-fail-closed-hardening) · [QWED-Legal fail-closed hardening](#qwed-legal-—-fail-closed-hardening-for-guards-diagnostics-and-github-action) · [`qwed init` server identity handshake](#qwed-verification-—-qwed-init-server-identity-handshake) · [Leaked key auto-revocation](#qwed-verification-—-leaked-api-key-auto-revocation-and-false-positive-feedback) · [API-key format spec](#qwed-verification-—-canonical-api-key-format-spec) · [Signed secret-scanning webhook](#qwed-verification-—-signed-secret-scanning-webhook-endpoint) · [v7.2.1](#v7-2-1-—-math-answer-comparison-security-patch) · [v7.2.0](#v7-2-0-—-precision-advisory-and-security-hardening-batch) · [v7.1.0](#v7-1-0-—-verification-context-v1-0-rollout) · [v7.0.0](#v7-0-0-—-full-diagnosticresult-engine-conformance)
+
+---
+
+## QWED-A2A — verdict admissibility contract and verified rename (breaking)
+
+**Merged: October 12, 2026** on `qwed-a2a` `main` after 0.3.0 · [GitHub PR #160](https://github.com/qwed-ai/qwed-a2a/pull/160) · [GitHub PR #161](https://github.com/qwed-ai/qwed-a2a/pull/161) · [GitHub PR #162](https://github.com/qwed-ai/qwed-a2a/pull/162) · [GitHub PR #163](https://github.com/qwed-ai/qwed-a2a/pull/163) · [GitHub PR #168](https://github.com/qwed-ai/qwed-a2a/pull/168)
+
+> QWED A2A now defines which verdicts a consumer may act on. Only `verified` is admissible. The `forwarded` verdict is renamed to `verified`, logic guard passes become `heuristic_pass`, and engine exceptions always return a signed `error` verdict.
+
+<Warning>
+**Breaking change.** The `forwarded` verdict is renamed to `verified`, and only finance guard passes return it. A logic assertion with no contradiction now returns `heuristic_pass`, which is not admissible.
+
+```python
+# Before
+if verdict.status == "forwarded":
+    process(message)
+
+# After
+if verdict.admissible:
+    process(message)
+```
+
+`VerdictStatus.FORWARDED` remains a deprecated alias of `VerdictStatus.VERIFIED`, and the legacy value `"forwarded"` still parses as `verified`. Upgrade consumers before, or together with, issuers: a 0.3.x consumer that compares the attestation claim to `"forwarded"` denies tokens carrying `"verified"`.
+</Warning>
+
+### What changed
+
+- **Admissibility contract (#161).** `ADMISSIBLE_VERDICTS`, `VerdictStatus.admissible`, and the `VerificationVerdict.admissible` computed field define admissibility in one place. `POST /a2a/intercept` responses include `admissible`. Attestation consumers call `A2ACryptoService.is_admissible(claims)` after `verify_attestation()`, because a valid attestation is not an admission decision.
+- **`forwarded` renamed to `verified` (#163).** `/a2a/metrics` adds `total_verified` and keeps `total_forwarded` as a deprecated alias with the same count.
+- **First-class `error` verdict (#160).** Engine exceptions always return a signed `error` verdict that counts toward `total_errors`. `block_on_error` has no effect. Setting it to `False` emits a `DeprecationWarning` and logs a warning.
+- **Engine input hardening (#162).** The logic guard normalizes claims (NFKC, casefold, whitespace collapsing, invisible-character removal) before comparing. A non-boolean `negated` returns `unverifiable`. A negative `claimed_total`, `amount`, or `quantity` in a finance payload returns `unverifiable`.
+- **Attestation scope clarified (#168).** `A2ACryptoService` verifies verdict attestations, not signatures from sending agents.
+
+See [Verdict statuses](/a2a/interceptor#verdict-statuses), [Admissibility](/a2a/interceptor#admissibility), and [Check admissibility](/a2a/crypto-attestations#check-admissibility).
 
 ---
 

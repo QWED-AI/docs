@@ -90,7 +90,6 @@ async def startup():
         enable_financial_verification=True,
         enable_code_verification=True,
         enable_logic_verification=True,
-        block_on_error=True,
     )
     configure_interceptor(config)
 ```
@@ -203,18 +202,29 @@ The key's agent ID is the identity the gateway trusts. Trust-boundary evaluation
 ```json
 {
   "total_intercepts": 15420,
-  "forwarded": 15200,
-  "blocked": 180,
-  "errors": 40,
-  "avg_latency_ms": 12.5,
-  "engines": {
+  "total_verified": 4900,
+  "total_forwarded": 4900,
+  "total_blocked": 180,
+  "total_unverifiable": 5420,
+  "total_heuristic_pass": 4880,
+  "total_errors": 40,
+  "average_latency_ms": 12.5,
+  "block_rate": 0.0117,
+  "by_engine": {
     "finance_guard": 5000,
     "code_guard": 3200,
     "logic_guard": 1800,
     "passthrough": 5420
+  },
+  "by_sender": {
+    "procurement-agent": 15420
   }
 }
 ```
+
+- `total_verified` counts admissible `verified` verdicts.
+- `total_forwarded` is a deprecated alias of `total_verified` with the same count. Migrate dashboards to `total_verified`.
+- `total_errors` counts `error` verdicts, which the interceptor returns whenever a verification engine raises an exception.
 
 ### JWKS endpoint
 
@@ -253,7 +263,7 @@ See [Crypto attestations](/a2a/crypto-attestations) for the full JWT structure a
 | `QWED_A2A_TRUSTED_ISSUERS` | JSON object mapping peer issuer IDs to `{"deployment_id": ..., "jwks": ...}` for [cross-deployment attestation verification](/a2a/crypto-attestations#cross-deployment-verification-trusted-issuers). Re-read on every verification, so rotation needs no restart. | *(none — only self-issued tokens verify)* |
 | `SENTRY_DSN` | Sentry error tracking DSN | *(disabled)* |
 | `QWED_LOG_LEVEL` | Logging level (`DEBUG`, `INFO`, `WARNING`, `ERROR`) | `INFO` |
-| `QWED_A2A_BLOCK_ON_ERROR` | Block on internal errors (`true`/`false`) | `true` |
+| `QWED_A2A_BLOCK_ON_ERROR` | **Deprecated, no effect.** Engine errors always return a fail-closed `error` verdict. | *(ignored)* |
 
 ---
 
@@ -278,7 +288,7 @@ sentry_sdk.init(
 All intercepts are logged with structured fields:
 
 ```text
-INFO  A2A Intercept [a2a_trace_001] FORWARDED -> engine=finance_guard (12.3ms)
+INFO  A2A Intercept [a2a_trace_001] VERIFIED -> engine=finance_guard (12.3ms)
 INFO  A2A Intercept [a2a_trace_002] BLOCKED -> engine=code_guard (3.1ms)
 WARN  Trust boundary violation: Sender 'rogue-agent' is globally blocked
 ```

@@ -94,6 +94,7 @@ See [Crypto attestations](/a2a/crypto-attestations) for key rotation and multi-r
         )
 
         print(f"Status:      {verdict.status.value}")
+        print(f"Admissible:  {verdict.admissible}")
         print(f"Engine:      {verdict.engine_used}")
         print(f"Trace ID:    {verdict.audit_trace_id}")
         print(f"Attestation: {verdict.attestation_jwt[:50]}...")
@@ -104,13 +105,14 @@ See [Crypto attestations](/a2a/crypto-attestations) for key rotation and multi-r
 
   <Step title="Check the output">
     ```text
-    Status:      forwarded ✅
+    Status:      verified ✅
+    Admissible:  True
     Engine:      finance_guard
     Trace ID:    quickstart_001
     Attestation: eyJhbGciOiJFUzI1NiIsInR5cCI6InF3ZWQtYTJhLWF0...
     ```
 
-    The financial totals match (50×2 + 25×2 = 150), so the message is **forwarded** with a signed attestation.
+    The financial totals match (50×2 + 25×2 = 150), so the finance guard returns **verified** with a signed attestation. `verified` is the only admissible verdict, so `verdict.admissible` is `True` and you can forward the message.
   </Step>
 </Steps>
 
@@ -158,6 +160,7 @@ See [Crypto attestations](/a2a/crypto-attestations) for key rotation and multi-r
   </Accordion>
 
   <Accordion title="Catch logical contradictions" icon="brain">
+    The logic guard blocks contradictions. If it finds none, it returns `heuristic_pass`, which is not admissible.
     ```python
     logic_message = AgentMessage(
         sender_agent_id="reasoning-agent",
@@ -222,11 +225,12 @@ Response:
   "audit_trace_id": "a2a_7f3c2a1b9e4d",
   "engine_used": "passthrough",
   "attestation_jwt": null,
-  "reason": "No verification engine available for this payload type"
+  "reason": "No verification engine available for this payload type",
+  "admissible": false
 }
 ```
 
-`GENERAL` and `DATA_QUERY` payloads have no verification engine, so the interceptor returns an `unverifiable` verdict with **no JWT attestation** — signing a token for content that was never verified would be a false cryptographic claim. Callers must decide how to handle unverified traffic. To see a signed `forwarded` verdict, send a `financial_transaction`, `logic_assertion`, or `code_execution` payload instead. See the [verdict status table](/a2a/interceptor#verdict-statuses) for the full contract.
+`GENERAL` and `DATA_QUERY` payloads have no verification engine, so the interceptor returns an `unverifiable` verdict with **no JWT attestation** — signing a token for content that was never verified would be a false cryptographic claim. Callers must decide how to handle unverified traffic. To see a signed `verified` verdict, send a valid `financial_transaction` payload instead. `logic_assertion` and `code_execution` payloads that pass return a signed but non-admissible `heuristic_pass`. Gate on the `admissible` field rather than on `status`. See the [verdict status table](/a2a/interceptor#verdict-statuses) for the full contract.
 
 ---
 

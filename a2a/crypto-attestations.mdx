@@ -7,12 +7,16 @@ icon: "certificate"
 
 ## Overview
 
-Every verification verdict is signed with an **ES256 JWT attestation** — a cryptographic proof that the verification took place. This enables:
+Every `verified`, `blocked`, `heuristic_pass`, and `error` verdict is signed with an **ES256 JWT attestation**: a cryptographic proof of which verdict the interceptor reached. `unverifiable` verdicts carry no attestation. This enables:
 
 - **Tamper detection** — any modification invalidates the signature
 - **Non-repudiation** — the signing service is identified by DID
 - **Audit compliance** — attestations are stored and queryable
 - **Cross-service verification** — any QWED node can verify the token
+
+<Note>
+`A2ACryptoService` signs and verifies the interceptor's own verdict attestations. It does **not** verify signatures from sending agents, and no sender-signature check exists. Over HTTP, sender identity comes from the per-agent [API key](/a2a/deployment#gateway-authentication). Direct library callers own identity binding.
+</Note>
 
 ---
 
@@ -63,7 +67,7 @@ The `kid` is derived from a SHA-256 fingerprint of the public key, so it stays s
   "jti": "a2a_trace_001",
   "qwed_a2a": {
     "version": "1.0",
-    "verdict": "forwarded",
+    "verdict": "verified",
     "engine": "finance_guard",
     "sender": "procurement-agent",
     "receiver": "treasury-agent"
@@ -117,7 +121,7 @@ crypto = A2ACryptoService(
 
 token = crypto.sign_verdict(
     trace_id="a2a_audit_001",
-    verdict_status="forwarded",
+    verdict_status="verified",
     engine="finance_guard",
     sender_id="procurement-agent",
     receiver_id="treasury-agent",
@@ -171,6 +175,25 @@ Verification tries every configured key until one verifies the signature: the lo
 | `(False, None, "Attestation payload hash mismatch — detached attestation rejected")` | The context payload's hash doesn't match the `sub` claim |
 | `(False, None, "Replay detected: jti already seen")` | This instance already consumed a token with the same `jti` |
 | `(False, None, "No verification keys available (no local key, no trusted issuers)")` | Neither a local signing key nor any trusted issuer is configured |
+
+### Check admissibility
+
+A valid attestation is not an admission decision. It only proves which verdict an issuer reached for this context. A genuine `blocked`, `heuristic_pass`, or `error` attestation verifies too.
+
+After `verify_attestation()` succeeds, call `A2ACryptoService.is_admissible(claims)` before acting on the message. It returns `True` only when the `qwed_a2a.verdict` claim is in `ADMISSIBLE_VERDICTS`, which currently contains only `verified`. It fails closed and returns `False` for `None`, malformed claims, and unknown verdict values.
+
+```python
+is_valid, claims, error = crypto.verify_attestation(token, context)
+
+if is_valid and A2ACryptoService.is_admissible(claims):
+    process(message)
+else:
+    reject(error or claims["qwed_a2a"]["verdict"])
+```
+
+<Info>
+The legacy claim value `"forwarded"` from 0.3.x issuers still parses as `verified`, so `is_admissible` returns `True` for those tokens. Upgrade consumers before, or together with, issuers. A 0.3.x consumer that compares the claim to `"forwarded"` denies tokens carrying `"verified"`.
+</Info>
 
 ---
 

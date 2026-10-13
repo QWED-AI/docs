@@ -54,7 +54,7 @@ The `trace_id` parameter is **required** and must be provided by the caller. Thi
     Based on `payload_type`, the message is routed to the appropriate verification engine (`finance_guard`, `logic_guard`, `code_guard`). Payload types with no engine (`GENERAL`, `DATA_QUERY`) return an `unverifiable` engine result instead of being silently forwarded.
   </Step>
   <Step title="Verdict & Attestation">
-    The engine result is wrapped in a `VerificationVerdict`. `FORWARDED`, `BLOCKED`, and `HEURISTIC_PASS` verdicts are signed with an ES256 JWT attestation. `UNVERIFIABLE` verdicts carry **no JWT** — issuing a signed token for content that was never verified would be a false cryptographic claim.
+    The engine result is wrapped in a `VerificationVerdict`. `VERIFIED`, `BLOCKED`, `HEURISTIC_PASS`, and `ERROR` verdicts are signed with an ES256 JWT attestation. `UNVERIFIABLE` verdicts carry **no JWT** — issuing a signed token for content that was never verified would be a false cryptographic claim.
   </Step>
 </Steps>
 
@@ -92,13 +92,21 @@ verdict = await interceptor.intercept(message, trace_id="fin_001")
 All financial comparisons use `decimal.Decimal` with `ROUND_HALF_UP` quantization to `0.01`. Floating-point arithmetic is **never** used in the verification path.
 </Warning>
 
+When the recomputed total matches `claimed_total`, the finance guard returns `verified`. This is the only admissible verdict in QWED A2A. See [Admissibility](#admissibility).
+
 <Info>
-**Empty or malformed payloads return `UNVERIFIABLE`, not `FORWARDED`.** If a `FINANCIAL_TRANSACTION` payload is missing `data`, `line_items`, or `claimed_total`, or contains non-numeric amounts, the finance guard returns `status=unverifiable` with no JWT attestation. Earlier releases collapsed these cases to a signed `FORWARDED` verdict, which falsely attested that the math had been checked.
+**Negative values return `UNVERIFIABLE`.** A negative `claimed_total`, `amount`, or `quantity` returns `status=unverifiable` with no JWT attestation. The payload has no credit/debit convention, so the finance guard cannot verify a sign-inverted transaction even when its arithmetic holds.
+</Info>
+
+<Info>
+**Empty or malformed payloads return `UNVERIFIABLE`, not `VERIFIED`.** If a `FINANCIAL_TRANSACTION` payload is missing `data`, `line_items`, or `claimed_total`, or contains non-numeric amounts, the finance guard returns `status=unverifiable` with no JWT attestation. Earlier releases collapsed these cases to a signed pass verdict, which falsely attested that the math had been checked.
 </Info>
 
 ### Logic guard
 
-Detects **logical contradictions** — claims where the same proposition is both asserted and negated.
+Detects **logical contradictions**: claims where the same proposition is both asserted and negated. A contradiction returns `blocked`.
+
+When the logic guard finds no contradiction, it returns `heuristic_pass`, not `verified`. String matching cannot detect semantic contradictions (`"paid"` vs `"unpaid"`) or cross-script homoglyphs, so the absence of a detected contradiction is not proof of consistency. `heuristic_pass` is not admissible.
 
 ```python
 message = AgentMessage(
@@ -122,6 +130,15 @@ verdict = await interceptor.intercept(message, trace_id="logic_001")
 <Tip>
 Contradictions are **sorted** before output, ensuring deterministic results regardless of Python's hash randomization (`PYTHONHASHSEED`).
 </Tip>
+
+The logic guard normalizes each claim before comparing:
+
+- Unicode NFKC normalization
+- Removal of invisible format characters, such as zero-width spaces
+- `casefold()`
+- Collapsing of repeated whitespace
+
+As a result, `"UserIsAdmin"` and `"userisadmin"` are treated as the same claim, and so are `"payment sent"` and `"payment  sent"`. The `negated` field must be a boolean. Any other value, such as the string `"true"`, returns `unverifiable`.
 
 <Info>
 **Empty or malformed logic payloads return `UNVERIFIABLE`.** A `LOGIC_ASSERTION` payload with a missing, non-list, or empty `assertions` array — or with malformed assertion entries — returns `status=unverifiable` and no JWT attestation. There is nothing to check, so nothing is attested.
@@ -180,18 +197,82 @@ verdict = await interceptor.intercept(chat_message, trace_id="chat_001")
 
 ## Verdict statuses
 
-Every call to `intercept()` returns a `VerificationVerdict` with one of four emitted statuses. Only statuses backed by a real verification decision carry a signed JWT attestation. (`VerdictStatus.ERROR` exists in the public enum but is not emitted by `intercept()` — see [Error handling](#error-handling).)
+Every call to `intercept()` returns a `VerificationVerdict` with one of five statuses. Only statuses backed by a real verification decision carry a signed JWT attestation.
 
-| Status | Meaning | JWT attestation |
-|--------|---------|-----------------|
-| `forwarded` | Engine verified the payload. Forward the message. | Signed |
-| `blocked` | Engine detected a violation (bad math, contradiction, dangerous code). Do not forward. | Signed |
-| `heuristic_pass` | Code guard ran, no known dangerous constructs found. Not a proof of safety. | Signed |
-| `unverifiable` | No engine could evaluate the payload (`GENERAL`/`DATA_QUERY`, empty/malformed finance or logic payload). No attestation is issued. | **None** |
+| Status | Meaning | JWT attestation | Admissible |
+|--------|---------|-----------------|------------|
+| `verified` | The finance guard recomputed the claims deterministically and they checked out. | Signed | Yes |
+| `heuristic_pass` | A heuristic check found no problem: the code guard scan was clean, or the logic guard found no contradiction. Not a proof. | Signed | No |
+| `blocked` | An engine detected a violation (bad math, contradiction, dangerous code), or the trust boundary refused the message. | Signed | No |
+| `error` | The engine raised an exception before verification completed. No outcome was established. | Signed | No |
+| `unverifiable` | No engine could evaluate the payload (`GENERAL`/`DATA_QUERY`, empty, malformed, or negative-valued finance payload, malformed logic payload). | **None** | No |
 
 <Warning>
 `UNVERIFIABLE` verdicts have `attestation_jwt=None`. If your downstream code assumes every verdict has a JWT, guard for this — issuing an attestation for content that was never verified would be a false cryptographic claim.
 </Warning>
+
+### Admissibility
+
+Only `verified` is admissible. An admissible verdict is one a consumer may act on without running its own checks. QWED A2A defines admissibility in one place:
+
+- `ADMISSIBLE_VERDICTS`: a `frozenset` of admissible `VerdictStatus` members. It currently contains only `VerdictStatus.VERIFIED`.
+- `VerdictStatus.admissible`: `True` when the status is in `ADMISSIBLE_VERDICTS`.
+- `VerificationVerdict.admissible`: a computed field on every verdict. It is also included in the `POST /a2a/intercept` JSON response.
+
+Gate on `verdict.admissible` instead of comparing status strings:
+
+```python
+from qwed_a2a import ADMISSIBLE_VERDICTS, VerdictStatus
+
+verdict = await interceptor.intercept(message, trace_id=trace_id)
+if verdict.admissible:
+    process(message)
+else:
+    reject_or_escalate(verdict.status, verdict.reason)
+
+assert VerdictStatus.VERIFIED in ADMISSIBLE_VERDICTS
+assert not VerdictStatus.HEURISTIC_PASS.admissible
+```
+
+<Warning>
+Never gate on `status != "blocked"`. That check admits `heuristic_pass`, `unverifiable`, and `error` verdicts.
+</Warning>
+
+To check admissibility from a signed attestation instead of a verdict object, use [`A2ACryptoService.is_admissible(claims)`](/a2a/crypto-attestations#check-admissibility).
+
+### Migrating from `forwarded` to `verified`
+
+<Warning>
+**Breaking change.** The `forwarded` verdict is renamed to `verified`, and only finance passes are `verified`. A logic guard pass now returns `heuristic_pass`, which is not admissible.
+</Warning>
+
+For compatibility:
+
+- `VerdictStatus.FORWARDED` remains a deprecated alias of `VerdictStatus.VERIFIED`.
+- The legacy wire value `"forwarded"` still parses to `verified` in HTTP verdicts and attestation claims, so tokens from 0.3.x issuers keep verifying on upgraded readers.
+- `/a2a/metrics` reports `total_verified` and keeps `total_forwarded` as a deprecated alias with the same count.
+
+QWED A2A will remove the alias and the legacy value in a future minor release.
+
+Before:
+
+```python
+if verdict.status == "forwarded":
+    process(message)
+```
+
+After:
+
+```python
+if verdict.admissible:
+    process(message)
+```
+
+If you must compare strings, replace `"forwarded"` with `"verified"`. If you relied on logic assertions being admitted, they now return `heuristic_pass`. Add your own policy for them.
+
+<Tip>
+Upgrade consumers before, or together with, issuers. A 0.3.x consumer that compares the attestation `verdict` claim to `"forwarded"` denies tokens carrying `"verified"` until you update it. This fails closed, but blocks legitimate traffic.
+</Tip>
 
 ---
 
@@ -204,7 +285,7 @@ The `InterceptorConfig` controls which engines are active:
 | `enable_financial_verification` | `bool` | `True` | Route financial payloads to math verification |
 | `enable_logic_verification` | `bool` | `True` | Route logic assertions to contradiction checks |
 | `enable_code_verification` | `bool` | `True` | Route code payloads to the AST + regex heuristic security scanner |
-| `block_on_error` | `bool` | `True` | Block forwarding if verification encounters an internal error |
+| `block_on_error` | `bool` | `True` | **Deprecated, no effect.** Engine errors always return an `error` verdict. Setting `False` emits a `DeprecationWarning` and logs a warning. |
 | `max_payload_size_bytes` | `int` | `1,048,576` | Maximum payload size (1 KB – 10 MB) |
 | `trusted_agents` | `List[str]?` | `None` | Agent IDs pre-added to the trust boundary allowlist at startup. These agents still run through the appropriate verification engine — they are not bypassed. |
 
@@ -214,7 +295,6 @@ from qwed_a2a.protocol.schema import InterceptorConfig
 config = InterceptorConfig(
     enable_financial_verification=True,
     enable_code_verification=True,
-    block_on_error=True,
     trusted_agents=["internal-orchestrator-001"],
 )
 ```
@@ -223,13 +303,22 @@ config = InterceptorConfig(
 
 ## Error handling
 
-When `block_on_error=True` (default), any exception in a verification engine results in a `BLOCKED` verdict. When `False`, the message is `FORWARDED` despite the error — useful for observability-only deployments.
+If a verification engine raises an exception, the interceptor always fails closed with an `error` verdict. No configuration turns an engine exception into a pass.
 
-<AccordionGroup>
-  <Accordion title="block_on_error=True (default)" icon="shield-halved">
-    Engine exception → `BLOCKED` verdict with error reason. Safe default for production.
-  </Accordion>
-  <Accordion title="block_on_error=False (observability mode)" icon="eye">
-    Engine exception → `FORWARDED` verdict. The error is logged but doesn't block communication. Use for shadow deployments.
-  </Accordion>
-</AccordionGroup>
+- The verdict has `status="error"` and `engine_used="error_handler"`.
+- The `reason` names only the exception type, for example `"Verification engine raised ValueError - fail closed"`. The exception message is omitted because it may echo payload data.
+- The verdict carries a signed JWT attestation whose `verdict` claim is `"error"`.
+- The error counts toward `total_errors` in `/a2a/metrics`.
+
+`error` is distinct from `blocked`. `blocked` means an engine checked the content and rejected it. `error` means verification never completed. Treat it as block-equivalent, then retry or alert.
+
+```python
+verdict = await interceptor.intercept(message, trace_id="err_001")
+# verdict.status = "error"
+# verdict.admissible = False
+# verdict.reason = "Verification engine raised ValueError - fail closed"
+```
+
+<Warning>
+`block_on_error` is deprecated and has no effect. Earlier releases forwarded the message on engine errors when `block_on_error=False`. Setting `block_on_error=False` now emits a `DeprecationWarning` and logs a warning, and engine errors still return `error`.
+</Warning>
