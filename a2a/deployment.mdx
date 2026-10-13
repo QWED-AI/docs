@@ -93,7 +93,32 @@ async def startup():
         block_on_error=True,
     )
     configure_interceptor(config)
+
+@app.on_event("shutdown")
+async def shutdown():
+    """Release the engine thread pool."""
+    from qwed_a2a.protocol.endpoints import get_interceptor
+
+    get_interceptor().close()
 ```
+
+The shutdown hook calls `close()` to release the interceptor's engine thread pool. See [Engine execution budget](/a2a/interceptor#engine-execution-budget).
+
+### Request size limits
+
+The router enforces `max_payload_size_bytes` itself, so no middleware is needed:
+
+- `POST /a2a/intercept` returns `413` for bodies larger than `max_payload_size_bytes` plus a 64 KiB envelope allowance, before buffering or parsing the body.
+- An invalid `Content-Length` header returns `400`.
+
+Keep a body limit at your reverse proxy too, as an outer layer of defense. For nginx, set `client_max_body_size` slightly above `max_payload_size_bytes` plus 64 KiB:
+
+```nginx
+# 1 MiB default payload + 64 KiB envelope allowance, rounded up
+client_max_body_size 2m;
+```
+
+See [Request size limits](/a2a/interceptor#request-size-limits) for library-level enforcement.
 
 ---
 
