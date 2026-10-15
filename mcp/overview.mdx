@@ -40,7 +40,7 @@ QWED-MCP exposes **deterministic verification** to AI assistants through a singl
 | --- | --- |
 | LLM-only math → approximated by the model | Script calls the QWED math engine → result computed by SymPy |
 | LLM-only SQL → unchecked for injection | Script calls the QWED SQL analyzer → known injection patterns flagged |
-| LLM-only reasoning → unchecked | Script calls Z3 via the SDK → the formal statement is proven or refuted |
+| LLM-only reasoning → unchecked | Script calls Z3 via the SDK → the formal statement is checked; the result can also be inconclusive |
 | LLM-only code → unchecked | Script runs an AST check → dangerous patterns flagged |
 
 What a run checks depends entirely on which QWED SDK calls the script makes: executing a script is not itself verification. The formal statement is only as good as the script the assistant wrote, so review it. See [qwedai.com/limits](https://qwedai.com/limits).

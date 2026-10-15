@@ -4,7 +4,7 @@ description: "How the choice between a cloud LLM and a local model affects QWED'
 sidebarTitle: "Why cloud LLMs?"
 ---
 
-**TL;DR:** On the paths that use a model, the model only translates your query into a formal statement; a deterministic engine decides the verdict. A model that translates more reliably gives fewer failed verifications. Larger hosted models (GPT-4 class, Claude) usually translate more reliably than small local models, but measure this on your own workload: QWED publishes no accuracy figures for any model.
+**TL;DR:** On the paths that use a model, the model translates your query into a formal statement and a deterministic engine evaluates it. Because the translation is not proven, the trust-boundary step can still return `INCONCLUSIVE` even when that evaluation succeeds (see the [Math engine](/engines/math)). A model that translates more reliably gives fewer failed verifications. Larger hosted models (GPT-4 class, Claude) usually translate more reliably than small local models, but measure this on your own workload: QWED publishes no accuracy figures for any model.
 
 ---
 
@@ -18,13 +18,13 @@ If the LLM gets step 1 wrong, verification fails even with perfect symbolic math
 
 ---
 
-## 📊 How translation quality shows up
+## 📊 How model answer quality shows up
 
 ### Math verification example
 
 **Query:** "What is the integral of 2x?"
 
-A model that translates reliably answers "x² + C". A smaller model may sometimes answer "2x²" or confuse the derivative with the integral. QWED does not publish accuracy rates per model; try your own queries against the models you are considering.
+For this query, a correct model answer is "x² + C". A smaller model may instead answer "2x²" or confuse the derivative with the integral. QWED does not publish accuracy rates per model; try your own queries against the models you are considering.
 
 ### Why this matters
 

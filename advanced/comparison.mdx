@@ -31,7 +31,7 @@ If you are evaluating formal verification for LLMs, AI agent guardrails, or runt
 ### Key differences
 
 - **Training vs. runtime**: RLHF is baked into the model weights during training. QWED sits outside the model, verifying outputs in real-time.
-- **Probabilistic vs. deterministic**: An RLHF-tuned model is _less likely_ to be wrong, but it can still hallucinate confidently. QWED checks the answer mathematically; if the output says `2+2=5`, QWED returns `VERIFIED · DENY` (proven wrong) regardless of how "aligned" the model is, and your integration holds the answer.
+- **Probabilistic vs. deterministic**: An RLHF-tuned model is _less likely_ to be wrong, but it can still hallucinate confidently. QWED checks the answer mathematically; if the output says `2+2=5`, the Math engine returns `CORRECTION_NEEDED` with the calculated value, regardless of how "aligned" the model is. That result is not admitted, and your integration holds the answer.
 - **Scope**: RLHF covers tone, style, and safety guidelines. QWED covers claims with a formal statement: math, logic, SQL and code.
 
 ### When to use what?
