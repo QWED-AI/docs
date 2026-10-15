@@ -1,44 +1,35 @@
 ---
-title: "QWED vs Guardrails AI"
-sidebarTitle: "QWED vs Guardrails"
-description: "Compare QWED and Guardrails AI for LLM verification, AI agent security, schema validation, and deterministic output checking with side-by-side examples."
+title: "QWED and Guardrails AI"
+sidebarTitle: "QWED and Guardrails"
+description: "How QWED and Guardrails AI differ in mechanism and scope, and how to use them together in an LLM or AI agent stack."
 ---
 
-QWED and Guardrails solve different problems in an AI stack.
+QWED and Guardrails AI work at different points in an AI stack and use different mechanisms. This page compares mechanism and scope, not quality. For what Guardrails AI does, its own documentation is the authority: [guardrailsai.com/docs](https://www.guardrailsai.com/docs).
 
-Guardrails helps you constrain structure. QWED helps you verify correctness.
+## What each project says it does
 
-## Core difference
+- **Guardrails AI**, in its own docs, runs Input and Output Guards that detect, quantify and mitigate specific types of risk, using validators collected in Guardrails Hub. It also helps generate structured data from LLMs.
+- **QWED** checks claims in model and agent output with deterministic engines (SymPy, Z3, SQLGlot, AST analysis and others). A claim is admitted only with a reproducible proof of its formal statement; anything proven false, unprovable or unchecked is denied by default. QWED decides; your integration enforces the decision.
 
-| Tool | Primary job | Best at |
+## Mechanism and scope
+
+| | QWED | Guardrails AI |
 | --- | --- | --- |
-| Guardrails | Output structure and policy rules | JSON schemas, validators, formatting constraints |
-| QWED | Deterministic verification | Math, logic, code, SQL, tool-call verification |
+| **How a result is reached** | A deterministic engine proves or disproves a formal statement. No model decides the verdict. | Validators from Guardrails Hub, combined into guards. See its docs for how each validator works. |
+| **When a check cannot run** | Fails closed: `UNVERIFIABLE` or `BLOCKED`, both denied. | See its docs. |
+| **Coverage** | Domains with a formal statement: math, logic, SQL, code, schema and others listed at [qwedai.com/engines](https://qwedai.com/engines). Anything else is `UNVERIFIABLE · DENY`. | The risks its validators cover, plus structured output. |
+| **Where it runs** | In your environment: Python library, CLI, self-hosted API or Docker image. | See its docs. |
 
-## When Guardrails is enough
+Guardrails AI covers checks QWED does not try to cover, such as risks with no formal statement to prove. QWED covers proof of formal statements.
 
-Use Guardrails when you need:
+## Using both
 
-- Valid JSON or XML
-- Required fields and schema checks
-- Basic policy filters
-- Controlled output formats for downstream parsing
+They can sit in the same pipeline:
 
-## When you need QWED
+1. Guardrails AI guards the input and output, including the response structure.
+2. QWED checks the claims inside that structure (a calculation, a SQL query, a tool call) and returns a decision your integration enforces.
 
-Use QWED when you need:
-
-- Formal verification for LLM outputs
-- AI agent security before tool execution
-- Verified tool calls and MCP security
-- Deterministic checks for numbers, logic, code, and SQL
-
-## Best-practice stack
-
-Use both together:
-
-1. Guardrails enforces the response format.
-2. QWED verifies whether the contents are actually correct.
+QWED verifies the formal statement, not intent, and is only as sound as its engines. See [qwedai.com/limits](https://qwedai.com/limits).
 
 ## Related docs
 
