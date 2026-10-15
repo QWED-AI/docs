@@ -1,10 +1,10 @@
 ---
 title: "Why cloud LLMs for QWED verification?"
-description: "Why cloud LLMs like GPT-4 and Claude outperform local models for QWED verification, with accuracy comparisons and production guidance."
+description: "How the choice between a cloud LLM and a local model affects QWED's translation step, with privacy, cost and production guidance."
 sidebarTitle: "Why cloud LLMs?"
 ---
 
-**TL;DR:** Verification is a critical task requiring maximum accuracy. Cloud LLMs (GPT-4, Claude) deliver 90-95% accuracy vs 70-80% for local models, making them ideal for production verification.
+**TL;DR:** On the paths that use a model, the model only translates your query into a formal statement; a deterministic engine decides the verdict. A model that translates more reliably gives fewer failed verifications. Larger hosted models (GPT-4 class, Claude) usually translate more reliably than small local models, but measure this on your own workload: QWED publishes no accuracy figures for any model.
 
 ---
 
@@ -14,22 +14,17 @@ sidebarTitle: "Why cloud LLMs?"
 1. **LLM translates the query** (natural language → structured reasoning)
 2. **Symbolic verifier proves the answer** (SymPy, Z3, AST)
 
-If the LLM gets step 1 wrong, verification fails even with perfect symbolic math.
+If the LLM gets step 1 wrong, verification fails even with perfect symbolic math. The translation itself is not verified: every result includes the formal statement, so a person can check that it says what was meant.
 
 ---
 
-## 📊 LLM accuracy comparison
+## 📊 How translation quality shows up
 
 ### Math verification example
 
 **Query:** "What is the integral of 2x?"
 
-| Model | Type | Accuracy | Typical Response |
-|-------|------|----------|------------------|
-| **GPT-4o-mini** | Cloud | ~95% | "x² + C" ✅ |
-| **Claude 3 Haiku** | Cloud | ~93% | "x² + C" ✅ |
-| **Llama 3 8B** | Local | ~75% | Sometimes "x² + C" ✅, sometimes "2x²/2" ❌ |
-| **Mistral 7B** | Local | ~70% | Inconsistent, may confuse derivative/integral |
+A model that translates reliably answers "x² + C". A smaller model may sometimes answer "2x²" or confuse the derivative with the integral. QWED does not publish accuracy rates per model; try your own queries against the models you are considering.
 
 ### Why this matters
 
@@ -56,10 +51,10 @@ If the LLM gets step 1 wrong, verification fails even with perfect symbolic math
 | Use Case | Local LLM (Ollama) | Cloud LLM (OpenAI/Anthropic) |
 |----------|-------------------|------------------------------|
 | **Development/Testing** | ✅ Free, fast iteration | ⚠️ Costs add up |
-| **Production (Critical)** | ❌ Lower accuracy | ✅ **Recommended** |
+| **Production (Critical)** | ⚠️ Test translation quality first | ✅ **Recommended** |
 | **Privacy-Sensitive Data** | ✅ 100% local + PII masking | ⚠️ Use with PII masking |
 | **Cost-Sensitive** | ✅ $0/month | ⚠️ ~$5-50/month |
-| **High-Stakes Decisions** | ❌ Risk of errors | ✅ **Recommended** |
+| **High-Stakes Decisions** | ⚠️ More failed verifications likely | ✅ **Recommended** |
 
 ---
 
@@ -113,14 +108,14 @@ result = client_prod.verify("Verify calculation: ...")
 ### Local LLM (Ollama)
 - **Setup:** 10 minutes (download model)
 - **Monthly Cost:** $0
-- **Accuracy:** 70-80% on math/logic
+- **Translation quality:** depends on model size; measure on your workload
 - **Privacy:** 100% local
 - **Best for:** Development, testing, learning
 
 ### Cloud LLM (OpenAI GPT-4o-mini)
 - **Setup:** 2 minutes (API key)
 - **Monthly Cost:** $5-10 (with caching)
-- **Accuracy:** 90-95% on math/logic
+- **Translation quality:** usually higher than small local models; measure on your workload
 - **Privacy:** Use PII masking
 - **Best for:** Production, critical tasks
 
@@ -142,7 +137,7 @@ result2 = client.verify("What is 2+2?")  # $0 cost!
 ### Local LLM advantages
 ✅ **Private** — data stays on your machine  
 ✅ **No API keys** - no third-party access  
-✅ **Compliance** - easier GDPR/HIPAA compliance
+✅ **Data residency** - no third party processes the data (this alone does not make a system GDPR or HIPAA compliant)
 
 ### Cloud LLM with PII masking
 ```python
@@ -157,7 +152,7 @@ result = client.verify("User email: john@example.com, calculate 2+2")
 # OpenAI sees: "User email: <EMAIL_ADDRESS>, calculate 2+2"
 ```
 
-**Result:** Cloud accuracy + local privacy! 🔒
+**Result:** A hosted model sees masked text instead of the raw values. Masking is pattern-based, so check what your entities list covers. 🔒
 
 ---
 
@@ -207,7 +202,7 @@ prod_client = QWEDLocal(provider="openai", mask_pii=True, cache=True)
 
 ## 🚀 The QWED advantage
 
-**Even with local LLMs, QWED catches errors!**
+**With a local LLM, the deterministic check still runs.**
 
 ### Scenario: local LLM makes mistake
 ```python
@@ -231,18 +226,9 @@ result = client.verify("What is the derivative of x²?")
 
 ---
 
-## 📈 Accuracy in practice
+## 📈 Measuring it yourself
 
-**From QWED internal testing:**
-
-| Domain | Local LLM (Llama 3 8B) | Cloud LLM (GPT-4o-mini) |
-|--------|----------------------|-------------------------|
-| Basic Math | 85% | 98% |
-| Calculus | 75% | 95% |
-| Logic (SAT) | 70% | 93% |
-| Code Security | 80% | 96% |
-
-**Takeaway:** Cloud LLMs reduce verification failures by 15-25%!
+QWED does not publish per-model accuracy figures. To choose a model, run a sample of your real queries through each candidate and compare how often the formal statement in the result matches what you meant, and how often verification fails because of a bad translation. QWED's own evaluation results are at [qwedai.com/evidence](https://qwedai.com/evidence).
 
 ---
 
@@ -290,13 +276,13 @@ python -c "from qwed_sdk import QWEDLocal; \
 ## ❓ FAQ
 
 **Q: Can I use Llama 3 70B instead of GPT-4?**  
-A: Yes! Larger local models (70B+) approach cloud accuracy but require significant hardware (40GB+ VRAM).
+A: Yes. Larger local models (70B+) usually translate more reliably than small ones but need significant hardware (40GB+ VRAM).
 
 **Q: Is Ollama really free?**  
 A: Yes! Fully open source. You just need hardware to run it.
 
 **Q: What about Google Gemini?**  
-A: QWED supports Gemini! Similar accuracy to GPT-4/Claude.
+A: QWED supports Gemini. Test its translation quality on your own queries, as with any model.
 
 **Q: Can I switch between local and cloud?**  
 A: Absolutely! Change the `provider` parameter anytime.
