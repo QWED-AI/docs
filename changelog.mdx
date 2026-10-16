@@ -34,11 +34,15 @@ Jump to: [v7.2.2](#v7-2-2-—-verification-soundness-and-safety-hardening) · [Q
 
 ### Upgrading
 
+<Warning>
+**Upgrading from before v7.2:** re-issue your API keys. Self-hosted deployments must also set `QWED_API_KEY_LOOKUP_SECRET` to a value distinct from `QWED_JWT_SECRET_KEY` before starting the server. Without these steps, old keys return `401 Unauthorized` and a server without the secret refuses to start. See [Authentication](/api/authentication#api-key-storage-and-migration-v7-2).
+</Warning>
+
 Patch release with no code changes required for valid inputs. Pin the new version and redeploy:
 
 ```bash
-pip install "qwed>=7.2.2"
-npm install @qwed-ai/sdk@^7.2.2
+pip install "qwed==7.2.2"
+npm install @qwed-ai/sdk@7.2.2
 cargo add qwed@7.2.2
 ```
 
