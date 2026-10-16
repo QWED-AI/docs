@@ -1,6 +1,6 @@
 ---
 sidebar_position: 6
-title: "Determinism guarantee"
+title: "Determinism levels"
 description: "How QWED classifies verification engines by determinism level: fully symbolic, hybrid with LLM fallback, and heuristic, and what to trust in production."
 ---
 
@@ -14,7 +14,7 @@ Every QWED verification engine falls into one of three categories:
 
 | Category | Engines | Technology | Reproducible? |
 |----------|---------|------------|---------------|
-| **100% Symbolic** | Math, Logic, Code, SQL, Schema, Taint | SymPy, Z3, AST, SQLGlot | ✅ Yes |
+| **Symbolic** | Math, Logic, Code, SQL, Schema, Taint | SymPy, Z3, AST, SQLGlot | ✅ Yes |
 | **Hybrid** | Fact, Stats | TF-IDF / Sandbox → LLM fallback | ⚠️ Conditional |
 | **Heuristic** | Image, Consensus, Reasoning | VLM / Multi-LLM voting | ❌ No |
 
@@ -54,7 +54,7 @@ Every API response includes a `verification_mode` field:
 
 | Value | Meaning | Trust Level |
 |-------|---------|-------------|
-| `SYMBOLIC` | Result proven by deterministic solver (SymPy/Z3/AST) | 🟢 **100% reproducible** |
+| `SYMBOLIC` | Result proven by deterministic solver (SymPy/Z3/AST) | 🟢 **Reproducible** (only as sound as the engine) |
 | `HEURISTIC` | Result from LLM fallback or multi-model voting | 🟡 **Best-effort, not guaranteed** |
 
 ---
@@ -74,7 +74,7 @@ Banks, healthcare, and legal systems require **audit trails** and **reproducibil
 result = client.verify_math("2+2=4")
 
 if result.verification_mode == "SYMBOLIC":
-    # Safe to use without human review
+    # Deterministic: a solver checked the formal statement
     process_result(result)
 elif result.verification_mode == "HEURISTIC":
     # Flag for human review or additional validation
@@ -150,7 +150,7 @@ To make this distinction explicit, the natural language math pipeline now:
 }
 ```
 
-This means a `VERIFIED` result from the Math engine's direct endpoint (`POST /verify/math`) carries stronger guarantees than the same calculation routed through the natural language pipeline. See the [Math engine](/engines/math#trust-boundary) documentation for the full field reference.
+This means a `VERIFIED` result from the Math engine's direct endpoint (`POST /verify/math`) proves more than the same calculation routed through the natural language pipeline. See the [Math engine](/engines/math#trust-boundary) documentation for the full field reference.
 
 ### Numerical sampling fallback
 
