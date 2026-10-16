@@ -5,7 +5,48 @@ description: "Release notes for the QWED Protocol: version history, new guards, 
 
 All notable changes to the QWED platform, listed by release.
 
-Jump to: [QWED-Finance v3.0.1](#qwed-finance-v3-0-1-—-iso-20022-sanctions-and-queryguard-security-fixes) · [QWED-Legal date and input bounds](#qwed-legal-—-fail-closed-date-handling-and-input-bounds) · [Open Responses v0.6.0](#qwed-open-responses-v0-6-0-—-fail-closed-hardening) · [QWED-Legal fail-closed hardening](#qwed-legal-—-fail-closed-hardening-for-guards-diagnostics-and-github-action) · [`qwed init` server identity handshake](#qwed-verification-—-qwed-init-server-identity-handshake) · [Leaked key auto-revocation](#qwed-verification-—-leaked-api-key-auto-revocation-and-false-positive-feedback) · [API-key format spec](#qwed-verification-—-canonical-api-key-format-spec) · [Signed secret-scanning webhook](#qwed-verification-—-signed-secret-scanning-webhook-endpoint) · [v7.2.1](#v7-2-1-—-math-answer-comparison-security-patch) · [v7.2.0](#v7-2-0-—-precision-advisory-and-security-hardening-batch) · [v7.1.0](#v7-1-0-—-verification-context-v1-0-rollout) · [v7.0.0](#v7-0-0-—-full-diagnosticresult-engine-conformance)
+Jump to: [v7.2.2](#v7-2-2-—-verification-soundness-and-safety-hardening) · [QWED-Finance v3.0.1](#qwed-finance-v3-0-1-—-iso-20022-sanctions-and-queryguard-security-fixes) · [QWED-Legal date and input bounds](#qwed-legal-—-fail-closed-date-handling-and-input-bounds) · [Open Responses v0.6.0](#qwed-open-responses-v0-6-0-—-fail-closed-hardening) · [QWED-Legal fail-closed hardening](#qwed-legal-—-fail-closed-hardening-for-guards-diagnostics-and-github-action) · [`qwed init` server identity handshake](#qwed-verification-—-qwed-init-server-identity-handshake) · [Leaked key auto-revocation](#qwed-verification-—-leaked-api-key-auto-revocation-and-false-positive-feedback) · [API-key format spec](#qwed-verification-—-canonical-api-key-format-spec) · [Signed secret-scanning webhook](#qwed-verification-—-signed-secret-scanning-webhook-endpoint) · [v7.2.1](#v7-2-1-—-math-answer-comparison-security-patch) · [v7.2.0](#v7-2-0-—-precision-advisory-and-security-hardening-batch) · [v7.1.0](#v7-1-0-—-verification-context-v1-0-rollout) · [v7.0.0](#v7-0-0-—-full-diagnosticresult-engine-conformance)
+
+---
+
+## v7.2.2 — Verification soundness and safety hardening
+
+**Released: October 9, 2026** · [GitHub Release ↗](https://github.com/QWED-AI/qwed-verification/releases/tag/v7.2.2) · [GitHub PR #434](https://github.com/QWED-AI/qwed-verification/pull/434) · Advisories GHSA-4v5r-g7f4-vvgc, GHSA-mfh5-3c8f-975p, GHSA-j622-qffp-rc27, GHSA-mxwv-x5qm-mrmf
+
+> v7.2.2 is a fail-closed security release covering four coordinated advisories. They affect all versions up to `v7.2.1`. No new capability and no breaking wire changes. Upgrade is recommended for any deployment on `v6.0.0` through `v7.2.1`.
+
+### Security fixes
+
+- **Local SDK math verification.** The SymPy expression validator in `QWEDLocal` now rejects string literals nested inside container arguments. This closes an allow-list bypass that could route untrusted model output to SymPy's string-evaluation path.
+- **Logic verification soundness.** The Z3 constraint evaluator no longer accepts Python boolean operators (`and`, `or`, `not`) or chained comparisons (`a < b < c`) on symbolic objects. The DSL compiler now rejects string literals instead of materializing them as variables. Both cases could previously yield a `VERIFIED` verdict that did not follow from the input.
+- **Large-number math verification.** `verify_math` now compares results at a precision scaled to the operands. Values beyond 15 significant digits are no longer rounded before the comparison, so a wrong claim on a large number can no longer pass as `VERIFIED`.
+- **Computational cost bounds.** The math parser applies its compute-cost gates to implicit-multiplication input (`2x`, `3(x+1)`). The logic and DSL engines bound statically known integer powers. Short requests can no longer exhaust a worker.
+
+### Version bumps
+
+| Surface | From | To |
+|---|---|---|
+| `qwed` (PyPI) | `7.2.1` | `7.2.2` |
+| `qwed_sdk` (Python) | `7.2.1` | `7.2.2` |
+| `@qwed-ai/sdk` (npm) | `7.2.0` | `7.2.2` |
+| `qwed` (crates.io) | `7.2.1` | `7.2.2` |
+| API version marker | `7.2.1` | `7.2.2` |
+
+### Upgrading
+
+<Warning>
+**Upgrading from before v7.2:** re-issue your API keys. Self-hosted deployments must also set `QWED_API_KEY_LOOKUP_SECRET` to a value distinct from `QWED_JWT_SECRET_KEY` before starting the server. Without these steps, old keys return `401 Unauthorized` and a server without the secret refuses to start. See [Authentication](/api/authentication#api-key-storage-and-migration-v7-2).
+</Warning>
+
+Patch release with no code changes required for valid inputs. Pin the new version and redeploy:
+
+```bash
+pip install "qwed==7.2.2"
+npm install @qwed-ai/sdk@7.2.2
+cargo add qwed@7.2.2
+```
+
+Inputs that relied on Python `and`/`or`/`not`, chained comparisons on symbolic variables, or string literals in DSL expressions now fail closed instead of returning `VERIFIED`. Rewrite Z3 constraints with `And(...)`, `Or(...)`, `Not(...)` and separate comparisons, and write DSL logic with the [`AND`/`OR`/`NOT` operators](/engines/logic).
 
 ---
 
