@@ -38,7 +38,11 @@ Every QWED verification engine falls into one of three categories:
 
 ## How to know which mode was used
 
-Every API response includes a `verification_mode` field:
+<Warning>
+Not every response carries this field today. The Symbolic engine reports a lowercase `verification_mode` (`symbolic` or `bounded_symbolic`) inside `developer_fields`, and such a result can still be `UNVERIFIABLE`. For other engines, rely on `status` and the engine classification above.
+</Warning>
+
+The intended shape of a `verification_mode` field:
 
 ```json
 {
@@ -54,7 +58,7 @@ Every API response includes a `verification_mode` field:
 
 | Value | Meaning | Trust Level |
 |-------|---------|-------------|
-| `SYMBOLIC` | Result proven by deterministic solver (SymPy/Z3/AST) | 🟢 **Reproducible** (only as sound as the engine) |
+| `SYMBOLIC` | Result checked deterministically by the engine (SymPy/Z3/AST) | 🟢 **Reproducible** (only as sound as the engine) |
 | `HEURISTIC` | Result from LLM fallback or multi-model voting | 🟡 **Best-effort, not guaranteed** |
 
 ---
@@ -150,7 +154,7 @@ To make this distinction explicit, the natural language math pipeline now:
 }
 ```
 
-This means a `VERIFIED` result from the Math engine's direct endpoint (`POST /verify/math`) proves more than the same calculation routed through the natural language pipeline. See the [Math engine](/engines/math#trust-boundary) documentation for the full field reference.
+This means the Math engine's direct endpoint (`POST /verify/math`) checks the submitted expression without the LLM translation step used by the natural language pipeline. See the [Math engine](/engines/math#trust-boundary) documentation for the full field reference.
 
 ### Numerical sampling fallback
 

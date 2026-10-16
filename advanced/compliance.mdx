@@ -39,7 +39,7 @@ GET /admin/compliance/report/soc2/{org_id}
 ```
 
 ### Audit trail verification
-Verify the cryptographic integrity of your audit logs. Verification detects entries that have been edited, reordered or removed since they were written.
+Verify the cryptographic integrity of your audit logs. Verification detects edited entries, reordered entries, and removals that break a link between the entries that remain. It does not prove the trail is complete: deleting the newest entries leaves a valid chain, so detecting that needs a separately stored checkpoint of the latest hash.
 
 Per-entry verification covers three checks:
 
