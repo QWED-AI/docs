@@ -5,8 +5,8 @@ description: "QWED Protocol release history with download links, installation in
 
 ## Current release
 
-<Card title="v7.2.2 — Verification soundness and safety hardening" icon="shield-check" href="/changelog#v7-2-2-—-verification-soundness-and-safety-hardening">
-  Fail-closed security release covering four advisories: local SDK SymPy validation, logic verification soundness, large-number math precision, and compute-cost bounds. Patch release with no breaking wire changes. Upgrade is recommended.
+<Card title="v7.3.0 — Five advisories, tenant scoping and DoS hardening" icon="shield-check" href="https://github.com/QWED-AI/qwed-verification/releases/tag/v7.3.0">
+  Fail-closed security and soundness release covering five advisories (whole-tree SQL command classification, code-verifier process/file-network sinks, sandbox namespace isolation, SQL schema and tautology checks, logic DSL string constants), plus tenant-scoped admin endpoints, denial-of-service caps and credential-handling fixes. No breaking wire changes. Upgrade is recommended.
 </Card>
 
 ### Install
@@ -14,19 +14,19 @@ description: "QWED Protocol release history with download links, installation in
 <CodeGroup>
 
 ```bash pip
-pip install qwed==7.2.2
+pip install qwed==7.3.0
 ```
 
 ```bash docker
-docker pull qwedai/qwed-verification:7.2.2
+docker pull qwedai/qwed-verification:7.3.0
 ```
 
 ```bash npm
-npm install @qwed-ai/sdk@7.2.2
+npm install @qwed-ai/sdk@7.3.0
 ```
 
 ```bash cargo
-cargo add qwed@7.2.2
+cargo add qwed@7.3.0
 ```
 
 </CodeGroup>
