@@ -1,143 +1,128 @@
 ---
 sidebar_position: 6
 title: "Determinism levels"
-description: "How QWED classifies verification engines by determinism level: fully symbolic, hybrid with LLM fallback, and heuristic, and what to trust in production."
+description: "Which QWED engines can return VERIFIED, where an LLM is involved, and how to read status, proof_ref and advisory_checks in production."
 ---
 
-> **TL;DR:** QWED uses **deterministic solvers** (SymPy, Z3, AST, SQLGlot) wherever possible. When LLM fallback is required, the response is explicitly marked as `HEURISTIC`.
+> **TL;DR:** A QWED result is `VERIFIED` only when a deterministic check produced a proof reference. Anything an LLM, a vision model, sandbox execution or a similarity score contributes is reported as an advisory check and never sets the status. Several engines cannot return `VERIFIED` at all.
+
+---
+
+## The status model
+
+Every engine reports one of three statuses:
+
+| Status | Meaning | `proof_ref` |
+|--------|---------|-------------|
+| `VERIFIED` | A deterministic check completed and produced a proof reference. | Present |
+| `UNVERIFIABLE` | The claim could not be proven: insufficient evidence, ambiguous input, model-only support, a missing provider path or a computation that did not converge. | `null` |
+| `BLOCKED` | Verification could not be attempted or was stopped: missing declarations, a parse error, a configuration failure, a security policy violation or a missing dependency. | `null` |
+
+There is no `HEURISTIC` status and no top-level field that labels a result as symbolic or heuristic. The distinction lives in two places:
+
+- `status` and `proof_ref`: only `VERIFIED` carries a proof reference.
+- `developer_fields.advisory_checks`: output from LLM fallbacks, NLI labels, vision-model interpretation, heuristic consistency checks and keyword scans. Each entry has `name`, `advisory_only`, `constraint_id` and `details`. Advisory checks never set `status` or `proof_ref`.
+
+`developer_fields.constraint_id` says why a result landed where it did, for example `fact_verifier.heuristic_supported` or `api.math.execution_error`.
+
+A response from the HTTP API has this shape (the entries inside `developer_fields` are also copied to the top level):
+
+```json
+{
+  "status": "VERIFIED",
+  "agent_message": "Expression evaluated",
+  "developer_fields": { "is_valid": true, "value": 4.0, "exact_value": "4" },
+  "proof_ref": "...",
+  "is_authoritative": true
+}
+```
+
+### Truth and admission are separate
+
+`VERIFIED` means the analysis is authoritative, not that the input is safe or correct. The Code, SQL and Schema engines return `VERIFIED` for a snippet proven unsafe or data proven non-conforming, with `developer_fields.is_valid` set to `false`.
+
+The admission rule turns a result into a decision at a boundary:
+
+| Result | Admission |
+|--------|-----------|
+| `VERIFIED` and `is_valid` is `true` | `ADMIT` |
+| `VERIFIED` and `is_valid` is not `true` | `BLOCKED` |
+| `UNVERIFIABLE` or `BLOCKED` | `BLOCKED` |
+
+`POST /verify/code` and `POST /verify/sql` return this decision in an `admission` field, so a safe snippet comes back as `VERIFIED · ADMIT` and a proven-unsafe one as `VERIFIED · BLOCKED`. QWED decides; your integration enforces the decision.
 
 ---
 
 ## Engine classification
 
-Every QWED verification engine falls into one of three categories:
+### Engines that can return `VERIFIED`
 
-| Category | Engines | Technology | Reproducible? |
-|----------|---------|------------|---------------|
-| **Symbolic** | Math, Logic, Code, SQL, Schema, Taint | SymPy, Z3, AST, SQLGlot | ✅ Yes |
-| **Hybrid** | Fact, Stats | TF-IDF / Sandbox → LLM fallback | ⚠️ Conditional |
-| **Heuristic** | Image, Consensus, Reasoning | VLM / Multi-LLM voting | ❌ No |
+| Engine | Endpoint | What decides the result | LLM involvement |
+|--------|----------|-------------------------|-----------------|
+| **Math** | `POST /verify/math` | SymPy. An identity is `VERIFIED` when the difference simplifies to zero; an expression is `VERIFIED` when it simplifies or evaluates. A false identity is `UNVERIFIABLE`; division by zero or an undefined result is `BLOCKED`. | None |
+| **Logic** | `POST /verify/logic` | An LLM translates the query into QWED-DSL, which is validated and compiled to Z3. Satisfiable is `VERIFIED`, unsatisfiable is `UNVERIFIABLE`. | Translation only. The translation itself is not verified. |
+| **Code** | `POST /verify/code` | Python AST analysis and pattern rules (Python, JavaScript/TypeScript, Java, Go, SQL). `VERIFIED` once analysis completes; `is_valid` and `admission` say whether the code is safe. | None |
+| **SQL** | `POST /verify/sql` | SQLGlot AST analysis against the supplied `schema_ddl`. `VERIFIED` when the query is valid or proven malicious; schema-parse failures and complexity-limit violations are `BLOCKED`. | None |
+| **Schema** | Python library (`SchemaVerifier`) | Type, constraint, nested-object and array checks, plus inline arithmetic consistency checks on numeric fields using `Decimal`. `VERIFIED` once validation completes; `is_valid` says whether the data conforms. | None |
+| **Image** | `POST /verify/image` | Width and height read from the image header. Only size and dimension claims can be `VERIFIED` (match) or `BLOCKED` (mismatch). | None from the API, which runs with the vision-model fallback off |
+| **Consensus** | `POST /verify/consensus` | Runs several QWED engines on the same query: SymPy always; Python in the Docker sandbox at `high`; Z3 and, for average, mean, median or variance queries, Stats at `maximum`. `VERIFIED` only when every successful engine agrees, none is blocked and every contributing result is itself `VERIFIED`. | An LLM translates the query for the SymPy, Python and Z3 engines |
 
-### Detailed breakdown
+### Engines that never return `VERIFIED`
 
-| Engine | Mode | Primary Technology | LLM Fallback? |
-|--------|------|-------------------|---------------|
-| **Math** | Symbolic | SymPy (symbolic algebra) | ❌ Never |
-| **Logic** | Symbolic | Z3 Theorem Prover (SMT) | ❌ Never |
-| **Code** | Symbolic | Python AST + Bandit | ❌ Never |
-| **SQL** | Symbolic | SQLGlot AST parser | ❌ Never |
-| **Schema** | Symbolic | Pydantic + SymPy | ❌ Never |
-| **Taint** | Symbolic | Data Flow Analysis (AST) | ❌ Never |
-| **Fact** | Hybrid | TF-IDF similarity | ✅ When TF-IDF confidence < threshold |
-| **Stats** | Hybrid | Wasm/Docker sandbox | ✅ When sandbox execution fails |
-| **Image** | Heuristic | Vision LLM (GPT-4V, Claude) | ✅ Always |
-| **Consensus** | Heuristic | Multi-LLM voting | ✅ Always |
-| **Reasoning** | Heuristic | Chain-of-thought LLM | ✅ Always |
+| Engine | Endpoint | Why not | Best possible status |
+|--------|----------|---------|----------------------|
+| **Fact** | `POST /verify/fact` | TF-IDF cosine similarity, keyword overlap, entity matching and negation detection are heuristics: two different claims can score alike. A supported claim is `UNVERIFIABLE` (`fact_verifier.heuristic_supported`); a negation conflict is `BLOCKED`. If deterministic confidence is below 0.7 and a provider is given, an LLM is consulted, and its verdict goes into `advisory_checks` only. | `UNVERIFIABLE` |
+| **Stats** | `POST /verify/stats` | An LLM writes pandas code that runs in the secure Docker sandbox. Execution is not verification, so a successful run is `UNVERIFIABLE` with the observed result and a dataset fingerprint as evidence. Without Docker the request is `BLOCKED`; there is no in-process fallback. | `UNVERIFIABLE` |
+| **Image (other claims)** | `POST /verify/image` | Numeric, colour, text and semantic claims need OCR or a vision model. In the Python library, vision-model output is recorded as an advisory check. | `UNVERIFIABLE` |
+| **Reasoning** | Python library (`ReasoningVerifier`) | Cross-checks LLM interpretations of a query. Heuristic and LLM analysis is advisory only. | `UNVERIFIABLE` |
+| **Symbolic** | Python library (`SymbolicVerifier`) | CrossHair (Z3-based) searches for counterexamples within a timeout. Finding none is not a completeness proof, so the result is `UNVERIFIABLE` (`symbolic_verifier.no_counterexample_found`). A counterexample or a timeout is also `UNVERIFIABLE`. | `UNVERIFIABLE` |
 
----
+**Taint analysis** (AST data-flow tracking from sources to sinks) runs inside `CodeVerifier.verify_python_deep` in the Python library. `POST /verify/code` does not call it.
 
-## How to know which mode was used
-
-<Warning>
-Not every response carries this field today. The Symbolic engine reports a lowercase `verification_mode` (`symbolic` or `bounded_symbolic`) inside `developer_fields`, and such a result can still be `UNVERIFIABLE`. For other engines, rely on `status` and the engine classification above.
-</Warning>
-
-The intended shape of a `verification_mode` field:
-
-```json
-{
-  "status": "VERIFIED",
-  "verified": true,
-  "engine": "math",
-  "verification_mode": "SYMBOLIC",
-  "result": { ... }
-}
-```
-
-### `verification_mode` values
-
-| Value | Meaning | Trust Level |
-|-------|---------|-------------|
-| `SYMBOLIC` | Result checked deterministically by the engine (SymPy/Z3/AST) | 🟢 **Reproducible** (only as sound as the engine) |
-| `HEURISTIC` | Result from LLM fallback or multi-model voting | 🟡 **Best-effort, not guaranteed** |
+<Note>
+`verification_mode` appears in two unrelated places. The Symbolic engine sets `developer_fields.verification_mode` to `symbolic` or `bounded_symbolic` to say which mode ran, and these results are never `VERIFIED`. `POST /verify/consensus` takes a request field `verification_mode` (`single`, `high` or `maximum`) that sets how many engines run. Neither is a trust label on the response.
+</Note>
 
 ---
 
-## Why this matters
+## Using this in production
 
-### For regulated industries
-
-Banks, healthcare, and legal systems require **audit trails** and **reproducibility**:
-
-- ✅ `SYMBOLIC` results can be independently verified
-- ⚠️ `HEURISTIC` results should be flagged for human review
-
-### For production systems
+Gate on `status` and, where the engine reports it, on `admission`. Treat `advisory_checks` as notes for a reviewer, never as a verdict.
 
 ```python
-result = client.verify_math("2+2=4")
+import requests
 
-if result.verification_mode == "SYMBOLIC":
-    # Deterministic: a solver checked the formal statement
-    process_result(result)
-elif result.verification_mode == "HEURISTIC":
-    # Flag for human review or additional validation
-    queue_for_review(result)
+resp = requests.post(
+    f"{QWED_URL}/verify/sql",
+    headers={"x-api-key": API_KEY},
+    json={"query": sql, "schema_ddl": schema_ddl},
+).json()
+
+if resp["status"] == "VERIFIED" and resp.get("admission") == "ADMIT":
+    run_query(sql)
+else:
+    # UNVERIFIABLE, BLOCKED, or VERIFIED · BLOCKED (proven unsafe)
+    reject(resp["agent_message"], resp["developer_fields"].get("constraint_id"))
+
+for check in resp["developer_fields"].get("advisory_checks", []):
+    log_for_review(check["name"], check["details"])
 ```
+
+For engines that never return `VERIFIED` (Fact, Stats, Reasoning, Symbolic), decide in advance what your application does with `UNVERIFIABLE`: route it to a person, keep the evidence in `developer_fields` as supporting material, or reject it.
 
 ---
 
 ## Trust boundaries in translated queries
 
-When a natural language query is verified through the math pipeline, the response status is `INCONCLUSIVE` — even when the expression evaluation itself is fully deterministic. This is because the LLM translation step (natural language → expression) is not formally verified.
+When an LLM translates natural language into a formal expression, the solver can only check the translated expression, not whether the translation matches what the user meant.
 
-Each response includes a `trust_boundary` object that makes this explicit:
+### `POST /verify/natural_language`
 
-```python
-result = client.verify("What is 15% of 200?")
+An LLM translates the query into a math expression and SymPy evaluates it. This endpoint does not return `VERIFIED`: a successful evaluation comes back as `UNVERIFIABLE` with `constraint_id` `api.natural_language.legacy_conversion_failed`, and a mismatch comes back as `UNVERIFIABLE` with `math.legacy_inconclusive`. Use `POST /verify/math` with the expression itself when you need a `VERIFIED` result.
 
-print(result.status)  # "INCONCLUSIVE"
-print(result.trust_boundary["deterministic_expression_evaluation"])  # True
-print(result.trust_boundary["query_semantics_verified"])  # False
-```
+### `trust_boundary` on agent verification
 
-Use the `trust_boundary` fields to decide how to handle the result in your application. For example, you might accept the computed answer while logging that the translation was not formally proven. See [Math Engine — Trust boundary](/engines/math#trust-boundary) for the full field reference.
-
----
-
-## Design philosophy
-
-> **"Probabilistic systems should not be trusted with deterministic tasks."**
-
-QWED treats LLMs as **untrusted translators**:
-
-1. LLM converts natural language → formal specification
-2. **Deterministic solver** verifies the formal specification
-3. If solver cannot verify, result is marked `HEURISTIC`
-4. If the translation itself cannot be formally verified, result is marked `INCONCLUSIVE` with a `trust_boundary`
-
-```
-┌─────────────────────────────────────────────────────────┐
-│                    QWED Protocol                        │
-├─────────────────────────────────────────────────────────┤
-│  User Query → LLM (Translator) → DSL → Solver → Result │
-│                                                         │
-│  Solver = SymPy/Z3/AST  →  SYMBOLIC                     │
-│  Solver = LLM Fallback  →  HEURISTIC                    │
-│  Translation unverified  →  INCONCLUSIVE + trust_boundary│
-└─────────────────────────────────────────────────────────┘
-```
-
----
-
-## Trust boundaries in the natural language pipeline
-
-When a query enters through `POST /verify/natural_language`, an LLM first translates the user's natural language into a formal expression. Even when the downstream solver (e.g., SymPy) evaluates that expression deterministically, the overall result depends on whether the LLM correctly interpreted the user's intent — and that step is **not** deterministic.
-
-To make this distinction explicit, the natural language math pipeline now:
-
-1. Returns `INCONCLUSIVE` as the top-level status instead of `VERIFIED`, even when the expression evaluation succeeds.
-2. Includes a `trust_boundary` object in the response that describes exactly what was and was not proven.
+`POST /agents/{agent_id}/verify` runs the same pipeline and returns a `trust_boundary` object that records what was and was not checked:
 
 ```json
 {
@@ -149,45 +134,65 @@ To make this distinction explicit, the natural language math pipeline now:
     "formal_proof": false,
     "translation_claim_self_consistent": true,
     "provider_used": "openai",
-    "overall_status": "INCONCLUSIVE"
+    "trust_enforced": "VERIFIED",
+    "attestation_policy": "mandatory",
+    "overall_status": "VERIFIED"
   }
 }
 ```
 
-This means the Math engine's direct endpoint (`POST /verify/math`) checks the submitted expression without the LLM translation step used by the natural language pipeline. See the [Math engine](/engines/math#trust-boundary) documentation for the full field reference.
+On this path a `VERIFIED` evaluation must be signed with an attestation bound to the translated expression. If signing fails, the result becomes `BLOCKED` and `trust_boundary.attestation_error` is set. `query_semantics_verified` is always `false`: even a `VERIFIED` result here covers the translated expression only.
 
 ### Numerical sampling fallback
 
-The identity verification fallback (numerical sampling at fixed test points) now **fails closed** — returning `BLOCKED` with `is_equivalent: false` and `confidence: 0.0`. Previously this returned `UNKNOWN` with `is_equivalent: null` (and before that, `LIKELY_EQUIVALENT` with `confidence: 0.99`). Matching at a handful of sample points does not constitute a formal proof, so the engine now rejects the result outright rather than leaving the outcome ambiguous.
+When the Math engine's identity check cannot show two expressions equal by simplification or expansion, it evaluates both at fixed sample points. A match at every point is not a proof, so the engine returns `BLOCKED` with `is_equivalent: false`, `confidence: 0.0` and `method: "numerical_sampling_rejected"`.
+
+---
+
+## Design philosophy
+
+> **"Probabilistic systems should not be trusted with deterministic tasks."**
+
+QWED treats LLMs as **untrusted translators**:
+
+1. An LLM may convert natural language into a formal specification.
+2. A **deterministic check** decides the status of that specification.
+3. Anything a model contributes is recorded in `advisory_checks` and cannot raise the status.
+4. Where the translation step itself is not checked, the response says so (`constraint_id`, `trust_boundary`).
+
+```
+┌──────────────────────────────────────────────────────────────┐
+│                        QWED Protocol                         │
+├──────────────────────────────────────────────────────────────┤
+│  Query → LLM (translator) → formal spec → deterministic check │
+│                                                              │
+│  Deterministic check passes     →  VERIFIED + proof_ref      │
+│  Not provable / model-only      →  UNVERIFIABLE              │
+│  Cannot run / policy violation  →  BLOCKED                   │
+│  LLM, VLM or heuristic output   →  advisory_checks only      │
+└──────────────────────────────────────────────────────────────┘
+```
 
 ---
 
 ## Frequently asked questions
 
-### Q: Can I filter responses by verification_mode?
+### Q: How do I accept only deterministically checked results?
 
-**A:** Yes! Use the `require_symbolic` option in your request:
+**A:** Accept `status == "VERIFIED"` with a non-null `proof_ref`, and where the response has an `admission` field, require `ADMIT`. There is no request option that forces a symbolic-only path; engines that cannot produce a proof return `UNVERIFIABLE` or `BLOCKED` on their own.
 
-```python
-result = client.verify(
-    query="Calculate NPV",
-    options={"require_symbolic": True}
-)
-# Fails if solver cannot verify deterministically
-```
+### Q: Why is my supported fact claim `UNVERIFIABLE`?
 
-### Q: Why is Fact verification sometimes HEURISTIC?
+**A:** The Fact engine's methods are heuristic, so it never returns `VERIFIED`. The scores, citations and any LLM opinion are in `developer_fields`, including `advisory_checks`, for you to review.
 
-**A:** Fact verification uses TF-IDF (deterministic) to find evidence. If TF-IDF confidence is below threshold, it falls back to NLI (LLM-based), marking the result as `HEURISTIC`.
+### Q: Is Consensus useful when it returns `UNVERIFIABLE`?
 
-### Q: Is Consensus useful if it's HEURISTIC?
-
-**A:** Yes! Consensus detects **disagreement** between multiple LLMs. While not deterministic, it catches cases where models are uncertain — useful as a safety net, not a formal verifier.
+**A:** Yes. It runs the same query through several engines and reports `agreement_status` (for example `unanimous`, `majority` or `split`), `engines_used` and `confidence` in `developer_fields`. Disagreement between engines is a useful signal even when the outcome is `UNVERIFIABLE`.
 
 ---
 
 ## See also
 
-- [Engines overview](/engines/overview) — Full engine documentation
-- [API endpoints](/api/endpoints) — Response schema reference
-- [Whitepaper](/whitepaper) — Academic justification for neurosymbolic approach
+- [Engines overview](/engines/overview) for full engine documentation
+- [API endpoints](/api/endpoints) for the response schema reference
+- [Whitepaper](/whitepaper) for the background on the neurosymbolic approach
