@@ -5,7 +5,46 @@ description: "Release notes for the QWED Protocol: version history, new guards, 
 
 All notable changes to the QWED platform, listed by release.
 
-Jump to: [v7.2.2](#v7-2-2-—-verification-soundness-and-safety-hardening) · [QWED-Finance v3.0.1](#qwed-finance-v3-0-1-—-iso-20022-sanctions-and-queryguard-security-fixes) · [QWED-Legal date and input bounds](#qwed-legal-—-fail-closed-date-handling-and-input-bounds) · [Open Responses v0.6.0](#qwed-open-responses-v0-6-0-—-fail-closed-hardening) · [QWED-Legal fail-closed hardening](#qwed-legal-—-fail-closed-hardening-for-guards-diagnostics-and-github-action) · [`qwed init` server identity handshake](#qwed-verification-—-qwed-init-server-identity-handshake) · [Leaked key auto-revocation](#qwed-verification-—-leaked-api-key-auto-revocation-and-false-positive-feedback) · [API-key format spec](#qwed-verification-—-canonical-api-key-format-spec) · [Signed secret-scanning webhook](#qwed-verification-—-signed-secret-scanning-webhook-endpoint) · [v7.2.1](#v7-2-1-—-math-answer-comparison-security-patch) · [v7.2.0](#v7-2-0-—-precision-advisory-and-security-hardening-batch) · [v7.1.0](#v7-1-0-—-verification-context-v1-0-rollout) · [v7.0.0](#v7-0-0-—-full-diagnosticresult-engine-conformance)
+Jump to: [QWED-Tax v0.2.1](#qwed-tax-v0-2-1-—-classification-claim-vocabulary-and-strict-facts) · [v7.2.2](#v7-2-2-—-verification-soundness-and-safety-hardening) · [QWED-Finance v3.0.1](#qwed-finance-v3-0-1-—-iso-20022-sanctions-and-queryguard-security-fixes) · [QWED-Legal date and input bounds](#qwed-legal-—-fail-closed-date-handling-and-input-bounds) · [Open Responses v0.6.0](#qwed-open-responses-v0-6-0-—-fail-closed-hardening) · [QWED-Legal fail-closed hardening](#qwed-legal-—-fail-closed-hardening-for-guards-diagnostics-and-github-action) · [`qwed init` server identity handshake](#qwed-verification-—-qwed-init-server-identity-handshake) · [Leaked key auto-revocation](#qwed-verification-—-leaked-api-key-auto-revocation-and-false-positive-feedback) · [API-key format spec](#qwed-verification-—-canonical-api-key-format-spec) · [Signed secret-scanning webhook](#qwed-verification-—-signed-secret-scanning-webhook-endpoint) · [v7.2.1](#v7-2-1-—-math-answer-comparison-security-patch) · [v7.2.0](#v7-2-0-—-precision-advisory-and-security-hardening-batch) · [v7.1.0](#v7-1-0-—-verification-context-v1-0-rollout) · [v7.0.0](#v7-0-0-—-full-diagnosticresult-engine-conformance)
+
+---
+
+## QWED-Tax v0.2.1 — classification claim vocabulary and strict facts
+
+**Released: October 10, 2026** in `qwed-tax` 0.2.1 (PyPI and npm `@qwed-ai/tax`) · [GitHub PR #81](https://github.com/QWED-AI/qwed-tax/pull/81) · [Changelog](https://github.com/QWED-AI/qwed-tax/blob/main/CHANGELOG.md)
+
+> `qwed-tax` v0.2.1 is a security patch. Upgrading is recommended for all users of `NexusGuard` (Python and npm) and `ClassificationGuard`. The release also ships the structured nexus claim described in the [August 31](#qwed-tax-—-explicit-boolean-claim-required-for-economic-nexus-verification) and [September 1](#qwed-tax-—-npm-verifier-enforces-structured-nexus-claims-fail-closed) entries.
+
+<Warning>
+**Behavior change.** Classification claims and worker facts that earlier versions interpreted are now rejected:
+
+```python
+# Before: "1099 contractor" was matched by substring and treated as 1099.
+# After: verified=False with an INVALID_CLAIM audit trace outcome.
+guard.verify_classification_claim(
+    llm_claim="1099 contractor",
+    facts={"provides_tools": False, "reimburses_expenses": False, "indefinite_relationship": False},
+)
+
+# After: pass a canonical claim and boolean facts.
+guard.verify_classification_claim(
+    llm_claim="1099",
+    facts={"provides_tools": False, "reimburses_expenses": False, "indefinite_relationship": False},
+)
+```
+</Warning>
+
+### What changed
+
+- **Closed claim vocabulary.** `ClassificationGuard.verify_classification_claim` maps the claim through a fixed set of values instead of substring matching. `W2`, `W-2`, and `EMPLOYEE` map to employee. `1099`, `1099-NEC`, `CONTRACTOR`, and `INDEPENDENT CONTRACTOR` map to contractor. Matching ignores case, spaces, hyphens, and underscores. Any other text fails closed with `INVALID_CLAIM`.
+- **Strict worker facts.** `provides_tools`, `reimburses_expenses`, and `indefinite_relationship` must all be present booleans. Otherwise the result fails closed with `INVALID_FACTS`. Strings such as `"no"` are rejected.
+- **`TaxPreFlight` `hire` intents.** The same vocabulary and fact rules apply to `worker_type` and `worker_facts`.
+- **npm `NexusGuard` fails closed.** The `@qwed-ai/tax` `NexusGuard` blocks states that are not in its threshold table and rejects invalid sales data, including non-object, non-finite, and negative values. The transaction-count prong applies only to states that have one.
+- **npm classification unchanged.** The npm SDK still compares `worker_type` exactly. Pass `"W2"` or `"1099"`.
+
+### Migration
+
+Translate the AI's classification into `"W2"` or `"1099"` and pass each worker fact as a real boolean — map known values explicitly (`"yes"`/`"true"` → `True`, `"no"`/`"false"` → `False`) and reject anything else. Do not wrap a string in `bool()`: `bool("no")` is `True`, which would recreate the bug this release fixes. Nexus callers that relied on `llm_decision` strings must pass `claimed_collects_tax` as a boolean. See [ClassificationGuard](/tax/guards#classificationguard-irs-common-law) and [NexusGuard](/tax/guards#nexusguard-economic-nexus).
 
 ---
 
