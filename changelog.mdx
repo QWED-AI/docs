@@ -44,7 +44,7 @@ guard.verify_classification_claim(
 
 ### Migration
 
-Translate the AI's classification into `"W2"` or `"1099"` and convert each worker fact to a `bool` before calling the guard or submitting a `hire` intent. Nexus callers that relied on `llm_decision` strings must pass `claimed_collects_tax` as a boolean. See [ClassificationGuard](/tax/guards#classificationguard-irs-common-law) and [NexusGuard](/tax/guards#nexusguard-economic-nexus).
+Translate the AI's classification into `"W2"` or `"1099"` and pass each worker fact as a real boolean — map known values explicitly (`"yes"`/`"true"` → `True`, `"no"`/`"false"` → `False`) and reject anything else. Do not wrap a string in `bool()`: `bool("no")` is `True`, which would recreate the bug this release fixes. Nexus callers that relied on `llm_decision` strings must pass `claimed_collects_tax` as a boolean. See [ClassificationGuard](/tax/guards#classificationguard-irs-common-law) and [NexusGuard](/tax/guards#nexusguard-economic-nexus).
 
 ---
 

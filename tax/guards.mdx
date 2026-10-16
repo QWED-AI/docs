@@ -213,7 +213,7 @@ These rules also apply to `TaxPreFlight` intents with `action: "hire"`, which pa
   # {"verified": True, "audit_trace": {...}}
   ```
 
-  Translate the AI's output into `"W2"` or `"1099"` and convert each fact to a `bool` before calling the guard.
+  Translate the AI's output into `"W2"` or `"1099"` and pass each fact as a real boolean — map known text values explicitly and reject anything else. Do not use `bool(<string>)`: `bool("no")` is `True`, which would recreate the bug this release fixes.
 </Warning>
 
 <Note>
