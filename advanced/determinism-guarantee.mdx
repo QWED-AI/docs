@@ -4,7 +4,7 @@ title: "Determinism levels"
 description: "Which QWED engines can return VERIFIED, where an LLM is involved, and how to read status, proof_ref and advisory_checks in production."
 ---
 
-> **TL;DR:** A QWED result is `VERIFIED` only when a deterministic check produced a proof reference. Anything an LLM, a vision model, sandbox execution or a similarity score contributes is reported as an advisory check and never sets the status. Several engines cannot return `VERIFIED` at all.
+> **TL;DR:** A QWED result is `VERIFIED` only when a deterministic check produced a proof reference. Where an LLM translates a query into a formal expression (Logic, Consensus, natural-language Math), the deterministic check runs on that translation, which is not itself verified. Anything else a model, sandbox execution or a similarity score contributes is reported as an advisory check and never sets the status. Several engines cannot return `VERIFIED` at all.
 
 ---
 
@@ -92,11 +92,19 @@ Gate on `status` and, where the engine reports it, on `admission`. Treat `adviso
 ```python
 import requests
 
-resp = requests.post(
-    f"{QWED_URL}/verify/sql",
-    headers={"x-api-key": API_KEY},
-    json={"query": sql, "schema_ddl": schema_ddl},
-).json()
+try:
+    r = requests.post(
+        f"{QWED_URL}/verify/sql",
+        headers={"x-api-key": API_KEY},
+        json={"query": sql, "schema_ddl": schema_ddl},
+        timeout=30,
+    )
+    r.raise_for_status()
+    resp = r.json()
+except (requests.RequestException, ValueError) as exc:
+    # No answer is not an ADMIT: fail closed.
+    reject(f"verification unavailable: {exc}", None)
+    raise
 
 if resp["status"] == "VERIFIED" and resp.get("admission") == "ADMIT":
     run_query(sql)
@@ -157,7 +165,7 @@ QWED treats LLMs as **untrusted translators**:
 
 1. An LLM may convert natural language into a formal specification.
 2. A **deterministic check** decides the status of that specification.
-3. Anything a model contributes is recorded in `advisory_checks` and cannot raise the status.
+3. The check runs on the translation, so a wrong translation can still produce a `VERIFIED` result for the wrong question. Any other model output is recorded in `advisory_checks` and cannot raise the status.
 4. Where the translation step itself is not checked, the response says so (`constraint_id`, `trust_boundary`).
 
 ```
