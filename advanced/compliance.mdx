@@ -1,9 +1,9 @@
 ---
 title: "QWED compliance guide"
-description: "Use QWED compliance features for SOC 2 preparation, GDPR adherence, HIPAA workflows, and cryptographic audit trail management via the API and SDKs."
+description: "Use the HMAC-signed, hash-chained audit log, SOC 2 report endpoint and data export to support your own SOC 2 and GDPR work. QWED does not make a system compliant."
 ---
 
-This guide provides instructions for System Administrators and Developers on how to use QWED's compliance features for SOC 2 preparation, GDPR adherence, and audit trail management.
+This guide provides instructions for System Administrators and Developers on how to use QWED's audit and export features to support SOC 2 preparation, GDPR requests, and audit trail management. These features produce a record of what was checked; they do not by themselves make a system compliant with any standard or regulation.
 
 ## Audience
 - **System Administrators:** Use the API endpoints described below to manage compliance tasks.
@@ -39,7 +39,7 @@ GET /admin/compliance/report/soc2/{org_id}
 ```
 
 ### Audit trail verification
-Verify the cryptographic integrity of your audit logs. This ensures that no logs have been tampered with since creation.
+Verify the cryptographic integrity of your audit logs. Verification detects edited entries, reordered entries, and removals that break a link between the entries that remain. It does not prove the trail is complete: deleting the newest entries leaves a valid chain, so detecting that needs a separately stored checkpoint of the latest hash.
 
 Per-entry verification covers three checks:
 
@@ -120,10 +120,10 @@ DELETE FROM verificationlog WHERE user_id = {user_id};
 ```
 
 ### Consent management
-QWED does not have a built-in "Consent Management Platform" (CMP), but you can use the immutable audit log to track consent events.
+QWED does not have a built-in "Consent Management Platform" (CMP), but you can use the hash-chained audit log to track consent events.
 
 **Implementing consent tracking:**
-Log a specific "verification" event when a user grants consent. This creates a tamper-proof record.
+Log a specific "verification" event when a user grants consent. The entry is HMAC-signed and hash-chained to the previous entry for the same organization, so a later edit to it is detectable when you verify the trail. It is not tamper-proof: anyone holding `QWED_AUDIT_SECRET_KEY` and database write access can rewrite the chain.
 
 ```python
 # Example: Logging a consent event via the API
@@ -133,7 +133,7 @@ requests.post("/verify/fact", json={
     "provider": "system"
 })
 ```
-*Note: This treats the consent record as a "fact" verification, securing it in the cryptographic ledger.*
+*Note: This treats the consent record as a "fact" verification, so it is written to the signed, hash-chained audit log.*
 
 ---
 
