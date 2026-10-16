@@ -192,7 +192,7 @@ Connect your application to the local QWED backend:
     )
     
     func main() {
-        client := qwed.NewClient("qwed_local", "http://localhost:8000")
+        client := qwed.NewClient("qwed_local", qwed.WithBaseURL("http://localhost:8000"))
         
         result, err := client.Verify(context.Background(), "Is 2+2 equal to 4?")
         if err != nil {
