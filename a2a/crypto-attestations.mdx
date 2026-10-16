@@ -63,7 +63,7 @@ The `kid` is derived from a SHA-256 fingerprint of the public key, so it stays s
   "jti": "a2a_trace_001",
   "qwed_a2a": {
     "version": "1.0",
-    "verdict": "forwarded",
+    "verdict": "verified",
     "engine": "finance_guard",
     "sender": "procurement-agent",
     "receiver": "treasury-agent"
@@ -78,7 +78,7 @@ The `kid` is derived from a SHA-256 fingerprint of the public key, so it stays s
 | `iat` | Token issued-at timestamp |
 | `exp` | Token expiration (default: 300 seconds / 5 minutes — one A2A hop) |
 | `jti` | Trace ID linking to the verification event |
-| `qwed_a2a` | QWED-specific claims: verdict, engine, sender/receiver |
+| `qwed_a2a` | QWED-specific claims: verdict, engine, sender/receiver. `verdict` is one of `verified`, `blocked`, `heuristic_pass` or `error`; `unverifiable` verdicts are never signed. Only `verified` is admissible. |
 
 ---
 
@@ -117,7 +117,7 @@ crypto = A2ACryptoService(
 
 token = crypto.sign_verdict(
     trace_id="a2a_audit_001",
-    verdict_status="forwarded",
+    verdict_status="verified",
     engine="finance_guard",
     sender_id="procurement-agent",
     receiver_id="treasury-agent",
@@ -127,6 +127,10 @@ token = crypto.sign_verdict(
 print(token)
 # eyJhbGciOiJFUzI1NiIsInR5cCI6InF3ZWQtYTJhLWF0dGVzdGF0aW9uK2p3dCIs...
 ```
+
+<Note>
+`verified` replaced `forwarded` as the name of the admissible status. `VerdictStatus.FORWARDED` is a deprecated alias of `VerdictStatus.VERIFIED`, and a legacy `"forwarded"` value is still accepted on input (so tokens minted by 0.3.x issuers keep verifying), but it is never emitted. Both will be removed in a future minor release.
+</Note>
 
 Each `trace_id` becomes the token's `jti` and must be unique per instance: signing the same `trace_id` again within its validity window raises `ValueError`. See [Replay protection](#replay-protection-jti-lifecycle).
 
