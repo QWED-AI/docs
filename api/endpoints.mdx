@@ -1295,15 +1295,48 @@ Returns verification logs for the authenticated tenant, ordered by most recent f
 
 <Info>New in v4.0.0</Info>
 
-These endpoints require the `admin:all` API key scope.
+Admin endpoints authenticate your API key with the `X-API-Key` header, then authorize the request by the role of the user who owns the key. Every admin endpoint acts only on your own organization, which is the organization the API key belongs to.
+
+Before QWED checks the role, the request must meet all of these conditions. Otherwise QWED returns `403 Forbidden`:
+
+- The API key is active, not revoked, and not expired.
+- The key's owning user is active and belongs to the key's organization.
+- The organization is active.
+
+| Endpoint | Allowed roles | Another organization's ID |
+|----------|---------------|---------------------------|
+| `GET /admin/compliance/export/csv` | `owner`, `admin` | `403 Forbidden` |
+| `GET /admin/compliance/verify/{log_id}` | `owner`, `admin` | `404 Not Found` |
+| `GET /admin/compliance/report/soc2/{org_id}` | `owner`, `admin` | `403 Forbidden` |
+| `GET /admin/security/threats/{org_id}` | `owner`, `admin` | `403 Forbidden` |
+| `POST /admin/keys/rotate` | `owner`, `admin`, `member` | `404 Not Found` |
+
+A caller whose role isn't allowed gets `403 Forbidden` with `"Insufficient permissions for this operation"`. A missing or invalid API key returns `401 Unauthorized`.
+
+<Note>
+Before this change, every admin endpoint returned `401 Unauthorized`, even for valid owner and admin keys. Admin endpoints now authorize by role and are scoped to the caller's organization.
+</Note>
 
 ### GET /admin/compliance/export/csv
 
-Export the full audit trail as a CSV file.
+Export your organization's audit trail as a CSV file (`text/csv`).
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `organization_id` | integer (query) | Must be your own organization ID |
+
+Passing another organization's ID returns `403 Forbidden` with `"Cannot access another organization's data"`.
+
+```bash
+curl --fail-with-body -H "X-API-Key: qwed_live_your_admin_key" \
+  "https://api.qwedai.com/v1/admin/compliance/export/csv?organization_id=12"
+```
 
 ### GET /admin/compliance/verify/{log_id}
 
 Cryptographically verify a specific audit log entry using HMAC-SHA256 and hash-chain validation.
+
+The entry must belong to your organization. QWED returns `404 Not Found` for a log ID in another organization, so the response doesn't reveal whether that entry exists.
 
 The response reports three independent checks: payload hash, HMAC signature (compared in constant time), and chain linkage to the prior entry within the same organization. Genesis entries must have a `null` `previous_hash`; non-genesis entries must link to a non-empty prior entry hash. Entries with malformed stored result payloads cause verification to fail closed with `SecurityError` instead of returning `"valid": true`.
 
@@ -1331,23 +1364,43 @@ Hash matching accepts either the current canonical payload (which includes `raw_
 
 ### GET /admin/compliance/report/soc2/{org_id}
 
-Generate a SOC 2 Type II compliance report for an organization.
+Generate a SOC 2 Type II compliance report for your organization. `org_id` must be your own organization ID. Another organization's ID returns `403 Forbidden`.
 
 ### GET /admin/security/threats/{org_id}
 
-Returns a real-time threat summary for an organization, including blocked injection attempts and anomalous patterns.
+Returns a real-time threat summary for your organization, including blocked injection attempts and anomalous patterns. `org_id` must be your own organization ID. Another organization's ID returns `403 Forbidden`.
 
 ### POST /admin/keys/rotate
 
-Rotate an API key. Available to admin and member roles.
+Rotate an API key and return the new secret once. Owners, admins, and members can call this endpoint, subject to these rules:
 
-**Request:**
+- **Your own key:** any allowed role can rotate a key it owns.
+- **Another user's key:** only an `owner` or `admin` can rotate it, and only when the key's owner doesn't hold a higher role. An admin can't rotate an owner's key. A member can't rotate anyone else's key. These cases return `403 Forbidden`.
+- **Organization scope:** the key must belong to your organization. A key ID in another organization returns `404 Not Found`, without revealing that the key exists.
+- **Live keys only:** QWED treats a revoked or inactive key as absent and returns `404 Not Found`. You can't rotate a dead credential into a new working secret.
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `key_id` | integer (query) | ID of the key to rotate |
+
+```bash
+curl --fail-with-body -X POST -H "X-API-Key: qwed_live_your_key" \
+  "https://api.qwedai.com/v1/admin/keys/rotate?key_id=42"
+```
+
+**Response:**
 
 ```json
 {
-  "key_id": "key_abc123"
+  "status": "rotated",
+  "old_key_id": 42,
+  "new_key_id": 57,
+  "new_key_preview": "qwed_live_ab...",
+  "new_key_secret": "qwed_live_..."
 }
 ```
+
+Store `new_key_secret` immediately. QWED returns it only in this response.
 
 ---
 
