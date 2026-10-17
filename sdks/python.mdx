@@ -115,7 +115,9 @@ result = client.verify_fact(claim=claim, context=context)
 if result.status == "UNVERIFIABLE":
     # Service unreachable, timed out, or the claim could not be proven.
     # Don't treat the claim as true. Retry, escalate, or reject.
-    print(result.result["message"])
+    # Completed checks expose "agent_message"; offline/timeout failures expose
+    # "message". Read both safely so neither path raises KeyError.
+    print(result.result.get("agent_message") or result.result.get("message") or "Verification unavailable.")
     reject(claim)
 elif result.status == "BLOCKED":
     reject(claim)
