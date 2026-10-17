@@ -173,7 +173,7 @@ A term is treated as `UNVERIFIABLE` when any of the following apply:
 - The `business`/`working`/`work` qualifier is **not adjacent** to the unit (e.g., `"30 business days"` parses; `"30 days business"` does not).
 - The parsed quantity exceeds an internal bound (~100,000 units after normalization) or produces an out-of-range date. This prevents crashes and unbounded business-day loops on inputs like `"999999999 business days"`.
 - The quantity is a digit run longer than 18 characters. The guard rejects it before converting it to a number.
-- The term is **anchored to an event** rather than the signing date. See [Event-anchored terms](#event-anchored-terms).
+- The term is **anchored to an event** rather than the signing date, or uses **directional wording** such as `before` or `prior to`. See [Supported term forms](#supported-term-forms) and [Event-anchored terms](#event-anchored-terms).
 
 Recognized time units are `day`/`calendar`, `week`, `month`, and `year`, with optional `business`/`working`/`work` qualifiers for business-day arithmetic. Business/working qualifiers are only valid on `day` and `week` units (`week` counts as 5 business days) — `"6 business months"` fails closed rather than silently computing a calendar period.
 
@@ -254,11 +254,39 @@ print(result.verified)       # True
   Normalize every date to ISO `YYYY-MM-DD` before you pass it to a QWED-Legal guard. ISO dates are never order-ambiguous or partial.
 </Tip>
 
+### Supported term forms
+
+Starting in `qwed-legal` 0.5.1, `DeadlineGuard` uses an allowlist. It computes a deadline from `signing_date` only when the term is measured forward from the signing date. Every other term returns `UNVERIFIABLE` (`verified=False`, `is_computable=False`, `computed_deadline=None`). The trace records an `UNSUPPORTED` step. This check runs before any date arithmetic, so rejected business-day terms never consult the holiday calendar.
+
+| Term form | Examples | Result |
+|-----------|----------|--------|
+| Bare-relative | `"30 days"`, `"10 business days"`, `"3 months"` | Computed from `signing_date` |
+| Anchored to signing or execution | `"30 days from signing"`, `"15 days after execution"` | Computed from `signing_date` |
+| Directional | `"30 days before signing"`, terms using `prior to`, `preceding`, `ahead of`, or `in advance of` | `UNVERIFIABLE` |
+| Anchored to another event | `"30 days after receipt of notice"`, `"30 days after closing"`, `"within 30 days of request"` | `UNVERIFIABLE` |
+
+Directional wording wins over a signing anchor. `"30 days before signing"` measures backward, so a forward computation would certify the wrong date. Before 0.5.1, the guard computed these terms forward from signing and could return `verified=True`.
+
+```python
+result = guard.verify(
+    signing_date="2026-01-01",
+    term="30 days before signing",
+    claimed_deadline="2026-01-31",
+)
+
+print(result.verified)           # False
+print(result.computed_deadline)  # None
+print(result.message)
+# ⚠️ UNVERIFIABLE: Term '30 days before signing' uses directional wording
+# (e.g. 'before', 'prior to', 'ahead of') that measures the period backward
+# or against a reference the signing-date computation does not apply. Supply
+# a term measured forward from the signing date (e.g. '30 days',
+# '30 days from signing'), or provide the anchor event's date.
+```
+
 ### Event-anchored terms
 
-`DeadlineGuard` computes deadlines from `signing_date` only. A term that starts its clock at a later event returns `UNVERIFIABLE` instead of a deadline counted from signing. The guard has no date for the event, so any computed deadline would be wrong.
-
-The guard treats a term as event-anchored when a preposition such as `after`, `following`, `upon`, `from`, or `within`, or a phrase like `days of`, ties the period to one of these events: receipt, notice, delivery, occurrence, demand, invoice, breach, termination, service (for example, service of process), or payment. Conditional wording about acceptance, approval, or payment (`"subject to approval"`) does not count as an anchor. A term that negates the signing date (`"not from signing"`) and names no supported replacement also fails closed.
+A term that starts its clock at an event other than signing or execution returns `UNVERIFIABLE` instead of a deadline counted from signing. The guard has no date for the event, so any computed deadline would be wrong. This covers any event, including closing, completion, request, receipt, notice, delivery, invoice, breach, termination, and payment. A term that negates the signing date (`"not from signing"`) and names no supported replacement also fails closed. Conditional wording about acceptance, approval, or payment (`"subject to approval"`) does not count as an anchor.
 
 ```python
 result = guard.verify(
@@ -267,8 +295,6 @@ result = guard.verify(
     claimed_deadline="2026-01-31",
 )
 
-# Before: computed 30 days from signing and returned verified=True.
-# After:
 print(result.verified)           # False
 print(result.computed_deadline)  # None
 print(result.message)
@@ -277,7 +303,25 @@ print(result.message)
 # from these inputs — supply the anchor event's date.
 ```
 
-To verify an event-anchored deadline, pass the event's date as `signing_date` and drop the anchor from the term (for example, `term="30 days"`).
+To verify a deadline that runs forward from another event:
+
+1. Confirm the event's date and that the period runs forward from it.
+2. Pass the event's date as `signing_date`.
+3. Rewrite the term to a bare-relative form, such as `term="30 days"`.
+
+Changing the date alone is not enough. The original event-anchored term still returns `UNVERIFIABLE`.
+
+```python
+# Contract: "Payment is due 30 days after closing." Closing occurred on 2026-03-02.
+result = guard.verify(
+    signing_date="2026-03-02",   # confirmed closing date
+    term="30 days",              # rewritten from "30 days after closing"
+    claimed_deadline="2026-04-01",
+)
+print(result.verified)  # True
+```
+
+Terms measured backward (`"before"`, `"prior to"`) have no supported rewrite. Verify them outside `DeadlineGuard`.
 
 <Warning>
 The result reports the date you passed as `signing_date` — it cannot tell an event date from a real signing. If you store or share results, keep the contract's actual signing date separately so the record does not misstate when the contract was signed.

@@ -6,7 +6,11 @@ description: "Complete QWED-MCP tools reference covering execute_python_code (th
 
 ## execute\_python\_code
 
-Execute Python code in a sandboxed subprocess with access to all QWED SDK libraries.
+Execute Python code in a subprocess with access to all QWED SDK libraries.
+
+<Warning>
+  The subprocess runs **with the server's privileges**. It is not a sandbox: it only gets a restricted set of environment variables. Enable code execution only where you trust the inputs.
+</Warning>
 
 <Info>
   As of **v0.2.0**, `execute_python_code` is the single MCP tool exposed by QWED-MCP. It replaces all previous `verify_*` tools to solve context bloat (RFC-9728 compatibility). See [migration from v0.1.x](#migrating-from-v0-1-x) below.

@@ -104,13 +104,13 @@ See [Crypto attestations](/a2a/crypto-attestations) for key rotation and multi-r
 
   <Step title="Check the output">
     ```text
-    Status:      forwarded ✅
+    Status:      verified ✅
     Engine:      finance_guard
     Trace ID:    quickstart_001
     Attestation: eyJhbGciOiJFUzI1NiIsInR5cCI6InF3ZWQtYTJhLWF0...
     ```
 
-    The financial totals match (50×2 + 25×2 = 150), so the message is **forwarded** with a signed attestation.
+    The financial totals match (50×2 + 25×2 = 150), so the verdict is **verified** with a signed attestation. `verified` is the only admissible status.
   </Step>
 </Steps>
 
@@ -226,7 +226,7 @@ Response:
 }
 ```
 
-`GENERAL` and `DATA_QUERY` payloads have no verification engine, so the interceptor returns an `unverifiable` verdict with **no JWT attestation** — signing a token for content that was never verified would be a false cryptographic claim. Callers must decide how to handle unverified traffic. To see a signed `forwarded` verdict, send a `financial_transaction`, `logic_assertion`, or `code_execution` payload instead. See the [verdict status table](/a2a/interceptor#verdict-statuses) for the full contract.
+`GENERAL` and `DATA_QUERY` payloads have no verification engine, so the interceptor returns an `unverifiable` verdict with **no JWT attestation**, since signing a token for content that was never verified would be a false cryptographic claim. Callers must decide how to handle unverified traffic. To see a signed `verified` verdict, send a well-formed `financial_transaction` payload instead; `logic_assertion` and `code_execution` payloads that pass return a signed `heuristic_pass`, which is not admissible. See the [verdict status table](/a2a/interceptor#verdict-statuses) for the full contract.
 
 ---
 
