@@ -60,10 +60,17 @@ print(result.proof_ref)                         # "sha256:..."
 When you pass `schema_ddl`, every table the query reads or writes must be declared in that DDL. A reference to an undeclared table is an admission failure: the result is `BLOCKED` with `is_valid: false` and `constraint_id: "sql_verifier.schema_violation"`. Names the query defines itself, such as CTEs, are not treated as tables. Without `schema_ddl`, the engine does not check table names.
 
 ```python
-result = client.verify_sql(
-    query="SELECT * FROM payments",
-    schema_ddl="CREATE TABLE users (id INT, name TEXT)"
-)
+import httpx
+
+try:
+    result = client.verify_sql(
+        query="SELECT * FROM payments",
+        schema_ddl="CREATE TABLE users (id INT, name TEXT)",
+    )
+except httpx.HTTPError as exc:
+    # Request failed (network error or non-2xx). Fail closed: do not run the SQL.
+    raise RuntimeError(f"SQL verification unavailable: {exc}") from exc
+
 print(result.status)                               # "BLOCKED"
 print(result.developer_fields["is_valid"])         # False
 print(result.developer_fields["constraint_id"])    # "sql_verifier.schema_violation"
@@ -80,8 +87,14 @@ MySQL and MariaDB run SQL placed inside executable comments (`/*! ... */`, `/*!N
 `developer_fields.executable_comments_expanded` is `true` when the query contained an executable comment.
 
 ```python
+import httpx
+
 # The tautology hidden in the comment is analysed as SQL
-result = client.verify_sql("SELECT * FROM users WHERE id = 1 /*!50000 OR 1=1 */")
+try:
+    result = client.verify_sql("SELECT * FROM users WHERE id = 1 /*!50000 OR 1=1 */")
+except httpx.HTTPError as exc:
+    # Request failed (network error or non-2xx). Fail closed: do not run the SQL.
+    raise RuntimeError(f"SQL verification unavailable: {exc}") from exc
 print(result.developer_fields["executable_comments_expanded"])  # True
 print(result.developer_fields["is_valid"])                      # False
 ```

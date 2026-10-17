@@ -350,7 +350,10 @@ Never treat `status == "VERIFIED"` as "safe to execute". Admission is a separate
 Calls made through an aliased import are detected too, for example `import subprocess as sp`, `from os import system as run_it`, or `from os import *`. `verify_code()`, `verify_python_deep()`, and `POST /verify/code` all apply this rule.
 
 ```python
-result = verifier.verify_code(
+from qwed_new.core.code_verifier import CodeVerifier
+
+code_verifier = CodeVerifier()
+result = code_verifier.verify_code(
     "import subprocess as sp\nsp.run(['ls', '-la'])",
     language="python",
 )
