@@ -196,7 +196,7 @@ else:
 ```
 
 <Info>
-The legacy claim value `"forwarded"` from 0.3.x issuers still parses as `verified`, so `is_admissible` returns `True` for those tokens. Upgrade consumers before, or together with, issuers. A 0.3.x consumer that compares the claim to `"forwarded"` denies tokens carrying `"verified"`.
+The legacy claim value `"forwarded"` from 0.3.x issuers still parses as `verified`, so `is_admissible` returns `True` for those tokens. In 0.3.x, `"forwarded"` covered logic-guard passes as well as finance passes, so a legacy token admitted this way may represent what is now a non-admissible `heuristic_pass`. Upgrading only the consumer does **not** enforce the new finance-only policy — a legacy logic pass is still accepted as `verified`. To enforce it, also upgrade the issuers (so logic passes emit `heuristic_pass`, not `forwarded`), or check which engine issued a legacy token before acting on it. A 0.3.x consumer that compares the claim to `"forwarded"` denies tokens carrying `"verified"`, so upgrade consumers before, or together with, issuers.
 </Info>
 
 ---

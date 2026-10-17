@@ -66,9 +66,13 @@ sequenceDiagram
 
 ```python
 from qwed_a2a.interceptor import A2AVerificationInterceptor
-from qwed_a2a.protocol.schema import AgentMessage, PayloadType
+from qwed_a2a.protocol.schema import AgentMessage, InterceptorConfig, PayloadType
 
-interceptor = A2AVerificationInterceptor()
+# The trust boundary denies by default (zero-trust), so the sending agent must be
+# allowlisted — otherwise the message is blocked before it reaches verification.
+interceptor = A2AVerificationInterceptor(
+    config=InterceptorConfig(trusted_agents=["procurement-agent"])
+)
 
 message = AgentMessage(
     sender_agent_id="procurement-agent",
