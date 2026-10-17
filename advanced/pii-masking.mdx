@@ -1,13 +1,13 @@
 ---
-title: "PII masking — enterprise privacy protection"
-description: "Automatically detect and mask PII (emails, credit cards, SSNs) before sending data to LLMs. Critical for HIPAA, GDPR, and PCI-DSS compliance requirements."
+title: "PII masking"
+description: "Optionally detect and mask PII (emails, card numbers, SSNs) before a query is sent to an LLM provider. Off by default; install qwed[pii] and set mask_pii=True."
 sidebarTitle: "PII masking"
 ---
 
-**Protect sensitive data automatically before sending to LLMs.**
+**Mask detected personal data before a query is sent to an LLM.**
 
 > [!IMPORTANT]
-> PII masking is an **enterprise privacy feature** that detects and masks Personally Identifiable Information (PII) before your data is sent to LLM providers. This is critical for HIPAA, GDPR, and PCI-DSS compliance.
+> PII masking is an **optional** feature, off by default. When enabled (`pip install 'qwed[pii]'` and `mask_pii=True`), it detects Personally Identifiable Information (PII) such as emails, card numbers and SSNs and replaces it with placeholders before the query is sent to the LLM provider. It reduces what the provider sees; it does not by itself make a system compliant with HIPAA, GDPR, PCI-DSS or any other regulation.
 
 ---
 
@@ -37,7 +37,7 @@ Input:  "My email is john@example.com and card is 4532-1234-5678-9010"
 Masked: "My email is <EMAIL_ADDRESS> and card is <CREDIT_CARD>"
 ```
 
-The LLM **never sees** your sensitive data!
+The LLM sees the placeholders instead of the detected values. Detection can miss PII (see [Limitations](#limitations)), so masking reduces exposure rather than eliminating it.
 
 ---
 
@@ -56,21 +56,20 @@ You → OpenAI API → OpenAI Servers → Training Data (potentially)
 - 📧 **Email addresses** harvested
 - 🔢 **SSNs** leaked
 - 📞 **Phone numbers** stored
-- 🏥 **Medical data** (HIPAA violation)
+- 🏥 **Medical data** (protected health information)
 
 ### The solution
 
 QWED masks PII **before** sending to LLMs:
 
 ```
-You → QWED (masks PII) → OpenAI API (sees <EMAIL>) → Safe!
+You → QWED (masks PII) → OpenAI API (sees <EMAIL>)
 ```
 
-**Benefits:**
-- ✅ **HIPAA Compliant** (Healthcare)
-- ✅ **GDPR Compliant** (EU Privacy)
-- ✅ **PCI-DSS Compliant** (Finance)
-- ✅ **Zero Trust** architecture
+**What it gives you:**
+- ✅ Detected PII is replaced before the provider call
+- ✅ A record of what was masked in `evidence['pii_masked']`
+- ✅ A control you can use as part of your own HIPAA, GDPR or PCI-DSS programme; it does not make a system compliant on its own
 
 ---
 
@@ -155,14 +154,14 @@ QWED detects **9 types** of PII using Microsoft Presidio:
 | Entity Type | Examples | Use Case |
 |-------------|----------|----------|
 | `EMAIL_ADDRESS` | john@example.com | Identity |
-| `CREDIT_CARD` | 4532-1234-5678-9010 | Finance (PCI-DSS) |
+| `CREDIT_CARD` | 4532-1234-5678-9010 | Finance (card data) |
 | `PHONE_NUMBER` | 555-123-4567, +1-555-1234 | Contact info |
 | `US_SSN` | 123-45-6789 | Identity (US) |
 | `IBAN_CODE` | DE89370400440532013000 | Banking (EU) |
 | `IP_ADDRESS` | 192.168.1.1 | Network security |
 | `PERSON` | John Doe, Jane Smith | Names |
 | `LOCATION` | New York, 123 Main St | Addresses |
-| `MEDICAL_LICENSE` | DEA-1234567 | Healthcare (HIPAA) |
+| `MEDICAL_LICENSE` | DEA-1234567 | Healthcare |
 
 ### Detection examples
 
@@ -184,18 +183,18 @@ qwed pii "John Doe (john@example.com) lives at 123 Main St"
 
 ## Usage examples
 
-### Example 1: healthcare (HIPAA)
+### Example 1: healthcare
 
 **Scenario:** Medical assistant built on an LLM
 
 ```python
 from qwed_sdk import QWEDLocal
 
-# HIPAA-compliant client
+# Client with PII masking enabled
 client = QWEDLocal(
     provider="openai",
     api_key="sk-...",
-    mask_pii=True  # Required for HIPAA!
+    mask_pii=True  # Mask detected PII before the provider call
 )
 
 # Query with patient data
@@ -216,11 +215,11 @@ result = client.verify(query)
 ```
 
 **Benefits:**
-- ✅ PHI (Protected Health Information) never sent to cloud
-- ✅ HIPAA compliance maintained
-- ✅ Transparent audit trail in evidence
+- ✅ Detected identifiers (name, SSN, email) are replaced before the cloud call
+- ✅ What was masked is recorded in the evidence
+- ⚠️ Undetected PHI is still sent; masking alone does not make the workflow HIPAA compliant
 
-### Example 2: finance (PCI-DSS)
+### Example 2: finance
 
 **Scenario:** Fraud detection system
 
@@ -242,8 +241,8 @@ print(result.evidence['pii_masked'])
 ```
 
 **Benefits:**
-- ✅ PCI-DSS Level 1 compliance
-- ✅ Card numbers never in LLM logs
+- ✅ Detected card numbers are replaced before the LLM call
+- ⚠️ PCI-DSS scope depends on your whole system, not on this setting
 - ✅ Works with local LLMs (zero cloud exposure)
 
 ### Example 3: legal (attorney-client privilege)
@@ -465,7 +464,7 @@ print(result.evidence['pii_masked'])
 
 ## Enterprise use cases
 
-### Healthcare: HIPAA compliance
+### Healthcare: protected health information
 
 ```python
 # Protected Health Information (PHI) masking
@@ -483,10 +482,10 @@ client = QWEDLocal(
 )
 ```
 
-### Finance: PCI-DSS compliance
+### Finance: card and account data
 
 ```python
-# Payment Card Industry compliance
+# Card, bank and customer contact data
 client = QWEDLocal(
     provider="anthropic",
     mask_pii=True,
@@ -502,7 +501,7 @@ client = QWEDLocal(
 ### Legal: data privacy laws
 
 ```python
-# GDPR / CCPA compliance
+# Personal data covered by GDPR / CCPA
 client = QWEDLocal(
     base_url="http://localhost:11434/v1",  # Local = zero data transfer
     mask_pii=True,
@@ -522,6 +521,6 @@ client = QWEDLocal(
 1. **Install:** `pip install 'qwed[pii]'`
 2. **Test:** `qwed pii "your sensitive text"`
 3. **Integrate:** Add `mask_pii=True` to your code
-4. **Audit:** Check `evidence['pii_masked']` for compliance
+4. **Audit:** Check `evidence['pii_masked']` to see what was masked
 
 See the [QWEDLocal guide](/advanced/qwed-local) for more examples.

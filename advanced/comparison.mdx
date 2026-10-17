@@ -6,19 +6,19 @@ sidebarTitle: "Comparison"
 
 QWED is a new layer in the AI stack: **deterministic verification**.
 
-While many tools exist to improve LLM outputs—ranging from better training (RLHF) to context retrieval (RAG) and structural validation (Guardrails)—QWED serves a distinct purpose. It does not try to make the model "smarter" or "safer" through probability. Instead, it treats the model as an untrusted translator and verifies the output against ground-truth engines (Math, Logic, SQL, etc.).
+While many tools exist to improve LLM outputs—ranging from better training (RLHF) to context retrieval (RAG) and structural validation (Guardrails)—QWED serves a distinct purpose. It does not try to make the model "smarter" or "safer" through probability. Instead, it treats the model as an untrusted translator and checks the claims in its output with deterministic engines (Math, Logic, SQL, etc.).
 
-This document outlines how QWED compares to and complements other key technologies in the AI landscape.
+This document compares mechanism and scope, not quality. For what another project does, its own documentation is the authority; follow the links.
 
 If you are evaluating formal verification for LLMs, AI agent guardrails, or runtime output validation, this is the right place to map QWED against adjacent approaches.
 
 ## Comparison matrix
 
-| Approach | Primary focus | Mechanism | Guarantee | Key tools |
+| Approach | Primary focus | Mechanism | Kind of result | Key tools |
 | --- | --- | --- | --- | --- |
-| **QWED** | **Correctness** | Runtime symbolic execution | **Deterministic proof** | QWED (Math, Logic, Code engines) |
+| **QWED** | **Correctness of formal statements** | Runtime deterministic engines (SymPy, Z3, SQLGlot, AST) | Proof of the formal statement, or denial | QWED (Math, Logic, SQL, Code engines) |
 | **RLHF / Constitutional AI** | **Alignment** | Training-time human/AI feedback | Probabilistic | Anthropic, OpenAI, PPO, DPO |
-| **Guardrails** | **Structure & format** | Input/output filtering | Syntactic validity | `guardrails-ai`, `guidance`, `lmql` |
+| **Guardrails and structured generation** | **Risk checks and structure** | Input/output guards, constrained generation | Depends on the validator | [Guardrails AI](https://www.guardrailsai.com/docs), `guidance`, `lmql` |
 | **RAG systems** | **Context** | Vector retrieval | Groundedness | LangChain, LlamaIndex |
 | **Red teaming** | **Vulnerability** | Adversarial testing | Risk identification | Giskard, PyRIT, Garak |
 
@@ -31,31 +31,33 @@ If you are evaluating formal verification for LLMs, AI agent guardrails, or runt
 ### Key differences
 
 - **Training vs. runtime**: RLHF is baked into the model weights during training. QWED sits outside the model, verifying outputs in real-time.
-- **Probabilistic vs. deterministic**: An RLHF-tuned model is _less likely_ to be wrong, but it can still hallucinate confidently. QWED checks the answer mathematically; if `2+2=5`, QWED blocks it, regardless of how "aligned" the model is.
-- **Scope**: RLHF covers tone, style, and safety guidelines. QWED covers objective facts, logic, and code security.
+- **Probabilistic vs. deterministic**: An RLHF-tuned model is _less likely_ to be wrong, but it can still hallucinate confidently. QWED checks the answer mathematically; if the output says `2+2=5`, the Math engine returns `CORRECTION_NEEDED` with the calculated value, regardless of how "aligned" the model is. That result is not admitted, and your integration holds the answer.
+- **Scope**: RLHF covers tone, style, and safety guidelines. QWED covers claims with a formal statement: math, logic, SQL and code.
 
 ### When to use what?
 
 - **Use RLHF** to ensure the model is polite, refuses illegal requests generally, and follows instructions.
-- **Use QWED** when you need to guarantee that a specific calculation, logical deduction, or code snippet is actually correct.
+- **Use QWED** when a specific calculation, logical deduction, or SQL query should go ahead only with a reproducible proof of its formal statement.
 
 ---
 
-## 2. QWED vs. Guardrails (guardrails-ai)
+## 2. QWED and Guardrails AI
 
-Tools like **guardrails-ai**, as well as structured generation libraries like **guidance** and **lmql**, focus on **structural validation**. They ensure the LLM speaks the "right language" (e.g., valid JSON, Pydantic schemas, regex matches).
+**Guardrails AI** describes itself as running Input and Output Guards that detect, quantify and mitigate specific types of risk, with validators collected in Guardrails Hub, and as helping generate structured data from LLMs ([its docs](https://www.guardrailsai.com/docs)). Structured generation libraries such as **guidance** and **lmql** constrain the shape of the output.
 
 ### Key differences
 
-- **Syntax vs. semantics**: Guardrails ensures the output is valid JSON containing a field `"answer": <number>`. QWED ensures the number inside that field is mathematically correct.
-- **Rule-based vs. proof-based**: Guardrails applies rules (e.g., "no profanity", "length \< 100"). QWED constructs proofs (e.g., "Does the code on line 10 actually calculate the derivative correctly?").
-- **Filtering vs. verification**: Guardrails filters bad formats. QWED verifies truth.
+- **Mechanism**: QWED proves or disproves a formal statement with a deterministic engine; no model decides the verdict. Guardrails AI applies validators; how each one works is described in its own docs.
+- **Scope**: QWED covers claims that have a formal statement (math, logic, SQL, code, schema). Guardrails AI covers risks its validators address, including ones with no formal statement to prove, which QWED does not try to cover.
+- **Default**: QWED fails closed: a claim it cannot check is denied.
 
 ### When to use what?
 
-- **Use Guardrails** to guarantee the API contract, ensure JSON validity, and prevent basic formatting errors.
-- **Use QWED** to validate the _content_ within that structure (e.g., checking that the SQL query inside the JSON is safe and optimized).
-- _Note: QWED and Guardrails are highly complementary. Use Guardrails to enforce the schema, and QWED to verify the logic._
+- **Use Guardrails AI or structured generation** to shape the response and to check risks its validators cover.
+- **Use QWED** to check the claims within that structure (for example, whether the SQL query inside the JSON is safe to run).
+- _They are complementary: one can guard the response, the other can check the claims inside it._
+
+See also [QWED and Guardrails AI](/advanced/qwed-vs-guardrails).
 
 ---
 
@@ -82,20 +84,20 @@ Tools like **guardrails-ai**, as well as structured generation libraries like **
 
 ### Key differences
 
-- **Attack vs. defense**: Red teaming tools simulate attackers to find bugs. QWED is a production firewall that actively blocks bugs/attacks in real-time.
-- **Testing vs. production**: Red teaming gives you a report card ("Your model fails 10% of math questions"). QWED gives you a guarantee ("This specific answer was verified as correct").
-- **Probabilistic risk vs. concrete safety**: Red teaming estimates risk. QWED enforces safety rules (e.g., the Code Engine explicitly blocks `eval()` regardless of prompt injection attempts).
+- **Attack vs. runtime check**: Red teaming tools simulate attackers to find weaknesses. QWED checks each claim at runtime and returns a decision that your integration enforces.
+- **Testing vs. production**: Red teaming gives you a report on the model. QWED gives you a decision on one specific answer, with the formal statement it checked.
+- **Estimated risk vs. rule check**: Red teaming estimates risk. QWED applies deterministic rules (e.g., the Code Engine flags `eval()` regardless of prompt injection attempts).
 
 ### When to use what?
 
 - **Use Red Teaming** during development/CI to benchmark model performance and find blind spots.
-- **Use QWED** in production to catch the hallucinations and security risks that red teaming missed.
+- **Use QWED** in production to deny claims that cannot be proven, within the domains it covers.
 
 ---
 
 ## 5. Summary: the right tool for the job
 
-QWED is not a "do-it-all" solution. It is a specialized engine for **objective truth**.
+QWED is not a "do-it-all" solution. It checks **claims that can be stated formally**, and denies the ones it cannot prove.
 
 ### Where QWED excels (use QWED)
 
@@ -108,16 +110,16 @@ QWED is not a "do-it-all" solution. It is a specialized engine for **objective t
 
 - **Creative writing**: Writing poems, marketing copy, or fiction. (Use **RLHF** optimized models).
 - **Open-ended chat**: "Tell me about the history of Rome." (Use **RAG**).
-- **Subjective analysis**: "Is this email polite?" or "What is the mood of this text?" (Use **Guardrails** for tone checks).
+- **Subjective analysis**: "Is this email polite?" or "What is the mood of this text?" (Use a validator or model built for tone).
 - **General knowledge**: "Who won the 1998 World Cup?" (Use **Search/RAG**).
 
-**Conclusion**: In the modern AI stack, **RAG** provides the knowledge, **Guardrails** provides the structure, **Red Teaming** provides the assurance, and **QWED** provides the **verification**.
+**Conclusion**: In an AI stack, **RAG** provides the knowledge, **Guardrails** and structured generation shape and check the response, **red teaming** tests the model before release, and **QWED** checks formal claims at runtime. QWED verifies the formal statement, not intent; see [qwedai.com/limits](https://qwedai.com/limits).
 
 ## Related guides
 
-- [QWED vs Guardrails AI](/advanced/qwed-vs-guardrails)
+- [QWED and Guardrails AI](/advanced/qwed-vs-guardrails)
 - [QWED vs RAG for LLM verification](/advanced/qwed-vs-rag)
 - [LLM verification with formal methods](/advanced/llm-verification)
 - [AI agent verification and security](/advanced/agent-verification)
 - [Prompt injection defense and security hardening](/advanced/security-hardening)
-- [QWED MCP: Model Context Protocol security and verification](/mcp/overview)
+- [QWED MCP: deterministic verification for MCP clients](/mcp/overview)

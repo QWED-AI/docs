@@ -239,7 +239,7 @@ except VerificationError as e:
 - Cons: Privacy risk, compliance issues
 
 **Option B: Built-in PII masking** ← **CHOSEN**
-- Pros: HIPAA/GDPR compliance, privacy by default
+- Pros: Detected PII is masked before the provider call; optional (`qwed[pii]`), off by default
 - Cons: Performance overhead, false positives
 
 ### The decision

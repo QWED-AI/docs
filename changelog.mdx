@@ -5,7 +5,199 @@ description: "Release notes for the QWED Protocol: version history, new guards, 
 
 All notable changes to the QWED platform, listed by release.
 
-Jump to: [Open Responses v0.6.1](#qwed-open-responses-v0-6-1-—-toolguard-verifies-client-action-items) · [QWED-Finance v3.0.1](#qwed-finance-v3-0-1-—-iso-20022-sanctions-and-queryguard-security-fixes) · [QWED-Legal date and input bounds](#qwed-legal-—-fail-closed-date-handling-and-input-bounds) · [Open Responses v0.6.0](#qwed-open-responses-v0-6-0-—-fail-closed-hardening) · [QWED-Legal fail-closed hardening](#qwed-legal-—-fail-closed-hardening-for-guards-diagnostics-and-github-action) · [`qwed init` server identity handshake](#qwed-verification-—-qwed-init-server-identity-handshake) · [Leaked key auto-revocation](#qwed-verification-—-leaked-api-key-auto-revocation-and-false-positive-feedback) · [API-key format spec](#qwed-verification-—-canonical-api-key-format-spec) · [Signed secret-scanning webhook](#qwed-verification-—-signed-secret-scanning-webhook-endpoint) · [v7.2.1](#v7-2-1-—-math-answer-comparison-security-patch) · [v7.2.0](#v7-2-0-—-precision-advisory-and-security-hardening-batch) · [v7.1.0](#v7-1-0-—-verification-context-v1-0-rollout) · [v7.0.0](#v7-0-0-—-full-diagnosticresult-engine-conformance)
+Jump to: [Admin endpoint tenant scoping](#qwed-verification-—-tenant-scoped-admin-endpoints-and-working-rbac) · [`verify_fact` fails closed offline](#qwed-verification-—-verify_fact-fails-closed-offline-and-money-rejects-non-finite-amounts) · [Request caps and sandbox limits](#qwed-verification-—-request-body-caps-timeouts-and-sandbox-concurrency-limits) · [QWED-Tax v0.2.1](#qwed-tax-v0-2-1-—-classification-claim-vocabulary-and-strict-facts) · [QWED-Legal v0.5.1](#qwed-legal-v0-5-1-—-deadlineguard-signing-anchor-allowlist) · [v7.2.2](#v7-2-2-—-verification-soundness-and-safety-hardening) · [Open Responses v0.6.1](#qwed-open-responses-v0-6-1-—-toolguard-verifies-client-action-items) · [QWED-Finance v3.0.1](#qwed-finance-v3-0-1-—-iso-20022-sanctions-and-queryguard-security-fixes) · [QWED-Legal date and input bounds](#qwed-legal-—-fail-closed-date-handling-and-input-bounds) · [Open Responses v0.6.0](#qwed-open-responses-v0-6-0-—-fail-closed-hardening) · [QWED-Legal fail-closed hardening](#qwed-legal-—-fail-closed-hardening-for-guards-diagnostics-and-github-action) · [`qwed init` server identity handshake](#qwed-verification-—-qwed-init-server-identity-handshake) · [Leaked key auto-revocation](#qwed-verification-—-leaked-api-key-auto-revocation-and-false-positive-feedback) · [API-key format spec](#qwed-verification-—-canonical-api-key-format-spec) · [Signed secret-scanning webhook](#qwed-verification-—-signed-secret-scanning-webhook-endpoint) · [v7.2.1](#v7-2-1-—-math-answer-comparison-security-patch) · [v7.2.0](#v7-2-0-—-precision-advisory-and-security-hardening-batch) · [v7.1.0](#v7-1-0-—-verification-context-v1-0-rollout) · [v7.0.0](#v7-0-0-—-full-diagnosticresult-engine-conformance)
+
+---
+
+## QWED Verification — tenant-scoped admin endpoints and working RBAC
+
+**Released: October 15, 2026** · [GitHub PR #450](https://github.com/QWED-AI/qwed-verification/pull/450) · Closes [issue #222](https://github.com/QWED-AI/qwed-verification/issues/222)
+
+> **Security fix.** Admin endpoints now authorize by the API key owner's role and act only on the caller's own organization. Previously, role checks never ran, so every admin endpoint returned `401 Unauthorized`. The endpoints also accepted organization, log, and key IDs from the caller without an ownership check, which would have allowed cross-tenant access once role checks worked.
+
+### What changed
+
+- **Working role checks.** QWED authenticates the API key, then checks the owning user's role. The key must be live (not revoked or expired), and the owning user and organization must be active, with the user in the key's organization. Otherwise QWED returns `403 Forbidden`.
+- **Tenant scoping with `403`.** `GET /admin/compliance/export/csv`, `GET /admin/compliance/report/soc2/{org_id}`, and `GET /admin/security/threats/{org_id}` return `403 Forbidden` for another organization's ID.
+- **Tenant scoping with `404`.** `GET /admin/compliance/verify/{log_id}` and `POST /admin/keys/rotate` return `404 Not Found` for an ID in another organization, without revealing that it exists.
+- **Key rotation rules.** Members can rotate only their own keys. Owners and admins can rotate other users' keys only when the key owner doesn't hold a higher role. Revoked or inactive keys return `404 Not Found`. The new secret is returned only for a key in the caller's organization.
+
+See [Admin endpoints](/api/endpoints#admin-endpoints).
+
+---
+
+## QWED Verification — `verify_fact` fails closed offline and `Money` rejects non-finite amounts
+
+**Released: October 14, 2026** · [GitHub PR #449](https://github.com/QWED-AI/qwed-verification/pull/449) · [GitHub PR #451](https://github.com/QWED-AI/qwed-verification/pull/451)
+
+> `QWEDClient.verify_fact` no longer reports a claim as verified when the QWED service can't be reached. `Money` rejects NaN and Infinity amounts, and `verify_invoice_total` reports invalid inputs as a failed check instead of raising.
+
+<Warning>
+**Behavior change.** `verify_fact` now returns `UNVERIFIABLE` when verification doesn't complete:
+
+```python
+# Before: status="VERIFIED", is_verified=True after only a local PII scan.
+# After: status="UNVERIFIABLE", is_verified=False.
+result = client.verify_fact(claim=claim, context=context)
+if result.status == "UNVERIFIABLE":
+    reject(claim)
+```
+</Warning>
+
+### What changed
+
+- **`verify_fact` fails closed when the service is unreachable (#449).** On a connection failure or a connect or read timeout, the Python SDK returns `status="UNVERIFIABLE"` and `is_verified=False` with a message explaining that remote verification was unavailable. Previously, a connection failure returned `VERIFIED` after only the local PII scan, and a timeout raised an exception. See [`verify_fact`](/sdks/python#verify-fact-claim-context).
+- **`Money` rejects non-finite amounts (#451).** `Money("NaN")`, `Money("Infinity")`, and `Money(float("inf"))` raise `ValueError`.
+- **`verify_invoice_total` never raises on invalid input (#451).** Invalid amounts, a negative or non-finite `tolerance`, or a non-`Decimal` `tolerance` return `(False, reason)` instead of raising. Currency mismatches still return `(False, "Currency mismatch: ...")`.
+
+```python
+from decimal import Decimal
+from qwed_new.core.money import Money, verify_invoice_total
+
+subtotal = Money("1000.00", "USD")
+tax = Money("180.00", "USD")
+claimed_total = Money("1180.00", "USD")
+
+ok, reason = verify_invoice_total(subtotal, tax, claimed_total, tolerance=Decimal("-1"))
+# (False, "Invalid tolerance: Decimal('-1') must be a finite, non-negative Decimal")
+```
+
+---
+
+## QWED Verification — request body caps, timeouts, and sandbox concurrency limits
+
+**Released: October 14, 2026** · [GitHub PR #447](https://github.com/QWED-AI/qwed-verification/pull/447) · [GitHub PR #448](https://github.com/QWED-AI/qwed-verification/pull/448)
+
+> Availability hardening for self-hosted servers. Oversized bodies, slow providers, unbounded batch jobs, and concurrent sandbox containers can no longer stall or exhaust the API. Verdicts and fail-closed behavior are unchanged.
+
+### What changed
+
+- **Body cap on every `/verify` route.** JSON routes accept up to 1,000,000 bytes. `/verify/stats` and `/verify/image` keep their larger upload caps. Oversized bodies return `413` before processing. See [Request limits](/api/endpoints#request-limits).
+- **Blocking work runs off the event loop.** `/verify/code` runs under `QWED_CODE_VERIFY_TIMEOUT` (default 10 seconds) and returns `503` on timeout. Provider calls for `natural_language`, `logic`, and `fact` run under `QWED_PROVIDER_TIMEOUT` (default 30 seconds) and fail closed on timeout.
+- **Bounded batch job store.** `/verify/batch` keeps at most `QWED_BATCH_MAX_JOBS` jobs (default 1000) and evicts finished jobs first. When every stored job is active, new submissions return `503`. Items that exceed `QWED_BATCH_ITEM_TIMEOUT` are marked failed.
+- **Sandbox concurrency limit.** Each server process runs at most `QWED_SANDBOX_MAX_CONCURRENT` sandbox containers (default 4). A request that can't get a slot within `QWED_SANDBOX_ACQUIRE_TIMEOUT` (default 10 seconds) is rejected with `Sandbox capacity reached — retry shortly.`
+
+See [Availability limits](/advanced/self-hosting#availability-limits) for the full configuration reference.
+
+---
+
+## QWED-Tax v0.2.1 — classification claim vocabulary and strict facts
+
+**Released: October 10, 2026** in `qwed-tax` 0.2.1 (PyPI and npm `@qwed-ai/tax`) · [GitHub PR #81](https://github.com/QWED-AI/qwed-tax/pull/81) · [Changelog](https://github.com/QWED-AI/qwed-tax/blob/main/CHANGELOG.md)
+
+> `qwed-tax` v0.2.1 is a security patch. Upgrading is recommended for all users of `NexusGuard` (Python and npm) and `ClassificationGuard`. The release also ships the structured nexus claim described in the [August 31](#qwed-tax-—-explicit-boolean-claim-required-for-economic-nexus-verification) and [September 1](#qwed-tax-—-npm-verifier-enforces-structured-nexus-claims-fail-closed) entries.
+
+<Warning>
+**Behavior change.** Classification claims and worker facts that earlier versions interpreted are now rejected:
+
+```python
+# Before: "1099 contractor" was matched by substring and treated as 1099.
+# After: verified=False with an INVALID_CLAIM audit trace outcome.
+guard.verify_classification_claim(
+    llm_claim="1099 contractor",
+    facts={"provides_tools": False, "reimburses_expenses": False, "indefinite_relationship": False},
+)
+
+# After: pass a canonical claim and boolean facts.
+guard.verify_classification_claim(
+    llm_claim="1099",
+    facts={"provides_tools": False, "reimburses_expenses": False, "indefinite_relationship": False},
+)
+```
+</Warning>
+
+### What changed
+
+- **Closed claim vocabulary.** `ClassificationGuard.verify_classification_claim` maps the claim through a fixed set of values instead of substring matching. `W2`, `W-2`, and `EMPLOYEE` map to employee. `1099`, `1099-NEC`, `CONTRACTOR`, and `INDEPENDENT CONTRACTOR` map to contractor. Matching ignores case, spaces, hyphens, and underscores. Any other text fails closed with `INVALID_CLAIM`.
+- **Strict worker facts.** `provides_tools`, `reimburses_expenses`, and `indefinite_relationship` must all be present booleans. Otherwise the result fails closed with `INVALID_FACTS`. Strings such as `"no"` are rejected.
+- **`TaxPreFlight` `hire` intents.** The same vocabulary and fact rules apply to `worker_type` and `worker_facts`.
+- **npm `NexusGuard` fails closed.** The `@qwed-ai/tax` `NexusGuard` blocks states that are not in its threshold table and rejects invalid sales data, including non-object, non-finite, and negative values. The transaction-count prong applies only to states that have one.
+- **npm classification unchanged.** The npm SDK still compares `worker_type` exactly. Pass `"W2"` or `"1099"`.
+
+### Migration
+
+Translate the AI's classification into `"W2"` or `"1099"` and pass each worker fact as a real boolean — map known values explicitly (`"yes"`/`"true"` → `True`, `"no"`/`"false"` → `False`) and reject anything else. Do not wrap a string in `bool()`: `bool("no")` is `True`, which would recreate the bug this release fixes. Nexus callers that relied on `llm_decision` strings must pass `claimed_collects_tax` as a boolean. See [ClassificationGuard](/tax/guards#classificationguard-irs-common-law) and [NexusGuard](/tax/guards#nexusguard-economic-nexus).
+
+---
+
+## QWED-Legal v0.5.1 — DeadlineGuard signing-anchor allowlist
+
+**Released: October 9, 2026** in `qwed-legal` 0.5.1 (PyPI and npm `@qwed-ai/legal`) · [GitHub PR #102](https://github.com/QWED-AI/qwed-legal/pull/102) · [GitHub PR #103](https://github.com/QWED-AI/qwed-legal/pull/103)
+
+> Security patch. `DeadlineGuard` now computes a deadline from `signing_date` only for terms measured forward from signing. Upgrade if you use `DeadlineGuard` through the Python API, the npm SDK, or the GitHub Action.
+
+<Warning>
+**Behavior change.** Terms that are measured backward or anchored to another event now return `UNVERIFIABLE` instead of `VERIFIED`:
+
+```python
+# Before: computed signing + 30 days and could return verified=True.
+# After: UNVERIFIABLE with an UNSUPPORTED trace step.
+guard.verify(signing_date="2026-01-15", term="30 days before signing", claimed_deadline="2026-02-14")
+guard.verify(signing_date="2026-01-15", term="30 days after closing", claimed_deadline="2026-02-14")
+
+# Migration for a forward term anchored to another event:
+# confirm the event date, pass it as signing_date, and rewrite the term.
+guard.verify(signing_date="2026-03-02", term="30 days", claimed_deadline="2026-04-01")
+```
+
+Changing `signing_date` alone does not make an event-anchored term supported. You must also rewrite the term to a bare-relative form such as `"30 days"`.
+</Warning>
+
+### What changed
+
+- **Signing-anchor allowlist.** `DeadlineGuard` computes from `signing_date` only when the term is bare-relative (`"30 days"`) or explicitly anchored to signing or execution (`"30 days from signing"`, `"15 days after execution"`). Every other term fails closed with `UNVERIFIABLE` and an `UNSUPPORTED` trace step.
+- **Directional terms fail closed.** Terms using `before`, `prior to`, `ahead of`, or `preceding` were previously computed forward from signing, which could certify the opposite direction.
+- **Any non-signing event anchor fails closed.** Anchors outside the earlier event list, such as `"after closing"`, `"after completion"`, or `"within 30 days of request"`, are now rejected. The open-ended event-noun list is replaced by an allowlist of signing-anchored phrasings.
+- **Check runs before date arithmetic.** Rejected business-day terms never consult the holiday calendar.
+- **npm engine version gate.** `DeadlineVerifier` in `@qwed-ai/legal` rejects its promise when the importable Python `qwed-legal` is older than 0.5.1. An npm-only upgrade cannot silently keep the old deadline engine. Upgrade both packages:
+
+```bash
+pip install "qwed-legal>=0.5.1"
+npm install @qwed-ai/legal@0.5.1
+```
+
+See [Supported term forms](/legal/guards#supported-term-forms) and [Event-anchored terms](/legal/guards#event-anchored-terms).
+
+---
+
+## v7.2.2 — Verification soundness and safety hardening
+
+**Released: October 9, 2026** · [GitHub Release ↗](https://github.com/QWED-AI/qwed-verification/releases/tag/v7.2.2) · [GitHub PR #434](https://github.com/QWED-AI/qwed-verification/pull/434) · Advisories GHSA-4v5r-g7f4-vvgc, GHSA-mfh5-3c8f-975p, GHSA-j622-qffp-rc27, GHSA-mxwv-x5qm-mrmf
+
+> v7.2.2 is a fail-closed security release covering four coordinated advisories. They affect all versions up to `v7.2.1`. No new capability and no breaking wire changes. Upgrade is recommended for any deployment on `v6.0.0` through `v7.2.1`.
+
+### Security fixes
+
+- **Local SDK math verification.** The SymPy expression validator in `QWEDLocal` now rejects string literals nested inside container arguments. This closes an allow-list bypass that could route untrusted model output to SymPy's string-evaluation path.
+- **Logic verification soundness.** The Z3 constraint evaluator no longer accepts Python boolean operators (`and`, `or`, `not`) or chained comparisons (`a < b < c`) on symbolic objects. The DSL compiler now rejects string literals instead of materializing them as variables. Both cases could previously yield a `VERIFIED` verdict that did not follow from the input.
+- **Large-number math verification.** `verify_math` now compares results at a precision scaled to the operands. Values beyond 15 significant digits are no longer rounded before the comparison, so a wrong claim on a large number can no longer pass as `VERIFIED`.
+- **Computational cost bounds.** The math parser applies its compute-cost gates to implicit-multiplication input (`2x`, `3(x+1)`). The logic and DSL engines bound statically known integer powers. Short requests can no longer exhaust a worker.
+
+### Version bumps
+
+| Surface | From | To |
+|---|---|---|
+| `qwed` (PyPI) | `7.2.1` | `7.2.2` |
+| `qwed_sdk` (Python) | `7.2.1` | `7.2.2` |
+| `@qwed-ai/sdk` (npm) | `7.2.0` | `7.2.2` |
+| `qwed` (crates.io) | `7.2.1` | `7.2.2` |
+| API version marker | `7.2.1` | `7.2.2` |
+
+### Upgrading
+
+<Warning>
+**Upgrading from before v7.2:** re-issue your API keys. Self-hosted deployments must also set `QWED_API_KEY_LOOKUP_SECRET` to a value distinct from `QWED_JWT_SECRET_KEY` before starting the server. Without these steps, old keys return `401 Unauthorized` and a server without the secret refuses to start. See [Authentication](/api/authentication#api-key-storage-and-migration-v7-2).
+</Warning>
+
+Patch release with no code changes required for valid inputs. Pin the new version and redeploy:
+
+```bash
+pip install "qwed==7.2.2"
+npm install @qwed-ai/sdk@7.2.2
+cargo add qwed@7.2.2
+```
+
+Inputs that relied on Python `and`/`or`/`not`, chained comparisons on symbolic variables, or string literals in DSL expressions now fail closed instead of returning `VERIFIED`. Rewrite Z3 constraints with `And(...)`, `Or(...)`, `Not(...)` and separate comparisons, and write DSL logic with the [`AND`/`OR`/`NOT` operators](/engines/logic).
 
 ---
 
