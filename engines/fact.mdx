@@ -46,6 +46,8 @@ The Fact Engine returns a [`DiagnosticResult`](/advanced/diagnostics). The deter
 | Empty claim or context | `UNVERIFIABLE` | Returns `constraint_id: fact_verifier.empty_input`. |
 | Pipeline error | `BLOCKED` | Unexpected errors fail closed rather than silently pass. |
 
+When you call the engine through the Python SDK, `QWEDClient.verify_fact` also fails closed on the client side. If the QWED service is unreachable or the request times out, the client returns `status="UNVERIFIABLE"` and `is_verified=False` instead of raising. See [`verify_fact`](/sdks/python#verify-fact-claim-context).
+
 Confidence is exposed via `developer_fields.deterministic_confidence` and is **never verdict-deciding** — the mapping above is based on the deterministic verdict alone.
 
 ## Scoring methods

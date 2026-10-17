@@ -103,8 +103,29 @@ result = client.verify_fact(
     claim="The company was founded in 2020",
     context="Acme Corp was established in 2020 in San Francisco."
 )
-print(result.verified)  # True
+print(result.status)       # "UNVERIFIABLE" (heuristic support is advisory-only)
+print(result.is_verified)  # False
 ```
+
+`verify_fact` fails closed when the QWED service can't complete the check. If the client can't connect (`httpx.ConnectError`) or the request times out (`httpx.TimeoutException`), it returns `status="UNVERIFIABLE"` and `is_verified=False`. It doesn't raise. The local PII pre-check still runs first, but it is not a fact check, so passing it never produces `VERIFIED`.
+
+```python
+result = client.verify_fact(claim=claim, context=context)
+
+if result.status == "UNVERIFIABLE":
+    # Service unreachable, timed out, or the claim could not be proven.
+    # Don't treat the claim as true. Retry, escalate, or reject.
+    # Completed checks expose "agent_message"; offline/timeout failures expose
+    # "message". Read both safely so neither path raises KeyError.
+    print(result.result.get("agent_message") or result.result.get("message") or "Verification unavailable.")
+    reject(claim)
+elif result.status == "BLOCKED":
+    reject(claim)
+```
+
+<Warning>
+Earlier SDK versions returned `status="VERIFIED"` and `is_verified=True` when the service was unreachable, after running only the local PII scan. If your code relied on that offline pass, it now receives `UNVERIFIABLE`.
+</Warning>
 
 ### verify_stats(query, file_path)
 

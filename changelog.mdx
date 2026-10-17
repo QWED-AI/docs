@@ -5,7 +5,45 @@ description: "Release notes for the QWED Protocol: version history, new guards, 
 
 All notable changes to the QWED platform, listed by release.
 
-Jump to: [Request caps and sandbox limits](#qwed-verification-—-request-body-caps-timeouts-and-sandbox-concurrency-limits) · [QWED-Tax v0.2.1](#qwed-tax-v0-2-1-—-classification-claim-vocabulary-and-strict-facts) · [QWED-Legal v0.5.1](#qwed-legal-v0-5-1-—-deadlineguard-signing-anchor-allowlist) · [v7.2.2](#v7-2-2-—-verification-soundness-and-safety-hardening) · [QWED-Finance v3.0.1](#qwed-finance-v3-0-1-—-iso-20022-sanctions-and-queryguard-security-fixes) · [QWED-Legal date and input bounds](#qwed-legal-—-fail-closed-date-handling-and-input-bounds) · [Open Responses v0.6.0](#qwed-open-responses-v0-6-0-—-fail-closed-hardening) · [QWED-Legal fail-closed hardening](#qwed-legal-—-fail-closed-hardening-for-guards-diagnostics-and-github-action) · [`qwed init` server identity handshake](#qwed-verification-—-qwed-init-server-identity-handshake) · [Leaked key auto-revocation](#qwed-verification-—-leaked-api-key-auto-revocation-and-false-positive-feedback) · [API-key format spec](#qwed-verification-—-canonical-api-key-format-spec) · [Signed secret-scanning webhook](#qwed-verification-—-signed-secret-scanning-webhook-endpoint) · [v7.2.1](#v7-2-1-—-math-answer-comparison-security-patch) · [v7.2.0](#v7-2-0-—-precision-advisory-and-security-hardening-batch) · [v7.1.0](#v7-1-0-—-verification-context-v1-0-rollout) · [v7.0.0](#v7-0-0-—-full-diagnosticresult-engine-conformance)
+Jump to: [`verify_fact` fails closed offline](#qwed-verification-—-verify_fact-fails-closed-offline-and-money-rejects-non-finite-amounts) · [Request caps and sandbox limits](#qwed-verification-—-request-body-caps-timeouts-and-sandbox-concurrency-limits) · [QWED-Tax v0.2.1](#qwed-tax-v0-2-1-—-classification-claim-vocabulary-and-strict-facts) · [QWED-Legal v0.5.1](#qwed-legal-v0-5-1-—-deadlineguard-signing-anchor-allowlist) · [v7.2.2](#v7-2-2-—-verification-soundness-and-safety-hardening) · [QWED-Finance v3.0.1](#qwed-finance-v3-0-1-—-iso-20022-sanctions-and-queryguard-security-fixes) · [QWED-Legal date and input bounds](#qwed-legal-—-fail-closed-date-handling-and-input-bounds) · [Open Responses v0.6.0](#qwed-open-responses-v0-6-0-—-fail-closed-hardening) · [QWED-Legal fail-closed hardening](#qwed-legal-—-fail-closed-hardening-for-guards-diagnostics-and-github-action) · [`qwed init` server identity handshake](#qwed-verification-—-qwed-init-server-identity-handshake) · [Leaked key auto-revocation](#qwed-verification-—-leaked-api-key-auto-revocation-and-false-positive-feedback) · [API-key format spec](#qwed-verification-—-canonical-api-key-format-spec) · [Signed secret-scanning webhook](#qwed-verification-—-signed-secret-scanning-webhook-endpoint) · [v7.2.1](#v7-2-1-—-math-answer-comparison-security-patch) · [v7.2.0](#v7-2-0-—-precision-advisory-and-security-hardening-batch) · [v7.1.0](#v7-1-0-—-verification-context-v1-0-rollout) · [v7.0.0](#v7-0-0-—-full-diagnosticresult-engine-conformance)
+
+---
+
+## QWED Verification — `verify_fact` fails closed offline and `Money` rejects non-finite amounts
+
+**Released: October 14, 2026** · [GitHub PR #449](https://github.com/QWED-AI/qwed-verification/pull/449) · [GitHub PR #451](https://github.com/QWED-AI/qwed-verification/pull/451)
+
+> `QWEDClient.verify_fact` no longer reports a claim as verified when the QWED service can't be reached. `Money` rejects NaN and Infinity amounts, and `verify_invoice_total` reports invalid inputs as a failed check instead of raising.
+
+<Warning>
+**Behavior change.** `verify_fact` now returns `UNVERIFIABLE` when verification doesn't complete:
+
+```python
+# Before: status="VERIFIED", is_verified=True after only a local PII scan.
+# After: status="UNVERIFIABLE", is_verified=False.
+result = client.verify_fact(claim=claim, context=context)
+if result.status == "UNVERIFIABLE":
+    reject(claim)
+```
+</Warning>
+
+### What changed
+
+- **`verify_fact` fails closed when the service is unreachable (#449).** On a connection failure or a connect or read timeout, the Python SDK returns `status="UNVERIFIABLE"` and `is_verified=False` with a message explaining that remote verification was unavailable. Previously, a connection failure returned `VERIFIED` after only the local PII scan, and a timeout raised an exception. See [`verify_fact`](/sdks/python#verify-fact-claim-context).
+- **`Money` rejects non-finite amounts (#451).** `Money("NaN")`, `Money("Infinity")`, and `Money(float("inf"))` raise `ValueError`.
+- **`verify_invoice_total` never raises on invalid input (#451).** Invalid amounts, a negative or non-finite `tolerance`, or a non-`Decimal` `tolerance` return `(False, reason)` instead of raising. Currency mismatches still return `(False, "Currency mismatch: ...")`.
+
+```python
+from decimal import Decimal
+from qwed_new.core.money import Money, verify_invoice_total
+
+subtotal = Money("1000.00", "USD")
+tax = Money("180.00", "USD")
+claimed_total = Money("1180.00", "USD")
+
+ok, reason = verify_invoice_total(subtotal, tax, claimed_total, tolerance=Decimal("-1"))
+# (False, "Invalid tolerance: Decimal('-1') must be a finite, non-negative Decimal")
+```
 
 ---
 
