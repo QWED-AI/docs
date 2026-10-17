@@ -5,7 +5,24 @@ description: "Release notes for the QWED Protocol: version history, new guards, 
 
 All notable changes to the QWED platform, listed by release.
 
-Jump to: [QWED-Tax v0.2.1](#qwed-tax-v0-2-1-—-classification-claim-vocabulary-and-strict-facts) · [QWED-Legal v0.5.1](#qwed-legal-v0-5-1-—-deadlineguard-signing-anchor-allowlist) · [v7.2.2](#v7-2-2-—-verification-soundness-and-safety-hardening) · [QWED-Finance v3.0.1](#qwed-finance-v3-0-1-—-iso-20022-sanctions-and-queryguard-security-fixes) · [QWED-Legal date and input bounds](#qwed-legal-—-fail-closed-date-handling-and-input-bounds) · [Open Responses v0.6.0](#qwed-open-responses-v0-6-0-—-fail-closed-hardening) · [QWED-Legal fail-closed hardening](#qwed-legal-—-fail-closed-hardening-for-guards-diagnostics-and-github-action) · [`qwed init` server identity handshake](#qwed-verification-—-qwed-init-server-identity-handshake) · [Leaked key auto-revocation](#qwed-verification-—-leaked-api-key-auto-revocation-and-false-positive-feedback) · [API-key format spec](#qwed-verification-—-canonical-api-key-format-spec) · [Signed secret-scanning webhook](#qwed-verification-—-signed-secret-scanning-webhook-endpoint) · [v7.2.1](#v7-2-1-—-math-answer-comparison-security-patch) · [v7.2.0](#v7-2-0-—-precision-advisory-and-security-hardening-batch) · [v7.1.0](#v7-1-0-—-verification-context-v1-0-rollout) · [v7.0.0](#v7-0-0-—-full-diagnosticresult-engine-conformance)
+Jump to: [Request caps and sandbox limits](#qwed-verification-—-request-body-caps-timeouts-and-sandbox-concurrency-limits) · [QWED-Tax v0.2.1](#qwed-tax-v0-2-1-—-classification-claim-vocabulary-and-strict-facts) · [QWED-Legal v0.5.1](#qwed-legal-v0-5-1-—-deadlineguard-signing-anchor-allowlist) · [v7.2.2](#v7-2-2-—-verification-soundness-and-safety-hardening) · [QWED-Finance v3.0.1](#qwed-finance-v3-0-1-—-iso-20022-sanctions-and-queryguard-security-fixes) · [QWED-Legal date and input bounds](#qwed-legal-—-fail-closed-date-handling-and-input-bounds) · [Open Responses v0.6.0](#qwed-open-responses-v0-6-0-—-fail-closed-hardening) · [QWED-Legal fail-closed hardening](#qwed-legal-—-fail-closed-hardening-for-guards-diagnostics-and-github-action) · [`qwed init` server identity handshake](#qwed-verification-—-qwed-init-server-identity-handshake) · [Leaked key auto-revocation](#qwed-verification-—-leaked-api-key-auto-revocation-and-false-positive-feedback) · [API-key format spec](#qwed-verification-—-canonical-api-key-format-spec) · [Signed secret-scanning webhook](#qwed-verification-—-signed-secret-scanning-webhook-endpoint) · [v7.2.1](#v7-2-1-—-math-answer-comparison-security-patch) · [v7.2.0](#v7-2-0-—-precision-advisory-and-security-hardening-batch) · [v7.1.0](#v7-1-0-—-verification-context-v1-0-rollout) · [v7.0.0](#v7-0-0-—-full-diagnosticresult-engine-conformance)
+
+---
+
+## QWED Verification — request body caps, timeouts, and sandbox concurrency limits
+
+**Released: October 14, 2026** · [GitHub PR #447](https://github.com/QWED-AI/qwed-verification/pull/447) · [GitHub PR #448](https://github.com/QWED-AI/qwed-verification/pull/448)
+
+> Availability hardening for self-hosted servers. Oversized bodies, slow providers, unbounded batch jobs, and concurrent sandbox containers can no longer stall or exhaust the API. Verdicts and fail-closed behavior are unchanged.
+
+### What changed
+
+- **Body cap on every `/verify` route.** JSON routes accept up to 1,000,000 bytes. `/verify/stats` and `/verify/image` keep their larger upload caps. Oversized bodies return `413` before processing. See [Request limits](/api/endpoints#request-limits).
+- **Blocking work runs off the event loop.** `/verify/code` runs under `QWED_CODE_VERIFY_TIMEOUT` (default 10 seconds) and returns `503` on timeout. Provider calls for `natural_language`, `logic`, and `fact` run under `QWED_PROVIDER_TIMEOUT` (default 30 seconds) and fail closed on timeout.
+- **Bounded batch job store.** `/verify/batch` keeps at most `QWED_BATCH_MAX_JOBS` jobs (default 1000) and evicts finished jobs first. When every stored job is active, new submissions return `503`. Items that exceed `QWED_BATCH_ITEM_TIMEOUT` are marked failed.
+- **Sandbox concurrency limit.** Each server process runs at most `QWED_SANDBOX_MAX_CONCURRENT` sandbox containers (default 4). A request that can't get a slot within `QWED_SANDBOX_ACQUIRE_TIMEOUT` (default 10 seconds) is rejected with `Sandbox capacity reached — retry shortly.`
+
+See [Availability limits](/advanced/self-hosting#availability-limits) for the full configuration reference.
 
 ---
 
