@@ -27,7 +27,7 @@ flowchart LR
 | **2. Trust** | `TrustBoundary` | Checks blocklists, allowlists, pair blocks, rate limits — deny-all by default |
 | **3. Engine** | `_route_to_engine()` | Routes to `finance_guard`, `logic_guard`, or `code_guard`. `GENERAL` and `DATA_QUERY` payload types have no engine and return an `unverifiable` result. |
 | **4. Attestation** | `A2ACryptoService` | Signs `verified`, `blocked`, `heuristic_pass` and `error` verdicts with an ES256 JWT (payload hash, trace ID, engine used) whose `verdict` claim names the status. `unverifiable` verdicts carry **no JWT**. |
-| **5. Verdict** | `VerificationVerdict` | Returns `verified`, `blocked`, `heuristic_pass`, `unverifiable` or `error` with reason, attestation (when present) and audit trace. Only `verified` is admissible. |
+| **5. Verdict** | `VerificationVerdict` | Returns `verified`, `blocked`, `heuristic_pass`, `unverifiable` or `error` with reason, attestation (when present), audit trace, and an `admissible` flag. Only `verified` is admissible. |
 
 ---
 
@@ -58,11 +58,18 @@ sequenceDiagram
         TB-->>Int: (true, null)
         Int->>Eng: route_to_engine(message)
 
-        alt Verification passes
+        alt Deterministic pass (finance guard)
             Eng-->>Int: {verified: true}
             Int->>Crypto: sign_verdict(VERIFIED)
-            Int-->>API: VerificationVerdict(VERIFIED)
+            Int-->>API: VerificationVerdict(VERIFIED, admissible=true)
             API-->>Recv: Forward payload + attestation JWT
+        else Heuristic pass (logic or code guard)
+            Eng-->>Int: {heuristic_pass}
+            Int->>Crypto: sign_verdict(HEURISTIC_PASS)
+            Int-->>API: VerificationVerdict(HEURISTIC_PASS, admissible=false)
+        else Engine exception
+            Int->>Crypto: sign_verdict(ERROR)
+            Int-->>API: VerificationVerdict(ERROR, admissible=false)
         else Verification fails
             Eng-->>Int: {verified: false, reason}
             Int->>Crypto: sign_verdict(BLOCKED)
@@ -179,6 +186,7 @@ classDiagram
         +str? engine_used
         +datetime verified_at
         +Dict? details
+        +bool admissible
     }
 
     class InterceptorConfig {
@@ -198,7 +206,7 @@ classDiagram
 
 ## JWT attestation structure
 
-Every verdict includes a signed JWT with this payload:
+Every verdict except `unverifiable` includes a signed JWT with this payload:
 
 ```json
 {
@@ -220,3 +228,7 @@ Every verdict includes a signed JWT with this payload:
 <Info>
 The `sub` claim is a SHA-256 hash of the original payload, making the attestation tamper-evident. Any modification to the payload invalidates the hash match.
 </Info>
+
+<Warning>
+A valid attestation is not an admission decision. A genuine `blocked` or `heuristic_pass` attestation verifies too. Check the `verdict` claim with [`A2ACryptoService.is_admissible(claims)`](/a2a/crypto-attestations#check-admissibility) before acting on the message.
+</Warning>

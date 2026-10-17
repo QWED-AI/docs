@@ -88,6 +88,7 @@ message = AgentMessage(
 verdict = await interceptor.intercept(message, trace_id="a2a_demo_001")
 
 print(verdict.status.value)     # "verified" ✅
+print(verdict.admissible)       # True — the only admissible status
 print(verdict.engine_used)      # "finance_guard"
 print(verdict.attestation_jwt)  # "eyJhbGciOiJFUzI1NiIs..."
 ```
