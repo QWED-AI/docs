@@ -5,7 +5,7 @@ description: "Release notes for the QWED Protocol: version history, new guards, 
 
 All notable changes to the QWED platform, listed by release.
 
-Jump to: [Admin endpoint tenant scoping](#qwed-verification-—-tenant-scoped-admin-endpoints-and-working-rbac) · [`verify_fact` fails closed offline](#qwed-verification-—-verify_fact-fails-closed-offline-and-money-rejects-non-finite-amounts) · [Request caps and sandbox limits](#qwed-verification-—-request-body-caps-timeouts-and-sandbox-concurrency-limits) · [QWED-Tax v0.2.1](#qwed-tax-v0-2-1-—-classification-claim-vocabulary-and-strict-facts) · [QWED-Legal v0.5.1](#qwed-legal-v0-5-1-—-deadlineguard-signing-anchor-allowlist) · [v7.2.2](#v7-2-2-—-verification-soundness-and-safety-hardening) · [QWED-Finance v3.0.1](#qwed-finance-v3-0-1-—-iso-20022-sanctions-and-queryguard-security-fixes) · [QWED-Legal date and input bounds](#qwed-legal-—-fail-closed-date-handling-and-input-bounds) · [Open Responses v0.6.0](#qwed-open-responses-v0-6-0-—-fail-closed-hardening) · [QWED-Legal fail-closed hardening](#qwed-legal-—-fail-closed-hardening-for-guards-diagnostics-and-github-action) · [`qwed init` server identity handshake](#qwed-verification-—-qwed-init-server-identity-handshake) · [Leaked key auto-revocation](#qwed-verification-—-leaked-api-key-auto-revocation-and-false-positive-feedback) · [API-key format spec](#qwed-verification-—-canonical-api-key-format-spec) · [Signed secret-scanning webhook](#qwed-verification-—-signed-secret-scanning-webhook-endpoint) · [v7.2.1](#v7-2-1-—-math-answer-comparison-security-patch) · [v7.2.0](#v7-2-0-—-precision-advisory-and-security-hardening-batch) · [v7.1.0](#v7-1-0-—-verification-context-v1-0-rollout) · [v7.0.0](#v7-0-0-—-full-diagnosticresult-engine-conformance)
+Jump to: [Admin endpoint tenant scoping](#qwed-verification-—-tenant-scoped-admin-endpoints-and-working-rbac) · [`verify_fact` fails closed offline](#qwed-verification-—-verify_fact-fails-closed-offline-and-money-rejects-non-finite-amounts) · [Request caps and sandbox limits](#qwed-verification-—-request-body-caps-timeouts-and-sandbox-concurrency-limits) · [QWED-Tax v0.2.1](#qwed-tax-v0-2-1-—-classification-claim-vocabulary-and-strict-facts) · [QWED-Legal v0.5.1](#qwed-legal-v0-5-1-—-deadlineguard-signing-anchor-allowlist) · [v7.2.2](#v7-2-2-—-verification-soundness-and-safety-hardening) · [Open Responses v0.6.1](#qwed-open-responses-v0-6-1-—-toolguard-verifies-client-action-items) · [QWED-Finance v3.0.1](#qwed-finance-v3-0-1-—-iso-20022-sanctions-and-queryguard-security-fixes) · [QWED-Legal date and input bounds](#qwed-legal-—-fail-closed-date-handling-and-input-bounds) · [Open Responses v0.6.0](#qwed-open-responses-v0-6-0-—-fail-closed-hardening) · [QWED-Legal fail-closed hardening](#qwed-legal-—-fail-closed-hardening-for-guards-diagnostics-and-github-action) · [`qwed init` server identity handshake](#qwed-verification-—-qwed-init-server-identity-handshake) · [Leaked key auto-revocation](#qwed-verification-—-leaked-api-key-auto-revocation-and-false-positive-feedback) · [API-key format spec](#qwed-verification-—-canonical-api-key-format-spec) · [Signed secret-scanning webhook](#qwed-verification-—-signed-secret-scanning-webhook-endpoint) · [v7.2.1](#v7-2-1-—-math-answer-comparison-security-patch) · [v7.2.0](#v7-2-0-—-precision-advisory-and-security-hardening-batch) · [v7.1.0](#v7-1-0-—-verification-context-v1-0-rollout) · [v7.0.0](#v7-0-0-—-full-diagnosticresult-engine-conformance)
 
 ---
 
@@ -198,6 +198,54 @@ cargo add qwed@7.2.2
 ```
 
 Inputs that relied on Python `and`/`or`/`not`, chained comparisons on symbolic variables, or string literals in DSL expressions now fail closed instead of returning `VERIFIED`. Rewrite Z3 constraints with `And(...)`, `Or(...)`, `Not(...)` and separate comparisons, and write DSL logic with the [`AND`/`OR`/`NOT` operators](/engines/logic).
+
+---
+
+## QWED Open Responses v0.6.1 — ToolGuard verifies client action items
+
+**Released: October 9, 2026** in `qwed-open-responses` 0.6.1 (PyPI and npm) · [GHSA-xhq6-w3f2-m5w6](https://github.com/QWED-AI/qwed-open-responses/security/advisories/GHSA-xhq6-w3f2-m5w6) · [PR #71](https://github.com/QWED-AI/qwed-open-responses/pull/71)
+
+> `ToolGuard` now checks Responses API items that ask your client to run shell commands, apply patches, or control a computer. Before v0.6.1, these items read as tool-free content and passed. Upgrade from v0.6.0.
+
+<Warning>
+**Breaking change.** The default blocklist adds `local_shell`, `apply_patch`, and `computer_use`. A default `ToolGuard` now blocks `local_shell_call`, `shell_call`, `apply_patch_call`, and `computer_call` items. To allow them, turn off the default blocklist and allowlist the tools you run:
+
+```python
+# Before: local_shell_call items passed a default ToolGuard
+ToolGuard()
+
+# After: opt out of the defaults and allowlist the action tools you run
+ToolGuard(
+    use_default_blocklist=False,
+    blocked_tools=["bash", "sh", "powershell"],
+    allowed_tools=["local_shell", "apply_patch"],
+)
+```
+
+```typescript
+new ToolGuard({
+  useDefaultBlocklist: false,
+  blockedTools: ["bash", "sh", "powershell"],
+  allowedTools: ["local_shell", "apply_patch"],
+});
+```
+
+`use_default_blocklist=False` drops every default entry, shells included. Re-add the names you still want blocked.
+</Warning>
+
+### What changed
+
+- **Client action items are tool calls.** `ToolGuard` normalizes `local_shell_call`, `shell_call`, `apply_patch_call`, `computer_call`, `custom_tool_call`, and `mcp_approval_request` items into tool calls. Blocklist, allowlist, dangerous-pattern, and validator checks apply. This covers direct items, `output[]` of a response object, `tool_calls[]` entries, and the streaming middleware.
+- **Canonical tool names.** Action items are checked as `local_shell`, `shell`, `apply_patch`, and `computer_use`. Custom tool and MCP approval items use their own `name`. `local_shell` argv lists are also scanned as a joined command line.
+- **Unknown executable items fail closed.** Any other `*_call` or `*_request` item in a streamed item, `output_item` event, or `output[]` of a response object is blocked. Provider-hosted items (`web_search_call`, `file_search_call`, `code_interpreter_call`, `image_generation_call`, `mcp_call`) keep their existing behavior.
+- **Ambiguous action items fail closed.** An action item that also carries a `tool_call`, `function_call`, `function`, or `tool_calls` envelope is blocked. So is a named item whose `tool_name` or `toolName` disagrees with `name`.
+
+### What this means for you
+
+- If your agent runs local shell, patch, or computer-use tools, configure `ToolGuard` with `use_default_blocklist=False` and an `allowed_tools` allowlist.
+- If you rely on the default blocklist for shells, re-add those names through `blocked_tools` when you opt out.
+
+See [Responses API client action items](/open-responses/guards#responses-api-client-action-items) in the guards reference.
 
 ---
 
