@@ -106,11 +106,11 @@ result = guard.check({
 
 ### Default blocked tools
 
-Blocklist matching normalizes tool names before comparing them. ToolGuard ignores case, surrounding whitespace, dashes, underscores, and camelCase boundaries. `Bash`, ` POWERSHELL `, `Execute-Shell`, and `executeShell` are all blocked the same as `bash`, `powershell`, and `execute_shell`.
+Blocklist matching normalizes tool names before comparing them. `ToolGuard` ignores case, surrounding whitespace, dashes, underscores, and camelCase boundaries. `Bash`, ` POWERSHELL `, `Execute-Shell`, and `executeShell` are all blocked the same as `bash`, `powershell`, and `execute_shell`.
 
 Allowlists are stricter. `allowed_tools` matching ignores case and surrounding whitespace, but separators must match exactly as configured. An allowlist entry of `read_file` does not authorize `read-file` or `readFile`, so one registered tool can't authorize another.
 
-`custom_validators` keys are matched the same way as allowlist entries. Keys that differ only in case or surrounding whitespace conflict, and ToolGuard raises `ValueError` at construction. Distinct names like `read_file` and `read-file` stay separate validators.
+`custom_validators` keys are matched the same way as allowlist entries. Keys that differ only in case or surrounding whitespace conflict, and `ToolGuard` raises `ValueError` at construction. Distinct names like `read_file` and `read-file` stay separate validators.
 
 The default blocklist covers:
 
@@ -123,7 +123,7 @@ The default blocklist covers:
 
 ### Default dangerous patterns
 
-ToolGuard ships a unified set of 14 dangerous-command patterns, matched case-insensitively. The Python and TypeScript packages enforce the identical superset, so `RM -RF /` is blocked on both runtimes:
+`ToolGuard` ships a unified set of 14 dangerous-command patterns, matched case-insensitively. The Python and TypeScript packages enforce the identical superset, so `RM -RF /` is blocked on both runtimes:
 
 - SQL: `DROP TABLE`, `DELETE FROM`, `TRUNCATE TABLE`
 - Filesystem: `rm -rf`, `rmdir /s`, `del /f`, `format c:`
@@ -132,7 +132,7 @@ ToolGuard ships a unified set of 14 dangerous-command patterns, matched case-ins
 
 Custom patterns passed via `dangerous_patterns` are also compiled case-insensitively.
 
-ToolGuard runs patterns against the raw parsed argument strings. This includes nested values and arguments of JSON-encoded calls. Because the original string is scanned, a custom pattern like `rm\s+-rf` matches across tabs and newlines. Arguments that are cyclic or nested too deeply to inspect fail closed.
+`ToolGuard` runs patterns against the raw parsed argument strings. This includes nested values and arguments of JSON-encoded calls. Because the original string is scanned, a custom pattern like `rm\s+-rf` matches across tabs and newlines. Arguments that are cyclic or nested too deeply to inspect fail closed.
 
 Each string is also scanned in a normalized form that catches common command spellings:
 
@@ -146,7 +146,7 @@ Argument scanning additionally decodes bounded base64 tokens (7 or more alphabet
 
 ### Recognized tool-call shapes
 
-ToolGuard extracts tool calls from these response envelopes:
+`ToolGuard` extracts tool calls from these response envelopes:
 
 | Shape | Format |
 |-------|--------|
@@ -160,9 +160,9 @@ The `type` match is case-insensitive, so a `Tool_Use` block is treated as a tool
 
 ### Responses API client action items
 
-Since v0.6.1, ToolGuard treats Responses API items that ask your client to run an action as tool calls. The blocklist, allowlist, dangerous-pattern, and custom validator checks all apply to them. Before v0.6.1, these items read as tool-free content and passed verification.
+Since v0.6.1, `ToolGuard` treats Responses API items that ask your client to run an action as tool calls. The blocklist, allowlist, dangerous-pattern, and custom validator checks all apply to them. Before v0.6.1, these items read as tool-free content and passed verification.
 
-ToolGuard checks each item under a canonical tool name:
+`ToolGuard` checks each item under a canonical tool name:
 
 | Item type | Checked as | Arguments scanned |
 |-----------|------------|-------------------|
@@ -173,14 +173,14 @@ ToolGuard checks each item under a canonical tool name:
 | `custom_tool_call` | The item's own `name` | Item payload |
 | `mcp_approval_request` | The item's own `name` | Item payload |
 
-ToolGuard also joins `local_shell` argv lists into a single command line before pattern scanning. This normalization applies to direct items, `output[]` members of a response object, `tool_calls[]` entries, and the streaming middleware, in both the Python and TypeScript packages.
+`ToolGuard` also joins `local_shell` argv lists into a single command line before pattern scanning. This normalization applies to direct items, `output[]` members of a response object, `tool_calls[]` entries, and the streaming middleware, in both the Python and TypeScript packages.
 
-Provider-hosted items (`web_search_call`, `file_search_call`, `code_interpreter_call`, `image_generation_call`, and `mcp_call`) run on the provider side before the response returns. ToolGuard keeps their existing behavior.
+Provider-hosted items (`web_search_call`, `file_search_call`, `code_interpreter_call`, `image_generation_call`, and `mcp_call`) run on the provider side before the response returns. `ToolGuard` keeps their existing behavior.
 
 <Warning>
-**Breaking change in v0.6.1.** The default blocklist now includes `local_shell`, `apply_patch`, and `computer_use`. `shell` was already on it. A ToolGuard with default settings blocks every `local_shell_call`, `shell_call`, `apply_patch_call`, and `computer_call` item.
+**Breaking change in v0.6.1.** The default blocklist now includes `local_shell`, `apply_patch`, and `computer_use`. `shell` was already on it. A `ToolGuard` with default settings blocks every `local_shell_call`, `shell_call`, `apply_patch_call`, and `computer_call` item.
 
-To run these tools, construct ToolGuard with `use_default_blocklist=False`. This drops the whole default blocklist, shells included. Re-add any names you still want blocked through `blocked_tools`. `allowed_tools` is optional, but for least-privilege execution, configure it as an allowlist and list every action tool you run.
+To run these tools, construct `ToolGuard` with `use_default_blocklist=False`. This drops the whole default blocklist, shells included. Re-add any names you still want blocked through `blocked_tools`. `allowed_tools` is optional, but for least-privilege execution, configure it as an allowlist and list every action tool you run.
 
 ```python
 from qwed_open_responses import ToolGuard
@@ -217,17 +217,17 @@ const guard = new ToolGuard({
 
 ### Fail-closed rejections
 
-ToolGuard blocks rather than passes when a response cannot be validated unambiguously:
+`ToolGuard` blocks rather than passes when a response cannot be validated unambiguously:
 
 - **Unrecognized tool-like content.** A response that looks like a tool call but matches none of the recognized shapes is blocked instead of passing with "No tool calls".
 - **Malformed entries.** A non-object item inside `tool_calls`, `choices`, or `content` is blocked, never silently dropped.
 - **Ambiguous hybrid envelopes.** A response that mixes a direct tool call (`type=tool_call` or `type=function_call`) with a sibling `tool_calls`, `choices`, or `content` collection is blocked, because validating one side would let the other escape policy checks.
 - **Nameless calls.** A tool call without a non-blank string name is blocked. A blank name can never match blocklist or allowlist checks.
 - **Oversized arguments.** JSON-encoded argument payloads over 10,000 characters or nested deeper than 128 levels are blocked before parsing.
-- **Conflicting tool identities.** A call entry that names its tool in more than one place is blocked. This covers root fields (`tool_name`, `name`, `arguments`) combined with a nested `tool_call` or `function_call` object, more than one nested call object, or either of those combined with a `function: {name, arguments}` wrapper. ToolGuard can't tell which identity the runtime will execute, so it rejects the entry.
+- **Conflicting tool identities.** A call entry that names its tool in more than one place is blocked. This covers root fields (`tool_name`, `name`, `arguments`) combined with a nested `tool_call` or `function_call` object, more than one nested call object, or either of those combined with a `function: {name, arguments}` wrapper. `ToolGuard` can't tell which identity the runtime will execute, so it rejects the entry.
 - **Unknown action items.** Any other `*_call` or `*_request` item in a protocol position is blocked as unrecognized. Protocol positions are streamed items, `output_item` events, and `output[]` members of a response object. Ordinary data that uses such type labels elsewhere, such as `pull_request`, is unaffected.
 - **Ambiguous action items.** An action item that also carries a `tool_call`, `function_call`, `function`, or `tool_calls` envelope is blocked. A named item whose `tool_name` or `toolName` disagrees with its `name` is also blocked.
-- **Truncated nested scans.** ToolGuard scans wrapper objects and arrays up to 12 levels deep for hidden tool calls. If the scan reaches that limit, the response is blocked instead of reported as "No tool calls".
+- **Truncated nested scans.** `ToolGuard` scans wrapper objects and arrays up to 12 levels deep for hidden tool calls. If the scan reaches that limit, the response is blocked instead of reported as "No tool calls".
 
 Configured ToolGuards also inspect `structured_output` responses, including those produced by `verify_structured_output`. A structured output that carries a tool-shaped payload, such as `name` plus `arguments`, goes through the same blocklist and pattern checks as a direct tool call.
 

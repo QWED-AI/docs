@@ -205,10 +205,10 @@ Inputs that relied on Python `and`/`or`/`not`, chained comparisons on symbolic v
 
 **Released: October 9, 2026** in `qwed-open-responses` 0.6.1 (PyPI and npm) · [GHSA-xhq6-w3f2-m5w6](https://github.com/QWED-AI/qwed-open-responses/security/advisories/GHSA-xhq6-w3f2-m5w6) · [PR #71](https://github.com/QWED-AI/qwed-open-responses/pull/71)
 
-> ToolGuard now checks Responses API items that ask your client to run shell commands, apply patches, or control a computer. Before v0.6.1, these items read as tool-free content and passed. Upgrade from v0.6.0.
+> `ToolGuard` now checks Responses API items that ask your client to run shell commands, apply patches, or control a computer. Before v0.6.1, these items read as tool-free content and passed. Upgrade from v0.6.0.
 
 <Warning>
-**Breaking change.** The default blocklist adds `local_shell`, `apply_patch`, and `computer_use`. A default ToolGuard now blocks `local_shell_call`, `shell_call`, `apply_patch_call`, and `computer_call` items. To allow them, turn off the default blocklist and allowlist the tools you run:
+**Breaking change.** The default blocklist adds `local_shell`, `apply_patch`, and `computer_use`. A default `ToolGuard` now blocks `local_shell_call`, `shell_call`, `apply_patch_call`, and `computer_call` items. To allow them, turn off the default blocklist and allowlist the tools you run:
 
 ```python
 # Before: local_shell_call items passed a default ToolGuard
@@ -235,14 +235,14 @@ new ToolGuard({
 
 ### What changed
 
-- **Client action items are tool calls.** ToolGuard normalizes `local_shell_call`, `shell_call`, `apply_patch_call`, `computer_call`, `custom_tool_call`, and `mcp_approval_request` items into tool calls. Blocklist, allowlist, dangerous-pattern, and validator checks apply. This covers direct items, `output[]` of a response object, `tool_calls[]` entries, and the streaming middleware.
+- **Client action items are tool calls.** `ToolGuard` normalizes `local_shell_call`, `shell_call`, `apply_patch_call`, `computer_call`, `custom_tool_call`, and `mcp_approval_request` items into tool calls. Blocklist, allowlist, dangerous-pattern, and validator checks apply. This covers direct items, `output[]` of a response object, `tool_calls[]` entries, and the streaming middleware.
 - **Canonical tool names.** Action items are checked as `local_shell`, `shell`, `apply_patch`, and `computer_use`. Custom tool and MCP approval items use their own `name`. `local_shell` argv lists are also scanned as a joined command line.
 - **Unknown executable items fail closed.** Any other `*_call` or `*_request` item in a streamed item, `output_item` event, or `output[]` of a response object is blocked. Provider-hosted items (`web_search_call`, `file_search_call`, `code_interpreter_call`, `image_generation_call`, `mcp_call`) keep their existing behavior.
 - **Ambiguous action items fail closed.** An action item that also carries a `tool_call`, `function_call`, `function`, or `tool_calls` envelope is blocked. So is a named item whose `tool_name` or `toolName` disagrees with `name`.
 
 ### What this means for you
 
-- If your agent runs local shell, patch, or computer-use tools, configure ToolGuard with `use_default_blocklist=False` and an `allowed_tools` allowlist.
+- If your agent runs local shell, patch, or computer-use tools, configure `ToolGuard` with `use_default_blocklist=False` and an `allowed_tools` allowlist.
 - If you rely on the default blocklist for shells, re-add those names through `blocked_tools` when you opt out.
 
 See [Responses API client action items](/open-responses/guards#responses-api-client-action-items) in the guards reference.
