@@ -48,7 +48,7 @@ Do not gate execution on `status` alone. `POST /verify/sql` returns an explicit 
 ```python
 result = client.verify_sql(
     query="SELECT * FROM users WHERE id = 1",
-    schema="CREATE TABLE users (id INT, name TEXT)"
+    schema_ddl="CREATE TABLE users (id INT, name TEXT)"
 )
 print(result.status)                            # "VERIFIED"
 print(result.developer_fields["is_valid"])      # True
@@ -62,7 +62,7 @@ When you pass `schema_ddl`, every table the query reads or writes must be declar
 ```python
 result = client.verify_sql(
     query="SELECT * FROM payments",
-    schema="CREATE TABLE users (id INT, name TEXT)"
+    schema_ddl="CREATE TABLE users (id INT, name TEXT)"
 )
 print(result.status)                               # "BLOCKED"
 print(result.developer_fields["is_valid"])         # False
