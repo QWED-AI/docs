@@ -92,6 +92,12 @@ verdict = await interceptor.intercept(message, trace_id="fin_001")
 All financial comparisons use `decimal.Decimal` with `ROUND_HALF_UP` quantization to `0.01`. Floating-point arithmetic is **never** used in the verification path.
 </Warning>
 
+When the recomputed total matches `claimed_total`, the finance guard returns `verified` — the only admissible verdict in QWED A2A. See [Admissibility](#admissibility).
+
+<Info>
+**Negative values return `UNVERIFIABLE`.** A negative `claimed_total`, line-item `amount`, or line-item `quantity` returns `status=unverifiable` with no JWT attestation. The payload has no credit/debit convention, so the finance guard cannot verify a sign-inverted transaction even when its arithmetic holds.
+</Info>
+
 <Info>
 **Empty or malformed payloads return `UNVERIFIABLE`, not `VERIFIED`.** If a `FINANCIAL_TRANSACTION` payload is missing `data`, `line_items`, or `claimed_total`, or contains non-numeric amounts, the finance guard returns `status=unverifiable` with no JWT attestation. Earlier releases collapsed these cases to a signed pass verdict, which falsely attested that the math had been checked.
 </Info>
@@ -122,6 +128,15 @@ verdict = await interceptor.intercept(message, trace_id="logic_001")
 <Tip>
 Contradictions are **sorted** before output, ensuring deterministic results regardless of Python's hash randomization (`PYTHONHASHSEED`).
 </Tip>
+
+The logic guard normalizes each claim before comparing:
+
+- Unicode NFKC normalization
+- Removal of invisible format characters, such as zero-width spaces
+- `casefold()`
+- Collapsing of repeated whitespace
+
+As a result, `"UserIsAdmin"` and `"userisadmin"` are treated as the same claim, and so are `"payment sent"` and `"payment  sent"`. The `negated` field must be a boolean. Any other value, such as the string `"true"`, returns `unverifiable`.
 
 <Info>
 **Empty or malformed logic payloads return `UNVERIFIABLE`.** A `LOGIC_ASSERTION` payload with a missing, non-list, or empty `assertions` array — or with malformed assertion entries — returns `status=unverifiable` and no JWT attestation. There is nothing to check, so nothing is attested.
@@ -224,6 +239,65 @@ Every call to `intercept()` returns a `VerificationVerdict` with one of five sta
 <Warning>
 `UNVERIFIABLE` verdicts have `attestation_jwt=None`. If your downstream code assumes every verdict has a JWT, guard for this — issuing an attestation for content that was never verified would be a false cryptographic claim.
 </Warning>
+
+### Admissibility
+
+Only `verified` is admissible — a verdict a consumer may act on without running its own checks. QWED A2A defines admissibility in one place:
+
+- `ADMISSIBLE_VERDICTS`: a `frozenset` of admissible `VerdictStatus` members. It currently contains only `VerdictStatus.VERIFIED`.
+- `VerdictStatus.admissible`: `True` when the status is in `ADMISSIBLE_VERDICTS`.
+- `VerificationVerdict.admissible`: a computed field on every verdict, derived from `status`. It is serialized with the verdict, so the `POST /a2a/intercept` JSON response carries it too.
+
+Gate on the verdict's `admissible` flag instead of comparing status strings:
+
+```python
+from qwed_a2a import ADMISSIBLE_VERDICTS, VerdictStatus
+
+verdict = await interceptor.intercept(message, trace_id="a2a_trace_001")
+if verdict.admissible:
+    process(message)
+else:
+    reject_or_escalate(verdict.status.value, verdict.reason)
+
+assert VerdictStatus.VERIFIED in ADMISSIBLE_VERDICTS
+assert not VerdictStatus.HEURISTIC_PASS.admissible
+```
+
+To check admissibility from a signed attestation instead of a verdict object, use [`A2ACryptoService.is_admissible(claims)`](/a2a/crypto-attestations#check-admissibility).
+
+### Migrating from `forwarded` to `verified`
+
+<Warning>
+**Breaking change.** The `forwarded` verdict is renamed to `verified`, and only finance passes are `verified`. A logic guard pass now returns `heuristic_pass`, which is not admissible.
+</Warning>
+
+For compatibility:
+
+- `VerdictStatus.FORWARDED` remains a deprecated alias of `VerdictStatus.VERIFIED`.
+- The legacy wire value `"forwarded"` still parses to `verified` in HTTP verdicts and attestation claims, so tokens from 0.3.x issuers keep verifying on upgraded readers.
+- `/a2a/metrics` reports `total_verified` and keeps `total_forwarded` as a deprecated alias with the same count.
+
+QWED A2A will remove the alias and the legacy value in a future minor release.
+
+Before:
+
+```python
+if verdict.status.value == "forwarded":
+    process(message)
+```
+
+After:
+
+```python
+if verdict.admissible:
+    process(message)
+```
+
+If you must compare strings, replace `"forwarded"` with `"verified"`. If you relied on logic assertions being admitted, they now return `heuristic_pass`. Add your own policy for them.
+
+<Tip>
+Upgrade consumers before, or together with, issuers. A 0.3.x consumer that compares the attestation `verdict` claim to `"forwarded"` denies tokens carrying `"verified"` until you update it. This fails closed, but blocks legitimate traffic.
+</Tip>
 
 ---
 

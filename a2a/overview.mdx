@@ -66,9 +66,13 @@ sequenceDiagram
 
 ```python
 from qwed_a2a.interceptor import A2AVerificationInterceptor
-from qwed_a2a.protocol.schema import AgentMessage, PayloadType
+from qwed_a2a.protocol.schema import AgentMessage, InterceptorConfig, PayloadType
 
-interceptor = A2AVerificationInterceptor()
+# The trust boundary denies by default (zero-trust), so the sending agent must be
+# allowlisted — otherwise the message is blocked before it reaches verification.
+interceptor = A2AVerificationInterceptor(
+    config=InterceptorConfig(trusted_agents=["procurement-agent"])
+)
 
 message = AgentMessage(
     sender_agent_id="procurement-agent",
@@ -88,6 +92,7 @@ message = AgentMessage(
 verdict = await interceptor.intercept(message, trace_id="a2a_demo_001")
 
 print(verdict.status.value)     # "verified" ✅
+print(verdict.admissible)       # True — the only admissible status
 print(verdict.engine_used)      # "finance_guard"
 print(verdict.attestation_jwt)  # "eyJhbGciOiJFUzI1NiIs..."
 ```
