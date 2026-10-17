@@ -1328,7 +1328,7 @@ Export your organization's audit trail as a CSV file (`text/csv`).
 Passing another organization's ID returns `403 Forbidden` with `"Cannot access another organization's data"`.
 
 ```bash
-curl -H "X-API-Key: qwed_live_your_admin_key" \
+curl --fail-with-body -H "X-API-Key: qwed_live_your_admin_key" \
   "https://api.qwedai.com/v1/admin/compliance/export/csv?organization_id=12"
 ```
 
@@ -1384,7 +1384,7 @@ Rotate an API key and return the new secret once. Owners, admins, and members ca
 | `key_id` | integer (query) | ID of the key to rotate |
 
 ```bash
-curl -X POST -H "X-API-Key: qwed_live_your_key" \
+curl --fail-with-body -X POST -H "X-API-Key: qwed_live_your_key" \
   "https://api.qwedai.com/v1/admin/keys/rotate?key_id=42"
 ```
 
