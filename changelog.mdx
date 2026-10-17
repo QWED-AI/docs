@@ -5,7 +5,7 @@ description: "Release notes for the QWED Protocol: version history, new guards, 
 
 All notable changes to the QWED platform, listed by release.
 
-Jump to: [QWED-Tax v0.2.1](#qwed-tax-v0-2-1-—-classification-claim-vocabulary-and-strict-facts) · [v7.2.2](#v7-2-2-—-verification-soundness-and-safety-hardening) · [QWED-Finance v3.0.1](#qwed-finance-v3-0-1-—-iso-20022-sanctions-and-queryguard-security-fixes) · [QWED-Legal date and input bounds](#qwed-legal-—-fail-closed-date-handling-and-input-bounds) · [Open Responses v0.6.0](#qwed-open-responses-v0-6-0-—-fail-closed-hardening) · [QWED-Legal fail-closed hardening](#qwed-legal-—-fail-closed-hardening-for-guards-diagnostics-and-github-action) · [`qwed init` server identity handshake](#qwed-verification-—-qwed-init-server-identity-handshake) · [Leaked key auto-revocation](#qwed-verification-—-leaked-api-key-auto-revocation-and-false-positive-feedback) · [API-key format spec](#qwed-verification-—-canonical-api-key-format-spec) · [Signed secret-scanning webhook](#qwed-verification-—-signed-secret-scanning-webhook-endpoint) · [v7.2.1](#v7-2-1-—-math-answer-comparison-security-patch) · [v7.2.0](#v7-2-0-—-precision-advisory-and-security-hardening-batch) · [v7.1.0](#v7-1-0-—-verification-context-v1-0-rollout) · [v7.0.0](#v7-0-0-—-full-diagnosticresult-engine-conformance)
+Jump to: [QWED-Tax v0.2.1](#qwed-tax-v0-2-1-—-classification-claim-vocabulary-and-strict-facts) · [QWED-Legal v0.5.1](#qwed-legal-v0-5-1-—-deadlineguard-signing-anchor-allowlist) · [v7.2.2](#v7-2-2-—-verification-soundness-and-safety-hardening) · [QWED-Finance v3.0.1](#qwed-finance-v3-0-1-—-iso-20022-sanctions-and-queryguard-security-fixes) · [QWED-Legal date and input bounds](#qwed-legal-—-fail-closed-date-handling-and-input-bounds) · [Open Responses v0.6.0](#qwed-open-responses-v0-6-0-—-fail-closed-hardening) · [QWED-Legal fail-closed hardening](#qwed-legal-—-fail-closed-hardening-for-guards-diagnostics-and-github-action) · [`qwed init` server identity handshake](#qwed-verification-—-qwed-init-server-identity-handshake) · [Leaked key auto-revocation](#qwed-verification-—-leaked-api-key-auto-revocation-and-false-positive-feedback) · [API-key format spec](#qwed-verification-—-canonical-api-key-format-spec) · [Signed secret-scanning webhook](#qwed-verification-—-signed-secret-scanning-webhook-endpoint) · [v7.2.1](#v7-2-1-—-math-answer-comparison-security-patch) · [v7.2.0](#v7-2-0-—-precision-advisory-and-security-hardening-batch) · [v7.1.0](#v7-1-0-—-verification-context-v1-0-rollout) · [v7.0.0](#v7-0-0-—-full-diagnosticresult-engine-conformance)
 
 ---
 
@@ -45,6 +45,46 @@ guard.verify_classification_claim(
 ### Migration
 
 Translate the AI's classification into `"W2"` or `"1099"` and pass each worker fact as a real boolean — map known values explicitly (`"yes"`/`"true"` → `True`, `"no"`/`"false"` → `False`) and reject anything else. Do not wrap a string in `bool()`: `bool("no")` is `True`, which would recreate the bug this release fixes. Nexus callers that relied on `llm_decision` strings must pass `claimed_collects_tax` as a boolean. See [ClassificationGuard](/tax/guards#classificationguard-irs-common-law) and [NexusGuard](/tax/guards#nexusguard-economic-nexus).
+
+---
+
+## QWED-Legal v0.5.1 — DeadlineGuard signing-anchor allowlist
+
+**Released: October 9, 2026** in `qwed-legal` 0.5.1 (PyPI and npm `@qwed-ai/legal`) · [GitHub PR #102](https://github.com/QWED-AI/qwed-legal/pull/102) · [GitHub PR #103](https://github.com/QWED-AI/qwed-legal/pull/103)
+
+> Security patch. `DeadlineGuard` now computes a deadline from `signing_date` only for terms measured forward from signing. Upgrade if you use `DeadlineGuard` through the Python API, the npm SDK, or the GitHub Action.
+
+<Warning>
+**Behavior change.** Terms that are measured backward or anchored to another event now return `UNVERIFIABLE` instead of `VERIFIED`:
+
+```python
+# Before: computed signing + 30 days and could return verified=True.
+# After: UNVERIFIABLE with an UNSUPPORTED trace step.
+guard.verify(signing_date="2026-01-15", term="30 days before signing", claimed_deadline="2026-02-14")
+guard.verify(signing_date="2026-01-15", term="30 days after closing", claimed_deadline="2026-02-14")
+
+# Migration for a forward term anchored to another event:
+# confirm the event date, pass it as signing_date, and rewrite the term.
+guard.verify(signing_date="2026-03-02", term="30 days", claimed_deadline="2026-04-01")
+```
+
+Changing `signing_date` alone does not make an event-anchored term supported. You must also rewrite the term to a bare-relative form such as `"30 days"`.
+</Warning>
+
+### What changed
+
+- **Signing-anchor allowlist.** `DeadlineGuard` computes from `signing_date` only when the term is bare-relative (`"30 days"`) or explicitly anchored to signing or execution (`"30 days from signing"`, `"15 days after execution"`). Every other term fails closed with `UNVERIFIABLE` and an `UNSUPPORTED` trace step.
+- **Directional terms fail closed.** Terms using `before`, `prior to`, `ahead of`, or `preceding` were previously computed forward from signing, which could certify the opposite direction.
+- **Any non-signing event anchor fails closed.** Anchors outside the earlier event list, such as `"after closing"`, `"after completion"`, or `"within 30 days of request"`, are now rejected. The open-ended event-noun list is replaced by an allowlist of signing-anchored phrasings.
+- **Check runs before date arithmetic.** Rejected business-day terms never consult the holiday calendar.
+- **npm engine version gate.** `DeadlineVerifier` in `@qwed-ai/legal` rejects its promise when the importable Python `qwed-legal` is older than 0.5.1. An npm-only upgrade cannot silently keep the old deadline engine. Upgrade both packages:
+
+```bash
+pip install "qwed-legal>=0.5.1"
+npm install @qwed-ai/legal@0.5.1
+```
+
+See [Supported term forms](/legal/guards#supported-term-forms) and [Event-anchored terms](/legal/guards#event-anchored-terms).
 
 ---
 
