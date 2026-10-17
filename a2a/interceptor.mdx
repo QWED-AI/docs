@@ -135,22 +135,49 @@ Scans code payloads using a **two-layer approach**. AST structural analysis runs
 
 | Threat | Example |
 |--------|---------|
-| Dangerous calls | `eval(`, `exec(`, `compile(`, `__import__(` |
-| Dangerous receiver methods | `subprocess.run(`, `os.system(`, `os.popen(` |
-| Dangerous imports | `import subprocess`, `import importlib`, `import ctypes` |
+| Dangerous calls | `eval(`, `exec(`, `compile(`, `__import__(` (also via `builtins.` and `__builtins__.`) |
+| Dangerous receiver methods | `subprocess.run(`; `os.system(`, `os.popen(`, `os.exec*(`, `os.spawn*(`, `os.posix_spawn(`, `os.startfile(`. The same methods on `posix` and `nt` are blocked too. |
+| Dangerous imports | `import subprocess`, `import importlib`, `import ctypes`; `from os import *`, `from os import system` |
+| `getattr` on a dangerous module | `getattr(os, "system")`, or any runtime-chosen name such as `getattr(os, name)` |
+
+The AST layer resolves receivers through every binding a name may have. Each of these is blocked:
+
+- Import aliases: `import os as o; o.system(...)`
+- Alias chains of any length and order: `x = os; y = x; y.system(...)`. A later re-assignment does not hide an earlier binding.
+- Re-bound functions: `s = os.system; s(...)`, `e = eval; e(...)`, `g = getattr; g(os, "system")`
+- Aliased from-imports: `from posix import system as s; s(...)`
+- Annotated (`x: T = os`), walrus (`(x := os)`), and tuple-unpacking (`a, b = os, 1`) bindings
+
+A local re-binding of `eval` cannot hide a builtin `eval(...)` call.
+
+Before parsing, the code guard checks the input:
+
+- Code larger than **256 KiB** is `BLOCKED` before `ast.parse` runs, because parsing amplifies memory roughly 140-250x.
+- A `code` value that is not a string returns `UNVERIFIABLE` with no attestation.
 
 **Layer 2 — Regex heuristic scan (secondary).** Catches obfuscation patterns that survive AST parsing:
 
 | Pattern | Catches |
 |---------|---------|
 | `getattr_builtin` | `getattr(__builtins__, ...)` |
-| `builtins_dict_access` | `__builtins__.__dict__[` |
+| `builtins_dict_access` | `__builtins__.__dict__[`, `builtins.__dict__[` |
 | `base64_exec` | `b64decode(` encoded payloads |
 | `dynamic_import` | `__import__(` dynamic imports |
 | `os_system` | `os.system(` shell execution |
 | `os_popen` | `os.popen(` process spawning |
 
-If either layer finds a threat, the verdict is `BLOCKED` (the reason notes which layer triggered). If both layers are clean, the verdict is `HEURISTIC_PASS` — a signed attestation that no known dangerous constructs were found, **not** a deterministic guarantee that the code is safe to execute.
+If either layer finds a threat, the verdict is `BLOCKED` (the reason notes which layer triggered). If both layers are clean, the verdict is `HEURISTIC_PASS` — a signed attestation that no known dangerous constructs were found, **not** a deterministic guarantee that the code is safe to execute. A `HEURISTIC_PASS` is not admissible as proof of safety.
+
+<Warning>
+**Known gaps.** A blocklist over arbitrary code cannot be made sound. The code guard does not detect these today:
+
+- Subscript callees such as `[eval][0](...)` or `d["e"](...)`
+- Modules reached through objects, such as `sys.modules["os"]`
+- Bindings made by `for`, `with`, function arguments, or attributes of other objects
+- Unlisted modules with side effects, such as `shutil`, `pickle`, `runpy`, `code`, and `socket`
+
+Never execute a `heuristic_pass` payload without your own sandbox or allowlist.
+</Warning>
 
 ```python
 message = AgentMessage(
@@ -180,7 +207,7 @@ verdict = await interceptor.intercept(chat_message, trace_id="chat_001")
 
 ## Verdict statuses
 
-Every call to `intercept()` returns a `VerificationVerdict` with one of five statuses. Every status except `unverifiable` carries a signed JWT attestation whose `verdict` claim names that status, so a signature on its own does not mean the payload passed. Only `verified` is admissible: gate on `verdict.status.admissible` (or `ADMISSIBLE_VERDICTS`), never on `status != blocked`, which would admit `heuristic_pass`, `unverifiable` and `error`.
+Every call to `intercept()` returns a `VerificationVerdict` with one of five statuses. Every status except `unverifiable` carries a signed JWT attestation whose `verdict` claim names that status, so a signature on its own does not mean the payload passed. Only `verified` is admissible: gate on `verdict.status.admissible` (or `ADMISSIBLE_VERDICTS`), never on `status != blocked`, which would admit `heuristic_pass`, `unverifiable` and `error`. `error` is returned when verification cannot complete — for example when an engine run exceeds its [execution budget](#engine-execution-budget) (engine `engine_timeout`) or the engine pool is saturated (engine `engine_busy`).
 
 | Status | Meaning | JWT attestation |
 |--------|---------|-----------------|
@@ -210,7 +237,8 @@ The `InterceptorConfig` controls which engines are active:
 | `enable_logic_verification` | `bool` | `True` | Route logic assertions to contradiction checks |
 | `enable_code_verification` | `bool` | `True` | Route code payloads to the AST + regex heuristic security scanner |
 | `block_on_error` | `bool` | `True` | Deprecated, no effect. Engine errors always fail closed with an `error` verdict; setting it to `False` logs a deprecation warning. Kept for config compatibility. |
-| `max_payload_size_bytes` | `int` | `1,048,576` | Maximum payload size (1 KB – 10 MB) |
+| `max_payload_size_bytes` | `int` | `1,048,576` | Maximum payload size (1 MiB; allowed range 1 KiB to 10 MiB). Enforced on the HTTP body (`413`) and in `intercept()` (`blocked`). See [Request size limits](#request-size-limits). |
+| `engine_timeout_seconds` | `float` | `5.0` | Wall-clock budget per engine run. Must be greater than 0 and at most 60. Exceeding it returns `error` (engine `engine_timeout`). See [Engine execution budget](#engine-execution-budget). |
 | `trusted_agents` | `List[str]?` | `None` | Agent IDs pre-added to the trust boundary allowlist at startup. These agents still run through the appropriate verification engine — they are not bypassed. |
 
 ```python
@@ -219,9 +247,51 @@ from qwed_a2a.protocol.schema import InterceptorConfig
 config = InterceptorConfig(
     enable_financial_verification=True,
     enable_code_verification=True,
+    max_payload_size_bytes=512 * 1024,  # 512 KiB
+    engine_timeout_seconds=2.0,
     trusted_agents=["internal-orchestrator-001"],
 )
 ```
+
+### Request size limits
+
+The interceptor enforces `max_payload_size_bytes` at two layers:
+
+- **HTTP body.** `POST /a2a/intercept` rejects bodies larger than `max_payload_size_bytes` plus a 64 KiB envelope allowance with `413`, before the body is buffered or parsed. The router checks a declared `Content-Length` up front and caps chunked bodies as they stream in. An invalid `Content-Length` returns `400`. The check is built into the router, so it applies wherever you mount `router` with no extra middleware.
+- **Payload.** `intercept()` returns `blocked` with engine `size_limit` when the payload's compact UTF-8 JSON exceeds `max_payload_size_bytes`. This check runs before trust evaluation or any engine, so it also covers direct library callers.
+
+The code guard applies a separate 256 KiB cap on code. See [Code guard](#code-guard).
+
+```python
+verdict = await interceptor.intercept(oversized_message, trace_id="big_001")
+# verdict.status = "blocked"
+# verdict.engine_used = "size_limit"
+# verdict.reason = "Payload is 2097152 bytes; max_payload_size_bytes=1048576"
+```
+
+<Tip>
+Keep a reverse-proxy body limit as well, such as nginx `client_max_body_size`, as an outer layer of defense.
+</Tip>
+
+### Engine execution budget
+
+Verification engines run on a dedicated thread pool, off the event loop. `/a2a/health`, `/a2a/metrics`, JWKS, and other intercepts keep responding while an engine works.
+
+- Each engine run has a wall-clock budget set by `engine_timeout_seconds`. A run that exceeds it returns `error` with engine `engine_timeout`.
+- Each interceptor allows at most 36 runs in flight: 4 running and 32 waiting for a thread. Beyond that, a run is refused immediately with `error` and engine `engine_busy` instead of queueing without bound.
+- A waiting run whose caller already timed out is skipped.
+
+Call `close()` from your application's shutdown hook to release the pool. Call it only after in-flight intercepts have drained. An intercept that starts after `close()` returns `error`.
+
+```python
+@app.on_event("shutdown")
+async def shutdown():
+    interceptor.close()
+```
+
+<Note>
+**Limits.** Python cannot kill a running thread. A timed-out run that already started finishes in the background and holds its thread until it completes. Under sustained overload, runs time out or are refused, both fail-closed. Long C-level calls that hold the GIL, such as `ast.parse` or regex, can still delay the event loop. The size limits above bound those calls. Each worker process has its own pool and state, so multiple workers add capacity but not isolation.
+</Note>
 
 ---
 

@@ -134,6 +134,8 @@ allowed, reason = boundary.evaluate(
 Expired entries are treated as non-existent — including their scope. If you need permanent scope restrictions, leave `valid_until=None` rather than setting a far-future expiry.
 </Info>
 
+`trust_agent()` copies `allowed_receivers` and `allowed_payload_types` into frozensets when you grant trust. Changing the set you passed in afterward does not change the grant. To change a scope, call `trust_agent()` again.
+
 Expired trust entries are auto-evicted at most once per minute during `evaluate()`, so revocation via `revoke_agent()` or expiry via `valid_until` never requires a service restart.
 
 ---
@@ -206,6 +208,16 @@ Cold pairs (no requests for 5 minutes) are automatically evicted from the rate-l
 <Tip>
 Rate-limit entries are **only allocated after allowlist checks pass**. This prevents malicious agents from spraying the map with one-off sender/receiver IDs in strict mode.
 </Tip>
+
+---
+
+## Thread safety
+
+`TrustBoundary` is thread-safe. Every public method runs under a re-entrant instance lock, so you can share one boundary, or one interceptor, across threads. Token-bucket updates are atomic, so concurrent requests cannot admit a pair past its rate limit. Eviction cannot fail with `RuntimeError: dictionary changed size during iteration` while other threads evaluate requests.
+
+<Note>
+The lock covers one process. Each worker process keeps its own trust and rate-limit state.
+</Note>
 
 ---
 
