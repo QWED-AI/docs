@@ -29,6 +29,7 @@ Verification is static AST analysis (SQLGlot). The engine never connects to a da
 | ------- | -------- | ------------------ | ----------- |
 | Safe query | `VERIFIED` | `is_valid: true` | Present |
 | Malicious query | `VERIFIED` (as-malicious) | `is_valid: false`, `malicious_classification: true` | Present |
+| Table outside `schema_ddl` | `BLOCKED` | `is_valid: false`, `constraint_id: "sql_verifier.schema_violation"` | `null` |
 | Complexity limit exceeded | `BLOCKED` | `constraint_id: "sql_verifier.complexity_limit_exceeded"` | `null` |
 | DDL schema parse failure | `BLOCKED` | `constraint_id: "sql_verifier.schema_parse_error"` | `null` |
 | Query parse error | `BLOCKED` | `constraint_id: "sql_verifier.parse_error"` | `null` |
@@ -47,11 +48,55 @@ Do not gate execution on `status` alone. `POST /verify/sql` returns an explicit 
 ```python
 result = client.verify_sql(
     query="SELECT * FROM users WHERE id = 1",
-    schema="CREATE TABLE users (id INT, name TEXT)"
+    schema_ddl="CREATE TABLE users (id INT, name TEXT)"
 )
 print(result.status)                            # "VERIFIED"
 print(result.developer_fields["is_valid"])      # True
 print(result.proof_ref)                         # "sha256:..."
+```
+
+## Schema compliance
+
+When you pass `schema_ddl`, every table the query reads or writes must be declared in that DDL. A reference to an undeclared table is an admission failure: the result is `BLOCKED` with `is_valid: false` and `constraint_id: "sql_verifier.schema_violation"`. Names the query defines itself, such as CTEs, are not treated as tables. Without `schema_ddl`, the engine does not check table names.
+
+```python
+import httpx
+
+try:
+    result = client.verify_sql(
+        query="SELECT * FROM payments",
+        schema_ddl="CREATE TABLE users (id INT, name TEXT)",
+    )
+except httpx.HTTPError as exc:
+    # Request failed (network error or non-2xx). Fail closed: do not run the SQL.
+    raise RuntimeError(f"SQL verification unavailable: {exc}") from exc
+
+print(result.status)                               # "BLOCKED"
+print(result.developer_fields["is_valid"])         # False
+print(result.developer_fields["constraint_id"])    # "sql_verifier.schema_violation"
+```
+
+<Note>
+Before v7.2.3, a query on a table outside the schema was admitted with a warning. See [GHSA-q5g6-6cw2-cjm3](https://github.com/QWED-AI/qwed-verification/security/advisories/GHSA-q5g6-6cw2-cjm3).
+</Note>
+
+## MySQL and MariaDB executable comments
+
+MySQL and MariaDB run SQL placed inside executable comments (`/*! ... */`, `/*!NNNNN ... */`, and `/*M! ... */`). The SQL engine expands these comments before analysis, so injection, destructive-operation, and schema checks apply to the SQL inside them. The engine expands them whatever `dialect` you declare.
+
+`developer_fields.executable_comments_expanded` is `true` when the query contained an executable comment.
+
+```python
+import httpx
+
+# The tautology hidden in the comment is analysed as SQL
+try:
+    result = client.verify_sql("SELECT * FROM users WHERE id = 1 /*!50000 OR 1=1 */")
+except httpx.HTTPError as exc:
+    # Request failed (network error or non-2xx). Fail closed: do not run the SQL.
+    raise RuntimeError(f"SQL verification unavailable: {exc}") from exc
+print(result.developer_fields["executable_comments_expanded"])  # True
+print(result.developer_fields["is_valid"])                      # False
 ```
 
 ## Injection detection

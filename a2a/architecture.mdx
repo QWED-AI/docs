@@ -26,8 +26,8 @@ flowchart LR
 | **1. Schema** | Pydantic `AgentMessage` | Validates sender/receiver IDs, payload type, timestamp. Over HTTP, the authenticated API-key identity overrides `sender_agent_id` before this stage. |
 | **2. Trust** | `TrustBoundary` | Checks blocklists, allowlists, pair blocks, rate limits — deny-all by default |
 | **3. Engine** | `_route_to_engine()` | Routes to `finance_guard`, `logic_guard`, or `code_guard`. `GENERAL` and `DATA_QUERY` payload types have no engine and return an `unverifiable` result. |
-| **4. Attestation** | `A2ACryptoService` | Signs `forwarded`, `blocked`, and `heuristic_pass` verdicts with an ES256 JWT (payload hash, trace ID, engine used). `unverifiable` verdicts carry **no JWT**. |
-| **5. Verdict** | `VerificationVerdict` | Returns `forwarded`, `blocked`, `heuristic_pass`, `unverifiable`, or `error` with reason, attestation (when present), and audit trace |
+| **4. Attestation** | `A2ACryptoService` | Signs `verified`, `blocked`, `heuristic_pass` and `error` verdicts with an ES256 JWT (payload hash, trace ID, engine used) whose `verdict` claim names the status. `unverifiable` verdicts carry **no JWT**. |
+| **5. Verdict** | `VerificationVerdict` | Returns `verified`, `blocked`, `heuristic_pass`, `unverifiable` or `error` with reason, attestation (when present) and audit trace. Only `verified` is admissible. |
 
 ---
 
@@ -60,8 +60,8 @@ sequenceDiagram
 
         alt Verification passes
             Eng-->>Int: {verified: true}
-            Int->>Crypto: sign_verdict(FORWARDED)
-            Int-->>API: VerificationVerdict(FORWARDED)
+            Int->>Crypto: sign_verdict(VERIFIED)
+            Int-->>API: VerificationVerdict(VERIFIED)
             API-->>Recv: Forward payload + attestation JWT
         else Verification fails
             Eng-->>Int: {verified: false, reason}
@@ -209,7 +209,7 @@ Every verdict includes a signed JWT with this payload:
   "jti": "a2a_demo_001",
   "qwed_a2a": {
     "version": "1.0",
-    "verdict": "forwarded",
+    "verdict": "verified",
     "engine": "finance_guard",
     "sender": "procurement-agent",
     "receiver": "treasury-agent"

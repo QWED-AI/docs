@@ -547,6 +547,8 @@ Validates shell commands before execution. See [Code engine](/engines/code) for 
 
 Scans configuration files for exposed secrets and credentials. See [Security hardening](/advanced/security-hardening) for configuration best practices.
 
+`ConfigGuard` detects OpenAI API keys in all current formats: project-scoped (`sk-proj-`), service-account (`sk-svcacct-`), and admin (`sk-admin-`) keys, as well as legacy `sk-` keys. Anthropic keys (`sk-ant-`) are reported separately. Detection of the scoped OpenAI formats was added in v7.2.3 ([GHSA-64xf-wffc-63fm](https://github.com/QWED-AI/qwed-verification/security/advisories/GHSA-64xf-wffc-63fm)).
+
 ---
 
 ## Server-side guards

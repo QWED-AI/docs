@@ -141,7 +141,7 @@ As of v7.2, QWED stores API keys as HMAC-SHA256 lookup digests keyed by a dedica
 **Breaking change.** There is no legacy fallback: API keys issued before v7.2 no longer authenticate and return `401 Unauthorized`. Each key must be re-issued once. The old raw key is never required:
 
 - **Portal or API:** sign in with your email and password to get a JWT, then call `POST /auth/api-keys` to mint a new key. This path needs no API key.
-- **Rotation by key ID:** call `/admin/keys/rotate` with the key's ID, authenticated with any already-working key.
+- **Rotation by key ID:** call [`POST /admin/keys/rotate`](/api/endpoints#post-admin-keys-rotate) with the key's ID, authenticated with an already-working key in the same organization. Members can rotate only their own keys. Owners and admins can also rotate other users' keys, unless the key owner holds a higher role. Revoked or inactive keys can't be rotated.
 
 ```bash
 # Before (pre-v7.2 key): now rejected

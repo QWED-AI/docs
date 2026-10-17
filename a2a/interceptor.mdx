@@ -54,7 +54,7 @@ The `trace_id` parameter is **required** and must be provided by the caller. Thi
     Based on `payload_type`, the message is routed to the appropriate verification engine (`finance_guard`, `logic_guard`, `code_guard`). Payload types with no engine (`GENERAL`, `DATA_QUERY`) return an `unverifiable` engine result instead of being silently forwarded.
   </Step>
   <Step title="Verdict & Attestation">
-    The engine result is wrapped in a `VerificationVerdict`. `FORWARDED`, `BLOCKED`, and `HEURISTIC_PASS` verdicts are signed with an ES256 JWT attestation. `UNVERIFIABLE` verdicts carry **no JWT** — issuing a signed token for content that was never verified would be a false cryptographic claim.
+    The engine result is wrapped in a `VerificationVerdict`. `VERIFIED`, `BLOCKED`, `HEURISTIC_PASS` and `ERROR` verdicts are signed with an ES256 JWT attestation whose `verdict` claim names the status. `UNVERIFIABLE` verdicts carry **no JWT**: issuing a signed token for content that was never verified would be a false cryptographic claim.
   </Step>
 </Steps>
 
@@ -93,7 +93,7 @@ All financial comparisons use `decimal.Decimal` with `ROUND_HALF_UP` quantizatio
 </Warning>
 
 <Info>
-**Empty or malformed payloads return `UNVERIFIABLE`, not `FORWARDED`.** If a `FINANCIAL_TRANSACTION` payload is missing `data`, `line_items`, or `claimed_total`, or contains non-numeric amounts, the finance guard returns `status=unverifiable` with no JWT attestation. Earlier releases collapsed these cases to a signed `FORWARDED` verdict, which falsely attested that the math had been checked.
+**Empty or malformed payloads return `UNVERIFIABLE`, not `VERIFIED`.** If a `FINANCIAL_TRANSACTION` payload is missing `data`, `line_items`, or `claimed_total`, or contains non-numeric amounts, the finance guard returns `status=unverifiable` with no JWT attestation. Earlier releases collapsed these cases to a signed pass verdict, which falsely attested that the math had been checked.
 </Info>
 
 ### Logic guard
@@ -207,14 +207,19 @@ verdict = await interceptor.intercept(chat_message, trace_id="chat_001")
 
 ## Verdict statuses
 
-Every call to `intercept()` returns a `VerificationVerdict`. Only statuses backed by a real verification decision carry a signed JWT attestation. `intercept()` also returns `error` when verification cannot complete, for example when an engine run exceeds its [execution budget](#engine-execution-budget) (engine `engine_timeout`) or the engine pool is saturated (engine `engine_busy`). Treat `error` as fail-closed and do not forward the message.
+Every call to `intercept()` returns a `VerificationVerdict` with one of five statuses. Every status except `unverifiable` carries a signed JWT attestation whose `verdict` claim names that status, so a signature on its own does not mean the payload passed. Only `verified` is admissible: gate on `verdict.status.admissible` (or `ADMISSIBLE_VERDICTS`), never on `status != blocked`, which would admit `heuristic_pass`, `unverifiable` and `error`. `error` is returned when verification cannot complete — for example when an engine run exceeds its [execution budget](#engine-execution-budget) (engine `engine_timeout`) or the engine pool is saturated (engine `engine_busy`).
 
 | Status | Meaning | JWT attestation |
 |--------|---------|-----------------|
-| `forwarded` | Engine verified the payload. Forward the message. | Signed |
-| `blocked` | Engine detected a violation (bad math, contradiction, dangerous code). Do not forward. | Signed |
-| `heuristic_pass` | Code guard ran, no known dangerous constructs found. Not a proof of safety. | Signed |
-| `unverifiable` | No engine could evaluate the payload (`GENERAL`/`DATA_QUERY`, empty/malformed finance or logic payload). No attestation is issued. | **None** |
+| `verified` | A deterministic engine (finance guard) recomputed the claims and they checked out. The only admissible status. | Signed |
+| `blocked` | Engine detected a violation (bad math, contradiction, dangerous code), or the trust boundary refused the message. Do not forward. | Signed |
+| `heuristic_pass` | Code guard's AST and regex scan, or logic guard's contradiction match, found no problem. Not a proof, and not admissible. | Signed |
+| `unverifiable` | No engine could evaluate the payload (`GENERAL`/`DATA_QUERY`, empty/malformed finance, logic or code payload). No attestation is issued. Not admissible. | **None** |
+| `error` | The engine raised, timed out or was saturated before verification completed. Fail closed; not admissible. See [Error handling](#error-handling). | Signed |
+
+<Note>
+`VerdictStatus.FORWARDED` is a deprecated alias of `VerdictStatus.VERIFIED` (value `"verified"`), and a legacy `"forwarded"` value still parses to `VERIFIED` on input. Neither is ever emitted; both will be removed in a future minor release. If your code compares against `"forwarded"`, switch it to `"verified"` or to `verdict.status.admissible`.
+</Note>
 
 <Warning>
 `UNVERIFIABLE` verdicts have `attestation_jwt=None`. If your downstream code assumes every verdict has a JWT, guard for this — issuing an attestation for content that was never verified would be a false cryptographic claim.
@@ -231,7 +236,7 @@ The `InterceptorConfig` controls which engines are active:
 | `enable_financial_verification` | `bool` | `True` | Route financial payloads to math verification |
 | `enable_logic_verification` | `bool` | `True` | Route logic assertions to contradiction checks |
 | `enable_code_verification` | `bool` | `True` | Route code payloads to the AST + regex heuristic security scanner |
-| `block_on_error` | `bool` | `True` | Block forwarding if verification encounters an internal error |
+| `block_on_error` | `bool` | `True` | Deprecated, no effect. Engine errors always fail closed with an `error` verdict; setting it to `False` logs a deprecation warning. Kept for config compatibility. |
 | `max_payload_size_bytes` | `int` | `1,048,576` | Maximum payload size (1 MiB; allowed range 1 KiB to 10 MiB). Enforced on the HTTP body (`413`) and in `intercept()` (`blocked`). See [Request size limits](#request-size-limits). |
 | `engine_timeout_seconds` | `float` | `5.0` | Wall-clock budget per engine run. Must be greater than 0 and at most 60. Exceeding it returns `error` (engine `engine_timeout`). See [Engine execution budget](#engine-execution-budget). |
 | `trusted_agents` | `List[str]?` | `None` | Agent IDs pre-added to the trust boundary allowlist at startup. These agents still run through the appropriate verification engine — they are not bypassed. |
@@ -242,7 +247,6 @@ from qwed_a2a.protocol.schema import InterceptorConfig
 config = InterceptorConfig(
     enable_financial_verification=True,
     enable_code_verification=True,
-    block_on_error=True,
     max_payload_size_bytes=512 * 1024,  # 512 KiB
     engine_timeout_seconds=2.0,
     trusted_agents=["internal-orchestrator-001"],
@@ -293,13 +297,12 @@ async def shutdown():
 
 ## Error handling
 
-When `block_on_error=True` (default), any exception in a verification engine results in a `BLOCKED` verdict. When `False`, the message is `FORWARDED` despite the error — useful for observability-only deployments.
+Verification that does not complete always fails closed with an `ERROR` verdict. An engine error is neither a pass (`VERIFIED`) nor a content rejection (`BLOCKED`), and no configuration turns it into a pass. The verdict is signed and its `verdict` claim is `"error"`.
 
-<AccordionGroup>
-  <Accordion title="block_on_error=True (default)" icon="shield-halved">
-    Engine exception → `BLOCKED` verdict with error reason. Safe default for production.
-  </Accordion>
-  <Accordion title="block_on_error=False (observability mode)" icon="eye">
-    Engine exception → `FORWARDED` verdict. The error is logged but doesn't block communication. Use for shadow deployments.
-  </Accordion>
-</AccordionGroup>
+| Cause | `engine_used` | Reason |
+|-------|---------------|--------|
+| Engine raised an exception | `error_handler` | `Verification engine raised <ExceptionType> - fail closed` (only the exception type is surfaced, since its message may echo payload data) |
+| Engine exceeded `engine_timeout_seconds` (default 5 s) | `engine_timeout` | `Verification engine timed out after <n>s - fail closed` |
+| All engine slots busy | `engine_busy` | `Verification engines are saturated - fail closed` |
+
+`block_on_error` is deprecated and ignored: earlier releases let `block_on_error=False` pass a message through despite an engine error. Setting it to `False` now only logs a deprecation warning.
