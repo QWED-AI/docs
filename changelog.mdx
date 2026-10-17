@@ -5,7 +5,7 @@ description: "Release notes for the QWED Protocol: version history, new guards, 
 
 All notable changes to the QWED platform, listed by release.
 
-Jump to: [Admin endpoint tenant scoping](#qwed-verification-—-tenant-scoped-admin-endpoints-and-working-rbac) · [`verify_fact` fails closed offline](#qwed-verification-—-verify_fact-fails-closed-offline-and-money-rejects-non-finite-amounts) · [Request caps and sandbox limits](#qwed-verification-—-request-body-caps-timeouts-and-sandbox-concurrency-limits) · [QWED-Tax v0.2.1](#qwed-tax-v0-2-1-—-classification-claim-vocabulary-and-strict-facts) · [QWED-Legal v0.5.1](#qwed-legal-v0-5-1-—-deadlineguard-signing-anchor-allowlist) · [v7.2.2](#v7-2-2-—-verification-soundness-and-safety-hardening) · [Open Responses v0.6.1](#qwed-open-responses-v0-6-1-—-toolguard-verifies-client-action-items) · [QWED-Finance v3.0.1](#qwed-finance-v3-0-1-—-iso-20022-sanctions-and-queryguard-security-fixes) · [QWED-Legal date and input bounds](#qwed-legal-—-fail-closed-date-handling-and-input-bounds) · [Open Responses v0.6.0](#qwed-open-responses-v0-6-0-—-fail-closed-hardening) · [QWED-Legal fail-closed hardening](#qwed-legal-—-fail-closed-hardening-for-guards-diagnostics-and-github-action) · [`qwed init` server identity handshake](#qwed-verification-—-qwed-init-server-identity-handshake) · [Leaked key auto-revocation](#qwed-verification-—-leaked-api-key-auto-revocation-and-false-positive-feedback) · [API-key format spec](#qwed-verification-—-canonical-api-key-format-spec) · [Signed secret-scanning webhook](#qwed-verification-—-signed-secret-scanning-webhook-endpoint) · [v7.2.1](#v7-2-1-—-math-answer-comparison-security-patch) · [v7.2.0](#v7-2-0-—-precision-advisory-and-security-hardening-batch) · [v7.1.0](#v7-1-0-—-verification-context-v1-0-rollout) · [v7.0.0](#v7-0-0-—-full-diagnosticresult-engine-conformance)
+Jump to: [Admin endpoint tenant scoping](#qwed-verification-—-tenant-scoped-admin-endpoints-and-working-rbac) · [`verify_fact` fails closed offline](#qwed-verification-—-verify_fact-fails-closed-offline-and-money-rejects-non-finite-amounts) · [Request caps and sandbox limits](#qwed-verification-—-request-body-caps-timeouts-and-sandbox-concurrency-limits) · [v7.2.3](#v7-2-3-—-code-secret-and-sql-verification-security-release) · [QWED-Tax v0.2.1](#qwed-tax-v0-2-1-—-classification-claim-vocabulary-and-strict-facts) · [QWED-Legal v0.5.1](#qwed-legal-v0-5-1-—-deadlineguard-signing-anchor-allowlist) · [v7.2.2](#v7-2-2-—-verification-soundness-and-safety-hardening) · [Open Responses v0.6.1](#qwed-open-responses-v0-6-1-—-toolguard-verifies-client-action-items) · [QWED-Finance v3.0.1](#qwed-finance-v3-0-1-—-iso-20022-sanctions-and-queryguard-security-fixes) · [QWED-Legal date and input bounds](#qwed-legal-—-fail-closed-date-handling-and-input-bounds) · [Open Responses v0.6.0](#qwed-open-responses-v0-6-0-—-fail-closed-hardening) · [QWED-Legal fail-closed hardening](#qwed-legal-—-fail-closed-hardening-for-guards-diagnostics-and-github-action) · [`qwed init` server identity handshake](#qwed-verification-—-qwed-init-server-identity-handshake) · [Leaked key auto-revocation](#qwed-verification-—-leaked-api-key-auto-revocation-and-false-positive-feedback) · [API-key format spec](#qwed-verification-—-canonical-api-key-format-spec) · [Signed secret-scanning webhook](#qwed-verification-—-signed-secret-scanning-webhook-endpoint) · [v7.2.1](#v7-2-1-—-math-answer-comparison-security-patch) · [v7.2.0](#v7-2-0-—-precision-advisory-and-security-hardening-batch) · [v7.1.0](#v7-1-0-—-verification-context-v1-0-rollout) · [v7.0.0](#v7-0-0-—-full-diagnosticresult-engine-conformance)
 
 ---
 
@@ -78,6 +78,46 @@ ok, reason = verify_invoice_total(subtotal, tax, claimed_total, tolerance=Decima
 - **Sandbox concurrency limit.** Each server process runs at most `QWED_SANDBOX_MAX_CONCURRENT` sandbox containers (default 4). A request that can't get a slot within `QWED_SANDBOX_ACQUIRE_TIMEOUT` (default 10 seconds) is rejected with `Sandbox capacity reached — retry shortly.`
 
 See [Availability limits](/advanced/self-hosting#availability-limits) for the full configuration reference.
+
+---
+
+## v7.2.3 — Code, secret, and SQL verification security release
+
+**Released: October 13, 2026** · [GitHub Release ↗](https://github.com/QWED-AI/qwed-verification/releases/tag/v7.2.3) · [GitHub PR #441](https://github.com/QWED-AI/qwed-verification/pull/441) · [GitHub PR #444](https://github.com/QWED-AI/qwed-verification/pull/444)
+
+> v7.2.3 is a fail-closed security release covering three advisories published on October 13, 2026: [GHSA-6rxr-gq43-694g](https://github.com/QWED-AI/qwed-verification/security/advisories/GHSA-6rxr-gq43-694g), [GHSA-64xf-wffc-63fm](https://github.com/QWED-AI/qwed-verification/security/advisories/GHSA-64xf-wffc-63fm), and [GHSA-q5g6-6cw2-cjm3](https://github.com/QWED-AI/qwed-verification/security/advisories/GHSA-q5g6-6cw2-cjm3). They affect all versions up to 7.2.2. Upgrading is recommended. No breaking wire changes.
+
+<Warning>
+**Behaviour changes.** All three fixes make the engines stricter. No response field is removed or renamed.
+
+- **Code:** code that runs a shell command or subprocess is no longer admitted by the code verifier, even with a constant argument or through an aliased import. Run such commands through a reviewed, sandboxed tool instead.
+- **Secrets:** OpenAI `sk-proj-`, `sk-svcacct-`, and `sk-admin-` keys are now detected, so content that previously passed may now be flagged.
+- **SQL:** MySQL and MariaDB executable comments (`/*! ... */`) are expanded and analysed as SQL, whatever the declared dialect. The new field `developer_fields.executable_comments_expanded` reports when this happened. With `schema_ddl`, a reference to an undeclared table now fails admission with `is_valid: false` and the new constraint `sql_verifier.schema_violation`. Without `schema_ddl`, tables are not checked, as before.
+</Warning>
+
+### Security fixes
+
+- **Code verification never admits shell or process execution** ([GHSA-6rxr-gq43-694g](https://github.com/QWED-AI/qwed-verification/security/advisories/GHSA-6rxr-gq43-694g)). `os.system`, `os.popen`, the `os.exec*` and `os.spawn*` families, `os.posix_spawn*`, `os.startfile`, `subprocess.*`, `pty.spawn`, and `asyncio.create_subprocess_*` are now blocking `process_execution` findings. This includes calls through aliased imports such as `import subprocess as sp`, `from os import system as run_it`, and `from os import *`. Before, they were warnings and the code was admitted. `verify_code`, `verify_python_deep`, and `POST /verify/code` are covered. See [Code engine](/engines/code#shell-and-process-execution-is-never-admitted).
+- **Project-scoped OpenAI keys are detected** ([GHSA-64xf-wffc-63fm](https://github.com/QWED-AI/qwed-verification/security/advisories/GHSA-64xf-wffc-63fm)). `ConfigGuard` and the code verifier detect `sk-proj-`, `sk-svcacct-`, and `sk-admin-` keys as well as legacy keys. See [ConfigGuard](/sdks/guards#configguard).
+- **SQL in executable comments and tables outside the schema are rejected** ([GHSA-q5g6-6cw2-cjm3](https://github.com/QWED-AI/qwed-verification/security/advisories/GHSA-q5g6-6cw2-cjm3)). Executable comments (`/*! ... */`, `/*!NNNNN ... */`, `/*M! ... */`) are expanded before analysis, so the SQL inside them is checked. With `schema_ddl`, a query on an undeclared table is `BLOCKED` with `sql_verifier.schema_violation` instead of being admitted with a warning. CTE names are not treated as tables. See [SQL engine](/engines/sql#schema-compliance).
+
+### Soundness eval
+
+From v7.2.3 on, each GitHub release includes a soundness eval report (`eval-results.json`). The eval runs claims with a known answer through the Math, Logic, SQL, Code, and Schema engines, including reproductions of advisories where an engine returned a false `VERIFIED`. The v7.2.3 report covers 76 claims with 0 false accepts.
+
+### Version bumps
+
+| Surface | From | To |
+|---|---|---|
+| `qwed` (PyPI) | `7.2.2` | `7.2.3` |
+| `qwed_sdk` (Python) | `7.2.2` | `7.2.3` |
+| `@qwed-ai/sdk` (npm) | `7.2.2` | `7.2.3` |
+| `qwed` (crates.io) | `7.2.2` | `7.2.3` |
+| API version marker | `7.2.2` | `7.2.3` |
+
+### Upgrading
+
+Pin `qwed>=7.2.3` on PyPI, `@qwed-ai/sdk@^7.2.3` on npm, and `qwed = "7.2.3"` on crates.io, then redeploy. If your generated code runs shell commands, or your SQL queries reference tables outside the `schema_ddl` you pass, expect those to be blocked after the upgrade.
 
 ---
 
