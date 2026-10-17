@@ -165,6 +165,61 @@ result = guard.verify_classification_claim(
   **Fails closed on ambiguous facts.** `verify_worker_status` returns `WorkerType.CONTRACTOR` only when **no** employee indicators are present. When some — but not all — of `behavioral_control`, `financial_control`, and `relationship_permanence` are true, it returns `None`, and `verify_classification_claim` then returns `{"verified": False, "error": "Ambiguous classification: facts contain mixed employee/contractor indicators. Cannot deterministically classify — manual review required."}`. The previous default-to-contractor path on mixed signals has been removed.
 </Note>
 
+| Parameter | Type | Required | Description |
+| --- | --- | --- | --- |
+| `llm_claim` | `str` | Yes | The AI's classification. Must be a value from the claim vocabulary below |
+| `facts` | `dict` | Yes | Must contain `provides_tools`, `reimburses_expenses`, and `indefinite_relationship`, each a `bool` |
+
+#### Claim vocabulary
+
+Since v0.2.1, `verify_classification_claim` maps `llm_claim` through a fixed vocabulary instead of searching the text for substrings. Matching ignores case, spaces, hyphens, and underscores.
+
+| Accepted claim | Maps to |
+| --- | --- |
+| `W2`, `W-2`, `EMPLOYEE` | Employee (W-2) |
+| `1099`, `1099-NEC`, `CONTRACTOR`, `INDEPENDENT CONTRACTOR` | Contractor (1099) |
+
+Any other text, such as `"1099 contractor"` or `"non-employee"`, fails closed. The guard returns `verified=False` with an `INVALID_CLAIM` audit trace outcome. Empty or non-string claims fail the same way.
+
+#### Strict worker facts
+
+`provides_tools`, `reimburses_expenses`, and `indefinite_relationship` must all be present and must be real booleans. A missing fact or a string such as `"no"` fails closed with an `INVALID_FACTS` audit trace outcome. The `error` lists the invalid fact names. The guard checks facts before it derives a classification or reads the claim.
+
+These rules also apply to `TaxPreFlight` intents with `action: "hire"`, which pass `worker_type` and `worker_facts` to this guard.
+
+<Warning>
+  **Behavior change in v0.2.1.** Claims and facts that earlier versions interpreted are now rejected:
+
+  ```python
+  # Before: "1099 contractor" was matched by substring and treated as 1099.
+  # After: verified=False, audit_trace outcome INVALID_CLAIM.
+  guard.verify_classification_claim(
+      llm_claim="1099 contractor",
+      facts={"provides_tools": False, "reimburses_expenses": False, "indefinite_relationship": False},
+  )
+
+  # Before: the string "no" was truthy and read as an employee indicator.
+  # After: verified=False, audit_trace outcome INVALID_FACTS.
+  guard.verify_classification_claim(
+      llm_claim="1099",
+      facts={"provides_tools": "no", "reimburses_expenses": False, "indefinite_relationship": False},
+  )
+
+  # After: pass a canonical claim and boolean facts.
+  guard.verify_classification_claim(
+      llm_claim="1099",
+      facts={"provides_tools": False, "reimburses_expenses": False, "indefinite_relationship": False},
+  )
+  # {"verified": True, "audit_trace": {...}}
+  ```
+
+  Translate the AI's output into `"W2"` or `"1099"` and pass each fact as a real boolean — map known text values explicitly and reject anything else. Do not use `bool(<string>)`: `bool("no")` is `True`, which would recreate the bug this release fixes.
+</Warning>
+
+<Note>
+  **TypeScript SDK.** The vocabulary above applies to the Python API only. The `@qwed-ai/tax` npm package compares `worker_type` exactly, so pass `"W2"` or `"1099"`.
+</Note>
+
 ### ABCClassificationGuard (ABC Test / Z3)
 
 **Goal:** Formal verification of worker classification under state-specific ABC Test laws (CA AB5, NJ, MA). Uses the **Z3 theorem prover** to prove classification correctness.

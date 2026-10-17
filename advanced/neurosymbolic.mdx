@@ -143,7 +143,7 @@ Z3 Solver: Proves "aspirin + warfarin = contraindicated"
 ```text
 GPT: "Investment return = 12.5%"
 → Trust blindly
-→ $12,889 error (from benchmark)
+→ A wrong figure reaches the ledger
 ```
 
 **QWED Way (Neurosymbolic):**
@@ -151,8 +151,8 @@ GPT: "Investment return = 12.5%"
 ```text
 GPT: "Investment return = 12.5%"
 → SymPy calculates: 11.8%
-→ 🛑 Mismatch detected!
-→ ✅ Corrected before loss
+→ 🛑 Mismatch detected: CORRECTION_NEEDED (not admitted)
+→ Your integration holds the result instead of using it
 ```
 
 ### Code security example

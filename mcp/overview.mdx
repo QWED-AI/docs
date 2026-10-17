@@ -1,8 +1,8 @@
 ---
 sidebar_position: 1
-title: "QWED MCP: Model Context Protocol security and verification"
+title: "QWED MCP: verification for Model Context Protocol"
 sidebarTitle: "MCP overview"
-description: "QWED MCP is a Model Context Protocol security layer for AI agents. Verify tool calls, detect poisoned MCP tools, and run deterministic checks before execution."
+description: "QWED-MCP is a Model Context Protocol server that runs assistant-written Python scripts using QWED SDK verification libraries with the server's privileges."
 ---
 
 **Model Context Protocol (MCP) Server for QWED Verification**
@@ -11,9 +11,13 @@ description: "QWED MCP is a Model Context Protocol security layer for AI agents.
  ![Tests](https://github.com/QWED-AI/qwed-mcp/actions/workflows/publish.yml/badge.svg)
  ![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)
 
-QWED-MCP brings deterministic verification to Claude Desktop, VS Code, and any MCP-compatible AI assistant. Instead of trusting LLMs to compute correctly, QWED-MCP provides a sandboxed Python execution environment with access to all QWED SDK verification libraries.
+QWED-MCP brings deterministic verification to Claude Desktop, VS Code, and any MCP-compatible AI assistant. Instead of trusting LLMs to compute correctly, QWED-MCP runs Python scripts written by the assistant, with access to the QWED SDK verification libraries. All verification runs locally.
 
-Use QWED-MCP when you need MCP security, tool call verification, skill supply chain protection, and deterministic enforcement around Model Context Protocol actions.
+Use QWED-MCP when you want an MCP-compatible assistant to run deterministic checks (math, logic, SQL, code) instead of computing answers itself.
+
+<Warning>
+  `execute_python_code` runs code in a subprocess **with the server's privileges**. It is not a sandbox. The subprocess gets a restricted set of environment variables, and calls pass through the `RiskBasedExecutionGateway`, but only enable code execution where you trust the inputs.
+</Warning>
 
 ---
 
@@ -30,14 +34,16 @@ LLMs are unreliable for:
 
 ### The solution
 
-QWED-MCP exposes **deterministic verification** to AI assistants through a single `execute_python_code` tool. The LLM writes a Python script that imports the appropriate QWED SDK, and the MCP server runs it in a sandboxed subprocess.
+QWED-MCP exposes **deterministic verification** to AI assistants through a single `execute_python_code` tool. The LLM writes a Python script that imports the appropriate QWED SDK, and the MCP server runs it in a subprocess with restricted environment variables and the server's privileges.
 
 | Without QWED-MCP | With QWED-MCP |
 | --- | --- |
-| LLM-only math → ~95% correct | QWED-MCP executes Python via `qwed_new` math engine → **100% correct** |
-| LLM-only SQL → unverified for injection | Script uses `qwed_new` SQL analyzer → **injection detected** |
-| LLM-only reasoning → unverified | Z3 solver executed via SDK → **formally proven** |
-| LLM-only code → unverified for safety | AST check script executed → **security checked** |
+| LLM-only math → approximated by the model | Script calls the QWED math engine → result computed by SymPy |
+| LLM-only SQL → unchecked for injection | Script calls the QWED SQL analyzer → known injection patterns flagged |
+| LLM-only reasoning → unchecked | Script calls Z3 via the SDK → the formal statement is checked; the result can also be inconclusive |
+| LLM-only code → unchecked | Script runs an AST check → dangerous patterns flagged |
+
+What a run checks depends entirely on which QWED SDK calls the script makes: executing a script is not itself verification. The formal statement is only as good as the script the assistant wrote, so review it. See [qwedai.com/limits](https://qwedai.com/limits).
 
 ---
 
@@ -297,7 +303,7 @@ Claude: def run_command(cmd):
 
 ### 4. SQL security
 
-Prevent SQL injection in generated queries:
+Check generated queries for SQL injection patterns:
 
 ```text
 User: Generate a query to find user "admin' OR '1'='1"
