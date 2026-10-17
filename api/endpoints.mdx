@@ -75,6 +75,29 @@ Servers released before this endpoint existed return `404`.
 
 ---
 
+## Request limits
+
+Every `/verify` route enforces a request body cap. QWED rejects an oversized body before the handler reads or parses it.
+
+| Route | Body cap |
+|-------|----------|
+| JSON routes: `/verify/natural_language`, `/verify/logic`, `/verify/fact`, `/verify/code`, `/verify/math`, `/verify/sql`, `/verify/rag`, `/verify/process`, `/verify/consensus`, `/verify/batch` | 1,000,000 bytes |
+| `/verify/stats` (multipart upload) | 10,000,000-byte file plus 64 KiB envelope headroom |
+| `/verify/image` (multipart upload) | 10 MiB file plus 64 KiB envelope headroom |
+
+The server also bounds slow work so one request can't stall the API for other callers. Self-hosters can tune these bounds with environment variables. See [Availability limits](/advanced/self-hosting#availability-limits).
+
+| Status | Detail | Cause |
+|--------|--------|-------|
+| `408` | `Request body not received in time.` | The client didn't finish sending the body within the read deadline (10 seconds for JSON routes, 30 seconds for uploads) |
+| `413` | `Request body exceeds the <N> byte limit for this endpoint.` | The body is larger than the route's cap |
+| `503` | `Server busy — retry shortly.` | Too many JSON requests are in flight on this server process |
+| `503` | `Upload capacity reached — retry shortly.` | Too many `/verify/stats` or `/verify/image` uploads are in flight on this server process |
+
+Treat `503` responses from these limits as retryable. Back off and resend the request.
+
+---
+
 ## Verification endpoints
 
 ### POST /verify/natural_language
@@ -168,6 +191,10 @@ The control plane treats attestation as an admission gate, not a decoration:
 - The attestation `qwed.query_hash` binds to the translated expression that the deterministic engine actually evaluated — not to the natural-language `user_query`. This matches the disclosed `verification_scope: "translated_expression_only"`: the natural-language query still appears in `response.user_query` for display, but downstream consumers verifying the attestation should hash the translated expression, not the user prose.
 
 See [Cryptographic attestations](/advanced/attestations) for the full `AttestationResult` contract and [Trust boundary](/engines/math#trust-boundary) for the math-engine discussion.
+
+<Note>
+The LLM provider call runs off the server's event loop under `QWED_PROVIDER_TIMEOUT` (default 30 seconds). If the provider doesn't respond in time, the request fails closed with an `ERROR` status instead of stalling other requests.
+</Note>
 
 ---
 
@@ -306,6 +333,8 @@ The `provider_used` field indicates which LLM provider handled the translation s
 }
 ```
 
+The provider translation step runs under `QWED_PROVIDER_TIMEOUT` (default 30 seconds) and the Z3 solve under `QWED_Z3_TIMEOUT` (default 15 seconds). A timeout returns the `ERROR` response above.
+
 ---
 
 ### POST /verify/code
@@ -366,6 +395,10 @@ Check code for security vulnerabilities using AST analysis. Returns the unified 
 <Warning>
 **Breaking change (v7.0.0):** proven-unsafe code now returns HTTP 200 with `status: "VERIFIED"` (previously `BLOCKED`). `VERIFIED` answers "was the code checked?", not "is it safe to execute?". Consumers that gated on `status` for safety must switch to the `admission` field or `developer_fields.is_valid`.
 </Warning>
+
+| Status | Description |
+|--------|-------------|
+| 503 | `Code verification timed out.` The scan exceeded `QWED_CODE_VERIFY_TIMEOUT` (default 10 seconds) |
 
 ---
 
@@ -448,6 +481,10 @@ Verify a factual claim against a provided context.
 | `REFUTED` | Claim contradicts the context |
 | `INCONCLUSIVE` | Not enough evidence in the context |
 
+| Status | Description |
+|--------|-------------|
+| 503 | `Fact verification timed out.` The provider call exceeded `QWED_PROVIDER_TIMEOUT` (default 30 seconds) |
+
 ---
 
 ### POST /verify/consensus
@@ -524,6 +561,8 @@ Only unanimous `VERIFIED` engine outcomes can produce a `VERIFIED` consensus. Ad
 | 400 | Invalid verification mode |
 | 422 | Consensus confidence below the requested `min_confidence` threshold |
 | 503 | Secure Docker sandbox unavailable — required for Python engine in `high`/`maximum` mode |
+
+Each server process runs at most `QWED_SANDBOX_MAX_CONCURRENT` sandbox containers at once (default 4). If a Python engine run can't get a sandbox slot within `QWED_SANDBOX_ACQUIRE_TIMEOUT` (default 10 seconds), QWED rejects the run with `Sandbox capacity reached — retry shortly.` instead of starting another container. A capacity rejection never produces a `VERIFIED` result.
 
 ---
 
@@ -618,6 +657,8 @@ Failure states return `status: "BLOCKED"` with a `constraint_id` of `stats_verif
 
 <Note>
 Statistical verification requires a running Docker daemon. If Docker is unavailable, the endpoint returns HTTP 503 instead of falling back to in-process execution. See the [Stats engine](/engines/stats) page for details.
+
+When the sandbox is at capacity (`QWED_SANDBOX_MAX_CONCURRENT` containers already running) and no slot frees within `QWED_SANDBOX_ACQUIRE_TIMEOUT`, the execution is rejected with `Sandbox capacity reached — retry shortly.` and the result is `BLOCKED`.
 </Note>
 
 ---
@@ -827,6 +868,13 @@ Bare expressions (no `=`) always return `UNVERIFIABLE`. A successful symbolic si
 <Info>
 The pre-v6.0 top-level `is_valid` field is preserved inside `developer_fields.is_valid` for backward compatibility, but new code should gate on `result.status == "VERIFIED"` and the presence of `result.proof_ref`. The batch response does not include a pass/fail aggregate because a boolean cannot represent the three-status verdict — count `items[].result.status == "VERIFIED"` entries directly if you need a success ratio.
 </Info>
+
+Each item runs under `QWED_BATCH_ITEM_TIMEOUT` (default 60 seconds). An item that times out is marked `failed` with its error recorded, and the rest of the job still completes.
+
+| Status | Description |
+|--------|-------------|
+| 400 | No items, or more than 100 items |
+| 503 | `Batch capacity reached — retry shortly.` The job store is full of active jobs. See [Availability limits](/advanced/self-hosting#availability-limits) |
 
 ### GET /verify/batch/{job_id}
 

@@ -144,6 +144,32 @@ uvicorn qwed_new.api.main:app --workers 4
 export QWED_DB_POOL_SIZE=20
 ```
 
+### Availability limits
+
+QWED bounds request size, slow work, and sandbox usage so one request can't stall or exhaust a server process. The defaults suit most deployments. Raise them only if your host has the headroom.
+
+| Variable | Default | What it bounds |
+|----------|---------|----------------|
+| `QWED_CODE_VERIFY_TIMEOUT` | `10` | Seconds a `/verify/code` scan can run. A timeout returns `503`. |
+| `QWED_PROVIDER_TIMEOUT` | `30` | Seconds an LLM provider call can run for `/verify/natural_language`, `/verify/logic`, and `/verify/fact`. Calls run off the event loop. A timeout fails closed: `/verify/fact` returns `503`, the others return an `ERROR` result. |
+| `QWED_Z3_TIMEOUT` | `15` | Seconds a `/verify/logic` Z3 solve can run. Solves run one at a time on a dedicated thread. |
+| `QWED_BATCH_MAX_JOBS` | `1000` | Jobs kept in the `/verify/batch` job store. QWED evicts the oldest finished job first and never evicts a running job. An evicted job returns `404` from `GET /verify/batch/{job_id}`. When every stored job is active, new submissions get `503 Batch capacity reached — retry shortly.` |
+| `QWED_BATCH_ITEM_TIMEOUT` | `60` | Seconds a single batch item can run. A timed-out item is marked `failed` so the job can finish. |
+| `QWED_SANDBOX_MAX_CONCURRENT` | `4` | Sandbox containers running at once per server process, across `/verify/consensus` and `/verify/stats` with the Docker executor. |
+| `QWED_SANDBOX_ACQUIRE_TIMEOUT` | `10` | Seconds a request waits for a free sandbox slot. If none frees in time, QWED rejects the run with `Sandbox capacity reached — retry shortly.` instead of starting another container. |
+
+```bash
+# Example: a larger host that runs more sandboxed verifications in parallel
+export QWED_SANDBOX_MAX_CONCURRENT=8
+export QWED_PROVIDER_TIMEOUT=45
+```
+
+Request body caps are fixed. Every `/verify` JSON route accepts up to 1,000,000 bytes. `/verify/stats` and `/verify/image` accept their 10 MB file limit plus envelope headroom. QWED rejects an oversized body with `413` before processing it. See [Request limits](/api/endpoints#request-limits) for the full error list.
+
+<Note>
+`QWED_SANDBOX_MAX_CONCURRENT` applies per worker process. With `uvicorn --workers 4` and the default of 4, a host can run up to 16 sandbox containers. Size the value against your host's memory, CPU, and PID limits.
+</Note>
+
 ## Monitoring
 
 ### Health check
