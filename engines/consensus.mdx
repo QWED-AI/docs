@@ -145,6 +145,27 @@ The pre-execution AST check on sandboxed Python code inspects every dotted segme
 
 Legitimate pandas and numpy verification code at the public API surface (`np.linalg.norm`, `pd.Timestamp.now`) is unaffected.
 
+### Runtime module and builtin allowlist
+
+Since v7.3.0, sandboxed code also runs in an isolated namespace inside the container. This runtime layer applies even if code gets past the static checks:
+
+- **Imports are limited to an allowlist** of analysis modules (the same allowlist the [Stats engine](/engines/stats#runtime-module-and-builtin-allowlist) uses): `numpy`, `pandas`, `scipy`, `sklearn`, `statsmodels`, `patsy`, `math`, `cmath`, `statistics`, `decimal`, `fractions`, `random`, `datetime`, `json`, `re`, `collections`, `itertools`, `functools`, `operator`, `array`, `bisect`, `heapq`, `string`, and `typing`. Importing any other module, or using a relative import, raises `ImportError` and the execution fails.
+- **Builtins are reduced to safe names.** `eval`, `exec`, `compile`, `getattr`, `setattr`, `delattr`, `vars`, `globals`, `locals`, `open`, `input`, and `memoryview` are not available.
+- **`np`/`numpy` and `pd`/`pandas` are pre-bound**, so generated code doesn't need to import them. Assign the output to `result`.
+
+```python
+# Runs: allowlisted modules only
+import math
+result = math.isclose(0.1 + 0.2, 0.3)
+
+# Fails: os is not on the allowlist
+import os  # ImportError: import of 'os' is not permitted in the sandbox
+```
+
+<Warning>
+**Behavior change in v7.3.0.** Sandboxed code that imported a module outside the allowlist now fails. Rewrite it to use the allowlisted modules. See [GHSA-j3x4-v3p2-4mq3](https://github.com/QWED-AI/qwed-verification/security/advisories/GHSA-j3x4-v3p2-4mq3).
+</Warning>
+
 ---
 
 ## Engine selection
