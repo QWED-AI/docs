@@ -1,7 +1,7 @@
 {
   "name": "qwed-docs-mintlify",
   "version": "1.0.0",
-  "description": "Official documentation for the [QWED Verification Protocol](https://qwedai.com).",
+  "description": "Official documentation for the [QWED Verification Protocol](https://qwedai.tech).",
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
