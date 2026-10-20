@@ -218,6 +218,8 @@ gunicorn qwed_new.api.main:app -w 4 -k uvicorn.workers.UvicornWorker --bind 0.0.
 | `SIMILARITY_THRESHOLD` | Prompt injection detection threshold | 0.6 |
 | `DOCKER_TIMEOUT` | Code execution timeout (seconds) | 10 |
 | `DOCKER_MEMORY_LIMIT` | Container memory limit | 512m |
+| `QWED_SANDBOX_IMAGE` | Alternative image for the stats and consensus code sandbox. QWED accepts it only when pinned by digest (`name@sha256:<64 hex>`). Any other value is refused, logged, and replaced by the pinned default image | `amancevice/pandas@sha256:9257b889…` |
+| `QWED_SANDBOX_UID_RANGE` | Operator-reserved uid range (`FIRST-LAST`, within `65536`–`2147483646`) that QWED hands sandbox workspaces to when the server process runs as root. An invalid value is logged and the default is used | `1879048192-2147483646` |
 | `QWED_SKIP_ENV_INTEGRITY_CHECK` | Skip `.pth` file verification on startup | `false` |
 
 ### AI providers
@@ -277,7 +279,8 @@ Before going to production, ensure the following:
 **Solution:**
 1. Check Docker is running: `docker ps`
 2. Verify the Docker daemon responds to pings: `docker info`
-3. Check `python:3.10-slim` image exists: `docker pull python:3.10-slim` (The executor uses this image).
+3. Check the pinned sandbox image exists: `docker pull amancevice/pandas@sha256:9257b88909bddf60c8a85b06d572fc6dfc708ea9c8a3c3dc2149e312d57f91e3` (or the digest you set in `QWED_SANDBOX_IMAGE`).
+4. Check the daemon's user mapping. QWED reports a `userns-remap` daemon, a rootless daemon used by a root server process, or a daemon whose security options QWED can't read as `SECURE_RUNTIME_UNAVAILABLE`. Run QWED as a non-root user with a rootless daemon, or as any user with a default (non-remapped) daemon.
 
 ---
 

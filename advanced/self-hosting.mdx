@@ -170,6 +170,41 @@ Request body caps are fixed. Every `/verify` JSON route accepts up to 1,000,000 
 `QWED_SANDBOX_MAX_CONCURRENT` applies per worker process. With `uvicorn --workers 4` and the default of 4, a host can run up to 16 sandbox containers. Size the value against your host's memory, CPU, and PID limits.
 </Note>
 
+### Sandbox image and container user
+
+`/verify/stats` and `/verify/consensus` run model-generated Python in a Docker sandbox. QWED pins the sandbox image by digest, so the sandbox only ever runs the exact image that was reviewed:
+
+```text
+amancevice/pandas@sha256:9257b88909bddf60c8a85b06d572fc6dfc708ea9c8a3c3dc2149e312d57f91e3
+```
+
+Each sandbox container runs with a read-only root filesystem, drops all Linux capabilities, sets `no-new-privileges`, and never runs as a privileged root. The only writable path is the per-execution `/workspace` directory, which is a private `0700` host directory. The container runs as that directory's owner:
+
+- **Non-root server process:** the container runs as the host user.
+- **Root server process:** QWED hands each workspace to a fresh uid for that execution. QWED skips any uid that a host account or group owns, that `/etc/subuid` or `/etc/subgid` delegates, or that another running execution uses.
+- **Rootless daemon run by the same non-root user:** the container runs as its root, which the daemon maps to that unprivileged host user.
+
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `QWED_SANDBOX_IMAGE` | Pinned image above | Runs a different sandbox image, such as a mirror in your own registry. The value must be pinned by digest (`name@sha256:<64 hex>`). QWED refuses any other value, logs an error, and uses the pinned image. |
+| `QWED_SANDBOX_UID_RANGE` | `1879048192-2147483646` | The uid range QWED draws workspace owners from when the server process runs as root. Use `FIRST-LAST` within `65536`–`2147483646`. QWED logs an invalid value and uses the default. The default is a range systemd documents as unused. |
+
+```bash
+# Mirror the sandbox image in a private registry, pinned by digest
+export QWED_SANDBOX_IMAGE=registry.example.com/qwed/pandas@sha256:9257b88909bddf60c8a85b06d572fc6dfc708ea9c8a3c3dc2149e312d57f91e3
+
+# Reserve a dedicated uid range for root-run deployments
+export QWED_SANDBOX_UID_RANGE=2000000000-2000099999
+```
+
+<Warning>
+QWED never guesses how the Docker daemon maps users. It reports the sandbox as unavailable (`SECURE_RUNTIME_UNAVAILABLE`, HTTP `503` on the affected endpoints) when:
+
+- the daemon uses `userns-remap`
+- the server process runs as root with a rootless daemon
+- QWED can't read the daemon's security options
+</Warning>
+
 ## Monitoring
 
 ### Health check
