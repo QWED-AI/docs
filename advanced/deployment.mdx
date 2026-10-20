@@ -46,6 +46,7 @@ Before starting the stack, create a `.env` file in the `deploy/` directory with 
 DATABASE_URL=postgresql://qwed:your_password@postgres:5432/qwed_db
 QWED_CORS_ORIGINS=https://app.yourcompany.com
 API_KEY_SECRET=your-generated-secret
+QWED_AUDIT_SECRET_KEY=your-generated-audit-key
 
 # Optional
 REDIS_URL=redis://redis:6379/0
@@ -62,12 +63,32 @@ GF_SECURITY_ADMIN_PASSWORD=your_grafana_password
 ```
 
 <Warning>
-`DATABASE_URL`, `QWED_CORS_ORIGINS`, and `API_KEY_SECRET` are **required**. Docker Compose will refuse to start if any of these are missing. Generate `API_KEY_SECRET` with:
+`DATABASE_URL`, `QWED_CORS_ORIGINS`, and `API_KEY_SECRET` are **required**. Docker Compose will refuse to start if any of these are missing. The API server also refuses to start without `QWED_AUDIT_SECRET_KEY`. Generate `API_KEY_SECRET` and `QWED_AUDIT_SECRET_KEY` separately with:
 
 ```bash
 python -c "import secrets; print(secrets.token_urlsafe(48))"
 ```
 </Warning>
+
+If your `docker-compose.yml` lists the `qwed-core` environment explicitly, pass the audit key through:
+
+```yaml
+services:
+  qwed-core:
+    environment:
+      QWED_AUDIT_SECRET_KEY: ${QWED_AUDIT_SECRET_KEY:?QWED_AUDIT_SECRET_KEY is required}
+```
+
+To run the image on its own, pass the same variables to `docker run`:
+
+```bash
+docker run -p 8000:8000 \
+  -e DATABASE_URL=postgresql://qwed:your_password@db-host:5432/qwed_db \
+  -e API_KEY_SECRET=your-generated-secret \
+  -e QWED_AUDIT_SECRET_KEY=your-generated-audit-key \
+  -e QWED_CORS_ORIGINS="https://app.yourcompany.com" \
+  qwed-core:5.0.0
+```
 
 Start the stack:
 
@@ -151,6 +172,10 @@ spec:
         averageUtilization: 70
 ```
 
+<Note>
+Multi-replica audit writes are not supported. The audit logger keeps each organization's chain head in memory, so replicas sharing one database can make audit appends fail with `500 audit persistence failed`. See [Chain continuity across restarts](/advanced/compliance#chain-continuity-across-restarts).
+</Note>
+
 ---
 
 ## Manual / bare metal deployment
@@ -192,6 +217,10 @@ python -c "from qwed_new.core.database import create_db_and_tables; create_db_an
 gunicorn qwed_new.api.main:app -w 4 -k uvicorn.workers.UvicornWorker --bind 0.0.0.0:8000
 ```
 
+<Warning>
+The audit logger supports one writer per database. With `-w 4`, each worker appends audit rows independently, and a conflicting append fails with `500 audit persistence failed`. Run a single worker if you rely on the audit trail. See [Chain continuity across restarts](/advanced/compliance#chain-continuity-across-restarts).
+</Warning>
+
 ---
 
 ## Environment variables reference
@@ -206,6 +235,8 @@ gunicorn qwed_new.api.main:app -w 4 -k uvicorn.workers.UvicornWorker --bind 0.0.
 | `QWED_SKIP_ENV_INTEGRITY_CHECK` | Set to `true` to bypass startup environment integrity check | `false` | No |
 | `QWED_API_KEY_LOOKUP_SECRET` | Secret for HMAC-SHA256 API-key lookup digests. Must differ from `QWED_JWT_SECRET_KEY` | None | **Yes** |
 | `QWED_CORS_ORIGINS` | Comma-separated allowed CORS origins | None | **Yes** |
+| `QWED_AUDIT_SECRET_KEY` | HMAC key that signs the per-organization audit hash chain. The server refuses to start without it. Rotating it invalidates the signatures on existing rows, so verify and archive the trail first. See [Audit trail setup](/advanced/compliance#3-audit-trail-setup) | None (must be set) | **Yes** |
+| `QWED_ENABLE_AUDIT_SEED` | Set to `1` to enable `POST /audit/seed`, which writes sample rows into the signed audit trail. Development only. Leave unset in production | Unset (route returns `404`) | No |
 
 <Warning>
 `API_KEY_SECRET` no longer has a default value. The server will refuse to start if it is not set. This prevents accidental deployment with a weak default secret.
@@ -254,6 +285,8 @@ Before going to production, ensure the following:
 ### 3. Security
 - [ ] **Set `API_KEY_SECRET`**: This is mandatory — generate a secure value with `python -c "import secrets; print(secrets.token_urlsafe(48))"`.
 - [ ] **Set `QWED_CORS_ORIGINS`**: Explicitly list your allowed origins (e.g., `https://app.yourcompany.com`). The server will not start without this.
+- [ ] **Set `QWED_AUDIT_SECRET_KEY`**: Required. The server will not start without it. Store it in a secrets manager and don't rotate it without archiving the existing audit trail.
+- [ ] **Leave `QWED_ENABLE_AUDIT_SEED` unset**: Keeps `POST /audit/seed` disabled so sample rows never enter the production audit trail.
 - [ ] **Rotate Keys**: Change all default passwords and secrets.
 - [ ] **SSL/TLS**: Ensure the API is behind a Load Balancer with a valid SSL certificate.
 - [ ] **Network Policies**: Restrict access to database/Redis.

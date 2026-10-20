@@ -5,7 +5,45 @@ description: "Release notes for the QWED Protocol: version history, new guards, 
 
 All notable changes to the QWED platform, listed by release.
 
-Jump to: [Admin endpoint tenant scoping](#qwed-verification-—-tenant-scoped-admin-endpoints-and-working-rbac) · [`verify_fact` fails closed offline](#qwed-verification-—-verify_fact-fails-closed-offline-and-money-rejects-non-finite-amounts) · [Request caps and sandbox limits](#qwed-verification-—-request-body-caps-timeouts-and-sandbox-concurrency-limits) · [v7.2.3](#v7-2-3-—-code-secret-and-sql-verification-security-release) · [QWED-A2A runtime hardening](#qwed-a2a-—-request-size-limits-engine-budget-and-code-guard-hardening) · [QWED-Tax v0.2.1](#qwed-tax-v0-2-1-—-classification-claim-vocabulary-and-strict-facts) · [QWED-Legal v0.5.1](#qwed-legal-v0-5-1-—-deadlineguard-signing-anchor-allowlist) · [v7.2.2](#v7-2-2-—-verification-soundness-and-safety-hardening) · [Open Responses v0.6.1](#qwed-open-responses-v0-6-1-—-toolguard-verifies-client-action-items) · [QWED-Finance v3.0.1](#qwed-finance-v3-0-1-—-iso-20022-sanctions-and-queryguard-security-fixes) · [QWED-Legal date and input bounds](#qwed-legal-—-fail-closed-date-handling-and-input-bounds) · [Open Responses v0.6.0](#qwed-open-responses-v0-6-0-—-fail-closed-hardening) · [QWED-Legal fail-closed hardening](#qwed-legal-—-fail-closed-hardening-for-guards-diagnostics-and-github-action) · [`qwed init` server identity handshake](#qwed-verification-—-qwed-init-server-identity-handshake) · [Leaked key auto-revocation](#qwed-verification-—-leaked-api-key-auto-revocation-and-false-positive-feedback) · [API-key format spec](#qwed-verification-—-canonical-api-key-format-spec) · [Signed secret-scanning webhook](#qwed-verification-—-signed-secret-scanning-webhook-endpoint) · [v7.2.1](#v7-2-1-—-math-answer-comparison-security-patch) · [v7.2.0](#v7-2-0-—-precision-advisory-and-security-hardening-batch) · [v7.1.0](#v7-1-0-—-verification-context-v1-0-rollout) · [v7.0.0](#v7-0-0-—-full-diagnosticresult-engine-conformance)
+Jump to: [Signed audit chain for API rows](#qwed-verification-—-api-audit-rows-written-through-the-signed-hash-chain) · [Admin endpoint tenant scoping](#qwed-verification-—-tenant-scoped-admin-endpoints-and-working-rbac) · [`verify_fact` fails closed offline](#qwed-verification-—-verify_fact-fails-closed-offline-and-money-rejects-non-finite-amounts) · [Request caps and sandbox limits](#qwed-verification-—-request-body-caps-timeouts-and-sandbox-concurrency-limits) · [v7.2.3](#v7-2-3-—-code-secret-and-sql-verification-security-release) · [QWED-A2A runtime hardening](#qwed-a2a-—-request-size-limits-engine-budget-and-code-guard-hardening) · [QWED-Tax v0.2.1](#qwed-tax-v0-2-1-—-classification-claim-vocabulary-and-strict-facts) · [QWED-Legal v0.5.1](#qwed-legal-v0-5-1-—-deadlineguard-signing-anchor-allowlist) · [v7.2.2](#v7-2-2-—-verification-soundness-and-safety-hardening) · [Open Responses v0.6.1](#qwed-open-responses-v0-6-1-—-toolguard-verifies-client-action-items) · [QWED-Finance v3.0.1](#qwed-finance-v3-0-1-—-iso-20022-sanctions-and-queryguard-security-fixes) · [QWED-Legal date and input bounds](#qwed-legal-—-fail-closed-date-handling-and-input-bounds) · [Open Responses v0.6.0](#qwed-open-responses-v0-6-0-—-fail-closed-hardening) · [QWED-Legal fail-closed hardening](#qwed-legal-—-fail-closed-hardening-for-guards-diagnostics-and-github-action) · [`qwed init` server identity handshake](#qwed-verification-—-qwed-init-server-identity-handshake) · [Leaked key auto-revocation](#qwed-verification-—-leaked-api-key-auto-revocation-and-false-positive-feedback) · [API-key format spec](#qwed-verification-—-canonical-api-key-format-spec) · [Signed secret-scanning webhook](#qwed-verification-—-signed-secret-scanning-webhook-endpoint) · [v7.2.1](#v7-2-1-—-math-answer-comparison-security-patch) · [v7.2.0](#v7-2-0-—-precision-advisory-and-security-hardening-batch) · [v7.1.0](#v7-1-0-—-verification-context-v1-0-rollout) · [v7.0.0](#v7-0-0-—-full-diagnosticresult-engine-conformance)
+
+---
+
+## QWED Verification — API audit rows written through the signed hash chain
+
+**Unreleased** · [GitHub PR #459](https://github.com/QWED-AI/qwed-verification/pull/459)
+
+> Every `/verify/*` endpoint, the Verification Context routes, and `POST /audit/seed` now append audit rows through `AuditLogger`. New rows are HMAC-signed and hash-chained per organization, so `GET /admin/compliance/verify/{log_id}` and `verify_audit_trail` can verify them. Previously these rows were written without a hash, signature, or previous hash.
+
+<Warning>
+**Breaking change.** The API server refuses to start without `QWED_AUDIT_SECRET_KEY`. Projects onboarded with `qwed init` before this release have no audit key in `.env`.
+
+To migrate:
+
+1. Re-run `qwed init`. It adds `QWED_AUDIT_SECRET_KEY` to `.env` and keeps your existing secrets. Or generate a key and set it yourself:
+
+   ```bash
+   python -c "import secrets; print(secrets.token_urlsafe(48))"
+   ```
+
+2. Set `QWED_AUDIT_SECRET_KEY` in every environment that runs the API server (`.env`, Docker Compose, Kubernetes secret).
+3. Restart the server on this release so it loads the key. `qwed init` refuses a running server that holds a different audit key or doesn't return `audit_hmac`.
+4. Don't rotate the key afterwards. A new key invalidates the signature on every audit row already written.
+</Warning>
+
+### What changed
+
+- **Fail-closed audit writes.** If an audit append fails (key unset, a chain head that fails verification, a continuity mismatch, or a database error), the request returns `500` with `audit persistence failed` instead of a result with no audit row.
+- **Legacy rows.** Rows written before this change have no hash. `verify_log_entry` reports them as `"legacy": true` and never `"valid": true`. The first chained row after them opens a new segment with no `previous_hash`. `verify_audit_trail` lists them under `legacy_entries` and stays `"valid": false` while any are in range. Pass `start_date` to verify from the upgrade onwards.
+- **Single writer.** The audit logger keeps each organization's chain head in memory. Run one process per database. A second writer makes the next append fail with `500` rather than fork the chain.
+- **`/verify/consensus` audit rows** store the result JSON like every other endpoint.
+- **`POST /audit/seed` is off by default.** It returns `404` and writes nothing unless `QWED_ENABLE_AUDIT_SEED=1`. Seeded rows are marked `{"sample": true}` and timestamped when written.
+- **CSV export.** The `Hash Chain Valid` column is now `Chain Status`, with values `Chained` or `Legacy`. A present hash is not a verified chain.
+- **`GET /health/identity`** also returns `audit_hmac`, and returns `503` when `QWED_AUDIT_SECRET_KEY` is unset.
+
+Verification still does not detect removal of the newest entries. That needs an externally stored checkpoint of the latest hash.
+
+See [Audit trail verification](/advanced/compliance#audit-trail-verification) and [Environment variables reference](/advanced/deployment#environment-variables-reference).
 
 ---
 

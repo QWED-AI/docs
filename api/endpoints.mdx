@@ -52,7 +52,8 @@ curl http://localhost:8000/health/identity?nonce=Vh8Qm2xT-0pLw6KdYs3rZbNf_5JtAe1
 {
   "identity": {
     "jwt_hmac": "9f2c...e41a",
-    "lookup_hmac": "b07d...5c13"
+    "lookup_hmac": "b07d...5c13",
+    "audit_hmac": "4e8a...d270"
   }
 }
 ```
@@ -61,6 +62,7 @@ curl http://localhost:8000/health/identity?nonce=Vh8Qm2xT-0pLw6KdYs3rZbNf_5JtAe1
 |-------|-------------|
 | `identity.jwt_hmac` | Hex HMAC-SHA256 under `QWED_JWT_SECRET_KEY` of the message `qwed-server-identity-v1:jwt:<nonce>` |
 | `identity.lookup_hmac` | Hex HMAC-SHA256 under `QWED_API_KEY_LOOKUP_SECRET` of the message `qwed-server-identity-v1:lookup:<nonce>` |
+| `identity.audit_hmac` | Hex HMAC-SHA256 under `QWED_AUDIT_SECRET_KEY` of the message `qwed-server-identity-v1:audit:<nonce>` |
 
 To verify, compute the same HMACs with your local secrets and compare them in constant time. The secrets themselves are never returned.
 
@@ -69,7 +71,7 @@ To verify, compute the same HMACs with your local secrets and compare them in co
 | Status | Detail | Cause |
 |--------|--------|-------|
 | `400` | `nonce is required (max 128 characters)` | `nonce` is missing, empty, or longer than 128 characters |
-| `503` | `server secrets not configured` | The server has no `QWED_JWT_SECRET_KEY` or `QWED_API_KEY_LOOKUP_SECRET` set |
+| `503` | `server secrets not configured` | The server has no `QWED_JWT_SECRET_KEY`, `QWED_API_KEY_LOOKUP_SECRET`, or `QWED_AUDIT_SECRET_KEY` set |
 
 Servers released before this endpoint existed return `404`.
 
@@ -1321,6 +1323,8 @@ Before this change, every admin endpoint returned `401 Unauthorized`, even for v
 
 Export your organization's audit trail as a CSV file (`text/csv`).
 
+The `Chain Status` column reports `Chained` when a row carries a hash and `Legacy` when it was written before the API used the hash chain. `Chained` doesn't mean the row was verified. Use [`GET /admin/compliance/verify/{log_id}`](#get-admin-compliance-verify-log-id) to verify it.
+
 | Parameter | Type | Description |
 |-----------|------|-------------|
 | `organization_id` | integer (query) | Must be your own organization ID |
@@ -1347,6 +1351,7 @@ Hash matching accepts either the current canonical payload (which includes `raw_
 ```json
 {
   "valid": true,
+  "legacy": false,
   "checks": {
     "hash_valid": true,
     "signature_valid": true,
@@ -1358,9 +1363,39 @@ Hash matching accepts either the current canonical payload (which includes `raw_
 }
 ```
 
+**Legacy entries.** Rows written before the API used the hash chain have no hash or signature. For an unchained row with no chained row before it, the response sets `"legacy": true` and `"valid": false`, with all three checks `false`:
+
+```json
+{
+  "valid": false,
+  "legacy": true,
+  "checks": {
+    "hash_valid": false,
+    "signature_valid": false,
+    "chain_valid": false
+  },
+  "errors": ["Entry predates the audit chain (no hash or signature); it cannot be verified"],
+  "log_id": 7,
+  "timestamp": "2026-10-01T09:00:00+00:00"
+}
+```
+
+An unchained row after a chained row is not legacy. It fails verification. See [Legacy entries](/advanced/compliance#legacy-entries).
+
 <Note>
-`AuditLogger` requires `QWED_AUDIT_SECRET_KEY` to be set. If the key is missing or persisted chain continuity cannot be loaded, initialization raises `SecurityError` and verification endpoints fail closed.
+`AuditLogger` requires `QWED_AUDIT_SECRET_KEY` to be set, and the server refuses to start without it. If the key is missing or persisted chain continuity cannot be loaded, initialization raises `SecurityError` and verification endpoints fail closed. Every `/verify/*` endpoint, the Verification Context routes, and `POST /audit/seed` write their audit row through the signed chain. If that write fails, the request returns `500` with `audit persistence failed`.
 </Note>
+
+### POST /audit/seed
+
+Write 10 sample audit rows for your organization through the signed hash chain. Use this only in development. Each row is marked `{"sample": true}` in its result and timestamped when written.
+
+The route is disabled by default. Set `QWED_ENABLE_AUDIT_SEED=1` on the server to enable it.
+
+| Status | Description |
+|--------|-------------|
+| 404 | Sample seeding is disabled (`QWED_ENABLE_AUDIT_SEED` is not `1`). No rows are written |
+| 500 | Audit persistence failed |
 
 ### GET /admin/compliance/report/soc2/{org_id}
 
