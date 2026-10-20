@@ -33,6 +33,17 @@ qwed test    # 12 deterministic tests — all must pass before production
 - Python 3.10+
 - Optional: Redis (for caching)
 
+### Symbolic engine (optional)
+
+The Symbolic engine runs CrossHair only inside a Docker sandbox. Install the `symbolic` extra, which includes CrossHair and the `docker` client, then build the sandbox image from a qwed-verification checkout:
+
+```bash
+pip install "qwed[symbolic]"
+docker build -t qwed-crosshair-sandbox:0.0.101 docker/crosshair-sandbox
+```
+
+The image comes from `docker/crosshair-sandbox/Dockerfile` and is never pulled at runtime. To use a different tag, set `QWED_CROSSHAIR_IMAGE`. Without Docker or the image, symbolic verification returns `BLOCKED`. See [Docker sandbox requirement](/advanced/symbolic-limits#docker-sandbox-requirement).
+
 ## TypeScript SDK
 
 ```bash

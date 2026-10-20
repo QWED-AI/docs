@@ -4,7 +4,58 @@ description: "CrossHair symbolic execution limits in QWED — path explosion, de
 sidebarTitle: "Symbolic limits"
 ---
 
-> **TL;DR:** CrossHair symbolic execution has real-world limitations. QWED addresses these with bounded model checking, depth limits, and graceful fallbacks. Every result is a [`DiagnosticResult`](/advanced/diagnostics) — see the [Code engine reference](/engines/code) for the full field map.
+> **TL;DR:** CrossHair symbolic execution has real-world limitations. QWED runs CrossHair only inside a Docker sandbox and addresses its limits with bounded model checking, depth limits, and graceful fallbacks. Every result is a [`DiagnosticResult`](/advanced/diagnostics) — see the [Code engine reference](/engines/code) for the full field map.
+
+## Docker sandbox requirement
+
+CrossHair analyzes a function by importing its module, which runs the module's top-level code. QWED therefore runs CrossHair only inside a hardened Docker container. There is no host fallback.
+
+The container has no network, a read-only root filesystem, no host mounts, and all capabilities dropped. It runs as user 65534 with `no-new-privileges` and the standard sandbox memory, CPU, PID, and concurrency limits. The submitted code reaches the container through its environment and is written only to a private tmpfs, so QWED writes nothing on the host.
+
+### Prerequisites
+
+- Docker running and reachable from the QWED process
+- The `docker` Python package, installed by `qwed[symbolic]`
+- The CrossHair sandbox image, built locally
+
+```bash
+pip install "qwed[symbolic]"
+
+# From a qwed-verification checkout
+docker build -t qwed-crosshair-sandbox:0.0.101 docker/crosshair-sandbox
+```
+
+QWED never pulls the image at runtime. To use a different tag, set `QWED_CROSSHAIR_IMAGE`:
+
+```bash
+export QWED_CROSSHAIR_IMAGE=registry.internal/qwed-crosshair-sandbox:0.0.101
+```
+
+If any prerequisite is missing, `verify_code()` returns `BLOCKED` with `constraint_id = "symbolic_verifier.runtime_unavailable"`:
+
+```python
+from qwed_new.core.diagnostics import DiagnosticStatus
+
+result = verifier.verify_code(code)
+
+if (result.status is DiagnosticStatus.BLOCKED
+        and result.developer_fields["constraint_id"] == "symbolic_verifier.runtime_unavailable"):
+    print(result.agent_message)  # Docker, a sandbox slot, the image, or CrossHair is unavailable
+```
+
+Code larger than 120 KiB returns `BLOCKED` with `constraint_id = "symbolic_verifier.input_too_large"` before QWED starts a container.
+
+### How QWED reads CrossHair's outcome
+
+The analyzed code runs in the same process tree as CrossHair, so it can influence the exit code. QWED trusts an outcome only when the in-container runner confirms it:
+
+- A clean run is only ever "no counterexample found" (`UNVERIFIABLE`), never a proof.
+- An exit code of 1 is a counterexample only when CrossHair's own report line (`<file>:<line>: error: ...`) is present. An early `os._exit(1)` from the analyzed code is an engine error.
+- A `SystemExit` raised by the analyzed code while it is imported is an engine error, not a clean run.
+
+### Function addressing
+
+QWED addresses each function by its module qualname: `target.func` for top-level functions and `target.Class.method` for methods. CrossHair can't load nested functions by name, so QWED reports functions defined inside other functions as unverifiable.
 
 ## The path explosion problem
 
@@ -67,7 +118,7 @@ if (result.status is DiagnosticStatus.UNVERIFIABLE
 ### Result fields
 
 <ResponseField name="status" type="DiagnosticStatus">
-  `DiagnosticStatus.UNVERIFIABLE` for any incomplete or counterexample-producing run, or `DiagnosticStatus.BLOCKED` when verification could not be attempted at all (parse error, no functions, CrossHair missing). Read `developer_fields["constraint_id"]` for the specific reason.
+  `DiagnosticStatus.UNVERIFIABLE` for any incomplete or counterexample-producing run, or `DiagnosticStatus.BLOCKED` when verification could not be attempted at all (parse error, no functions, code too large, sandbox runtime unavailable). Read `developer_fields["constraint_id"]` for the specific reason.
 </ResponseField>
 
 <ResponseField name="is_verified" type="boolean">
@@ -85,13 +136,14 @@ if (result.status is DiagnosticStatus.UNVERIFIABLE
 <ResponseField name="developer_fields.constraint_id" type="string">
   Structured reason code. One of:
   - `symbolic_verifier.no_counterexample_found` — clean CrossHair run, still `UNVERIFIABLE` because completeness was not proven.
-  - `symbolic_verifier.counterexample_found` — CrossHair disproved a check.
+  - `symbolic_verifier.counterexample_found` — CrossHair disproved a check and printed its own report line.
   - `symbolic_verifier.timeout` — verification did not converge within `timeout_seconds`.
   - `symbolic_verifier.incomplete_coverage` — at least one function could not be checked.
   - `symbolic_verifier.no_typed_functions` — no functions carried the type hints CrossHair requires.
   - `symbolic_verifier.no_verifiable_functions` — the source contained no functions.
   - `symbolic_verifier.syntax_error` — the code could not be parsed.
-  - `symbolic_verifier.crosshair_not_available` — the CrossHair engine is not installed.
+  - `symbolic_verifier.runtime_unavailable` — the Docker sandbox could not run CrossHair (no Docker, no free sandbox slot, missing image, CrossHair missing from the image, or the `docker` package not installed).
+  - `symbolic_verifier.input_too_large` — the submitted code exceeds 120 KiB.
   - `symbolic_verifier.verification_error` — verification did not complete cleanly.
 </ResponseField>
 
@@ -151,7 +203,7 @@ assert result.developer_fields["functions_unverifiable"] == 1
 
 Mixed code that contains both typed and untyped functions also fails closed — a single skipped function is enough to keep `is_verified = False` and produce `constraint_id = "symbolic_verifier.incomplete_coverage"`. Code that contains no functions at all returns `BLOCKED` with `constraint_id = "symbolic_verifier.no_verifiable_functions"`.
 
-Pre-verification exits (`crosshair_not_available`, `syntax_error`) return the same fail-closed shape — `is_verified` is `False` and function counters are absent from `developer_fields` — so callers can rely on `constraint_id` and `agent_message` regardless of how verification ended.
+Pre-verification exits (`runtime_unavailable`, `input_too_large`, `syntax_error`) return the same fail-closed shape — `is_verified` is `False` and function counters are absent from `developer_fields` — so callers can rely on `constraint_id` and `agent_message` regardless of how verification ended.
 
 ## Configuration guide
 
@@ -252,13 +304,14 @@ if result.developer_fields.get("constraint_id") == "symbolic_verifier.bounds_tra
 | `developer_fields["constraint_id"]`               | When it applies |
 | ------------------------------------------------- | ---------------- |
 | `symbolic_verifier.no_counterexample_found`       | Every checked function ran cleanly. Still `UNVERIFIABLE` because completeness is not proven. |
-| `symbolic_verifier.counterexample_found`          | CrossHair returned at least one counterexample. |
+| `symbolic_verifier.counterexample_found`          | CrossHair reported at least one counterexample with its own report line. |
 | `symbolic_verifier.timeout`                       | At least one function timed out. |
-| `symbolic_verifier.incomplete_coverage`           | At least one function was skipped or errored. |
+| `symbolic_verifier.incomplete_coverage`           | At least one function was skipped, nested, or errored. |
 | `symbolic_verifier.no_typed_functions`            | Every discovered function was skipped (for example, all untyped). |
 | `symbolic_verifier.no_verifiable_functions`       | The source contained no functions. |
 | `symbolic_verifier.syntax_error`                  | The submitted code could not be parsed. |
-| `symbolic_verifier.crosshair_not_available`       | The CrossHair engine is not installed. |
+| `symbolic_verifier.runtime_unavailable`           | `BLOCKED`. Docker, a free sandbox slot, the sandbox image, CrossHair in the image, or the `docker` package is missing. |
+| `symbolic_verifier.input_too_large`               | `BLOCKED`. The submitted code exceeds 120 KiB. |
 
 ### Typed function — no counterexample found
 

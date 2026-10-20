@@ -218,6 +218,7 @@ gunicorn qwed_new.api.main:app -w 4 -k uvicorn.workers.UvicornWorker --bind 0.0.
 | `SIMILARITY_THRESHOLD` | Prompt injection detection threshold | 0.6 |
 | `DOCKER_TIMEOUT` | Code execution timeout (seconds) | 10 |
 | `DOCKER_MEMORY_LIMIT` | Container memory limit | 512m |
+| `QWED_CROSSHAIR_IMAGE` | Local Docker image the Symbolic engine runs CrossHair in. Build it from `docker/crosshair-sandbox/Dockerfile`. QWED never pulls it at runtime | `qwed-crosshair-sandbox:0.0.101` |
 | `QWED_SKIP_ENV_INTEGRITY_CHECK` | Skip `.pth` file verification on startup | `false` |
 
 ### AI providers
