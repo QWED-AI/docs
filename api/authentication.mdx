@@ -16,6 +16,8 @@ All requests require an API key, except `GET /health` and `GET /health/identity`
 curl -H "X-API-Key: qwed_your_key" https://api.qwedai.com/v1/health
 ```
 
+A key authenticates only while it is live: active, not revoked, and not past its expiry time. Since v7.3.0, QWED rejects expired and revoked keys on every authenticated path, including `/verify/*`, admin, and metrics routes, with `401 Unauthorized` or `403 Forbidden`. Keys issued by rotation expire after 90 days. Rotate a key before it expires.
+
 ### SDK authentication
 
 ```python
@@ -141,7 +143,7 @@ As of v7.2, QWED stores API keys as HMAC-SHA256 lookup digests keyed by a dedica
 **Breaking change.** There is no legacy fallback: API keys issued before v7.2 no longer authenticate and return `401 Unauthorized`. Each key must be re-issued once. The old raw key is never required:
 
 - **Portal or API:** sign in with your email and password to get a JWT, then call `POST /auth/api-keys` to mint a new key. This path needs no API key.
-- **Rotation by key ID:** call [`POST /admin/keys/rotate`](/api/endpoints#post-admin-keys-rotate) with the key's ID, authenticated with an already-working key in the same organization. Members can rotate only their own keys. Owners and admins can also rotate other users' keys, unless the key owner holds a higher role. Revoked or inactive keys can't be rotated.
+- **Rotation by key ID:** call [`POST /admin/keys/rotate`](/api/endpoints#post-admin-keys-rotate) with the key's ID, authenticated with an already-working key in the same organization. Members can rotate only their own keys. Owners and admins can also rotate other users' keys, unless the key owner holds a higher role. Revoked or inactive keys can't be rotated. Rotation is atomic: it mints at most one replacement key, even when several rotations of the same key run concurrently. Rotating a key that is already inactive mints nothing and returns `404 Not Found`.
 
 ```bash
 # Before (pre-v7.2 key): now rejected

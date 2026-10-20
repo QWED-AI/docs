@@ -209,6 +209,25 @@ print(result.status)         # "UNSAT"
 
 This field also appears in error responses, which helps you debug provider-related issues without inspecting server logs.
 
+### Categorical string constants fail closed
+
+The natural-language bridge rejects string literals such as `tier == 'gold'`. The solver has no string type, so QWED can't soundly model categorical string constants. A constraint that contains one returns `UNVERIFIABLE` (or an error) instead of a verdict. Floating-point literals are rejected the same way.
+
+Encode categories as explicit integers instead:
+
+```python
+# Fails closed: string constants are rejected
+result = client.verify_logic("tier == 'gold' and tier == 'silver'")
+
+# Encode categories as integers (gold = 1, silver = 2)
+result = client.verify_logic("(AND (EQ tier 1) (EQ tier 2))")
+print(result.status)  # "UNSAT"
+```
+
+<Note>
+Before v7.3.0, the bridge turned each string into a free integer variable, so contradictory categorical claims could come back satisfiable. See [GHSA-g25v-44j8-gg7x](https://github.com/QWED-AI/qwed-verification/security/advisories/GHSA-g25v-44j8-gg7x).
+</Note>
+
 ---
 
 ## Error handling
