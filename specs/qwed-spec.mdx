@@ -505,14 +505,15 @@ QWED-Logic is an S-expression based Domain Specific Language for expressing logi
 
 program     = expression ;
 expression  = atom | list ;
-list        = "(" operator { expression } ")" ;
+list        = "(" operator { expression } ")" | quantified ;
+quantified  = "(" quantifier_op variable expression ")" ;  (* binder is a plain variable name *)
 atom        = variable | number | boolean | string ;
 
 (* Operators *)
 operator    = logic_op | comparison_op | arithmetic_op | quantifier_op | special_op ;
 
 logic_op      = "AND" | "OR" | "NOT" | "IMPLIES" | "IFF" | "XOR" ;
-comparison_op = "EQ" | "NE" | "GT" | "GE" | "LT" | "LE" ;
+comparison_op = "EQ" | "NEQ" | "GT" | "GTE" | "LT" | "LTE" ;
 arithmetic_op = "PLUS" | "MINUS" | "MULT" | "DIV" | "MOD" | "POW" | "ABS" | "NEG" ;
 quantifier_op = "FORALL" | "EXISTS" ;
 special_op    = "IF" | "LET" | "MATCH" ;
@@ -522,7 +523,7 @@ variable    = letter { letter | digit | "_" } ;
 number      = integer | float ;
 integer     = [ "-" ] digit { digit } ;
 float       = [ "-" ] digit { digit } "." digit { digit } ;
-boolean     = "true" | "false" ;
+boolean     = "True" | "False" ;
 string      = '"' { character } '"' ;
 
 (* Terminals *)
@@ -541,7 +542,7 @@ character   = ? any printable character except '"' ? ;
 | `OR` | 2+ | Logical disjunction | `(OR p q)` |
 | `NOT` | 1 | Logical negation | `(NOT p)` |
 | `IMPLIES` | 2 | Implication | `(IMPLIES p q)` |
-| `IFF` | 2 | If and only if | `(IFF p q)` |
+| `IFF` | 2 | If and only if. Operands must be Boolean. | `(IFF p q)` |
 | `XOR` | 2 | Exclusive or | `(XOR p q)` |
 
 #### 7.3.2 Comparison operators
@@ -549,11 +550,11 @@ character   = ? any printable character except '"' ? ;
 | Operator | Arity | Description | Example |
 |----------|-------|-------------|---------|
 | `EQ` | 2 | Equal | `(EQ x 5)` |
-| `NE` | 2 | Not equal | `(NE x 0)` |
+| `NEQ` | 2 | Not equal | `(NEQ x 0)` |
 | `GT` | 2 | Greater than | `(GT x 5)` |
-| `GE` | 2 | Greater or equal | `(GE x 5)` |
+| `GTE` | 2 | Greater or equal | `(GTE x 5)` |
 | `LT` | 2 | Less than | `(LT x 10)` |
-| `LE` | 2 | Less or equal | `(LE x 10)` |
+| `LTE` | 2 | Less or equal | `(LTE x 10)` |
 
 #### 7.3.3 Arithmetic operators
 
@@ -575,6 +576,17 @@ character   = ? any printable character except '"' ? ;
 | `FORALL` | 2 | Universal quantifier | `(FORALL x (GT x 0))` |
 | `EXISTS` | 2 | Existential quantifier | `(EXISTS x (EQ x 5))` |
 
+The first argument of a quantifier MUST be a plain variable name. Implementations MUST reject any other binder, such as a list `(x)`, a number, an operator name, or a Boolean literal. The bound variable takes its declared sort, or `Int` if undeclared, and is scoped to the body. A free variable with the same name is unaffected. The body MUST be Boolean. A solver `unknown` result MUST NOT be reported as verified.
+
+#### 7.3.5 Type rules
+
+Implementations MUST NOT coerce Booleans to numbers:
+
+- `EQ`/`NEQ` between a Boolean and a non-Boolean operand is a compile error.
+- `GT`, `LT`, `GTE`, `LTE`, and all arithmetic operators reject Boolean operands.
+- `IFF` operands MUST be Boolean.
+- An undeclared variable compared with `True` or `False` is a compile error. It MUST be declared `(VAR name Bool)`.
+
 ### 7.4 Examples
 
 #### Simple constraint
@@ -595,17 +607,16 @@ character   = ? any printable character except '"' ? ;
 ```lisp
 (IMPLIES
   (EQ category "electronics")
-  (GE tax_rate 0.18))
+  (GTE tax_rate 0.18))
 ; IF category = "electronics" THEN tax_rate >= 18%
 ```
 
 ### 7.5 Variable declaration
 
-Variables are automatically inferred from usage. The default type is `Real`. Explicit type declarations:
+An undeclared variable is an `Int`. Declare `Real` or `Bool` variables explicitly with `VAR`:
 
 ```lisp
-(LET ((x Int) (y Real) (p Bool))
-  (AND (GT x 0) (NOT p)))
+(VAR p Bool)
 ```
 
 ### 7.6 Security

@@ -272,6 +272,7 @@ SECURITY BLOCK: Unknown operator 'CHECK_IF_VALID'
 |---------|-------------|
 | AND, OR, NOT | CHECK, VALIDATE |
 | GT, LT, EQ | GREATER, LESS |
+| NEQ, GTE, LTE, MULT | NE, GE, LE, MUL |
 | IMPLIES, IFF | IF, THEN |
 | FORALL, EXISTS | ALL, ANY |
 
@@ -281,6 +282,40 @@ SECURITY BLOCK: Unknown operator 'CHECK_IF_VALID'
 
 # Correct
 "(GT x 0)"
+```
+
+### Invalid quantifier binder
+
+```
+Operator 'FORALL' must bind a variable name, got: ['x']
+```
+
+The result status is `BLOCKED`.
+
+`FORALL` and `EXISTS` take a single plain variable name as the binder. A list such as `(x)`, a number, an operator name, or `True`/`False` is blocked.
+
+```python
+# Wrong
+"(FORALL (x) (GT x 0))"
+
+# Correct
+"(FORALL x (GT x 0))"
+```
+
+### Boolean compared with a non-Boolean value
+
+```
+EQ compares a Boolean literal with a non-Boolean value: flag vs True. Declare Boolean variables with (VAR name Bool).
+```
+
+The result status is `ERROR`. An undeclared variable is an `Int`, and QWED does not coerce `True` to `1`. **Solution:** Declare the variable as `Bool`, or compare numbers with numbers. Ordering comparisons (`GT`, `LT`, `GTE`, `LTE`) and arithmetic also reject Boolean operands, and `IFF` requires Boolean operands.
+
+```python
+# Wrong: flag is undeclared, so it is an Int
+"(EQ flag True)"
+
+# Correct: declare flag as Bool
+verifier.verify_from_dsl("(EQ flag True)", variables=[{"name": "flag", "type": "Bool"}])
 ```
 
 ### Missing parentheses
