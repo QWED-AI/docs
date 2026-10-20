@@ -45,17 +45,35 @@ QWED uses a secure S-expression DSL for logic expressions.
 
 ### Operators
 
-| Category        | Operators                           | Example               |
-| --------------- | ----------------------------------- | --------------------- |
-| **Logic**       | AND, OR, NOT                        | `(AND a b)`           |
-| **Comparison**  | GT, LT, EQ, NE, GE, LE, GTE, LTE, NEQ | `(GT x 5)`        |
-| **Implication** | IMPLIES, IFF                        | `(IMPLIES a b)`       |
-| **Quantifiers** | FORALL, EXISTS                      | `(FORALL x (GT x 0))` |
-| **Arithmetic**  | PLUS, MINUS, MUL, MULT, DIV, MOD, POW | `(PLUS x y)`       |
+| Category        | Operators                       | Example               |
+| --------------- | ------------------------------- | --------------------- |
+| **Logic**       | AND, OR, NOT, XOR               | `(AND a b)`           |
+| **Comparison**  | EQ, NEQ, GT, LT, GTE, LTE       | `(GT x 5)`            |
+| **Implication** | IMPLIES, IFF                    | `(IMPLIES a b)`       |
+| **Quantifiers** | FORALL, EXISTS                  | `(FORALL x (GT x 0))` |
+| **Arithmetic**  | PLUS, MINUS, MULT, DIV, MOD, POW | `(PLUS x y)`         |
+| **Declaration** | VAR                             | `(VAR flag Bool)`     |
 
-<Tip>
-Comparison and arithmetic operators accept multiple aliases for convenience. For example, `GTE` and `GE` both mean "greater than or equal to", `NEQ` and `NE` both mean "not equal", and `MUL` and `MULT` both mean multiplication.
-</Tip>
+<Warning>
+The parser accepts only the operator names in this table. Aliases such as `NE`, `GE`, `LE`, and `MUL` are not on the whitelist, so the engine returns `BLOCKED` with `Unknown operator`. Use `NEQ`, `GTE`, `LTE`, and `MULT`.
+</Warning>
+
+### Type rules
+
+Every variable has a sort: `Int`, `Real`, or `Bool`. An undeclared variable is an `Int`. Declare other sorts with `(VAR name Bool)`, or pass `variables=[{"name": "flag", "type": "Bool"}]` to the verifier.
+
+The compiler rejects mixed Boolean and numeric operands instead of coercing `True` to `1`. A rejected program returns `ERROR`, never `SAT` or `VERIFIED`.
+
+| Rule | Valid | Rejected (`ERROR`) |
+| ---- | ----- | ------------------ |
+| `EQ`/`NEQ` compare two Booleans or two numbers | `(EQ (GT x 5) True)` | `(EQ x True)` with `x` an `Int` |
+| An undeclared name compared with `True`/`False` must be declared `Bool` | `(EQ flag True)` with `flag` declared `Bool` | `(EQ flag True)` with `flag` undeclared |
+| `GT`/`LT`/`GTE`/`LTE` take numeric operands only | `(GTE x 2)` | `(GT flag 0)` with `flag` a `Bool` |
+| `PLUS`/`MINUS`/`MULT`/`DIV`/`POW`/`MOD` take numeric operands only | `(EQ (PLUS x 1) 2)` | `(EQ x (PLUS True 0))` |
+| `IFF` takes Boolean operands: comparisons, `Bool` variables, or `True`/`False` | `(IFF (GT x 1) (GTE x 2))` | `(IFF x y)` with `x`, `y` as `Int` |
+| A `FORALL`/`EXISTS` body must be Boolean | `(FORALL x (GTE (MULT x x) 0))` | `(FORALL x (PLUS x 1))` |
+
+For an undeclared name compared with a Boolean literal, the error tells you to add `(VAR name Bool)`. QWED does not infer the sort from the literal, because that would hide a translation that forgot the declaration.
 
 ### Examples
 
@@ -67,10 +85,10 @@ Comparison and arithmetic operators accept multiple aliases for convenience. For
 "(AND (GT x 5) (LT y 10))"      # x > 5 AND y < 10
 
 # Implication
-"(IMPLIES (GT age 18) adult)"   # age > 18 implies adult
+"(IMPLIES (GT age 18) adult)"   # age > 18 implies adult (adult declared Bool)
 
 # Nested logic
-"(AND (OR a b) (NOT c))"        # (a OR b) AND NOT c
+"(AND (OR a b) (NOT c))"        # (a OR b) AND NOT c (a, b, c declared Bool)
 ```
 
 ---
@@ -113,6 +131,8 @@ while solver.check() == sat:
 
 ## Business rules
 
+These rules compare flags such as `has_id` with `True`. Declare each flag as `Bool`, or the compiler returns `ERROR` (see [Type rules](#type-rules)).
+
 ### Age verification
 
 ```python
@@ -122,6 +142,7 @@ rule = """
     (EQ can_purchase True)
 )
 """
+# Declare has_id and can_purchase as Bool
 result = client.verify_logic(rule)
 ```
 
@@ -134,6 +155,7 @@ rule = """
     (IMPLIES (AND (EQ member True) (GT total 50)) (EQ discount 15))
 )
 """
+# Declare member as Bool
 result = client.verify_logic(rule)
 ```
 
@@ -147,6 +169,7 @@ rule = """
          (GTE approvers 2))
 )
 """
+# Declare requires_approval as Bool
 result = client.verify_logic(rule)
 ```
 
@@ -154,22 +177,51 @@ result = client.verify_logic(rule)
 
 ## Quantifiers
 
+`FORALL` and `EXISTS` take exactly two arguments: a binder and a body.
+
+```lisp
+(FORALL x body)
+(EXISTS x body)
+```
+
+- **Binder.** The first argument is a single plain variable name. The parser returns `BLOCKED` for any other binder, such as a number, an operator name, `True`/`False`, a list like `(x)`, or an expression.
+- **Sort.** The bound variable takes its declared sort. If it isn't declared, it is an `Int`.
+- **Scope.** The binding applies inside the body only. A free variable with the same name outside the quantifier is a separate variable.
+- **Body.** The body must be Boolean, such as a comparison or a logical expression. A numeric body returns `ERROR`.
+- **Solver limits.** Quantified formulas can be hard for Z3. If Z3 returns `unknown`, for example on a timeout, the result is `UNKNOWN`. The `/verify/logic` endpoint reports it as `BLOCKED`, never as verified.
+
+To quantify over a collection, quantify over a numeric variable and state the property with arithmetic and comparisons. The DSL has no uninterpreted functions, so a form like `(quantity item)` returns `BLOCKED` with `Unknown operator`.
+
 ### Universal (FORALL)
 
 ```python
-# All items must have positive quantity
-result = client.verify_logic(
-    "(FORALL item (GT (quantity item) 0))"
-)
+# Every number greater than 5 is also greater than 3
+result = client.verify_logic("(FORALL n (IMPLIES (GT n 5) (GT n 3)))")
+print(result.status)  # "SAT"
+
+# Not every integer is positive
+result = client.verify_logic("(FORALL x (GT x 0))")
+print(result.status)  # "UNSAT"
 ```
 
 ### Existential (EXISTS)
 
 ```python
-# At least one item must be in stock
-result = client.verify_logic(
-    "(EXISTS item (GT (stock item) 0))"
-)
+# Some integer lies strictly between 0 and 10
+result = client.verify_logic("(EXISTS x (AND (GT x 0) (LT x 10)))")
+print(result.status)  # "SAT"
+
+# No integer lies strictly between 0 and 1 (x is an Int by default)
+result = client.verify_logic("(EXISTS x (AND (GT x 0) (LT x 1)))")
+print(result.status)  # "UNSAT"
+```
+
+### Bound and free variables
+
+```python
+# The quantified x and the free x are different variables
+result = client.verify_logic("(AND (FORALL x (GTE (MULT x x) 0)) (EQ x 3))")
+print(result.status)  # "SAT", with x = 3 in the model
 ```
 
 ---
@@ -208,6 +260,28 @@ print(result.status)         # "UNSAT"
 ```
 
 This field also appears in error responses, which helps you debug provider-related issues without inspecting server logs.
+
+### Python-style constraints
+
+QWED also converts Python-style constraints from a structured logic task into DSL. It maps each operator to its whitelisted DSL name:
+
+| Constraint | DSL operator |
+| ---------- | ------------ |
+| `==`, `!=` | `EQ`, `NEQ` |
+| `>`, `<`, `>=`, `<=` | `GT`, `LT`, `GTE`, `LTE` |
+| `+`, `-`, `*`, `/`, `%`, `**` | `PLUS`, `MINUS`, `MULT`, `DIV`, `MOD`, `POW` |
+
+Constraints such as `x >= 5` or `x * 2 <= 10` compile and return `SAT` or `UNSAT`. Earlier releases emitted `GE`, `LE`, `NE`, and `MUL`, so these constraints came back `BLOCKED`.
+
+You can join conditions with infix `and`/`or`/`not` in any case, or with the call forms `And(...)` and `Or(...)`:
+
+```python
+"x > 1 and x < 3"        # (AND (GT x 1) (LT x 3))
+"(x > 1) AND (x < 3)"    # infix, parenthesized operands
+"And(x > 1, x < 3)"      # call form
+```
+
+Unknown operators, unsupported Python syntax, and solver errors still fail closed.
 
 ---
 
