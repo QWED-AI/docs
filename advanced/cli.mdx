@@ -53,19 +53,19 @@ $ qwed init
   [ok] SQLGlot  sql engine ready
 
 Running verification suite...
-  [ok] 2+2=5                     -> BLOCKED
-  [ok] x>5 AND x<3              -> UNSAT
-  [ok] SELECT * FROM users ...   -> BLOCKED
-  [ok] os.system(...)            -> BLOCKED
+  [ok] 2+2=5                    -> VERIFIED (false) | DENY
+  [ok] x>5 AND x<3              -> UNVERIFIABLE | DENY
+  [ok] SELECT * WHERE 1=1       -> VERIFIED (unsafe) | DENY
+  [ok] eval(user_input)         -> VERIFIED (unsafe) | DENY
 
-All engines verified. QWED is operational.
+All engines ready.
 
 -----------------------------------------
 Step 1/3: LLM Provider Setup
 -----------------------------------------
 QWED uses an LLM for natural language translation.
 The LLM is treated as an untrusted translator.
-All outputs are verified deterministically.
+Its outputs are checked by deterministic engines before use.
 
 Select provider:
   1. NVIDIA NIM
@@ -335,27 +335,29 @@ $ qwed test
 [QWED] Running verification test suite...
 
 Math:
-  [ok] 2+2=4                  -> VALID
-  [ok] 2+2=5                  -> BLOCKED
-  [ok] 997*997-3*997+2        -> 994010994 (verified)
+  [ok] 2+2=4                  -> VERIFIED | ADMIT
+  [ok] 2+2=5                  -> VERIFIED (false) | DENY
+  [ok] 997*998*999            -> VERIFIED (994010994) | ADMIT
 
 Logic:
-  [ok] x>5 AND x<3            -> UNSAT (contradiction)
-  [ok] x>3 AND x<10           -> SAT {x=4}
-  [ok] approval=1 AND approval=0 -> UNSAT (contradiction)
+  [ok] x>5 AND x<3            -> UNVERIFIABLE (contradiction) | DENY
+  [ok] x>3 AND x<10           -> VERIFIED (x=4) | ADMIT
+  [ok] approval=1 AND approval=0 -> UNVERIFIABLE (contradiction) | DENY
 
 SQL:
-  [ok] Valid SELECT            -> SAFE
-  [ok] OR 1=1 injection       -> BLOCKED
-  [ok] DROP TABLE stacked     -> BLOCKED
+  [ok] Valid SELECT            -> VERIFIED (safe) | ADMIT
+  [ok] OR 1=1 injection       -> VERIFIED (unsafe) | DENY
+  [ok] DROP TABLE stacked     -> VERIFIED (unsafe) | DENY
 
 Code:
-  [ok] Safe function           -> SAFE
-  [ok] eval(input)             -> BLOCKED (CRITICAL)
-  [ok] curl | bash             -> BLOCKED (CRITICAL)
+  [ok] Safe function           -> VERIFIED (safe) | ADMIT
+  [ok] eval(input)             -> VERIFIED (unsafe, critical) | DENY
+  [ok] curl | bash             -> VERIFIED (unsafe, critical) | DENY
 
-12/12 tests passed. All engines operational.
+12/12 tests passed. All engines ready.
 ```
+
+Each line prints the verdict together with its admission decision, so `VERIFIED` never appears alone. `VERIFIED` means the engine decided the claim, not that the claim is safe to use. A claim proven false, such as `2+2=5`, is `VERIFIED (false) | DENY`. A test case whose self-check fails prints `FAILED` instead of a verdict, and an engine that raises prints `ERROR`.
 
 #### Verbose mode
 
@@ -367,9 +369,9 @@ qwed test --verbose
 
 ```
 Math:
-  [ok] 2+2=4                  -> VALID
+  [ok] 2+2=4                  -> VERIFIED | ADMIT
     computed=4
-  [ok] 2+2=5                  -> BLOCKED
+  [ok] 2+2=5                  -> VERIFIED (false) | DENY
     computed=4
 ```
 
