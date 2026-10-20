@@ -108,6 +108,8 @@ Richer distinctions (ambiguity, insufficient evidence, non-convergence, provider
 **No `HEURISTIC`, `AMBIGUOUS`, or `CORRECTION_NEEDED` statuses.** Ambiguity IS unverifiability — the distinction is structured in `constraint_id`, not in the status string.
 </Warning>
 
+**Proven false is `VERIFIED`.** A claim the engine disproves (for example the math claim `2+2=5`) is a decided verdict. It is `VERIFIED` with `developer_fields.is_valid: false`, carries a `proof_ref`, and admission is `BLOCKED` (`DENY`). `UNVERIFIABLE` means the engine could neither prove nor disprove the claim. The math `VerificationEngine` no longer emits the legacy `CORRECTION_NEEDED` status. It returns `DISPROVEN` for a decided mismatch.
+
 ## Key invariants
 
 ### VERIFIED requires proof
@@ -188,7 +190,19 @@ result = DiagnosticResult.blocked(
     },
 )
 # result.proof_ref = None
+
+# VERIFIED, proven false — a counter-proof
+result = DiagnosticResult.disproven(
+    agent_message="Claimed value is proven false",
+    developer_fields={"calculated_value": 4, "claimed_value": 5},
+    evidence={"expression": "2+2", "calculated_value": 4, "claimed_value": 5},
+)
+# result.status = VERIFIED
+# result.developer_fields["is_valid"] = False
+# result.is_authoritative = True
 ```
+
+`disproven()` builds a `VERIFIED` result and forces `developer_fields.is_valid` to `False`, so `admission_decision()` returns `BLOCKED`.
 
 ### Advisory checks
 
@@ -213,13 +227,17 @@ result = DiagnosticResult.unverifiable(
 ### Downstream gate
 
 ```python
+from src.qwed_new.core.diagnostics import AdmissionDecision, admission_decision
+
 def release_gate(result: DiagnosticResult) -> bool:
-    """Mechanical authority check — proof_ref presence decides."""
-    if not result.is_authoritative:
+    """Admit only proven-valid results."""
+    if admission_decision(result) is not AdmissionDecision.ADMIT:
         log_block(result.constraint_id, result.agent_message)
         return False
     return True
 ```
+
+Don't gate on `is_authoritative` alone. A proven-false or proven-unsafe result is authoritative too, because it carries a counter-proof.
 
 ### Serialization
 
@@ -238,7 +256,7 @@ result = DiagnosticResult.from_dict(d)
 
 ```python
 # Legacy engine returns dict
-legacy = {"is_correct": False, "status": "CORRECTION_NEEDED", "calculated_value": 3}
+legacy = {"is_correct": False, "status": "INCONCLUSIVE", "calculated_value": 3}
 
 # Migrate
 result = DiagnosticResult.from_legacy_dict(legacy, engine="math")
@@ -246,7 +264,7 @@ result = DiagnosticResult.from_legacy_dict(legacy, engine="math")
 ```
 
 <Warning>
-`from_legacy_dict` **raises** for legacy `VERIFIED` results — proof artifacts were discarded by pre-v5.2.0 engines, so backfilling is impossible. Use `DiagnosticResult.verified()` with explicit evidence for true verified results.
+`from_legacy_dict` **raises** for legacy `VERIFIED` and `DISPROVEN` results. Both are decided verdicts that need a `proof_ref`, and the legacy dict doesn't carry the proof artifacts. Use `DiagnosticResult.verified()` or `DiagnosticResult.disproven()` with explicit evidence instead.
 </Warning>
 
 ## API reference
@@ -282,6 +300,7 @@ class DiagnosticStatus(str, Enum):
 | `to_dict()` | Serialize to JSON-safe dict |
 | `from_dict(data)` | Deserialize from dict |
 | `verified(agent_message, developer_fields, evidence)` | Construct VERIFIED with computed proof_ref |
+| `disproven(agent_message, developer_fields, evidence)` | Construct VERIFIED for a claim proven false, with `is_valid` forced to `False` |
 | `unverifiable(agent_message, developer_fields)` | Construct UNVERIFIABLE |
 | `blocked(agent_message, developer_fields)` | Construct BLOCKED |
 | `from_legacy_dict(data, engine)` | Migrate ad-hoc engine dict |
