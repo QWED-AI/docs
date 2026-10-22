@@ -43,6 +43,10 @@ print(agent["agent_id"])     # agent_abc123
 print(agent["agent_token"])  # qwed_agent_xyz...
 ```
 
+<Warning>
+The `agent_token` is shown only once. QWED stores an HMAC-SHA256 digest of it, keyed with `QWED_API_KEY_LOOKUP_SECRET`, so it can't be retrieved later. To replace a lost or exposed token, call [`POST /agents/{agent_id}/token/reissue`](/api/endpoints#post-agents-agent-id-token-reissue). The old token stops working.
+</Warning>
+
 ## Verifying actions
 
 Before an agent executes an action, you must provide an `ActionContext` with a `conversation_id` and a monotonically increasing `step_number`. These fields are **required** — requests without them are rejected.
