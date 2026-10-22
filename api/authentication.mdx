@@ -206,6 +206,18 @@ curl -X POST https://api.qwedai.com/v1/agents/42/verify \
   -d '{"query": "What is 2+2?"}'
 ```
 
+### Agent token storage
+
+QWED stores each agent token as an HMAC-SHA256 digest keyed with `QWED_API_KEY_LOOKUP_SECRET`, not as plain text. The token is shown only once, in the response to registration or re-issue. Store it when you receive it.
+
+Tokens issued before this change keep working. At startup, after its fail-closed checks, the server hashes any agent token still stored in plain text, in place. You don't need to re-register agents.
+
+To replace a token, for example one whose plain text might remain in a database backup, call [`POST /agents/{agent_id}/token/reissue`](/api/endpoints#post-agents-agent-id-token-reissue). QWED returns a new token and the old one stops working.
+
+<Warning>
+Agent token digests depend on `QWED_API_KEY_LOOKUP_SECRET`. Changing the secret invalidates every agent token as well as every API key. Re-issue agent tokens after changing it.
+</Warning>
+
 ## Scopes
 
 API keys can have restricted scopes:
@@ -275,9 +287,29 @@ Get the current authenticated user's information. Requires a `Bearer` token in t
 curl -H "Authorization: Bearer eyJhbG..." https://api.qwedai.com/v1/auth/me
 ```
 
+### Roles on API-key and audit routes
+
+The `/auth/api-keys` and `/audit` routes authorize by the signed-in user's role. Roles rank from lowest to highest: `viewer`, `member`, `admin`, `owner`.
+
+| Route | `viewer` | `member` | `admin` | `owner` |
+|-------|----------|----------|---------|---------|
+| `POST /auth/api-keys` | No | Yes | Yes | Yes |
+| `GET /auth/api-keys` | Own keys | Own keys | All keys in the organization | All keys in the organization |
+| `DELETE /auth/api-keys/{key_id}` | Own keys | Own keys | Own keys, plus keys of users who don't rank higher | Any key in the organization |
+| `GET /audit/logs` | Yes | Yes | Yes | Yes |
+| `GET /audit/logs/{log_id}` | Yes | Yes | Yes | Yes |
+| `GET /audit/export` | No | No | Yes | Yes |
+| `POST /audit/seed` | No | No | Yes | Yes |
+
+Before QWED checks the role, it checks the user and organization. QWED returns `403 Forbidden` when:
+
+- The user is inactive (`"User is not active"`).
+- The user's organization is inactive or missing (`"Organization is not active"`).
+- The user's role isn't allowed on the route, including any role not listed above (`"Insufficient permissions for this operation"`).
+
 ### POST /auth/api-keys
 
-Generate a new API key for the current user's organization. Requires JWT authentication.
+Generate a new API key for the current user's organization. Requires JWT authentication and the `member`, `admin`, or `owner` role. A `viewer` gets `403 Forbidden`.
 
 **Request:**
 
@@ -302,15 +334,26 @@ Generate a new API key for the current user's organization. Requires JWT authent
 
 ### GET /auth/api-keys
 
-List all active API keys for the current user's organization.
+List active API keys. Admins and owners see every active key in their organization. Members and viewers see only their own keys.
 
 ### DELETE /auth/api-keys/{key_id}
 
 Revoke an API key. Performs a soft delete.
 
+- Any role can revoke its own key.
+- An `admin` can revoke another user's key unless that user holds a higher role. Revoking an owner's key returns `403 Forbidden`.
+- An `owner` can revoke any key in the organization.
+- A `member` or `viewer` gets `404 Not Found` for a key they don't own, so the response doesn't confirm that the key exists.
+- A key ID that isn't a positive integer, or that belongs to another organization, returns `404 Not Found`.
+
+```bash
+curl -X DELETE https://api.qwedai.com/v1/auth/api-keys/12 \
+  -H "Authorization: Bearer eyJhbG..."
+```
+
 ## Audit endpoints
 
-These endpoints require JWT authentication (Bearer token) and return data scoped to the authenticated user's organization.
+These endpoints require JWT authentication (Bearer token) and return data scoped to the authenticated user's organization. Every role can read the log. Exporting it and seeding samples need `admin` or `owner`. See [Roles on API-key and audit routes](#roles-on-api-key-and-audit-routes).
 
 ### GET /audit/logs
 
@@ -323,9 +366,9 @@ Get audit logs for the current organization.
 
 ### GET /audit/logs/{log_id}
 
-Get detailed information for a single audit log entry.
+Get detailed information for a single audit log entry. Returns `404 Not Found` if the log doesn't exist in your organization.
 
 ### GET /audit/export
 
-Export audit logs as a CSV file (up to 1,000 records).
+Export audit logs as a CSV file (up to 1,000 records). Requires the `admin` or `owner` role.
 
