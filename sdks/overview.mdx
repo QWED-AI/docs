@@ -56,25 +56,25 @@ cargo add qwed
   </Tab>
   <Tab title="TypeScript">
     ```typescript
-    import { QWEDClient } from '@qwed-ai/sdk';
+    import { QWEDClient, isAdmitted } from '@qwed-ai/sdk';
     
     const client = new QWEDClient({ apiKey: 'qwed_...' });
-    const result = await client.verify('2+2=4');
-    console.log(result.verified);  // true
+    const result = await client.verifyMath('2+2=4');
+    console.log(isAdmitted(result));  // true
     ```
   </Tab>
   <Tab title="Go">
     ```go
     client := qwed.NewClient("qwed_...")
-    result, _ := client.Verify(ctx, "2+2=4")
-    fmt.Println(result.Verified)  // true
+    result, _ := client.VerifyMath(ctx, "2+2=4")
+    fmt.Println(result.IsAdmitted())  // true
     ```
   </Tab>
   <Tab title="Rust">
     ```rust
     let client = QWEDClient::new("qwed_...");
-    let result = client.verify("2+2=4").await?;
-    println!("{}", result.verified);  // true
+    let result = client.verify_math("2+2=4").await?;
+    println!("{}", result.is_admitted());  // true
     ```
   </Tab>
 </Tabs>
