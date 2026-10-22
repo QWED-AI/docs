@@ -1364,7 +1364,19 @@ Hash matching accepts either the current canonical payload (which includes `raw_
 
 ### GET /admin/compliance/report/soc2/{org_id}
 
-Generate a SOC 2 Type II compliance report for your organization. `org_id` must be your own organization ID. Another organization's ID returns `403 Forbidden`.
+Return a security activity summary for your organization over the last 90 days. `org_id` must be your own organization ID. Another organization's ID returns `403 Forbidden`.
+
+QWED computes every value from its own records. The response has `report_type` `"Security activity summary"`, `report_version` `"2.0"`, and a `disclaimer` stating that it is not a SOC 2 report or an auditor's attestation. The path keeps `soc2` for compatibility.
+
+- `metrics` counts verifications, security events (`security_events_by_type` groups them by recorded event type), active users, and active API keys.
+- `audit_trail` checks the signature and hash chain of every audit entry in the period. `status` is `VERIFIED` (with `evidence` and a `sha256:` `proof_ref`), `NO_ENTRIES`, or `NOT_VERIFIED`. The check fails closed: any failed or legacy entry, or a check that can't run (for example, `QWED_AUDIT_SECRET_KEY` unset), returns `NOT_VERIFIED`.
+
+```bash
+curl --fail-with-body -H "X-API-Key: qwed_live_your_key" \
+  "https://api.qwedai.com/v1/admin/compliance/report/soc2/1"
+```
+
+See [Security activity summary](/advanced/compliance#1-security-activity-summary) for the full response and field reference.
 
 ### GET /admin/security/threats/{org_id}
 
