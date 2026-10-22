@@ -19,7 +19,7 @@ Error: 401 Unauthorized - Invalid API key
 **Solution:**
 1. Check your API key is correct: `echo $QWED_API_KEY`
 2. Make sure the value is not a placeholder — `qwed init` ignores common dummy values like `your-api-key`, `changeme`, `placeholder`, and `xxx`. Replace them with a real key.
-3. Regenerate key at [cloud.qwedai.com](https://cloud.qwedai.com)
+3. Issue a new key from your QWED server with `POST /auth/api-keys` (see [Authentication](/api/authentication))
 4. Ensure no extra spaces or newlines
 
 ```python
@@ -361,7 +361,7 @@ for result in client.verify_batch_stream(large_list):
 
 1. **Documentation:** [docs.qwedai.tech](https://docs.qwedai.tech)
 2. **GitHub Issues:** [github.com/QWED-AI/qwed-verification/issues](https://github.com/QWED-AI/qwed-verification/issues)
-3. **Email:** support@qwedai.com
+3. **Email:** support@qwedai.tech
 4. **Intercom:** Chat widget on docs site
 
 ---

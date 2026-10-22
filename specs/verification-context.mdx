@@ -14,6 +14,16 @@ The Verification Context is the atomic record of a QWED verification. It standar
 
 A Verification Context document is a single JSON object that validates against the machine-readable JSON Schema shipped with the spec ([`spec/v1.0/schemas/verification-context.schema.json`](https://github.com/QWED-AI/qwed-verification/blob/main/spec/v1.0/schemas/verification-context.schema.json)).
 
+The schema's `$id` is `https://qwedai.tech/schemas/verification-context/v1.0`. If your validator or schema registry resolves the schema by its `$id`, register it under this URI. Earlier copies of the schema used `https://qwed.dev/schemas/verification-context/v1.0`, so update any lookups that still reference the old `$id`.
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://qwedai.tech/schemas/verification-context/v1.0",
+  "title": "QWED Verification Context"
+}
+```
+
 ## Design goals
 
 - **One protocol.** Every verification surface emits the same document shape.
