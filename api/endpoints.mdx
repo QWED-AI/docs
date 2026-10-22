@@ -873,6 +873,8 @@ The pre-v6.0 top-level `is_valid` field is preserved inside `developer_fields.is
 
 Each item runs under `QWED_BATCH_ITEM_TIMEOUT` (default 60 seconds). An item that times out is marked `failed` with its error recorded, and the rest of the job still completes.
 
+**Audit trail:** QWED appends one signed, hash-chained audit row per item, including failed items. Each row stores the item's query and a result with `batch_job_id`, `batch_item_id`, `batch_item_type`, `item_status`, and `details` (the item's `result` or `error`). The row's domain and `is_verified` follow the rule of the item type's own `/verify/*` route. If the audit append for an item fails, QWED marks that item `failed`, returns `"result": null` with `"error": "audit persistence failed"`, and counts it in `failed_items`. No item result is returned without its audit row.
+
 | Status | Description |
 |--------|-------------|
 | 400 | No items, or more than 100 items |
@@ -1117,7 +1119,9 @@ X-Agent-Token: qwed_agent_...
 |--------|-------------|
 | 401 | Invalid agent token |
 | 403 | Agent budget exceeded or request blocked by security checks |
-| 500 | Internal agent verification error |
+| 500 | Internal agent verification error, or `audit persistence failed` |
+
+**Audit trail:** Before QWED logs the agent activity and returns, it appends the same signed, hash-chained audit row that `POST /verify/natural_language` writes, plus the `agent_id`. If that append fails, the request returns `500` with `audit persistence failed` and no agent activity is logged.
 
 ---
 
@@ -1148,7 +1152,7 @@ Submit an agent tool call for risk evaluation before execution. Unknown tools (n
 
 ### GET /agents/{agent_id}/activity
 
-Retrieve the audit log for a specific agent. Provides a full audit trail of all agent actions.
+Retrieve the activity log for a specific agent. Activity entries are not signed or hash-chained. The signed record of each agent verification is its row in the organization's audit log (see [`GET /audit/logs`](/api/authentication#get-audit-logs)).
 
 **Headers:**
 
@@ -1383,7 +1387,7 @@ Hash matching accepts either the current canonical payload (which includes `raw_
 An unchained row after a chained row is not legacy. It fails verification. See [Legacy entries](/advanced/compliance#legacy-entries).
 
 <Note>
-`AuditLogger` requires `QWED_AUDIT_SECRET_KEY` to be set, and the server refuses to start without it. If the key is missing or persisted chain continuity cannot be loaded, initialization raises `SecurityError` and verification endpoints fail closed. Every `/verify/*` endpoint, the Verification Context routes, and `POST /audit/seed` write their audit row through the signed chain. If that write fails, the request returns `500` with `audit persistence failed`.
+`AuditLogger` requires `QWED_AUDIT_SECRET_KEY` to be set, and the server refuses to start without it. If the key is missing or persisted chain continuity cannot be loaded, initialization raises `SecurityError` and verification endpoints fail closed. Every `/verify/*` endpoint (one row per item for `/verify/batch`), the Verification Context routes, `POST /agents/{agent_id}/verify`, and `POST /audit/seed` write their audit row through the signed chain. If that write fails, the request returns `500` with `audit persistence failed`.
 </Note>
 
 ### POST /audit/seed

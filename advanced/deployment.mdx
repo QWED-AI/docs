@@ -85,6 +85,7 @@ To run the image on its own, pass the same variables to `docker run`:
 docker run -p 8000:8000 \
   -e DATABASE_URL=postgresql://qwed:your_password@db-host:5432/qwed_db \
   -e API_KEY_SECRET=your-generated-secret \
+  -e QWED_API_KEY_LOOKUP_SECRET=your-generated-lookup-secret \
   -e QWED_AUDIT_SECRET_KEY=your-generated-audit-key \
   -e QWED_CORS_ORIGINS="https://app.yourcompany.com" \
   qwed-core:5.0.0
@@ -214,11 +215,11 @@ python -c "from qwed_new.core.database import create_db_and_tables; create_db_an
 
 ```bash
 # Production Mode with Gunicorn (Linux/macOS)
-gunicorn qwed_new.api.main:app -w 4 -k uvicorn.workers.UvicornWorker --bind 0.0.0.0:8000
+gunicorn qwed_new.api.main:app -w 1 -k uvicorn.workers.UvicornWorker --bind 0.0.0.0:8000
 ```
 
 <Warning>
-The audit logger supports one writer per database. With `-w 4`, each worker appends audit rows independently, and a conflicting append fails with `500 audit persistence failed`. Run a single worker if you rely on the audit trail. See [Chain continuity across restarts](/advanced/compliance#chain-continuity-across-restarts).
+Run one worker per database. Every verification request appends an audit row, and the audit logger supports one writer per database. With several workers, each appends audit rows independently, and a conflicting append makes the verification request fail with `500 audit persistence failed`. See [Chain continuity across restarts](/advanced/compliance#chain-continuity-across-restarts).
 </Warning>
 
 ---

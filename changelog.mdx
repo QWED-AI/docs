@@ -11,9 +11,9 @@ Jump to: [Signed audit chain for API rows](#qwed-verification-—-api-audit-rows
 
 ## QWED Verification — API audit rows written through the signed hash chain
 
-**Unreleased** · [GitHub PR #459](https://github.com/QWED-AI/qwed-verification/pull/459)
+**Unreleased** · [GitHub PR #459](https://github.com/QWED-AI/qwed-verification/pull/459) · [GitHub PR #492](https://github.com/QWED-AI/qwed-verification/pull/492) · [GitHub PR #493](https://github.com/QWED-AI/qwed-verification/pull/493)
 
-> Every `/verify/*` endpoint, the Verification Context routes, and `POST /audit/seed` now append audit rows through `AuditLogger`. New rows are HMAC-signed and hash-chained per organization, so `GET /admin/compliance/verify/{log_id}` and `verify_audit_trail` can verify them. Previously these rows were written without a hash, signature, or previous hash.
+> Every `/verify/*` endpoint (including each `/verify/batch` item), the Verification Context routes, `POST /agents/{agent_id}/verify`, and `POST /audit/seed` now append audit rows through `AuditLogger`. New rows are HMAC-signed and hash-chained per organization, so `GET /admin/compliance/verify/{log_id}` and `verify_audit_trail` can verify them. Previously these rows were written without a hash, signature, or previous hash.
 
 <Warning>
 **Breaking change.** The API server refuses to start without `QWED_AUDIT_SECRET_KEY`. Projects onboarded with `qwed init` before this release have no audit key in `.env`.
@@ -40,6 +40,8 @@ To migrate:
 - **`POST /audit/seed` is off by default.** It returns `404` and writes nothing unless `QWED_ENABLE_AUDIT_SEED=1`. Seeded rows are marked `{"sample": true}` and timestamped when written.
 - **CSV export.** The `Hash Chain Valid` column is now `Chain Status`, with values `Chained` or `Legacy`. A present hash is not a verified chain.
 - **`GET /health/identity`** also returns `audit_hmac`, and returns `503` when `QWED_AUDIT_SECRET_KEY` is unset.
+- **`/verify/batch` and `/agents/{agent_id}/verify` write audit rows.** Until this fix they wrote none: batch items were missing from the audit trail, and agent verifications were logged only to the unsigned agent activity log. A batch now appends one chained row per item, failed items included. If an item's append fails, the item is marked `failed` with `result: null` and `error: "audit persistence failed"`. An agent verification appends the row `/verify/natural_language` writes, plus `agent_id`. If that append fails, the request returns `500` and no activity is logged.
+- **Audit log routes return the stored verdict and chain entry.** `GET /audit/logs` and `GET /audit/logs/{log_id}` add `verdict` (`VERIFIED`, `UNVERIFIABLE`, `BLOCKED`, or `null`), read from the stored result rather than from `is_verified`. The list adds `entry_hash`. The detail adds `entry_hash`, `previous_hash`, and `hmac_signature`. `status` is unchanged. `verdict` is not an admission decision: a disproven claim is `VERIFIED` with `status` `blocked`, so don't gate on it alone.
 
 Verification still does not detect removal of the newest entries. That needs an externally stored checkpoint of the latest hash.
 

@@ -139,15 +139,12 @@ spec:
 ### Performance tuning
 
 ```bash
-# Increase workers
-uvicorn qwed_new.api.main:app --workers 4
-
 # Enable connection pooling
 export QWED_DB_POOL_SIZE=20
 ```
 
 <Warning>
-Multiple workers or replicas writing audit rows to the same database are not supported. The audit logger keeps each organization's chain head in memory and expects a single writer per database. With `--workers 4` or several replicas, a conflicting append fails with `500 audit persistence failed` instead of forking the chain. Run one worker against a given database if you rely on the [audit trail](/advanced/compliance#chain-continuity-across-restarts).
+Run one uvicorn worker per database. Multiple workers or replicas writing audit rows to the same database are not supported. Every verification request appends an audit row, and the audit logger keeps each organization's chain head in memory. With `--workers 4` or several replicas, a conflicting append makes the verification request fail with `500 audit persistence failed` instead of forking the chain. See [Chain continuity across restarts](/advanced/compliance#chain-continuity-across-restarts).
 </Warning>
 
 ### Availability limits
