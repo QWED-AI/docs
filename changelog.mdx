@@ -5,7 +5,39 @@ description: "Release notes for the QWED Protocol: version history, new guards, 
 
 All notable changes to the QWED platform, listed by release.
 
-Jump to: [Admin endpoint tenant scoping](#qwed-verification-—-tenant-scoped-admin-endpoints-and-working-rbac) · [`verify_fact` fails closed offline](#qwed-verification-—-verify_fact-fails-closed-offline-and-money-rejects-non-finite-amounts) · [Request caps and sandbox limits](#qwed-verification-—-request-body-caps-timeouts-and-sandbox-concurrency-limits) · [v7.2.3](#v7-2-3-—-code-secret-and-sql-verification-security-release) · [QWED-A2A runtime hardening](#qwed-a2a-—-request-size-limits-engine-budget-and-code-guard-hardening) · [QWED-Tax v0.2.1](#qwed-tax-v0-2-1-—-classification-claim-vocabulary-and-strict-facts) · [QWED-Legal v0.5.1](#qwed-legal-v0-5-1-—-deadlineguard-signing-anchor-allowlist) · [v7.2.2](#v7-2-2-—-verification-soundness-and-safety-hardening) · [Open Responses v0.6.1](#qwed-open-responses-v0-6-1-—-toolguard-verifies-client-action-items) · [QWED-Finance v3.0.1](#qwed-finance-v3-0-1-—-iso-20022-sanctions-and-queryguard-security-fixes) · [QWED-Legal date and input bounds](#qwed-legal-—-fail-closed-date-handling-and-input-bounds) · [Open Responses v0.6.0](#qwed-open-responses-v0-6-0-—-fail-closed-hardening) · [QWED-Legal fail-closed hardening](#qwed-legal-—-fail-closed-hardening-for-guards-diagnostics-and-github-action) · [`qwed init` server identity handshake](#qwed-verification-—-qwed-init-server-identity-handshake) · [Leaked key auto-revocation](#qwed-verification-—-leaked-api-key-auto-revocation-and-false-positive-feedback) · [API-key format spec](#qwed-verification-—-canonical-api-key-format-spec) · [Signed secret-scanning webhook](#qwed-verification-—-signed-secret-scanning-webhook-endpoint) · [v7.2.1](#v7-2-1-—-math-answer-comparison-security-patch) · [v7.2.0](#v7-2-0-—-precision-advisory-and-security-hardening-batch) · [v7.1.0](#v7-1-0-—-verification-context-v1-0-rollout) · [v7.0.0](#v7-0-0-—-full-diagnosticresult-engine-conformance)
+Jump to: [Docker image runs the API server](#qwed-verification-—-docker-image-runs-the-api-server-and-the-compose-stack-builds) · [Admin endpoint tenant scoping](#qwed-verification-—-tenant-scoped-admin-endpoints-and-working-rbac) · [`verify_fact` fails closed offline](#qwed-verification-—-verify_fact-fails-closed-offline-and-money-rejects-non-finite-amounts) · [Request caps and sandbox limits](#qwed-verification-—-request-body-caps-timeouts-and-sandbox-concurrency-limits) · [v7.2.3](#v7-2-3-—-code-secret-and-sql-verification-security-release) · [QWED-A2A runtime hardening](#qwed-a2a-—-request-size-limits-engine-budget-and-code-guard-hardening) · [QWED-Tax v0.2.1](#qwed-tax-v0-2-1-—-classification-claim-vocabulary-and-strict-facts) · [QWED-Legal v0.5.1](#qwed-legal-v0-5-1-—-deadlineguard-signing-anchor-allowlist) · [v7.2.2](#v7-2-2-—-verification-soundness-and-safety-hardening) · [Open Responses v0.6.1](#qwed-open-responses-v0-6-1-—-toolguard-verifies-client-action-items) · [QWED-Finance v3.0.1](#qwed-finance-v3-0-1-—-iso-20022-sanctions-and-queryguard-security-fixes) · [QWED-Legal date and input bounds](#qwed-legal-—-fail-closed-date-handling-and-input-bounds) · [Open Responses v0.6.0](#qwed-open-responses-v0-6-0-—-fail-closed-hardening) · [QWED-Legal fail-closed hardening](#qwed-legal-—-fail-closed-hardening-for-guards-diagnostics-and-github-action) · [`qwed init` server identity handshake](#qwed-verification-—-qwed-init-server-identity-handshake) · [Leaked key auto-revocation](#qwed-verification-—-leaked-api-key-auto-revocation-and-false-positive-feedback) · [API-key format spec](#qwed-verification-—-canonical-api-key-format-spec) · [Signed secret-scanning webhook](#qwed-verification-—-signed-secret-scanning-webhook-endpoint) · [v7.2.1](#v7-2-1-—-math-answer-comparison-security-patch) · [v7.2.0](#v7-2-0-—-precision-advisory-and-security-hardening-batch) · [v7.1.0](#v7-1-0-—-verification-context-v1-0-rollout) · [v7.0.0](#v7-0-0-—-full-diagnosticresult-engine-conformance)
+
+---
+
+## QWED Verification — Docker image runs the API server and the Compose stack builds
+
+**Unreleased** · [GitHub PR #474](https://github.com/QWED-AI/qwed-verification/pull/474) · Closes [issue #467](https://github.com/QWED-AI/qwed-verification/issues/467)
+
+> The `qwedai/qwed-verification` image now runs the API server, and `deploy/docker-compose.yml` builds and starts the full stack.
+
+<Warning>
+**Image behavior change.** Docker Hub now publishes the API server as `qwedai/qwed-verification`. `latest` tracks `main`, and versioned tags start at 7.3.1. Earlier tags ran the QWED GitHub Action. If you ran the image as a repository scanner, switch to the [GitHub Action](/advanced/github-action).
+
+```bash
+docker run -p 8000:8000 \
+  -e QWED_CORS_ORIGINS="https://app.yourcompany.com" \
+  -e API_KEY_SECRET="..." \
+  -e QWED_JWT_SECRET_KEY="..." \
+  -e QWED_API_KEY_LOOKUP_SECRET="..." \
+  -e QWED_AUDIT_SECRET_KEY="..." \
+  qwedai/qwed-verification:7.3.1
+```
+</Warning>
+
+### What changed
+
+- **`server` image target.** The `Dockerfile` has a `server` target that runs uvicorn on port 8000 as UID 1000, with `/var/lib/qwed` as the working directory for the default SQLite database. A health check calls `/health`. `UVICORN_HOST` and `UVICORN_PORT` set the bind address and port, and the health check follows `UVICORN_PORT`. The GitHub Action stays the default target.
+- **Working Compose stack.** Run `docker compose -f deploy/docker-compose.yml up -d` from the repository root after copying `deploy/.env.example` to `deploy/.env`. Compose refuses to start until `QWED_CORS_ORIGINS`, `API_KEY_SECRET`, `QWED_JWT_SECRET_KEY`, `QWED_API_KEY_LOOKUP_SECRET`, `QWED_AUDIT_SECRET_KEY`, and `DATABASE_URL` are set. The Postgres and Grafana containers refuse to start while their passwords are empty. Grafana no longer falls back to `admin`/`admin`.
+- **Stack fixes.** Postgres and Grafana receive only their own settings. Grafana ships with Prometheus and Jaeger data sources. Prometheus scrapes the API at `qwed-core:8000`. The API server keeps its data in the `qwed-data` volume.
+- **`docker` client in the `server` extra.** `qwed[server]` now includes `docker>=7.0.0`. Previously, a request that reached the code executor failed with an `ImportError` instead of the sandbox's fail-closed result.
+- **Kubernetes pins 7.3.1.** The manifest uses `docker.io/qwedai/qwed-verification:7.3.1`, the first server image. The Secret lists `QWED_JWT_SECRET_KEY`, `QWED_API_KEY_LOOKUP_SECRET`, and `QWED_AUDIT_SECRET_KEY`, and ships every value empty.
+
+See [Self-hosting](/advanced/self-hosting) and [Deployment](/advanced/deployment#docker-deployment).
 
 ---
 
