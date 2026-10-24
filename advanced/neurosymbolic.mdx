@@ -159,22 +159,21 @@ GPT: "Investment return = 12.5%"
 
 **Old Way:**
 
-````text
-GPT: "Here's the code"
-```python
-eval(user_input)  # Dangerous!
-````
-
-→ No check → 🔓 Security breach
-
 ```text
-
-**QWED Way:**
+GPT: "Here's the code"
+     eval(user_input)  # Dangerous!
+→ No check
+→ 🔓 Security breach
 ```
 
-GPT: "Here's the code" → AST analyzer detects 'eval' → 🛑 UNSAFE CODE → ✅ Blocked before execution
+**QWED Way:**
 
 ```text
+GPT: "Here's the code"
+→ AST analyzer detects 'eval'
+→ 🛑 UNSAFE CODE
+→ ✅ Blocked before execution
+```
 
 ---
 
@@ -195,4 +194,3 @@ GPT: "Here's the code" → AST analyzer detects 'eval' → 🛑 UNSAFE CODE → 
 ---
 
 **QWED: Where Neural Networks meet Mathematical Proof.** 🧠🔬
-```
