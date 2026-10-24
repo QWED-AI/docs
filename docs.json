@@ -16,10 +16,7 @@
       "family": "Instrument Sans"
     }
   },
-  "favicon": {
-    "light": "/images/brand/favicon-ink.png",
-    "dark": "/images/brand/favicon-white.png"
-  },
+  "favicon": "/images/brand/favicon.svg",
   "redirects": [
     {
       "source": "/docs",
@@ -397,8 +394,8 @@
     ]
   },
   "logo": {
-    "light": "/images/brand/qwed-lockup.svg",
-    "dark": "/images/brand/qwed-lockup-white.svg",
+    "light": "/images/brand/qwed-lockup-cobalt.svg",
+    "dark": "/images/brand/qwed-lockup-cobalt-white.svg",
     "href": "https://docs.qwedai.tech"
   },
   "navbar": {
