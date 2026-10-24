@@ -17,7 +17,7 @@ QWED and Guardrails AI work at different points in an AI stack and use different
 | --- | --- | --- |
 | **How a result is reached** | A deterministic engine proves or disproves a formal statement. No model decides the verdict. | Validators from Guardrails Hub, combined into guards. See its docs for how each validator works. |
 | **When a check cannot run** | Fails closed: `UNVERIFIABLE` or `BLOCKED`, both denied. | See its docs. |
-| **Coverage** | Domains with a formal statement: math, logic, SQL, code, schema and others listed at [qwedai.com/engines](https://qwedai.com/engines). Anything else is `UNVERIFIABLE · DENY`. | The risks its validators cover, plus structured output. |
+| **Coverage** | Domains with a formal statement: math, logic, SQL, code, schema and others listed at [qwedai.tech/engines](https://qwedai.tech/engines). Anything else is `UNVERIFIABLE · DENY`. | The risks its validators cover, plus structured output. |
 | **Where it runs** | In your environment: Python library, CLI, self-hosted API or Docker image. | See its docs. |
 
 Guardrails AI covers checks QWED does not try to cover, such as risks with no formal statement to prove. QWED covers proof of formal statements.
@@ -29,7 +29,7 @@ They can sit in the same pipeline:
 1. Guardrails AI guards the input and output, including the response structure.
 2. QWED checks the claims inside that structure (a calculation, a SQL query, a tool call) and returns a decision your integration enforces.
 
-QWED verifies the formal statement, not intent, and is only as sound as its engines. See [qwedai.com/limits](https://qwedai.com/limits).
+QWED verifies the formal statement, not intent, and is only as sound as its engines. See [qwedai.tech/limits](https://qwedai.tech/limits).
 
 ## Related docs
 
