@@ -3,9 +3,9 @@
   "theme": "aspen",
   "name": "QWED Documentation",
   "colors": {
-    "primary": "#111111",
-    "light": "#F2F2F2",
-    "dark": "#616161"
+    "primary": "#2340D9",
+    "light": "#9AABFF",
+    "dark": "#2340D9"
   },
   "fonts": {
     "heading": {
@@ -16,10 +16,7 @@
       "family": "Instrument Sans"
     }
   },
-  "favicon": {
-    "light": "/images/brand/favicon-ink.png",
-    "dark": "/images/brand/favicon-white.png"
-  },
+  "favicon": "/images/brand/favicon.svg",
   "redirects": [
     {
       "source": "/docs",
@@ -79,323 +76,317 @@
         }
       ]
     },
-    "languages": [
+    "tabs": [
       {
-        "language": "en",
-        "default": true,
-        "tabs": [
+        "tab": "Getting Started",
+        "groups": [
           {
-            "tab": "Getting Started",
-            "groups": [
-              {
-                "group": "Start here",
-                "pages": [
-                  "intro",
-                  "getting-started/concepts",
-                  "getting-started/installation",
-                  "getting-started/quickstart"
-                ]
-              },
-              {
-                "group": "Configure and understand",
-                "pages": [
-                  "getting-started/llm-configuration",
-                  "getting-started/custom-providers",
-                  "architecture",
-                  "faq"
-                ]
-              },
-              {
-                "group": "Releases",
-                "pages": [
-                  "releases",
-                  "changelog"
-                ]
-              },
-              {
-                "group": "Help",
-                "pages": [
-                  "troubleshooting",
-                  "support"
-                ]
-              }
+            "group": "Start here",
+            "pages": [
+              "intro",
+              "getting-started/concepts",
+              "getting-started/installation",
+              "getting-started/quickstart"
             ]
           },
           {
-            "tab": "Engines",
-            "groups": [
-              {
-                "group": "Overview",
-                "pages": [
-                  "engines/overview"
-                ]
-              },
-              {
-                "group": "Core Engines",
-                "pages": [
-                  "engines/math",
-                  "engines/logic",
-                  "engines/code",
-                  "engines/sql",
-                  "engines/schema"
-                ]
-              },
-              {
-                "group": "Analysis Engines",
-                "pages": [
-                  "engines/stats",
-                  "engines/fact",
-                  "engines/consensus",
-                  "engines/reasoning"
-                ]
-              },
-              {
-                "group": "Specialized Engines",
-                "pages": [
-                  "engines/image",
-                  "engines/graph",
-                  "engines/taint",
-                  "engines/process"
-                ]
-              }
+            "group": "Configure and understand",
+            "pages": [
+              "getting-started/llm-configuration",
+              "getting-started/custom-providers",
+              "architecture",
+              "faq"
             ]
           },
           {
-            "tab": "Extensions",
-            "groups": [
-              {
-                "group": "QWED Finance",
-                "pages": [
-                  "finance/overview"
-                ]
-              },
-              {
-                "group": "QWED Legal",
-                "pages": [
-                  "legal/overview",
-                  "legal/guards",
-                  "legal/examples",
-                  "legal/troubleshooting"
-                ]
-              },
-              {
-                "group": "QWED Tax",
-                "pages": [
-                  "tax/overview",
-                  "tax/guards",
-                  "tax/integration"
-                ]
-              },
-              {
-                "group": "QWED Infra",
-                "pages": [
-                  "infra/overview",
-                  "infra/guards",
-                  "infra/examples",
-                  "infra/troubleshooting"
-                ]
-              }
+            "group": "Releases",
+            "pages": [
+              "releases",
+              "changelog"
             ]
           },
           {
-            "tab": "Protocols",
-            "groups": [
-              {
-                "group": "MCP Server",
-                "pages": [
-                  "mcp/overview",
-                  "mcp/tools",
-                  "mcp/examples",
-                  "mcp/troubleshooting"
-                ]
-              },
-              {
-                "group": "Open Responses",
-                "pages": [
-                  "open-responses/overview",
-                  "open-responses/guards",
-                  "open-responses/openai",
-                  "open-responses/langchain",
-                  "open-responses/examples",
-                  "open-responses/troubleshooting"
-                ]
-              },
-              {
-                "group": "UCP (Commerce)",
-                "pages": [
-                  "ucp/overview",
-                  "ucp/guards",
-                  "ucp/middleware-fastapi",
-                  "ucp/middleware-express",
-                  "ucp/examples",
-                  "ucp/troubleshooting"
-                ]
-              }
+            "group": "Help",
+            "pages": [
+              "troubleshooting",
+              "support"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Engines",
+        "groups": [
+          {
+            "group": "Overview",
+            "pages": [
+              "engines/overview"
             ]
           },
           {
-            "tab": "A2A Protocol",
-            "groups": [
-              {
-                "group": "Overview",
-                "pages": [
-                  "a2a/overview",
-                  "a2a/architecture"
-                ]
-              },
-              {
-                "group": "Core Components",
-                "pages": [
-                  "a2a/interceptor",
-                  "a2a/trust-boundary",
-                  "a2a/crypto-attestations"
-                ]
-              },
-              {
-                "group": "Guides",
-                "pages": [
-                  "a2a/quickstart",
-                  "a2a/deployment"
-                ]
-              }
+            "group": "Core Engines",
+            "pages": [
+              "engines/math",
+              "engines/logic",
+              "engines/code",
+              "engines/sql",
+              "engines/schema"
             ]
           },
           {
-            "tab": "Integrations",
-            "groups": [
-              {
-                "group": "Framework integrations",
-                "pages": [
-                  "integrations/langchain",
-                  "integrations/llamaindex",
-                  "integrations/crewai"
-                ]
-              }
+            "group": "Analysis Engines",
+            "pages": [
+              "engines/stats",
+              "engines/fact",
+              "engines/consensus",
+              "engines/reasoning"
             ]
           },
           {
-            "tab": "SDKs & API",
-            "groups": [
-              {
-                "group": "API Reference",
-                "pages": [
-                  "api/overview",
-                  "api/authentication",
-                  "api/endpoints",
-                  "api/errors",
-                  "api/rate-limits",
-                  "api/dsl-reference"
-                ]
-              },
-              {
-                "group": "SDKs",
-                "pages": [
-                  "sdks/overview",
-                  "sdks/python",
-                  "sdks/typescript",
-                  "sdks/go",
-                  "sdks/rust",
-                  "sdks/guards"
-                ]
-              }
+            "group": "Specialized Engines",
+            "pages": [
+              "engines/image",
+              "engines/graph",
+              "engines/taint",
+              "engines/process"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Extensions",
+        "groups": [
+          {
+            "group": "QWED Finance",
+            "pages": [
+              "finance/overview"
             ]
           },
           {
-            "tab": "Guides",
-            "groups": [
-              {
-                "group": "Production path",
-                "pages": [
-                  "integration/getting-started",
-                  "integration/common-pitfalls",
-                  "integration/testing",
-                  "integration/production",
-                  "integration/monitoring",
-                  "integration/troubleshooting"
-                ]
-              },
-              {
-                "group": "Deployment",
-                "pages": [
-                  "advanced/deployment",
-                  "advanced/self-hosting",
-                  "advanced/qwed-local",
-                  "advanced/ollama"
-                ]
-              },
-              {
-                "group": "CI/CD",
-                "pages": [
-                  "advanced/cli",
-                  "advanced/github-action",
-                  "advanced/github-app"
-                ]
-              },
-              {
-                "group": "Security & Compliance",
-                "pages": [
-                  "advanced/security-hardening",
-                  "advanced/compliance",
-                  "advanced/pii-masking",
-                  "advanced/attestations",
-                  "advanced/state-guard",
-                  "advanced/agent-state-guard",
-                  "advanced/qwed-security-rule-catalog"
-                ]
-              }
+            "group": "QWED Legal",
+            "pages": [
+              "legal/overview",
+              "legal/guards",
+              "legal/examples",
+              "legal/troubleshooting"
             ]
           },
           {
-            "tab": "Reference",
-            "groups": [
-              {
-                "group": "Architecture",
-                "pages": [
-                  "advanced/architecture-diagrams",
-                  "advanced/diagnostics",
-                  "advanced/neurosymbolic",
-                  "advanced/determinism-guarantee",
-                  "advanced/symbolic-limits",
-                  "advanced/design"
-                ]
-              },
-              {
-                "group": "Concepts",
-                "pages": [
-                  "advanced/why-cloud-llms",
-                  "advanced/llm-verification",
-                  "advanced/qwed-vs-guardrails",
-                  "advanced/qwed-vs-rag",
-                  "advanced/comparison",
-                  "advanced/performance-benchmarks",
-                  "advanced/agent-verification"
-                ]
-              },
-              {
-                "group": "Specifications",
-                "pages": [
-                  "specs/overview",
-                  "whitepaper",
-                  "specs/qwed-spec",
-                  "specs/verification-context",
-                  "specs/attestation",
-                  "specs/agent",
-                  "advanced/specification-guide"
-                ]
-              },
-              {
-                "group": "Integration Patterns",
-                "pages": [
-                  "advanced/integration-overview",
-                  "advanced/integration-guide"
-                ]
-              },
-              {
-                "group": "Contributing",
-                "pages": [
-                  "advanced/contributor-onboarding"
-                ]
-              }
+            "group": "QWED Tax",
+            "pages": [
+              "tax/overview",
+              "tax/guards",
+              "tax/integration"
+            ]
+          },
+          {
+            "group": "QWED Infra",
+            "pages": [
+              "infra/overview",
+              "infra/guards",
+              "infra/examples",
+              "infra/troubleshooting"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Protocols",
+        "groups": [
+          {
+            "group": "MCP Server",
+            "pages": [
+              "mcp/overview",
+              "mcp/tools",
+              "mcp/examples",
+              "mcp/troubleshooting"
+            ]
+          },
+          {
+            "group": "Open Responses",
+            "pages": [
+              "open-responses/overview",
+              "open-responses/guards",
+              "open-responses/openai",
+              "open-responses/langchain",
+              "open-responses/examples",
+              "open-responses/troubleshooting"
+            ]
+          },
+          {
+            "group": "UCP (Commerce)",
+            "pages": [
+              "ucp/overview",
+              "ucp/guards",
+              "ucp/middleware-fastapi",
+              "ucp/middleware-express",
+              "ucp/examples",
+              "ucp/troubleshooting"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "A2A Protocol",
+        "groups": [
+          {
+            "group": "Overview",
+            "pages": [
+              "a2a/overview",
+              "a2a/architecture"
+            ]
+          },
+          {
+            "group": "Core Components",
+            "pages": [
+              "a2a/interceptor",
+              "a2a/trust-boundary",
+              "a2a/crypto-attestations"
+            ]
+          },
+          {
+            "group": "Guides",
+            "pages": [
+              "a2a/quickstart",
+              "a2a/deployment"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Integrations",
+        "groups": [
+          {
+            "group": "Framework integrations",
+            "pages": [
+              "integrations/langchain",
+              "integrations/llamaindex",
+              "integrations/crewai"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "SDKs & API",
+        "groups": [
+          {
+            "group": "API Reference",
+            "pages": [
+              "api/overview",
+              "api/authentication",
+              "api/endpoints",
+              "api/errors",
+              "api/rate-limits",
+              "api/dsl-reference"
+            ]
+          },
+          {
+            "group": "SDKs",
+            "pages": [
+              "sdks/overview",
+              "sdks/python",
+              "sdks/typescript",
+              "sdks/go",
+              "sdks/rust",
+              "sdks/guards"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Guides",
+        "groups": [
+          {
+            "group": "Production path",
+            "pages": [
+              "integration/getting-started",
+              "integration/common-pitfalls",
+              "integration/testing",
+              "integration/production",
+              "integration/monitoring",
+              "integration/troubleshooting"
+            ]
+          },
+          {
+            "group": "Deployment",
+            "pages": [
+              "advanced/deployment",
+              "advanced/self-hosting",
+              "advanced/qwed-local",
+              "advanced/ollama"
+            ]
+          },
+          {
+            "group": "CI/CD",
+            "pages": [
+              "advanced/cli",
+              "advanced/github-action",
+              "advanced/github-app"
+            ]
+          },
+          {
+            "group": "Security & Compliance",
+            "pages": [
+              "advanced/security-hardening",
+              "advanced/compliance",
+              "advanced/pii-masking",
+              "advanced/attestations",
+              "advanced/state-guard",
+              "advanced/agent-state-guard",
+              "advanced/qwed-security-rule-catalog"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Reference",
+        "groups": [
+          {
+            "group": "Architecture",
+            "pages": [
+              "advanced/architecture-diagrams",
+              "advanced/diagnostics",
+              "advanced/neurosymbolic",
+              "advanced/determinism-guarantee",
+              "advanced/symbolic-limits",
+              "advanced/design"
+            ]
+          },
+          {
+            "group": "Concepts",
+            "pages": [
+              "advanced/why-cloud-llms",
+              "advanced/llm-verification",
+              "advanced/qwed-vs-guardrails",
+              "advanced/qwed-vs-rag",
+              "advanced/comparison",
+              "advanced/performance-benchmarks",
+              "advanced/agent-verification"
+            ]
+          },
+          {
+            "group": "Specifications",
+            "pages": [
+              "specs/overview",
+              "whitepaper",
+              "specs/qwed-spec",
+              "specs/verification-context",
+              "specs/attestation",
+              "specs/agent",
+              "advanced/specification-guide"
+            ]
+          },
+          {
+            "group": "Integration Patterns",
+            "pages": [
+              "advanced/integration-overview",
+              "advanced/integration-guide"
+            ]
+          },
+          {
+            "group": "Contributing",
+            "pages": [
+              "advanced/contributor-onboarding"
             ]
           }
         ]
@@ -403,8 +394,8 @@
     ]
   },
   "logo": {
-    "light": "/images/brand/qwed-lockup.svg",
-    "dark": "/images/brand/qwed-lockup-white.svg",
+    "light": "/images/brand/qwed-lockup-cobalt.svg",
+    "dark": "/images/brand/qwed-lockup-cobalt-white.svg",
     "href": "https://docs.qwedai.tech"
   },
   "navbar": {
@@ -444,7 +435,7 @@
             "href": "/sdks/go"
           },
           {
-            "label": "Typescript",
+            "label": "TypeScript",
             "href": "/sdks/typescript"
           },
           {
@@ -532,13 +523,8 @@
   },
   "description": "Official documentation for QWED. Learn deterministic verification for LLMs and AI agents using formal methods, symbolic execution, and policy guards.",
   "banner": {
-    "content": "**QWED is now a GitHub Technology Partner** — QWED Security and verification, natively integrated with GitHub. [Browse the Marketplace listing](https://github.com/marketplace/qwed-security)",
+    "content": "**QWED v7.3.0** fixes five security advisories and adds tenant scoping and DoS hardening. [See the release](https://github.com/QWED-AI/qwed-verification/releases/tag/v7.3.0)",
     "dismissible": true
-  },
-  "integrations": {
-    "gtm": {
-      "tagId": "GTM-WFWSMKGZ"
-    }
   },
   "seo": {
     "indexing": "all",
@@ -555,7 +541,7 @@
   },
   "background": {
     "color": {
-      "dark": "#0C0C0C",
+      "dark": "#0C0D11",
       "light": "#FFFFFF"
     }
   }
