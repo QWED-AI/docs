@@ -6,8 +6,10 @@ description: "Complete QWED API endpoint reference covering health checks, verif
 
 ## Base URL
 
+QWED has no hosted API. Use the address of the QWED server you run; locally it is:
+
 ```text
-https://api.qwedai.com/v1
+http://localhost:8000
 ```
 
 ## Health check
@@ -17,7 +19,7 @@ https://api.qwedai.com/v1
 Check API status. No authentication required.
 
 ```bash
-curl https://api.qwedai.com/v1/health
+curl http://localhost:8000/health
 ```
 
 **Response:**
@@ -294,14 +296,14 @@ Verify logical constraints. Routes through the QWED Control Plane.
 
 ```json
 {
-  "query": "(AND (GT x 5) (LT y 10))",
+  "query": "Is there an x greater than 5 and less than 10?",
   "provider": "openai"
 }
 ```
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `query` | string | Yes | Logical constraint in DSL or natural language |
+| `query` | string | Yes | A logic question in natural language. The server translates it into the [QWED DSL](/api/dsl-reference) with the LLM provider and checks the DSL with Z3. It does not check DSL directly. |
 | `provider` | string | No | Preferred LLM provider |
 
 **Response:**
@@ -573,7 +575,7 @@ Verify claims about image content. Accepts multipart form data with an image fil
 **Request:**
 
 ```bash
-curl -X POST https://api.qwedai.com/v1/verify/image \
+curl -X POST http://localhost:8000/verify/image \
   -H "X-API-Key: qwed_your_key" \
   -F "image=@photo.jpg" \
   -F "claim=The image is 800x600 pixels"
@@ -613,7 +615,7 @@ Statistical code execution requires the secure Docker sandbox. If Docker is unav
 **Request:**
 
 ```bash
-curl -X POST https://api.qwedai.com/v1/verify/stats \
+curl -X POST http://localhost:8000/verify/stats \
   -H "X-API-Key: qwed_your_key" \
   -F "file=@data.csv" \
   -F "query=The average salary is above 50000"
@@ -1329,7 +1331,7 @@ Passing another organization's ID returns `403 Forbidden` with `"Cannot access a
 
 ```bash
 curl --fail-with-body -H "X-API-Key: qwed_live_your_admin_key" \
-  "https://api.qwedai.com/v1/admin/compliance/export/csv?organization_id=12"
+  "http://localhost:8000/admin/compliance/export/csv?organization_id=12"
 ```
 
 ### GET /admin/compliance/verify/{log_id}
@@ -1385,7 +1387,7 @@ Rotate an API key and return the new secret once. Owners, admins, and members ca
 
 ```bash
 curl --fail-with-body -X POST -H "X-API-Key: qwed_live_your_key" \
-  "https://api.qwedai.com/v1/admin/keys/rotate?key_id=42"
+  "http://localhost:8000/admin/keys/rotate?key_id=42"
 ```
 
 **Response:**
