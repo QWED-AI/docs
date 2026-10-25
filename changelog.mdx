@@ -829,7 +829,10 @@ A character denylist can never defend an `eval` sink — these releases replace 
 
   ```bash
   # Before (pre-v7.2 key): now rejected
-  curl -H "X-API-Key: qwed_live_old_key" http://localhost:8000/health
+  curl -X POST http://localhost:8000/verify/math \
+    -H "X-API-Key: qwed_live_old_key" \
+    -H "Content-Type: application/json" \
+    -d '{"expression": "1 + 1 = 2"}'
   # -> 401 Unauthorized
 
   # After: sign in with email/password (no API key needed), then mint a new key

@@ -145,7 +145,10 @@ As of v7.2, QWED stores API keys as HMAC-SHA256 lookup digests keyed by a dedica
 
 ```bash
 # Before (pre-v7.2 key): now rejected
-curl -H "X-API-Key: qwed_live_old_key" http://localhost:8000/health
+curl -X POST http://localhost:8000/verify/math \
+  -H "X-API-Key: qwed_live_old_key" \
+  -H "Content-Type: application/json" \
+  -d '{"expression": "1 + 1 = 2"}'
 # -> 401 Unauthorized
 
 # After: re-issue via JWT login (no API key required)

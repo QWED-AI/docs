@@ -178,12 +178,15 @@ response = requests.post(
     "http://localhost:8000/verify/math",
     headers={"X-API-Key": os.environ["QWED_API_KEY"]},
     json={"expression": "(x + 1)**2 = x**2 + 2*x + 1"},
+    timeout=30,
 )
+response.raise_for_status()  # 401 for a rejected key, 422 for a malformed body
 
 result = response.json()
 print(result["status"])     # VERIFIED
 print(result["admission"])  # ADMIT
-print(result["attestation"])  # JWT proof
+if result["status"] == "VERIFIED":
+    print(result["attestation"])  # JWT proof
 ```
 
 #### Python SDK
