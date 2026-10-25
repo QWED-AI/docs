@@ -296,14 +296,14 @@ Verify logical constraints. Routes through the QWED Control Plane.
 
 ```json
 {
-  "query": "(AND (GT x 5) (LT y 10))",
+  "query": "Is there an x greater than 5 and less than 10?",
   "provider": "openai"
 }
 ```
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `query` | string | Yes | Logical constraint in DSL or natural language |
+| `query` | string | Yes | A logic question in natural language. The server translates it into the [QWED DSL](/api/dsl-reference) with the LLM provider and checks the DSL with Z3. It does not check DSL directly. |
 | `provider` | string | No | Preferred LLM provider |
 
 **Response:**
