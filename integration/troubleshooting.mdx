@@ -87,7 +87,7 @@ result.verified == False  # But should be True
    ```
 3. **Check network latency:**
    ```bash
-   curl -o /dev/null -s -w "%{time_total}s\n" http://localhost:8000/health  # your QWED server
+   curl -o /dev/null -sS -f -w "HTTP %{http_code} in %{time_total}s\n" http://localhost:8000/health  # your QWED server
    ```
 
 ---
