@@ -1191,20 +1191,12 @@ X-Agent-Token: qwed_agent_...
 
 ## Attestation endpoints
 
-### GET /attestation/{id}
+### GET /.well-known/jwks.json
 
-Get an attestation by ID.
+The public keys that verify the attestations the server signs (ES256). No authentication required. Check an attestation's signature with the key whose `kid` matches the token's header. The server has no route that looks up or verifies an attestation by ID.
 
-### POST /attestation/verify
-
-Verify an attestation JWT.
-
-**Request:**
-
-```json
-{
-  "jwt": "eyJhbGciOiJFUzI1NiIs..."
-}
+```bash
+curl -sS -f http://localhost:8000/.well-known/jwks.json
 ```
 
 ---
@@ -1403,47 +1395,6 @@ curl --fail-with-body -X POST -H "X-API-Key: qwed_live_your_key" \
 ```
 
 Store `new_key_secret` immediately. QWED returns it only in this response.
-
----
-
-## Badge endpoints
-
-All badge endpoints return SVG images (`image/svg+xml`). You can embed them directly in Markdown or HTML.
-
-### GET /badge/verified
-
-Get a verified or failed badge SVG.
-
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `verified` | boolean | `true` | Whether to show a verified or failed badge |
-
-### GET /badge/status/{status}
-
-Get a badge for any verification status (e.g., `VERIFIED`, `FAILED`, `CORRECTED`, `BLOCKED`, `PENDING`, `ERROR`).
-
-### GET /badge/attestation/{attestation_id}
-
-Get a badge for a specific attestation by ID.
-
-### GET /badge/engine/{engine}
-
-Get a badge for a specific verification engine.
-
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `verified` | boolean | `true` | Whether to show a verified or failed badge |
-
-### GET /badge/custom
-
-Generate a custom badge with configurable label, message, color, and logo.
-
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `label` | string | `QWED` | Left side label |
-| `message` | string | `verified` | Right side message |
-| `color` | string | — | Hex color (e.g., `#00C853`) |
-| `logo` | boolean | `true` | Include QWED logo |
 
 ---
 
