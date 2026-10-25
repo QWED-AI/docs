@@ -170,24 +170,19 @@ response = verified_engine.query(
 #### REST API
 
 ```python
+import os
 import requests
 
+# Your QWED server; there is no hosted QWED API.
 response = requests.post(
-    "https://api.qwedai.com/v1/verify",
-    headers={"X-API-Key": "qwed_..."},
-    json={
-        "domain": "math",
-        "query": "What is the derivative of x^2?",
-        "llm_output": "2x",
-        "options": {
-            "strict_mode": True,
-            "timeout_ms": 5000
-        }
-    }
+    "http://localhost:8000/verify/math",
+    headers={"X-API-Key": os.environ["QWED_API_KEY"]},
+    json={"expression": "(x + 1)**2 = x**2 + 2*x + 1"},
 )
 
 result = response.json()
-print(result["verified"])  # True
+print(result["status"])     # VERIFIED
+print(result["admission"])  # ADMIT
 print(result["attestation"])  # JWT proof
 ```
 
