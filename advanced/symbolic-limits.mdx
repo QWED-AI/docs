@@ -8,6 +8,8 @@ sidebarTitle: "Symbolic limits"
 
 ## Docker sandbox requirement
 
+<Info>v8.0.0</Info>
+
 CrossHair analyzes a function by importing its module, which runs the module's top-level code. QWED therefore runs CrossHair only inside a hardened Docker container. There is no host fallback.
 
 The container has no network, a read-only root filesystem, no host mounts, and all capabilities dropped. It runs as user 65534 with `no-new-privileges` and the standard sandbox memory, CPU, PID, and concurrency limits. The submitted code reaches the container through its environment and is written only to a private tmpfs, so QWED writes nothing on the host.

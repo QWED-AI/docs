@@ -35,7 +35,7 @@ qwed test    # 12 deterministic tests — all must pass before production
 
 ### Symbolic engine (optional)
 
-The Symbolic engine runs CrossHair only inside a Docker sandbox. Install the `symbolic` extra, which includes CrossHair and the `docker` client, then build the sandbox image from a qwed-verification checkout:
+From v8.0.0, the Symbolic engine runs CrossHair only inside a Docker sandbox. Install the `symbolic` extra, which includes CrossHair and the `docker` client, then build the sandbox image from a qwed-verification checkout:
 
 ```bash
 pip install "qwed[symbolic]"
@@ -98,7 +98,7 @@ python -m uvicorn qwed_new.api.main:app --reload
 | Prometheus | http://localhost:9090 |
 | Jaeger | http://localhost:16686 |
 
-> **Enterprise support coming soon:** Managed hosting and dedicated support. Contact support@qwedai.com
+> **Enterprise support coming soon:** Managed hosting and dedicated support. Contact support@qwedai.tech
 
 ---
 

@@ -243,7 +243,7 @@ By contributing, you agree that your contributions will be licensed under the [A
 
 - Open an issue with the `question` label
 - Join discussions in [GitHub Discussions](https://github.com/QWED-AI/docs/discussions)
-- Email: rahul@qwedai.com
+- Email: rahul@qwedai.tech
 
 ---
 

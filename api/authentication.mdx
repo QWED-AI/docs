@@ -13,7 +13,7 @@ All requests require an API key, except `GET /health` and `GET /health/identity`
 ### Header authentication
 
 ```bash
-curl -H "X-API-Key: qwed_your_key" https://api.qwedai.com/v1/health
+curl -H "X-API-Key: qwed_your_key" http://localhost:8000/health
 ```
 
 ### SDK authentication
@@ -145,15 +145,18 @@ As of v7.2, QWED stores API keys as HMAC-SHA256 lookup digests keyed by a dedica
 
 ```bash
 # Before (pre-v7.2 key): now rejected
-curl -H "X-API-Key: qwed_live_old_key" https://api.qwedai.com/v1/health
+curl -X POST http://localhost:8000/verify/math \
+  -H "X-API-Key: qwed_live_old_key" \
+  -H "Content-Type: application/json" \
+  -d '{"expression": "1 + 1 = 2"}'
 # -> 401 Unauthorized
 
 # After: re-issue via JWT login (no API key required)
-curl -X POST https://api.qwedai.com/v1/auth/signin \
+curl -X POST http://localhost:8000/auth/signin \
   -H "Content-Type: application/json" \
   -d '{"email": "user@example.com", "password": "..."}'
 
-curl -X POST https://api.qwedai.com/v1/auth/api-keys \
+curl -X POST http://localhost:8000/auth/api-keys \
   -H "Authorization: Bearer eyJhbG..." \
   -H "Content-Type: application/json" \
   -d '{"name": "Production Key"}'
@@ -200,7 +203,7 @@ client.verify_action(
 Agent tokens are passed via the `X-Agent-Token` header:
 
 ```bash
-curl -X POST https://api.qwedai.com/v1/agents/42/verify \
+curl -X POST http://localhost:8000/agents/42/verify \
   -H "X-Agent-Token: qwed_agent_..." \
   -H "Content-Type: application/json" \
   -d '{"query": "What is 2+2?"}'
@@ -272,7 +275,7 @@ Sign in an existing user.
 Get the current authenticated user's information. Requires a `Bearer` token in the `Authorization` header.
 
 ```bash
-curl -H "Authorization: Bearer eyJhbG..." https://api.qwedai.com/v1/auth/me
+curl -H "Authorization: Bearer eyJhbG..." http://localhost:8000/auth/me
 ```
 
 ### POST /auth/api-keys
