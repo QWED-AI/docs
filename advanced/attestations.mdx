@@ -40,13 +40,22 @@ The client fetches the server's JWKS, caches it for five minutes, and checks the
 ```python
 from qwed_sdk import AttestationError
 
-result = client.verify_math("2+2=4")
-if result.attestation:
+def admitted(result, query):
+    """True only for an answer whose attestation verifies and that is admitted."""
+    if not result.attestation:
+        return False  # not VERIFIED, so nothing to act on
     try:
-        claims = client.verify_attestation(result, query="2+2=4")
-    except AttestationError as exc:
-        print("attestation does not verify for this answer:", exc)
+        client.verify_attestation(result, query=query)
+    except AttestationError:
+        return False  # fail closed: an answer that doesn't verify is not trusted
+    return result.admission == "ADMIT"
+
+result = client.verify_math("2+2=4")
+if not admitted(result, "2+2=4"):
+    raise RuntimeError("not a verified, admitted answer")
 ```
+
+Treat a missing attestation, or one that doesn't verify, as a refusal. Never act on the unchecked result.
 
 `verify_attestation()` returns the verified claims, or raises `AttestationError`. It checks:
 
@@ -54,7 +63,7 @@ if result.attestation:
 - The issuer, and that the token has not expired (nor is used before any `nbf`).
 - That it attests a `VERIFIED` result.
 - That its `qwed.proof_hash` is the answer's `proof_ref`, so it's this answer's token.
-- When you pass `query`, that its `qwed.query_hash` is the SHA-256 of that statement.
+- When you pass `query`, that its `qwed.query_hash` is the SHA-256 of that statement. For a natural-language answer, pass the translated expression the answer reports (`translated_expression` in its developer fields), not your question: the verdict covers that expression.
 - On a route that decides an admission, that the token signs the answer's `admission`.
 
 If no cached key verifies the token, the client fetches the keys once more, at most once every 30 seconds, to pick up a rotated key. If it can't fetch them, it raises `KeysUnavailableError`, a subclass of `AttestationError`. `KeyMismatchError` means no key in the JWKS verifies the token.
@@ -100,7 +109,7 @@ The server signs with one ES256 key.
 - **Configured key.** Set `QWED_SIGNING_KEY` (PEM text) or `QWED_SIGNING_KEY_FILE` (a path to a PEM file). The key survives restarts and every replica shares it. Its `kid` is `<issuer>#<RFC 7638 thumbprint>`, the same on every restart and replica. A key that can't be loaded stops the server at startup.
 - **Generated key.** Without either variable, the server generates a key per process and logs `attestation.ephemeral_key` at startup. Its tokens stop verifying after a restart, and on another replica.
 
-Tokens last `QWED_ATTESTATION_TTL_SECONDS` (24 hours by default, from 60 seconds to 30 days). Rotating the key ends every token issued before. Revocation is held per process and is not shared, so a token's lifetime is what bounds its use.
+Tokens last `QWED_ATTESTATION_TTL_SECONDS` (24 hours by default, from 60 seconds to 30 days). Rotating the key stops old tokens from verifying against the server's new key. Callers that still hold the old public key, cached for up to five minutes or pinned, can verify those tokens until they expire, so rotation is not an immediate revocation. Revocation is held per process and is not shared, so a token's lifetime is what bounds its use.
 
 `AttestationService.get_issuer_info()` reports the key's lifecycle: `key_continuity_policy` (`"ephemeral"` or `"configured"`), `key_generated_at` (`null` for a configured key), and `key_loaded_at`. QWED logs `attestation.key_generated` on every new key generation.
 
@@ -253,7 +262,7 @@ decision = enforce_trust_decision(
     result,                              # DiagnosticResult from the engine
     attestation_token=token,             # JWT from create_verification_attestation
     require_attestation=True,            # mandatory policy
-    query="2+2=4",                       # original query, for query_hash binding
+    query="2+2=4",                       # the statement the verdict covers, for query_hash binding
     admission="ADMIT",                   # optional: the admission the token must sign
 )
 
@@ -283,7 +292,7 @@ else:
 </ParamField>
 
 <ParamField path="query" type="string | None">
-  Optional original query string. When provided, the token's `qwed.query_hash` claim must equal `sha256(query)`, otherwise the decision is blocked. Without it, query binding is not checked.
+  Optional statement the verdict covers. For a natural-language verdict, that's the translated expression, not the user's question. When provided, the token's `qwed.query_hash` claim must equal `sha256(query)`, otherwise the decision is blocked. Without it, query binding is not checked.
 </ParamField>
 
 <ParamField path="admission" type="string | None">
@@ -310,7 +319,7 @@ When a token is present, `enforce_trust_decision` checks these bindings against 
 | Claim | Bound to | Blocked when |
 |-------|----------|--------------|
 | `qwed.result.status` | `result.status.value` | Token status does not match the engine's status. |
-| `qwed.query_hash` | `sha256(query)` | `query` is provided and does not match the token's query hash. |
+| `qwed.query_hash` | `sha256(query)` | `query` is provided and does not match the token's query hash (for natural language, the translated expression). |
 | `qwed.proof_hash` | `result.proof_ref` | Token proof hash does not match the diagnostic's proof reference. |
 | `qwed.admission` | `admission` | `admission` is provided and the token signs a different one, or none. |
 
