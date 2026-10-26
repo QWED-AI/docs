@@ -88,15 +88,28 @@ CMD ["uvicorn", "qwed_new.api.main:app", "--host", "0.0.0.0"]
 
 ### Build and run
 
+The repository's `Dockerfile` builds the GitHub Action by default; build the API server with `--target server`. Pass the secrets from your shell, so no value is written into the command:
+
 ```bash
-docker build -t qwed-api .
+docker build --target server -t qwed-api .
+
+# Generate each secret once and keep it. Changing the lookup or audit key later
+# invalidates existing API keys or audit signatures.
+for name in API_KEY_SECRET QWED_JWT_SECRET_KEY QWED_API_KEY_LOOKUP_SECRET QWED_AUDIT_SECRET_KEY; do
+  export "$name=$(python -c 'import secrets; print(secrets.token_urlsafe(48))')"
+done
+
 docker run -p 8000:8000 \
-  -e QWED_API_KEY=... \
-  -e API_KEY_SECRET=... \
+  -v qwed-data:/var/lib/qwed \
+  -e API_KEY_SECRET \
+  -e QWED_JWT_SECRET_KEY \
+  -e QWED_API_KEY_LOOKUP_SECRET \
   -e QWED_AUDIT_SECRET_KEY \
   -e QWED_CORS_ORIGINS="https://app.yourcompany.com" \
   qwed-api
 ```
+
+If you keep the values in a `.env` file instead, pass it with `--env-file .env`.
 
 ## Kubernetes
 

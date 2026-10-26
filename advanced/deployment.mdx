@@ -90,9 +90,11 @@ for name in API_KEY_SECRET QWED_JWT_SECRET_KEY QWED_API_KEY_LOOKUP_SECRET QWED_A
   export "$name=$(python -c 'import secrets; print(secrets.token_urlsafe(48))')"
 done
 # For Postgres, also export DATABASE_URL from your secrets manager. Left unset,
-# docker run passes nothing and the server uses SQLite.
+# docker run passes nothing and the server keeps a SQLite database in the
+# qwed-data volume, so it survives replacing the container.
 
 docker run -p 8000:8000 \
+  -v qwed-data:/var/lib/qwed \
   -e DATABASE_URL \
   -e API_KEY_SECRET \
   -e QWED_JWT_SECRET_KEY \
