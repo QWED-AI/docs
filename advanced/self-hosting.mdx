@@ -75,20 +75,9 @@ SETTINGS = {
 
 ## Docker
 
-### API only
-
-```dockerfile
-FROM python:3.13-slim-bookworm
-WORKDIR /app
-COPY . .
-RUN pip install -e .
-EXPOSE 8000
-CMD ["uvicorn", "qwed_new.api.main:app", "--host", "0.0.0.0"]
-```
-
 ### Build and run
 
-The repository's `Dockerfile` builds the GitHub Action by default; build the API server with `--target server`. Pass the secrets from your shell, so no value is written into the command:
+Build from the repository's `Dockerfile`. Its `server` target is the API server: uvicorn on port 8000 as a non-root user, with its data in `/var/lib/qwed`. The default target is the GitHub Action, so pass `--target server`. Pass the secrets from your shell, so no value is written into the command:
 
 ```bash
 docker build --target server -t qwed-api .
