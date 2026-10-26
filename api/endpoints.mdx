@@ -903,7 +903,9 @@ Get the status and results of a batch verification job. Use this to poll results
 
 <Info>New in v7.1.0</Info>
 
-These endpoints work with [Verification Context v1.0](/specs/verification-context) documents — the standardized JSON record of a verification. All three require an API key and are rate-limited per key.
+These endpoints work with [Verification Context](/specs/verification-context) documents, the standardized JSON record of a verification. All three require an API key and are rate-limited per key.
+
+The server signs every document it issues. `from-diagnostic` returns a [v1.1 document](/specs/verification-context#version-1-1-and-the-issuer-attestation) whose `attestation` field is the server's ES256 signature over every other field. By default, `validate` and `resolve` check that signature before they answer, so a document someone else built or edited is refused even when its `proof_ref` resolves.
 
 ### POST /verification-context/from-diagnostic
 
@@ -934,28 +936,30 @@ Convert a [`DiagnosticResult`](/advanced/diagnostics) into a schema-valid Verifi
 | `verifier_version` | string | No | Engine version. Defaults to the installed `qwed` package version |
 | `attestation_token` | string | No | Signed attestation for the diagnostic. Required to keep a `VERIFIED` status |
 
-**Response:** the full Verification Context document (`spec_version`, `object`, `context`, `verdict`).
+**Response:** a v1.1 Verification Context document (`spec_version`, `object`, `context`, `verdict`, `attestation`), signed by the server.
 
 **Fail-closed behavior:**
 
 - A malformed `diagnostic` payload is converted to a `BLOCKED` document instead of being rejected, so the audit trail records the failure.
-- A `VERIFIED` diagnostic without an `attestation_token` fails closed to `BLOCKED` (`trust_gate.mandatory_attestation_missing`). A supplied invalid token fails closed to `BLOCKED` (`trust_gate.invalid_attestation_token`); a valid token with mismatched claims uses the corresponding `trust_gate.claims_*` code. Attestation is enforced through the same trust boundary as `/verify/*`.
+- A `VERIFIED` diagnostic without an `attestation_token` fails closed to `BLOCKED` (`trust_gate.mandatory_attestation_missing`). A supplied invalid token fails closed to `BLOCKED` (`trust_gate.invalid_attestation_token`). A valid token with mismatched claims uses the corresponding `trust_gate.claims_*` code. Attestation is enforced through the same trust boundary as `/verify/*`.
+- The server records the diagnostic but does not vouch for it. The caller's `agent_message` and `developer_fields` are kept under `developer_fields.caller_supplied` and decide nothing, `is_valid` included.
+- The admission is `DENY` unless `attestation_token` also signs `ADMIT` for this verdict (`qwed.admission`), as the token of an answer the server admitted does. An admitted document names the engine that signed the token, and this server's version, as its verifier. Your `verifier` and `verifier_version` are kept under `caller_supplied`.
 
 | Status | Description |
 |--------|-------------|
-| 422 | The resulting document failed Verification Context validation |
-| 500 | Audit persistence failed |
+| 422 | The resulting document failed Verification Context validation, or the canonical encoding refuses it (for example, a lone surrogate in a string) |
+| 500 | Audit persistence, or attestation verification or signing, failed |
 
 ### POST /verification-context/validate
 
-Validate a Verification Context document against the v1.0 JSON Schema, including the verdict/`proof_ref` invariants.
+Validate a Verification Context document against the JSON Schema of its `spec_version` (v1.0 or v1.1), including the verdict/`proof_ref` invariants. By default, the server first checks the document's attestation with its own signing key.
 
 **Request:**
 
 ```json
 {
   "document": {
-    "spec_version": "1.0",
+    "spec_version": "1.1",
     "object": {"formal_statement": "x**2 + 2*x + 1 = (x+1)**2"},
     "context": {
       "interpretation": {"theory": "real-closed field", "logic": "first-order logic"},
@@ -963,10 +967,16 @@ Validate a Verification Context document against the v1.0 JSON Schema, including
       "evidence": {"evidence": {"status": "VERIFIED"}, "proof_ref": "sha256:9f2c…"},
       "decision": {"admission": "ADMIT"}
     },
-    "verdict": "VERIFIED"
+    "verdict": "VERIFIED",
+    "attestation": "<ES256 JWT from from-diagnostic>"
   }
 }
 ```
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `document` | object | Yes | The Verification Context document |
+| `require_attestation` | boolean | No | Default `true`. The document must carry an `attestation` that the server's key verifies and that signs this document. Set `false` to check the schema alone, for example for a v1.0 document |
 
 **Response:**
 
@@ -974,18 +984,34 @@ Validate a Verification Context document against the v1.0 JSON Schema, including
 {"valid": true}
 ```
 
-An invalid document returns `{"valid": false, "error": "validation_failed"}` with HTTP 200. Gate on the `valid` field.
+A failure returns HTTP 200 with `valid: false` and an `error`. Gate on the `valid` field.
+
+| `error` | Cause |
+|---------|-------|
+| `attestation_required` | The document carries no `attestation` |
+| `attestation_invalid` | The attestation does not verify with the server's key, or does not sign this document (it was edited after signing, or carries another document's token) |
+| `validation_failed` | Schema or invariant violation |
+
+<Warning>
+**Behavior change.** A v1.0 document has no `attestation`, so it now returns `attestation_required` unless you send `"require_attestation": false`. Older SDK versions don't send the flag.
+</Warning>
+
+| Status | Description |
+|--------|-------------|
+| 500 | Audit persistence failed, or the server could not load its signing key to check the attestation |
 
 ### POST /verification-context/resolve
 
 Resolve the `proof_ref` evidence commitment of a Verification Context document. The server removes the stored `proof_ref`, re-derives the SHA-256 commitment over the canonical (RFC 8785) bound payload, and compares it to the stored value.
+
+A `proof_ref` is an unkeyed commitment: anyone can compute one for a document they built. So, by default, the server first checks the document's attestation, as for `/validate`, and takes the same `require_attestation` parameter.
 
 **Request:**
 
 ```json
 {
   "document": {
-    "spec_version": "1.0",
+    "spec_version": "1.1",
     "object": {"formal_statement": "x**2 + 2*x + 1 = (x+1)**2"},
     "context": {
       "interpretation": {"theory": "real-closed field", "logic": "first-order logic"},
@@ -993,7 +1019,8 @@ Resolve the `proof_ref` evidence commitment of a Verification Context document. 
       "evidence": {"evidence": {"status": "VERIFIED"}, "proof_ref": "sha256:9f2c…"},
       "decision": {"admission": "ADMIT"}
     },
-    "verdict": "VERIFIED"
+    "verdict": "VERIFIED",
+    "attestation": "<ES256 JWT from from-diagnostic>"
   }
 }
 ```
@@ -1004,7 +1031,7 @@ Resolve the `proof_ref` evidence commitment of a Verification Context document. 
 {"resolved": true}
 ```
 
-`resolved` is `true` only when the document has `verdict: "VERIFIED"`, validates against the schema, and the stored `proof_ref` matches the re-derived commitment. Any other outcome (non-`VERIFIED` verdict, schema failure, mismatched or missing commitment) returns `{"resolved": false}` — a `proof_ref` that cannot be resolved confers no authority.
+`resolved` is `true` only when the attestation verifies (unless `require_attestation` is `false`), the document has `verdict: "VERIFIED"`, it validates against the schema, and the stored `proof_ref` matches the re-derived commitment. An attestation failure returns `{"resolved": false, "error": "attestation_required"}` or `"attestation_invalid"`. Any other failure (non-`VERIFIED` verdict, schema failure, mismatched or missing commitment) returns `{"resolved": false}`. A `proof_ref` that cannot be resolved confers no authority.
 
 ---
 

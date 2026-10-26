@@ -201,7 +201,7 @@ For `math` items, supply equality claims (e.g., `"x + x = 2*x"`) to receive proo
 
 <Info>New in v7.1.0</Info>
 
-The SDK exposes [Verification Context v1.0](/specs/verification-context) — the standardized JSON record of a verification — as client methods, re-exported types, and a `to_verification_context()` method on the verifier classes.
+The SDK exposes [Verification Context](/specs/verification-context), the standardized JSON record of a verification, as client methods, re-exported types, and a `to_verification_context()` method on the verifier classes.
 
 ### Client methods
 
@@ -209,7 +209,7 @@ All three methods are available on both `QWEDClient` and `QWEDAsyncClient` and c
 
 #### create_verification_context_from_diagnostic(diagnostic, query, verifier)
 
-Create a schema-valid Verification Context document from a [`DiagnosticResult`](/advanced/diagnostics) dict. Optional keyword arguments: `verifier_version` and `attestation_token`. A `VERIFIED` diagnostic without a valid attestation token fails closed to `BLOCKED` (fail-closed).
+Create a schema-valid Verification Context document from a [`DiagnosticResult`](/advanced/diagnostics) dict. Optional keyword arguments: `verifier_version` and `attestation_token`. A `VERIFIED` diagnostic without a valid attestation token fails closed to `BLOCKED` (fail-closed). The admission is `DENY` unless the token also signs `ADMIT`, as the `attestation` of an answer the server admitted does. The server returns a v1.1 document, signed in its `attestation` field.
 
 ```python
 document = client.create_verification_context_from_diagnostic(
@@ -227,23 +227,47 @@ print(document["verdict"])                             # "VERIFIED"
 print(document["context"]["decision"]["admission"])    # "ADMIT"
 ```
 
-#### validate_verification_context(document)
+#### validate_verification_context(document, require_attestation=True)
 
-Validate a document against the v1.0 JSON Schema.
+Validate a document against the JSON Schema of its `spec_version`. By default, the client first verifies the document's `attestation` against the server's keys (`/.well-known/jwks.json`), then asks the server, which checks it too.
 
 ```python
 result = client.validate_verification_context(document)
 print(result["valid"])  # True or False
 ```
 
-#### resolve_verification_context(document)
+#### resolve_verification_context(document, require_attestation=True)
 
-Resolve the document's `proof_ref` evidence commitment.
+Resolve the document's `proof_ref` evidence commitment, after the same attestation check. A `proof_ref` alone is a commitment anyone can compute; the attestation shows the server issued the document.
 
 ```python
 result = client.resolve_verification_context(document)
-print(result["resolved"])  # True only if the stored proof_ref matches
+print(result["resolved"])  # True only if the attestation verifies and the stored proof_ref matches
 ```
+
+When the attestation check fails, both methods return the failure without asking the server:
+
+| Result | Cause |
+|--------|-------|
+| `{"valid": False, "error": "attestation_required"}` | The document carries no `attestation`, such as a v1.0 document |
+| `{"valid": False, "error": "attestation_invalid"}` | The attestation does not verify, or does not sign this document |
+
+`resolve_verification_context()` returns the same errors with `resolved` in place of `valid`. If the client can't fetch the server's keys, it raises `KeysUnavailableError` instead of reporting the document invalid. Pass `require_attestation=False` to check the schema or `proof_ref` alone, for example for a v1.0 document you built locally.
+
+#### verify_document_attestation(document)
+
+Verify a document's `attestation` against the server's keys and return its claims, or raise `AttestationError`. To verify offline, or against keys you pinned, use the module function with the JWKS you hold:
+
+```python
+from qwed_sdk import AttestationError, verify_document_attestation
+
+try:
+    claims = verify_document_attestation(document, jwks)
+except AttestationError as exc:
+    print("not this server's document:", exc)
+```
+
+The signature authenticates the document. It adds nothing to the verdict or the admission: a signed `DENY` document is still `DENY`.
 
 ### Re-exported types and helpers
 
@@ -402,9 +426,9 @@ qwed verify-code -f script.py
 # Batch verify
 qwed batch -f queries.json
 
-# Verification Context v1.0 utilities (v7.1.0)
-qwed context validate document.json
-qwed context resolve document.json
+# Verification Context utilities
+qwed context validate --server http://localhost:8000 document.json
+qwed context resolve --jwks-file jwks.json document.json
 qwed context from-diagnostic --diagnostic-file diag.json \
   --query "x + x = 2*x" --verifier MathVerifier
 ```
