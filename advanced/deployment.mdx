@@ -79,16 +79,17 @@ services:
       QWED_AUDIT_SECRET_KEY: ${QWED_AUDIT_SECRET_KEY:?QWED_AUDIT_SECRET_KEY is required}
 ```
 
-To run the image on its own, pass the same variables to `docker run`:
+To run the image on its own, pass every required secret to `docker run`. Generate each one separately; `QWED_API_KEY_LOOKUP_SECRET` must differ from `QWED_JWT_SECRET_KEY`:
 
 ```bash
 docker run -p 8000:8000 \
   -e DATABASE_URL=postgresql://qwed:your_password@db-host:5432/qwed_db \
   -e API_KEY_SECRET=your-generated-secret \
+  -e QWED_JWT_SECRET_KEY=your-generated-jwt-secret \
   -e QWED_API_KEY_LOOKUP_SECRET=your-generated-lookup-secret \
   -e QWED_AUDIT_SECRET_KEY=your-generated-audit-key \
   -e QWED_CORS_ORIGINS="https://app.yourcompany.com" \
-  qwed-core:5.0.0
+  qwedai/qwed-verification:8.0.0
 ```
 
 Start the stack:

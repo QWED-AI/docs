@@ -5,13 +5,13 @@ description: "Release notes for the QWED Protocol: version history, new guards, 
 
 All notable changes to the QWED platform, listed by release.
 
-Jump to: [Signed audit chain for API rows](#qwed-verification-—-api-audit-rows-written-through-the-signed-hash-chain) · [Admin endpoint tenant scoping](#qwed-verification-—-tenant-scoped-admin-endpoints-and-working-rbac) · [`verify_fact` fails closed offline](#qwed-verification-—-verify_fact-fails-closed-offline-and-money-rejects-non-finite-amounts) · [Request caps and sandbox limits](#qwed-verification-—-request-body-caps-timeouts-and-sandbox-concurrency-limits) · [v7.2.3](#v7-2-3-—-code-secret-and-sql-verification-security-release) · [QWED-A2A runtime hardening](#qwed-a2a-—-request-size-limits-engine-budget-and-code-guard-hardening) · [QWED-Tax v0.2.1](#qwed-tax-v0-2-1-—-classification-claim-vocabulary-and-strict-facts) · [QWED-Legal v0.5.1](#qwed-legal-v0-5-1-—-deadlineguard-signing-anchor-allowlist) · [v7.2.2](#v7-2-2-—-verification-soundness-and-safety-hardening) · [Open Responses v0.6.1](#qwed-open-responses-v0-6-1-—-toolguard-verifies-client-action-items) · [QWED-Finance v3.0.1](#qwed-finance-v3-0-1-—-iso-20022-sanctions-and-queryguard-security-fixes) · [QWED-Legal date and input bounds](#qwed-legal-—-fail-closed-date-handling-and-input-bounds) · [Open Responses v0.6.0](#qwed-open-responses-v0-6-0-—-fail-closed-hardening) · [QWED-Legal fail-closed hardening](#qwed-legal-—-fail-closed-hardening-for-guards-diagnostics-and-github-action) · [`qwed init` server identity handshake](#qwed-verification-—-qwed-init-server-identity-handshake) · [Leaked key auto-revocation](#qwed-verification-—-leaked-api-key-auto-revocation-and-false-positive-feedback) · [API-key format spec](#qwed-verification-—-canonical-api-key-format-spec) · [Signed secret-scanning webhook](#qwed-verification-—-signed-secret-scanning-webhook-endpoint) · [v7.2.1](#v7-2-1-—-math-answer-comparison-security-patch) · [v7.2.0](#v7-2-0-—-precision-advisory-and-security-hardening-batch) · [v7.1.0](#v7-1-0-—-verification-context-v1-0-rollout) · [v7.0.0](#v7-0-0-—-full-diagnosticresult-engine-conformance)
+Jump to: [Signed audit chain for API rows](#qwed-verification-—-api-audit-rows-written-through-the-signed-hash-chain) · [Signed Verification Context documents](#qwed-verification-—-signed-verification-context-documents-and-attestation-checks) · [Contacts moved to qwedai.tech](#qwed-verification-—-contacts-and-links-moved-to-qwedai-tech) · [Admin endpoint tenant scoping](#qwed-verification-—-tenant-scoped-admin-endpoints-and-working-rbac) · [`verify_fact` fails closed offline](#qwed-verification-—-verify_fact-fails-closed-offline-and-money-rejects-non-finite-amounts) · [Request caps and sandbox limits](#qwed-verification-—-request-body-caps-timeouts-and-sandbox-concurrency-limits) · [v7.2.3](#v7-2-3-—-code-secret-and-sql-verification-security-release) · [QWED-A2A runtime hardening](#qwed-a2a-—-request-size-limits-engine-budget-and-code-guard-hardening) · [QWED-Tax v0.2.1](#qwed-tax-v0-2-1-—-classification-claim-vocabulary-and-strict-facts) · [QWED-Legal v0.5.1](#qwed-legal-v0-5-1-—-deadlineguard-signing-anchor-allowlist) · [v7.2.2](#v7-2-2-—-verification-soundness-and-safety-hardening) · [Open Responses v0.6.1](#qwed-open-responses-v0-6-1-—-toolguard-verifies-client-action-items) · [QWED-Finance v3.0.1](#qwed-finance-v3-0-1-—-iso-20022-sanctions-and-queryguard-security-fixes) · [QWED-Legal date and input bounds](#qwed-legal-—-fail-closed-date-handling-and-input-bounds) · [Open Responses v0.6.0](#qwed-open-responses-v0-6-0-—-fail-closed-hardening) · [QWED-Legal fail-closed hardening](#qwed-legal-—-fail-closed-hardening-for-guards-diagnostics-and-github-action) · [`qwed init` server identity handshake](#qwed-verification-—-qwed-init-server-identity-handshake) · [Leaked key auto-revocation](#qwed-verification-—-leaked-api-key-auto-revocation-and-false-positive-feedback) · [API-key format spec](#qwed-verification-—-canonical-api-key-format-spec) · [Signed secret-scanning webhook](#qwed-verification-—-signed-secret-scanning-webhook-endpoint) · [v7.2.1](#v7-2-1-—-math-answer-comparison-security-patch) · [v7.2.0](#v7-2-0-—-precision-advisory-and-security-hardening-batch) · [v7.1.0](#v7-1-0-—-verification-context-v1-0-rollout) · [v7.0.0](#v7-0-0-—-full-diagnosticresult-engine-conformance)
 
 ---
 
 ## QWED Verification — API audit rows written through the signed hash chain
 
-**Unreleased** · [GitHub PR #459](https://github.com/QWED-AI/qwed-verification/pull/459) · [GitHub PR #492](https://github.com/QWED-AI/qwed-verification/pull/492) · [GitHub PR #493](https://github.com/QWED-AI/qwed-verification/pull/493)
+**v8.0.0** · [GitHub PR #459](https://github.com/QWED-AI/qwed-verification/pull/459) · [GitHub PR #492](https://github.com/QWED-AI/qwed-verification/pull/492) · [GitHub PR #493](https://github.com/QWED-AI/qwed-verification/pull/493)
 
 > Every `/verify/*` endpoint (including each `/verify/batch` item), the Verification Context routes, `POST /agents/{agent_id}/verify`, and `POST /audit/seed` now append audit rows through `AuditLogger`. New rows are HMAC-signed and hash-chained per organization, so `GET /admin/compliance/verify/{log_id}` and `verify_audit_trail` can verify them. Previously these rows were written without a hash, signature, or previous hash.
 
@@ -46,6 +46,47 @@ To migrate:
 Verification still does not detect removal of the newest entries. That needs an externally stored checkpoint of the latest hash.
 
 See [Audit trail verification](/advanced/compliance#audit-trail-verification) and [Environment variables reference](/advanced/deployment#environment-variables-reference).
+
+---
+
+## QWED Verification — signed Verification Context documents and attestation checks
+
+**Unreleased** · [GitHub PR #517](https://github.com/QWED-AI/qwed-verification/pull/517) · [GitHub PR #523](https://github.com/QWED-AI/qwed-verification/pull/523) · Part of [issue #319](https://github.com/QWED-AI/qwed-verification/issues/319)
+
+> **Security fix.** A document's `proof_ref` is a commitment anyone can compute, so anyone could build a document, an `ADMIT` one included, whose `proof_ref` resolves. The server now signs every document it issues, and `validate` and `resolve` check that signature by default.
+
+### What changed
+
+- **Spec v1.1.** A [v1.1 document](/specs/verification-context#version-1-1-and-the-issuer-attestation) carries `attestation`: an ES256 JWT of type `qwed-context+jwt` that signs the hash of every other field, with the verdict, admission, and `proof_ref`.
+- **Signed documents.** [`POST /verification-context/from-diagnostic`](/api/endpoints#post-verification-context-from-diagnostic) returns v1.1 documents. A failure to sign is a `500`, not an unsigned document. A document the canonical encoding refuses is a `422`.
+- **API checks.** `POST /verification-context/validate` and `/resolve` take `require_attestation` (default `true`) and check the attestation with the server's key. A document with none returns `attestation_required`; one that doesn't verify or isn't this document's returns `attestation_invalid`.
+- **Python SDK.** `validate_verification_context()` and `resolve_verification_context()` verify the attestation against the server's JWKS first, and raise `KeysUnavailableError` if they can't fetch the keys. `verify_document_attestation()` returns the claims. See [Python SDK](/sdks/python#verification-context).
+- **CLI.** `qwed context validate` and `resolve` verify the attestation with `--server` or `--jwks-file`. See [CLI reference](/advanced/cli#qwed-context-verification-context-utilities).
+- **PyJWT 2.8 and 2.9.** The SDK's `verify_attestation` failed with `AttributeError` for every token on these versions. It now works on every version the `pyjwt>=2.8.0` range allows.
+
+### Action required
+
+- **v1.0 documents.** They carry no attestation, so `validate` and `resolve` now refuse them. Pass `require_attestation=False` in the SDK, `"require_attestation": false` to the API, or `--no-require-attestation` to the CLI. Older SDK versions don't send the flag.
+- **Signing key.** Set `QWED_SIGNING_KEY` or `QWED_SIGNING_KEY_FILE` so the documents a server issues still verify after a restart or on another replica.
+
+---
+
+## QWED Verification — contacts and links moved to `qwedai.tech`
+
+**Unreleased** · [GitHub PR #473](https://github.com/QWED-AI/qwed-verification/pull/473)
+
+> `qwedai.tech` is now the only QWED domain. Contact addresses, docs links, and the Verification Context schema `$id` all use it.
+
+### What changed
+
+- **Contacts.** Report security vulnerabilities to `rahul@qwedai.tech`. For support, email `support@qwedai.tech`.
+- **Alert email default.** `ALERT_EMAIL_TO` now defaults to `rahul@qwedai.tech`. Set the variable to send alerts to a different address.
+- **Links.** Website, docs, and finance links point to `qwedai.tech`, `docs.qwedai.tech`, and `finance.qwedai.tech`. Error messages link straight to the docs page, and `QWEDSyntaxError` now shows its docs link like the other QWED errors.
+- **No hosted API.** References to API hosts that never existed are gone. SDK custom base URL examples now use your self-hosted server at `http://localhost:8000`, and the `500` error hint tells you to check the server logs.
+- **Schema `$id`.** The Verification Context schema `$id` is now `https://qwedai.tech/schemas/verification-context/v1.0`. Tools that look the schema up by its old `$id` need the new one.
+- **`qwed init` signup address.** `qwed init` signs up its local bootstrap account with an `example.com` address. The organization slug is cut to fit the 64-character limit on an email local part, so a long organization name no longer makes signup fail with `422`.
+
+See [Verification Context specification](/specs/verification-context), [Go SDK](/sdks/go#configuration), and [Rust SDK](/sdks/rust#configuration).
 
 ---
 
@@ -850,15 +891,18 @@ A character denylist can never defend an `eval` sink — these releases replace 
 
   ```bash
   # Before (pre-v7.2 key): now rejected
-  curl -H "X-API-Key: qwed_live_old_key" https://api.qwedai.com/v1/health
+  curl -X POST http://localhost:8000/verify/math \
+    -H "X-API-Key: qwed_live_old_key" \
+    -H "Content-Type: application/json" \
+    -d '{"expression": "1 + 1 = 2"}'
   # -> 401 Unauthorized
 
   # After: sign in with email/password (no API key needed), then mint a new key
-  curl -X POST https://api.qwedai.com/v1/auth/signin \
+  curl -X POST http://localhost:8000/auth/signin \
     -H "Content-Type: application/json" \
     -d '{"email": "user@example.com", "password": "..."}'
 
-  curl -X POST https://api.qwedai.com/v1/auth/api-keys \
+  curl -X POST http://localhost:8000/auth/api-keys \
     -H "Authorization: Bearer eyJhbG..." \
     -H "Content-Type: application/json" \
     -d '{"name": "Production Key"}'
