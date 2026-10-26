@@ -29,6 +29,20 @@ async fn main() -> Result<(), qwed::Error> {
 }
 ```
 
+## Configuration
+
+Use `QWEDClient::with_options` to point the client at your self-hosted QWED server or change the timeout. There is no hosted QWED API, so set the base URL to the server you run.
+
+```rust
+use std::time::Duration;
+
+let client = QWEDClient::with_options(
+    "qwed_your_key",
+    "http://localhost:8000", // your local QWED server
+    Duration::from_secs(60),
+);
+```
+
 ## Methods
 
 ### verify

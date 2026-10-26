@@ -164,7 +164,7 @@ import statistics
 result = statistics.median(df["amount"])
 
 # Fails: os is not on the allowlist
-import os  # ImportError: import of 'os' is not permitted in the sandbox
+import os  # ImportError: import of 'os' is not permitted in the sandbox (GHSA-j3x4)
 ```
 
 <Warning>

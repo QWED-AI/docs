@@ -5,7 +5,7 @@
 
   > **Deterministic verification infrastructure for AI systems, agents, finance, legal, and compliance.**
 
-  [![Docs](https://img.shields.io/badge/Docs-docs.qwedai.com-0f1117?style=flat&logo=mintlify&logoColor=white)](https://docs.qwedai.com)
+  [![Docs](https://img.shields.io/badge/Docs-docs.qwedai.tech-0f1117?style=flat&logo=mintlify&logoColor=white)](https://docs.qwedai.tech)
   [![Powered by Mintlify](https://img.shields.io/badge/Powered_by-Mintlify-0f1117?style=flat&logo=mintlify&logoColor=white)](https://mintlify.com)
   [![License](https://img.shields.io/badge/License-Apache%202.0-green.svg)](LICENSE)
   [![GitHub Developer Program](https://img.shields.io/badge/GitHub_Developer_Program-Member-4c1?style=flat&logo=github)](https://github.com/QWED-AI)
@@ -33,7 +33,7 @@ The documentation covers:
 
 ## Documentation Site
 
-📖 **[docs.qwedai.com](https://docs.qwedai.com)**
+📖 **[docs.qwedai.tech](https://docs.qwedai.tech)**
 
 ---
 

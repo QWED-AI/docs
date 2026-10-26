@@ -40,6 +40,23 @@ func main() {
 }
 ```
 
+## Configuration
+
+Pass options to `NewClient` to point the client at your self-hosted QWED server or change the timeout. There is no hosted QWED API, so set the base URL to the server you run.
+
+```go
+import (
+    "time"
+
+    qwed "github.com/QWED-AI/qwed-verification/sdk-go/v7"
+)
+
+client := qwed.NewClient("qwed_your_key",
+    qwed.WithBaseURL("http://localhost:8000"), // your local QWED server
+    qwed.WithTimeout(30 * time.Second),
+)
+```
+
 ## Methods
 
 ### Verify

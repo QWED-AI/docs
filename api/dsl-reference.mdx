@@ -272,14 +272,13 @@ qwed verify-logic -f constraint.dsl
 
 ### HTTP API
 
+`POST /verify/logic` takes a natural-language `query`. The server translates it into this DSL with the LLM provider you configured, then checks the DSL with Z3. It does not take DSL directly.
+
 ```bash
-curl -X POST https://api.qwedai.com/v1/verify/logic \
-  -H "Authorization: Bearer qwed_your_key" \
+curl -X POST http://localhost:8000/verify/logic \
+  -H "X-API-Key: qwed_your_key" \
   -H "Content-Type: application/json" \
-  -d '{
-    "expression": "(AND (GT x 5) (LT y 10))",
-    "format": "dsl"
-  }'
+  -d '{"query": "Is there an x greater than 5 and less than 10?"}'
 ```
 
 ---

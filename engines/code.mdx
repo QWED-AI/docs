@@ -382,7 +382,7 @@ Before v7.2.3, shell and subprocess calls were warnings and the code was admitte
 - `urllib.request`, `http.client`, `requests.*`, `httpx.*`, `aiohttp.*`, and `asyncio.open_connection`
 - `ftplib`, `smtplib`, `telnetlib`, `poplib`, and `imaplib`
 
-`os.path.*` is pure path-string manipulation and is not flagged.
+`os.path.*` is not flagged. That includes the string helpers such as `os.path.join` and `os.path.basename`, and also `os.path.exists`, `os.path.isfile` and `os.path.getsize`, which read file-system metadata without opening the file.
 
 ```python
 result = code_verifier.verify_code(

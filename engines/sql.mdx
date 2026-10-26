@@ -62,19 +62,25 @@ When you pass `schema_ddl`, every table the query reads or writes must be declar
 With `schema_ddl`, the engine also expands `SELECT *` (qualified or not, such as `SELECT u.*`) against the declared columns. If the star covers a sensitive column, the query is not valid (`is_valid: false`) with a `CRITICAL` `sensitive_column_access` issue. Select the non-sensitive columns you need instead of `*`. Without `schema_ddl`, the engine can't tell which columns a star covers.
 
 ```python
-result = client.verify_sql(
-    query="SELECT * FROM users",
-    schema_ddl="CREATE TABLE users (id INT, name TEXT, password_hash TEXT)"
-)
-print(result.developer_fields["is_valid"])   # False
-# issues: [{"issue_type": "sensitive_column_access", "severity": "CRITICAL", ...}]
+import httpx
 
-# Select only the columns you need
-result = client.verify_sql(
-    query="SELECT id, name FROM users",
-    schema_ddl="CREATE TABLE users (id INT, name TEXT, password_hash TEXT)"
-)
-print(result.developer_fields["is_valid"])   # True
+try:
+    result = client.verify_sql(
+        query="SELECT * FROM users",
+        schema_ddl="CREATE TABLE users (id INT, name TEXT, password_hash TEXT)",
+    )
+    print(result.developer_fields["is_valid"])   # False
+    # issues: [{"type": "sensitive_column_access", "severity": "CRITICAL", ...}]
+
+    # Select only the columns you need
+    result = client.verify_sql(
+        query="SELECT id, name FROM users",
+        schema_ddl="CREATE TABLE users (id INT, name TEXT, password_hash TEXT)",
+    )
+    print(result.developer_fields["is_valid"])   # True
+except httpx.HTTPError as exc:
+    # Request failed (network error or non-2xx). Fail closed: do not run the SQL.
+    raise RuntimeError(f"SQL verification unavailable: {exc}") from exc
 ```
 
 ```python
@@ -166,10 +172,16 @@ print(result.developer_fields["issues"])
 The engine inspects every node of the parsed query, not just the top-level statement. A data-modifying statement hidden in a CTE or subquery is reported as `destructive_command`, even though the outer statement is a `SELECT`:
 
 ```python
+import httpx
+
 # DML inside a CTE: verified, not valid, not admissible
-result = client.verify_sql("WITH d AS (DELETE FROM users RETURNING *) SELECT * FROM d")
+try:
+    result = client.verify_sql("WITH d AS (DELETE FROM users RETURNING *) SELECT * FROM d")
+except httpx.HTTPError as exc:
+    # Request failed (network error or non-2xx). Fail closed: do not run the SQL.
+    raise RuntimeError(f"SQL verification unavailable: {exc}") from exc
 print(result.developer_fields["is_valid"])   # False
-# issues: [{"issue_type": "destructive_command", "severity": "CRITICAL", ...}]
+# issues: [{"type": "destructive_command", "severity": "CRITICAL", ...}]
 ```
 
 Administrative and side-effecting statement families are reported as `admin_command` wherever they appear (see the table below). Beyond that, only read-only query types are admitted at the top level: `SELECT`, `UNION`, `INTERSECT`, `EXCEPT`, and their `WITH` and parenthesized forms. Any other top-level statement is reported as `non_read_only_statement` with `is_valid: false`, so the engine fails closed on statement types it doesn't recognize.

@@ -221,7 +221,7 @@ result = client.verify_logic("tier == 'gold' and tier == 'silver'")
 
 # Encode categories as integers (gold = 1, silver = 2)
 result = client.verify_logic("(AND (EQ tier 1) (EQ tier 2))")
-print(result.status)  # "UNSAT"
+print(result.status)  # "UNVERIFIABLE" (unsatisfiable)
 ```
 
 <Note>
