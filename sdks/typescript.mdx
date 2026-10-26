@@ -95,13 +95,22 @@ If you call the QWED API without the client, pass the parsed JSON body to `parse
 ```typescript
 import { parseVerificationResponse, isAdmitted } from '@qwed-ai/sdk';
 
-const res = await fetch('http://localhost:8000/verify/math', {
-  method: 'POST',
-  headers: { 'Content-Type': 'application/json', 'X-API-Key': 'qwed_...' },
-  body: JSON.stringify({ expression: '2 + 2 = 4' }),
-});
-const result = parseVerificationResponse(await res.json());
-console.log(isAdmitted(result)); // true
+try {
+  const res = await fetch('http://localhost:8000/verify/math', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-API-Key': 'qwed_...' },
+    body: JSON.stringify({ expression: '2 + 2 = 4' }),
+  });
+  if (!res.ok) {
+    throw new Error(`QWED request failed: ${res.status} ${await res.text()}`);
+  }
+  const result = parseVerificationResponse(await res.json());
+  console.log(isAdmitted(result)); // true
+} catch (err) {
+  // Network error, non-2xx status, or a body that isn't a verification result
+  // (QWEDError QWED-SDK-PARSE-001). Fail closed: treat the claim as not admitted.
+  console.error(err);
+}
 ```
 
 ## Verification methods
@@ -248,7 +257,7 @@ console.log(result.mismatched_count);           // 1
 
 Verify multiple items at once. The response is a `BatchResponse` that mirrors the server's batch job: `job_id`, `status` (the job state: `pending`, `processing`, `completed`, `partial`, or `failed`), `progress_percent`, `total_items`, `completed_items`, `failed_items`, and `items`. There is no aggregate `summary`.
 
-Each item has an `id`, a `status` (the item state, such as `completed` or `failed`), and a `result` holding its [`DiagnosticResult`](/advanced/diagnostics). Gate each item with `isAdmitted(item.result)`. Batch items carry no admission decision today, so they're never admitted.
+Each item has an `id`, a `status` (the item state, such as `completed` or `failed`), and a `result` holding its [`DiagnosticResult`](/advanced/diagnostics). Gate each item with `isAdmitted(item.result)`. Math, code and SQL items carry their route's admission, so an item can be admitted. Natural-language items carry one too, but it is always `BLOCKED`, because nothing proves the translation. Logic and fact items make no decision, so they're never admitted.
 
 ```typescript
 const batch = await client.verifyBatch([

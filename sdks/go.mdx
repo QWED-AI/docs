@@ -117,6 +117,9 @@ result, err := client.Verify(ctx, "Is 15% of 200 equal to 30?")
 
 ```go
 result, err := client.VerifyMath(ctx, "x**2 + 2*x + 1 = (x+1)**2")
+if err != nil {
+    log.Fatal(err)
+}
 fmt.Println(result.IsAdmitted())     // true
 fmt.Println(result.Extra["is_valid"]) // true
 ```
@@ -125,6 +128,9 @@ fmt.Println(result.Extra["is_valid"]) // true
 
 ```go
 result, err := client.VerifyLogic(ctx, "(AND (GT x 5) (LT y 10))")
+if err != nil {
+    log.Fatal(err)
+}
 // /verify/logic makes no admission decision: Admission is "" and IsAdmitted() is false.
 fmt.Println(result.Status, result.Extra["model"])
 ```
@@ -133,6 +139,9 @@ fmt.Println(result.Status, result.Extra["model"])
 
 ```go
 result, err := client.VerifyCode(ctx, code, "python")
+if err != nil {
+    log.Fatal(err)
+}
 fmt.Println(result.Status, result.Admission) // VERIFIED BLOCKED
 fmt.Println(result.Extra["issues"])          // what was found
 ```
@@ -141,7 +150,11 @@ fmt.Println(result.Extra["issues"])          // what was found
 
 ```go
 result, err := client.VerifyFact(ctx, claim, factContext)
+if err != nil {
+    log.Fatal(err)
+}
 // /verify/fact makes no admission decision, so IsAdmitted() is false.
+fmt.Println(result.Status, result.AgentMessage)
 ```
 
 ### VerifySQL

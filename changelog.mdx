@@ -19,7 +19,7 @@ Jump to: [Go, TypeScript, and Rust SDK admission gating](#qwed-verification-—-
 **Breaking type changes.** Code that reads `verified`, `summary`, `engine`, or `result`, or matches on the old statuses, no longer compiles or no longer behaves the same.
 
 - **Statuses.** `VerificationStatus` is `VERIFIED`, `UNVERIFIABLE`, `BLOCKED`, or `Unknown`. The old `FAILED`, `CORRECTED`, `ERROR`, `TIMEOUT`, and `UNSUPPORTED` values are removed. Unknown server status text is kept in `raw_status` / `RawStatus` / `rawStatus` and is never admitted.
-- **New `Admission` enum.** `ADMIT`, `BLOCKED`, or `Unknown`. It's absent where the endpoint makes no decision: `/verify/logic`, `/verify/fact`, `/verify/rag`, `/verify/process`, and batch items.
+- **New `Admission` enum.** `ADMIT`, `BLOCKED`, or `Unknown`. It's absent where the endpoint makes no decision: `/verify/logic`, `/verify/fact`, `/verify/rag`, `/verify/process`, and batch logic and fact items.
 - **Envelope fields.** Responses expose `status`, `admission`, `proof_ref`, `agent_message`, `is_authoritative`, `constraint_id`, and `developer_fields`. Endpoint fields such as `is_valid` and `issues` move to `extra` (Rust), `Extra` (Go), or top-level keys (TypeScript).
 - **Batch responses.** `BatchResponse` mirrors the batch job: `job_id`, `status`, `progress_percent`, `total_items`, `completed_items`, `failed_items`, and `items[]` with a per-item `result`. `summary` is removed.
 - **Deprecated.** `is_verified()` / `IsVerified()` / `isVerified()` and the `verified` / `Verified` fields now follow admission.
