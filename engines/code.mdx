@@ -12,7 +12,11 @@ description: "QWED Code engine reference: CrossHair symbolic execution for Pytho
 **Updated in v7.0.0 (breaking).** The security-scanning path (`CodeVerifier` and `SecureCodeExecutor`, backing `POST /verify/code`) also returns `DiagnosticResult` now, and proven-unsafe code is reported as `VERIFIED` with a separate admission decision. See [Security scanning](#security-scanning-codeverifier) below and the [changelog](/changelog#v7-0-0-—-full-diagnosticresult-engine-conformance).
 </Info>
 
-The Code Engine uses [CrossHair](https://github.com/pschanely/crosshair), a symbolic execution tool for Python, to verify code properties without running it.
+The Code Engine uses [CrossHair](https://github.com/pschanely/crosshair), a symbolic execution tool for Python, to search for counterexamples to code properties.
+
+<Warning>
+CrossHair imports the module it analyzes, which runs that module's top-level code. QWED runs CrossHair only inside a hardened Docker container and never on the host. Without Docker or the sandbox image, `verify_code()` returns `BLOCKED` with `constraint_id = "symbolic_verifier.runtime_unavailable"`. See [Docker sandbox requirement](/advanced/symbolic-limits#docker-sandbox-requirement).
+</Warning>
 
 ---
 
@@ -27,6 +31,17 @@ The Code Engine uses [CrossHair](https://github.com/pschanely/crosshair), a symb
 | **Complexity analysis**     | Loops, recursions, and path-budget estimates            |
 
 ---
+
+## Prerequisites
+
+Install the symbolic extra, which includes CrossHair and the `docker` client, then build the sandbox image from a qwed-verification checkout:
+
+```bash
+pip install "qwed[symbolic]"
+docker build -t qwed-crosshair-sandbox:0.0.101 docker/crosshair-sandbox
+```
+
+The image is built from `docker/crosshair-sandbox/Dockerfile`. QWED never pulls it at runtime. Set `QWED_CROSSHAIR_IMAGE` to use a different tag.
 
 ## Quick start
 
@@ -62,7 +77,7 @@ All six public methods — `verify_code`, `verify_function_contract`, `verify_sa
 | ---------------------------------- | ----------------------------------------------------------------------- |
 | `DiagnosticStatus.VERIFIED`        | **Never emitted by this engine.** See [below](#why-verified-is-never-emitted). |
 | `DiagnosticStatus.UNVERIFIABLE`    | Analysis ran but proof was incomplete, timed out, or found a counterexample. |
-| `DiagnosticStatus.BLOCKED`         | Verification could not be attempted (parse error, no functions, CrossHair missing). |
+| `DiagnosticStatus.BLOCKED`         | Verification could not be attempted (parse error, no functions, code over 120 KiB, Docker sandbox unavailable). |
 
 Read the specific reason from `result.developer_fields["constraint_id"]`.
 
@@ -88,7 +103,7 @@ Downstream policy gates must reject `UNVERIFIABLE` results for control flow. Tre
 
 ## Symbolic verification
 
-`verify_code()` walks the AST, extracts every function with type annotations, and runs CrossHair on each one.
+`verify_code()` walks the AST, extracts every function with type annotations, and runs CrossHair on each one inside the Docker sandbox. QWED addresses each function by module qualname (`target.func` or `target.Class.method`). Functions nested inside other functions can't be loaded by name and are reported as unverifiable.
 
 ```python
 result = verifier.verify_code(code)
