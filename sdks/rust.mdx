@@ -30,6 +30,20 @@ async fn main() -> Result<(), qwed::Error> {
 }
 ```
 
+## Configuration
+
+Use `QWEDClient::with_options` to point the client at your self-hosted QWED server or change the timeout. There is no hosted QWED API, so set the base URL to the server you run.
+
+```rust
+use std::time::Duration;
+
+let client = QWEDClient::with_options(
+    "qwed_your_key",
+    "http://localhost:8000", // your local QWED server
+    Duration::from_secs(60),
+);
+```
+
 ## Reading a result
 
 Every verification method returns a `VerificationResponse` that models the server's [DiagnosticResult](/advanced/diagnostics) envelope.
@@ -38,8 +52,9 @@ Every verification method returns a `VerificationResponse` that models the serve
 |-------|------|---------|
 | `status` | `VerificationStatus` | `Verified`, `Unverifiable`, or `Blocked`. `Unknown` for a value this SDK doesn't recognize. |
 | `raw_status` | `String` | The server's status text exactly as sent, such as `SAT` where `status` is `Unknown`. Never used for admission. |
-| `admission` | `Option<Admission>` | `Some(Admit)` or `Some(Blocked)` where the endpoint makes a decision. `None` where it doesn't. |
+| `admission` | `Option<Admission>` | `Some(Admit)` or `Some(Blocked)` where the endpoint makes a decision. `Some(Unknown)` for a value this SDK doesn't recognise. `None` where the endpoint makes no decision. |
 | `proof_ref` | `Option<String>` | Set only when `status` is `Verified`. |
+| `attestation` | `Option<String>` | On a `Verified` answer, the server's signed attestation, an ES256 JWT. Check it with `client.verify_attestation`. |
 | `agent_message` | `Option<String>` | Human-readable explanation. |
 | `is_authoritative` | `Option<bool>` | Whether the verdict is authoritative. |
 | `constraint_id` | `Option<String>` | The constraint that produced the verdict. |
@@ -58,7 +73,7 @@ Use `is_admitted()` to decide whether to act on a result. Don't gate on `status`
 - `status` is `Verified`
 - `proof_ref` is set
 
-A missing or `Unknown` admission is never admitted. Endpoints that make no admission decision (`/verify/logic`, `/verify/fact`, `/verify/rag`, `/verify/process`, and batch items) are therefore never admitted. The `verified` field that `/verify/rag` and `/verify/process` send is their guard's own result, not an admission. It stays in `extra["verified"]` and `developer_fields`.
+A missing or `Unknown` admission is never admitted. Endpoints that make no admission decision (`/verify/logic`, `/verify/fact`, `/verify/rag`, `/verify/process`, and batch logic and fact items) are therefore never admitted. The `verified` field that `/verify/rag` and `/verify/process` send is their guard's own result, not an admission. It stays in `extra["verified"]` and `developer_fields`.
 
 ```rust
 let result = client.verify_math("2 + 2 = 5").await?;

@@ -87,7 +87,7 @@ result.verified == False  # But should be True
    ```
 3. **Check network latency:**
    ```bash
-   ping api.qwedai.com
+   curl -o /dev/null -sS -f -w "HTTP %{http_code} in %{time_total}s\n" http://localhost:8000/health  # your QWED server
    ```
 
 ---
@@ -179,7 +179,7 @@ QuotaExceededError: API quota exceeded
 
 ### Enterprise support
 
-- 📧 Email: [support@qwedai.com](mailto:support@qwedai.com)
+- 📧 Email: [support@qwedai.tech](mailto:support@qwedai.tech)
 - 💼 Slack Connect (Enterprise customers)
 - 📞 Emergency Hotline (Enterprise Pro\+)
 
@@ -202,7 +202,7 @@ When troubleshooting:
 
 ---
 
-**Still stuck?** Contact [support@qwedai.com](mailto:support@qwedai.com) with:
+**Still stuck?** Contact [support@qwedai.tech](mailto:support@qwedai.tech) with:
 
 - Error message
 - Code snippet
