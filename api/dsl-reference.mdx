@@ -162,7 +162,14 @@ from qwed_new.core.dsl_logic_verifier import DSLLogicVerifier
 result = DSLLogicVerifier().verify_from_dsl(
     "(EQ flag True)", variables=[{"name": "flag", "type": "Bool"}]
 )
-print(result.status)  # "SAT"
+
+if result.status == "SAT":
+    print(result.model)               # {"flag": "True"}
+elif result.status == "UNSAT":
+    print(result.rejection_reason)    # the constraints contradict each other
+else:
+    # ERROR, BLOCKED or UNKNOWN: the solver reached no verdict. Fail closed.
+    raise RuntimeError(f"Logic verification failed ({result.status}): {result.error}")
 ```
 
 The compiler checks operand sorts and never coerces a Boolean to `1` or `0`:
