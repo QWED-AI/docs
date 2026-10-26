@@ -128,7 +128,7 @@ v1.1 is v1.0 plus one field, `attestation`: the issuing server's signature. Ever
 
 - A v1.1 document must carry `attestation`, and a v1.0 document must not.
 - `attestation` is a compact ES256 JWT. Its header has `typ` `qwed-context+jwt`, which separates it from a verdict's attestation (`qwed-attestation+jwt`), and a `kid` naming the signing key.
-- Its claims sign the **document hash**: the SHA-256 of the canonical encoding of every field except `attestation`, in both `sub` and `qwed.document_hash`. The claims also name `qwed.version` (`"1.1"`), `qwed.verdict`, `qwed.admission`, and `qwed.proof_ref`.
+- Its claims sign the **document hash**: the SHA-256 of the canonical encoding of every field except `attestation`, written as `sha256:` followed by 64 lowercase hex characters, in both `sub` and `qwed.document_hash`. The claims also name `qwed.version` (`"1.1"`), `qwed.verdict`, `qwed.admission`, and `qwed.proof_ref`.
 - The token lasts as long as a verdict's attestation (`QWED_ATTESTATION_TTL_SECONDS`, 24 hours by default). An expired document is obtained again, not trusted.
 
 To verify a v1.1 document, check:

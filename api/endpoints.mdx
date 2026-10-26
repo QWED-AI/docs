@@ -984,7 +984,7 @@ Validate a Verification Context document against the JSON Schema of its `spec_ve
 {"valid": true}
 ```
 
-A failure returns HTTP 200 with `valid: false` and an `error`. Gate on the `valid` field.
+A document that fails the attestation check or validation returns HTTP 200 with `valid: false` and an `error`. Gate on the `valid` field. A server-side failure is a `500` instead (see the status table below), so treat any non-200 response as not validated.
 
 | `error` | Cause |
 |---------|-------|

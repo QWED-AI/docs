@@ -514,7 +514,7 @@ Install PII support with `pip install 'qwed[pii]'` and download the spaCy model:
 
 <Info>New in v7.1.0</Info>
 
-Work with [Verification Context](/specs/verification-context) documents from the command line. All subcommands print JSON and exit non-zero on failure, so they compose cleanly in CI pipelines.
+Work with [Verification Context](/specs/verification-context) documents from the command line. All three commands print JSON. `validate` and `from-diagnostic` exit with code 1 on any failure. `resolve` exits with code 1 when it can't read the file or the attestation check fails, but exits with code 0 when the commitment doesn't resolve. In CI, gate on the `resolved` field, not only the exit code.
 
 `validate` and `resolve` check a document's [attestation](/specs/verification-context#version-1-1-and-the-issuer-attestation) by default: it must verify with the issuing server's keys and sign this document. Pass the keys with one of these options:
 
@@ -567,7 +567,7 @@ qwed context resolve --jwks-file jwks.json document.json
 }
 ```
 
-`resolved` is `true` only for a schema-valid `VERIFIED` document whose attestation verifies and whose stored `proof_ref` matches the re-derived commitment. An attestation failure prints `{"resolved": false, "error": "..."}` and exits with code 1. Any other outcome prints `{"resolved": false}` (fail-closed).
+`resolved` is `true` only for a schema-valid `VERIFIED` document whose attestation verifies and whose stored `proof_ref` matches the re-derived commitment. An attestation failure prints `{"resolved": false, "error": "..."}` and exits with code 1. Any other outcome prints `{"resolved": false}` and exits with code 0, so check the `resolved` field: a `proof_ref` that doesn't resolve confers no authority.
 
 #### `qwed context from-diagnostic`
 
