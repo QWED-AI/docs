@@ -124,7 +124,7 @@ spec:
               key: api-key
 ```
 
-> 🏢 **Enterprise Support Coming Soon:** Managed hosting, dedicated support, and SLA guarantees. Contact [support@qwedai.com](mailto:support@qwedai.com)
+> 🏢 **Enterprise Support Coming Soon:** Managed hosting, dedicated support, and SLA guarantees. Contact [support@qwedai.tech](mailto:support@qwedai.tech)
 
 ## Scaling
 
@@ -172,6 +172,8 @@ Request body caps are fixed. Every `/verify` JSON route accepts up to 1,000,000 
 
 ### Sandbox image and container user
 
+<Info>v8.0.0</Info>
+
 `/verify/stats` and `/verify/consensus` run model-generated Python in a Docker sandbox. QWED pins the sandbox image by digest, so the sandbox only ever runs the exact image that was reviewed:
 
 ```text
@@ -198,7 +200,7 @@ export QWED_SANDBOX_UID_RANGE=2000000000-2000099999
 ```
 
 <Warning>
-QWED never guesses how the Docker daemon maps users. It reports the sandbox as unavailable (`SECURE_RUNTIME_UNAVAILABLE`, HTTP `503` on the affected endpoints) when:
+QWED never guesses how the Docker daemon maps users. It reports the sandbox as unavailable (`SECURE_RUNTIME_UNAVAILABLE`) when any of the following is true. `/verify/stats` then returns `BLOCKED` with constraint `stats_verifier.runtime_unavailable`, and `/verify/consensus` counts its code-execution engine as `BLOCKED`.
 
 - the daemon uses `userns-remap`
 - the server process runs as root with a rootless daemon
