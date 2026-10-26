@@ -131,12 +131,19 @@ while solver.check() == sat:
 
 ## Business rules
 
-These rules compare flags such as `has_id` with `True`, so each flag must be declared `Bool`, or the compiler returns `ERROR` (see [Type rules](#type-rules)). The examples run the DSL directly with `DSLLogicVerifier`, which takes the declarations in `variables`:
+These rules compare flags such as `has_id` with `True`, so each flag must be declared `Bool`, or the compiler returns `ERROR` (see [Type rules](#type-rules)). The examples here and under [Quantifiers](#quantifiers) run the DSL directly with `DSLLogicVerifier`, which takes the declarations in `variables`. `verdict()` returns `SAT` or `UNSAT` and fails closed on anything else:
 
 ```python
 from qwed_new.core.dsl_logic_verifier import DSLLogicVerifier
 
 verifier = DSLLogicVerifier()
+
+
+def verdict(result):
+    if result.status in ("SAT", "UNSAT"):
+        return result.status
+    # ERROR, BLOCKED or UNKNOWN: the solver reached no verdict. Fail closed.
+    raise RuntimeError(f"Logic verification failed ({result.status}): {result.error}")
 ```
 
 ### Age verification
@@ -152,6 +159,7 @@ result = verifier.verify_from_dsl(rule, variables=[
     {"name": "has_id", "type": "Bool"},
     {"name": "can_purchase", "type": "Bool"},
 ])
+print(verdict(result))  # "SAT"
 ```
 
 ### Discount eligibility
@@ -164,6 +172,7 @@ rule = """
 )
 """
 result = verifier.verify_from_dsl(rule, variables=[{"name": "member", "type": "Bool"}])
+print(verdict(result))  # "SAT"
 ```
 
 ### Approval workflow
@@ -177,6 +186,7 @@ rule = """
 )
 """
 result = verifier.verify_from_dsl(rule, variables=[{"name": "requires_approval", "type": "Bool"}])
+print(verdict(result))  # "SAT"
 ```
 
 ---
@@ -203,11 +213,11 @@ To quantify over a collection, quantify over a numeric variable and state the pr
 ```python
 # Every number greater than 5 is also greater than 3
 result = verifier.verify_from_dsl("(FORALL n (IMPLIES (GT n 5) (GT n 3)))")
-print(result.status)  # "SAT"
+print(verdict(result))  # "SAT"
 
 # Not every integer is positive
 result = verifier.verify_from_dsl("(FORALL x (GT x 0))")
-print(result.status)  # "UNSAT"
+print(verdict(result))  # "UNSAT"
 ```
 
 ### Existential (EXISTS)
@@ -215,11 +225,11 @@ print(result.status)  # "UNSAT"
 ```python
 # Some integer lies strictly between 0 and 10
 result = verifier.verify_from_dsl("(EXISTS x (AND (GT x 0) (LT x 10)))")
-print(result.status)  # "SAT"
+print(verdict(result))  # "SAT"
 
 # No integer lies strictly between 0 and 1 (x is an Int by default)
 result = verifier.verify_from_dsl("(EXISTS x (AND (GT x 0) (LT x 1)))")
-print(result.status)  # "UNSAT"
+print(verdict(result))  # "UNSAT"
 ```
 
 ### Bound and free variables
@@ -227,7 +237,7 @@ print(result.status)  # "UNSAT"
 ```python
 # The quantified x and the free x are different variables
 result = verifier.verify_from_dsl("(AND (FORALL x (GTE (MULT x x) 0)) (EQ x 3))")
-print(result.status)  # "SAT", with x = 3 in the model
+print(verdict(result), result.model)  # SAT {'x': '3'}
 ```
 
 ---
@@ -262,7 +272,7 @@ When you verify a natural-language logic query, QWED translates it to DSL using 
 ```python
 result = client.verify_logic("x must be greater than 5 and less than 3")
 print(result.provider_used)  # "openai_compat"
-print(result.status)         # "UNSAT"
+print(result.status)         # "UNVERIFIABLE" (unsatisfiable)
 ```
 
 This field also appears in error responses, which helps you debug provider-related issues without inspecting server logs.
