@@ -105,7 +105,7 @@ Verify an output:
     -H "Content-Type: application/json" \
     -d '{"expression": "2+2=4"}'
 
-Documentation: https://docs.qwedai.com
+Documentation: https://docs.qwedai.tech
 -----------------------------------------
 ```
 
@@ -516,14 +516,31 @@ Install PII support with `pip install 'qwed[pii]'` and download the spaCy model:
 
 <Info>New in v7.1.0</Info>
 
-Work with [Verification Context v1.0](/specs/verification-context) documents from the command line. All subcommands print JSON and exit non-zero on failure, so they compose cleanly in CI pipelines.
+Work with [Verification Context](/specs/verification-context) documents from the command line. All three commands print JSON. `validate` and `from-diagnostic` exit with code 1 on any failure. `resolve` exits with code 1 when it can't read the file or the attestation check fails, but exits with code 0 when the commitment doesn't resolve. In CI, gate on the `resolved` field, not only the exit code.
+
+`validate` and `resolve` check a document's [attestation](/specs/verification-context#version-1-1-and-the-issuer-attestation) by default: it must verify with the issuing server's keys and sign this document. Pass the keys with one of these options:
+
+| Option | Description |
+|--------|-------------|
+| `--server URL` | Fetch the keys from the server's `/.well-known/jwks.json` |
+| `--jwks-file PATH` | Read the keys from a JWKS file, to verify offline or against keys you pinned |
+| `--no-require-attestation` | Skip the attestation check. Use it for a v1.0 document, such as one `qwed context from-diagnostic` builds locally |
+
+Pass `--server` or `--jwks-file`, not both. The attestation errors are:
+
+| `error` | Cause |
+|---------|-------|
+| `attestation_required` | The document carries no `attestation` |
+| `attestation_keys_required` | The document is signed, but you passed neither `--server` nor `--jwks-file` |
+| `attestation_keys_unavailable` | The JWKS file could not be read, or the server's keys could not be fetched |
+| `attestation_invalid` | The attestation does not verify with those keys, or does not sign this document |
 
 #### `qwed context validate`
 
-Validate a Verification Context document file against the v1.0 JSON Schema, including the verdict/`proof_ref` invariants.
+Validate a Verification Context document file against the JSON Schema of its `spec_version` (v1.0 or v1.1), including the verdict/`proof_ref` invariants, after the attestation check.
 
 ```bash
-qwed context validate document.json
+qwed context validate --server http://localhost:8000 document.json
 ```
 
 **Example output:**
@@ -534,14 +551,14 @@ qwed context validate document.json
 }
 ```
 
-An invalid or unreadable file prints `{"valid": false, "error": "..."}` and exits with code 1. Error values are `invalid_document_file` (file could not be read or parsed as JSON) and `validation_failed` (schema or invariant violation).
+An invalid or unreadable file prints `{"valid": false, "error": "..."}` and exits with code 1. Error values are the attestation errors above, `invalid_document_file` (file could not be read or parsed as JSON) and `validation_failed` (schema or invariant violation).
 
 #### `qwed context resolve`
 
-Resolve the `proof_ref` evidence commitment of a document file. The command re-derives the SHA-256 commitment over the canonical bound payload and compares it to the stored value.
+Resolve the `proof_ref` evidence commitment of a document file. The command re-derives the SHA-256 commitment over the canonical bound payload and compares it to the stored value, after the attestation check.
 
 ```bash
-qwed context resolve document.json
+qwed context resolve --jwks-file jwks.json document.json
 ```
 
 **Example output:**
@@ -552,11 +569,11 @@ qwed context resolve document.json
 }
 ```
 
-`resolved` is `true` only for a schema-valid `VERIFIED` document whose stored `proof_ref` matches the re-derived commitment. Any other outcome prints `{"resolved": false}` (fail-closed).
+`resolved` is `true` only for a schema-valid `VERIFIED` document whose attestation verifies and whose stored `proof_ref` matches the re-derived commitment. An attestation failure prints `{"resolved": false, "error": "..."}` and exits with code 1. Any other outcome prints `{"resolved": false}` and exits with code 0, so check the `resolved` field: a `proof_ref` that doesn't resolve confers no authority.
 
 #### `qwed context from-diagnostic`
 
-Create a Verification Context document from a [`DiagnosticResult`](/advanced/diagnostics) JSON file and print it.
+Create a Verification Context document from a [`DiagnosticResult`](/advanced/diagnostics) JSON file and print it. The command runs locally and has no signing key, so it prints an unsigned v1.0 document. Validate it with `--no-require-attestation`. For a signed document, use the server's [`POST /verification-context/from-diagnostic`](/api/endpoints#post-verification-context-from-diagnostic).
 
 ```bash
 qwed context from-diagnostic \

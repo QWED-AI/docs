@@ -81,14 +81,16 @@ developer_fields = {
 
 Cryptographic hash (`sha256:...`) of retained proof artifact. Present only when `status == VERIFIED` and proof was established. `None` for `UNVERIFIABLE` / `BLOCKED`.
 
-**This is the authority bit.** Downstream gates use a mechanical rule:
+**This is the authority bit.** It says the verdict was decided, not that the claim holds: a claim proven false or code proven unsafe is `VERIFIED` with a `proof_ref` too. Downstream gates admit through `admission_decision()`, which also requires `developer_fields.is_valid`:
 
 ```python
-if result.proof_ref is not None:
-    # Authoritative — admissible for control flow
+from qwed_new.core.diagnostics import AdmissionDecision, admission_decision
+
+if admission_decision(result) is AdmissionDecision.ADMIT:
+    # Proven and valid: admissible for control flow
     admit()
 else:
-    # Non-authoritative — reject for control flow
+    # Proven false or unsafe, unverifiable, or blocked: reject for control flow
     block()
 ```
 
@@ -150,7 +152,7 @@ Advisory checks **never** set `status` or `proof_ref`. This structurally enforce
 ### Constructing results
 
 ```python
-from src.qwed_new.core.diagnostics import DiagnosticResult, DiagnosticStatus, AdvisoryCheck
+from qwed_new.core.diagnostics import DiagnosticResult, DiagnosticStatus, AdvisoryCheck
 
 # VERIFIED with proof
 result = DiagnosticResult.verified(
@@ -227,7 +229,7 @@ result = DiagnosticResult.unverifiable(
 ### Downstream gate
 
 ```python
-from src.qwed_new.core.diagnostics import AdmissionDecision, admission_decision
+from qwed_new.core.diagnostics import AdmissionDecision, admission_decision
 
 def release_gate(result: DiagnosticResult) -> bool:
     """Admit only proven-valid results."""

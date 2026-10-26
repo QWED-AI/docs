@@ -6,8 +6,10 @@ description: "Complete QWED API endpoint reference covering health checks, verif
 
 ## Base URL
 
+QWED has no hosted API. Use the address of the QWED server you run; locally it is:
+
 ```text
-https://api.qwedai.com/v1
+http://localhost:8000
 ```
 
 ## Health check
@@ -17,7 +19,7 @@ https://api.qwedai.com/v1
 Check API status. No authentication required.
 
 ```bash
-curl https://api.qwedai.com/v1/health
+curl http://localhost:8000/health
 ```
 
 **Response:**
@@ -220,11 +222,13 @@ Verify mathematical expressions or equations using SymPy symbolic computation.
   "right_side": "(x + 1)**2",
   "simplified_difference": "0",
   "agent_message": "Identity is true",
+  "proof_ref": "sha256:...",
+  "attestation": "eyJ...",
   "admission": "ADMIT"
 }
 ```
 
-Every response includes `admission`. Gate on `admission`, not on `status`: `ADMIT` only when `status` is `VERIFIED` and `is_valid` is `true`.
+Every response from this endpoint includes `admission`. Gate on `admission`, not on `status`: `ADMIT` only when `status` is `VERIFIED` and `is_valid` is `true`. A `VERIFIED` response also carries `proof_ref` and its signed `attestation`.
 
 | Outcome | Example | `status` | `is_valid` | `admission` |
 |---------|---------|----------|------------|-------------|
@@ -244,6 +248,8 @@ Every response includes `admission`. Gate on `admission`, not on `status`: `ADMI
   "right_side": "5",
   "simplified_difference": "-1",
   "agent_message": "Identity is false",
+  "proof_ref": "sha256:...",
+  "attestation": "eyJ...",
   "admission": "BLOCKED"
 }
 ```
@@ -258,16 +264,22 @@ The audit log row's `is_verified` follows `is_valid`, so a proven-false identity
 
 ```json
 {
+  "status": "VERIFIED",
   "is_valid": true,
   "value": 4.0,
+  "exact_value": "4",
   "simplified": "4",
-  "original": "2 + 2"
+  "original": "2 + 2",
+  "agent_message": "Expression evaluated",
+  "proof_ref": "sha256:...",
+  "attestation": "eyJ...",
+  "admission": "ADMIT"
 }
 ```
 
 Symbolic expressions that cannot be evaluated to a numeric value include `is_symbolic: true`. Expressions involving complex numbers include `is_complex: true`.
 
-**Ambiguous expressions:** Expressions with implicit multiplication after division (e.g., `1/2(3+1)`) are rejected with `is_valid: false`, `result: false`, and `status: "BLOCKED"`. The response includes `warning: "ambiguous"` and a `message` explaining why. Rewrite the expression with explicit parentheses or a `*` operator to remove the ambiguity.
+**Ambiguous expressions:** Expressions with implicit multiplication after division (e.g., `1/2(3+1)`) are rejected with `is_valid: false`, `result: false`, `status: "BLOCKED"`, and `admission: "BLOCKED"`. The response includes `warning: "ambiguous"` and an `agent_message` explaining why. Rewrite the expression with explicit parentheses or a `*` operator to remove the ambiguity.
 
 ```json
 {
@@ -275,16 +287,17 @@ Symbolic expressions that cannot be evaluated to a numeric value include `is_sym
   "result": false,
   "status": "BLOCKED",
   "warning": "ambiguous",
-  "message": "Expression may be ambiguous due to implicit multiplication after division",
-  "simplified": "..."
+  "agent_message": "Expression may be ambiguous due to implicit multiplication after division",
+  "simplified": "...",
+  "admission": "BLOCKED"
 }
 ```
 
-**Error cases:** Division by zero, `log(0)`, and square root of negative numbers in the real domain return `is_valid: false` with a descriptive `error` and `message`.
+**Error cases:** Division by zero, `log(0)`, and square root of negative numbers in the real domain return `status: "BLOCKED"`, `is_valid: false`, and `admission: "BLOCKED"`, with a descriptive `error` and `agent_message`.
 
-**Tolerance bounding:** When verifying an expression against an expected value with a `tolerance` parameter, the engine enforces a deterministic upper bound on the tolerance. The maximum allowed tolerance is `max(0.01, abs(calculated_value) * 0.01)`. If the requested tolerance exceeds this bound, the request returns a `BLOCKED` status. Invalid tolerance values (negative, `NaN`, `Infinity`, or non-numeric) are also rejected with `BLOCKED`.
+**Tolerance bounding:** This endpoint takes no `tolerance`. The bound applies to the engine method `VerificationEngine.verify_math(expression, expected, tolerance)`, which returns an engine dictionary without `admission`. When it verifies an expression against an expected value with a `tolerance` parameter, the engine enforces a deterministic upper bound on the tolerance. The maximum allowed tolerance is `max(0.01, abs(calculated_value) * 0.01)`. If the requested tolerance exceeds this bound, the request returns a `BLOCKED` status. Invalid tolerance values (negative, `NaN`, `Infinity`, or non-numeric) are also rejected with `BLOCKED`.
 
-**Response (tolerance exceeded):**
+**Engine dictionary (tolerance exceeded):**
 
 ```json
 {
@@ -315,14 +328,14 @@ Verify logical constraints. Routes through the QWED Control Plane.
 
 ```json
 {
-  "query": "(AND (GT x 5) (LT y 10))",
+  "query": "Is there an x greater than 5 and less than 10?",
   "provider": "openai"
 }
 ```
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `query` | string | Yes | Logical constraint in DSL or natural language |
+| `query` | string | Yes | A logic question in natural language. The server translates it into the [QWED DSL](/api/dsl-reference) with the LLM provider and checks the DSL with Z3. It does not check DSL directly. |
 | `provider` | string | No | Preferred LLM provider |
 
 **Response:**
@@ -594,7 +607,7 @@ Verify claims about image content. Accepts multipart form data with an image fil
 **Request:**
 
 ```bash
-curl -X POST https://api.qwedai.com/v1/verify/image \
+curl -X POST http://localhost:8000/verify/image \
   -H "X-API-Key: qwed_your_key" \
   -F "image=@photo.jpg" \
   -F "claim=The image is 800x600 pixels"
@@ -634,7 +647,7 @@ Statistical code execution requires the secure Docker sandbox. If Docker is unav
 **Request:**
 
 ```bash
-curl -X POST https://api.qwedai.com/v1/verify/stats \
+curl -X POST http://localhost:8000/verify/stats \
   -H "X-API-Key: qwed_your_key" \
   -F "file=@data.csv" \
   -F "query=The average salary is above 50000"
@@ -922,7 +935,9 @@ Get the status and results of a batch verification job. Use this to poll results
 
 <Info>New in v7.1.0</Info>
 
-These endpoints work with [Verification Context v1.0](/specs/verification-context) documents — the standardized JSON record of a verification. All three require an API key and are rate-limited per key.
+These endpoints work with [Verification Context](/specs/verification-context) documents, the standardized JSON record of a verification. All three require an API key and are rate-limited per key.
+
+The server signs every document it issues. `from-diagnostic` returns a [v1.1 document](/specs/verification-context#version-1-1-and-the-issuer-attestation) whose `attestation` field is the server's ES256 signature over every other field. By default, `validate` and `resolve` check that signature before they answer, so a document someone else built or edited is refused even when its `proof_ref` resolves.
 
 ### POST /verification-context/from-diagnostic
 
@@ -953,28 +968,30 @@ Convert a [`DiagnosticResult`](/advanced/diagnostics) into a schema-valid Verifi
 | `verifier_version` | string | No | Engine version. Defaults to the installed `qwed` package version |
 | `attestation_token` | string | No | Signed attestation for the diagnostic. Required to keep a `VERIFIED` status |
 
-**Response:** the full Verification Context document (`spec_version`, `object`, `context`, `verdict`).
+**Response:** a v1.1 Verification Context document (`spec_version`, `object`, `context`, `verdict`, `attestation`), signed by the server.
 
 **Fail-closed behavior:**
 
 - A malformed `diagnostic` payload is converted to a `BLOCKED` document instead of being rejected, so the audit trail records the failure.
-- A `VERIFIED` diagnostic without an `attestation_token` fails closed to `BLOCKED` (`trust_gate.mandatory_attestation_missing`). A supplied invalid token fails closed to `BLOCKED` (`trust_gate.invalid_attestation_token`); a valid token with mismatched claims uses the corresponding `trust_gate.claims_*` code. Attestation is enforced through the same trust boundary as `/verify/*`.
+- A `VERIFIED` diagnostic without an `attestation_token` fails closed to `BLOCKED` (`trust_gate.mandatory_attestation_missing`). A supplied invalid token fails closed to `BLOCKED` (`trust_gate.invalid_attestation_token`). A valid token with mismatched claims uses the corresponding `trust_gate.claims_*` code. Attestation is enforced through the same trust boundary as `/verify/*`.
+- The server records the diagnostic but does not vouch for it. The caller's `agent_message` and `developer_fields` are kept under `developer_fields.caller_supplied` and decide nothing, `is_valid` included.
+- The admission is `DENY` unless `attestation_token` also signs `ADMIT` for this verdict (`qwed.admission`), as the token of an answer the server admitted does. An admitted document names the engine that signed the token, and this server's version, as its verifier. Your `verifier` and `verifier_version` are kept under `caller_supplied`.
 
 | Status | Description |
 |--------|-------------|
-| 422 | The resulting document failed Verification Context validation |
-| 500 | Audit persistence failed |
+| 422 | The resulting document failed Verification Context validation, or the canonical encoding refuses it (for example, a lone surrogate in a string) |
+| 500 | Audit persistence, or attestation verification or signing, failed |
 
 ### POST /verification-context/validate
 
-Validate a Verification Context document against the v1.0 JSON Schema, including the verdict/`proof_ref` invariants.
+Validate a Verification Context document against the JSON Schema of its `spec_version` (v1.0 or v1.1), including the verdict/`proof_ref` invariants. By default, the server first checks the document's attestation with its own signing key.
 
 **Request:**
 
 ```json
 {
   "document": {
-    "spec_version": "1.0",
+    "spec_version": "1.1",
     "object": {"formal_statement": "x**2 + 2*x + 1 = (x+1)**2"},
     "context": {
       "interpretation": {"theory": "real-closed field", "logic": "first-order logic"},
@@ -982,10 +999,16 @@ Validate a Verification Context document against the v1.0 JSON Schema, including
       "evidence": {"evidence": {"status": "VERIFIED"}, "proof_ref": "sha256:9f2c…"},
       "decision": {"admission": "ADMIT"}
     },
-    "verdict": "VERIFIED"
+    "verdict": "VERIFIED",
+    "attestation": "<ES256 JWT from from-diagnostic>"
   }
 }
 ```
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `document` | object | Yes | The Verification Context document |
+| `require_attestation` | boolean | No | Default `true`. The document must carry an `attestation` that the server's key verifies and that signs this document. Set `false` to check the schema alone, for example for a v1.0 document |
 
 **Response:**
 
@@ -993,18 +1016,34 @@ Validate a Verification Context document against the v1.0 JSON Schema, including
 {"valid": true}
 ```
 
-An invalid document returns `{"valid": false, "error": "validation_failed"}` with HTTP 200. Gate on the `valid` field.
+A document that fails the attestation check or validation returns HTTP 200 with `valid: false` and an `error`. Gate on the `valid` field. A server-side failure is a `500` instead (see the status table below), so treat any non-200 response as not validated.
+
+| `error` | Cause |
+|---------|-------|
+| `attestation_required` | The document carries no `attestation` |
+| `attestation_invalid` | The attestation does not verify with the server's key, or does not sign this document (it was edited after signing, or carries another document's token) |
+| `validation_failed` | Schema or invariant violation |
+
+<Warning>
+**Behavior change.** A v1.0 document has no `attestation`, so it now returns `attestation_required` unless you send `"require_attestation": false`. Older SDK versions don't send the flag.
+</Warning>
+
+| Status | Description |
+|--------|-------------|
+| 500 | Audit persistence failed, or the server could not load its signing key to check the attestation |
 
 ### POST /verification-context/resolve
 
 Resolve the `proof_ref` evidence commitment of a Verification Context document. The server removes the stored `proof_ref`, re-derives the SHA-256 commitment over the canonical (RFC 8785) bound payload, and compares it to the stored value.
+
+A `proof_ref` is an unkeyed commitment: anyone can compute one for a document they built. So, by default, the server first checks the document's attestation, as for `/validate`, and takes the same `require_attestation` parameter.
 
 **Request:**
 
 ```json
 {
   "document": {
-    "spec_version": "1.0",
+    "spec_version": "1.1",
     "object": {"formal_statement": "x**2 + 2*x + 1 = (x+1)**2"},
     "context": {
       "interpretation": {"theory": "real-closed field", "logic": "first-order logic"},
@@ -1012,7 +1051,8 @@ Resolve the `proof_ref` evidence commitment of a Verification Context document. 
       "evidence": {"evidence": {"status": "VERIFIED"}, "proof_ref": "sha256:9f2c…"},
       "decision": {"admission": "ADMIT"}
     },
-    "verdict": "VERIFIED"
+    "verdict": "VERIFIED",
+    "attestation": "<ES256 JWT from from-diagnostic>"
   }
 }
 ```
@@ -1023,7 +1063,7 @@ Resolve the `proof_ref` evidence commitment of a Verification Context document. 
 {"resolved": true}
 ```
 
-`resolved` is `true` only when the document has `verdict: "VERIFIED"`, validates against the schema, and the stored `proof_ref` matches the re-derived commitment. Any other outcome (non-`VERIFIED` verdict, schema failure, mismatched or missing commitment) returns `{"resolved": false}` — a `proof_ref` that cannot be resolved confers no authority.
+`resolved` is `true` only when the attestation verifies (unless `require_attestation` is `false`), the document has `verdict: "VERIFIED"`, it validates against the schema, and the stored `proof_ref` matches the re-derived commitment. An attestation failure returns `{"resolved": false, "error": "attestation_required"}` or `"attestation_invalid"`. Any other failure (non-`VERIFIED` verdict, schema failure, mismatched or missing commitment) returns `{"resolved": false}`. A `proof_ref` that cannot be resolved confers no authority.
 
 ---
 
@@ -1210,20 +1250,12 @@ X-Agent-Token: qwed_agent_...
 
 ## Attestation endpoints
 
-### GET /attestation/{id}
+### GET /.well-known/jwks.json
 
-Get an attestation by ID.
+The public keys that verify the attestations the server signs (ES256). No authentication required. Check an attestation's signature with the key whose `kid` matches the token's header. The server has no route that looks up or verifies an attestation by ID.
 
-### POST /attestation/verify
-
-Verify an attestation JWT.
-
-**Request:**
-
-```json
-{
-  "jwt": "eyJhbGciOiJFUzI1NiIs..."
-}
+```bash
+curl -sS -f http://localhost:8000/.well-known/jwks.json
 ```
 
 ---
@@ -1350,7 +1382,7 @@ Passing another organization's ID returns `403 Forbidden` with `"Cannot access a
 
 ```bash
 curl --fail-with-body -H "X-API-Key: qwed_live_your_admin_key" \
-  "https://api.qwedai.com/v1/admin/compliance/export/csv?organization_id=12"
+  "http://localhost:8000/admin/compliance/export/csv?organization_id=12"
 ```
 
 ### GET /admin/compliance/verify/{log_id}
@@ -1406,7 +1438,7 @@ Rotate an API key and return the new secret once. Owners, admins, and members ca
 
 ```bash
 curl --fail-with-body -X POST -H "X-API-Key: qwed_live_your_key" \
-  "https://api.qwedai.com/v1/admin/keys/rotate?key_id=42"
+  "http://localhost:8000/admin/keys/rotate?key_id=42"
 ```
 
 **Response:**
@@ -1422,47 +1454,6 @@ curl --fail-with-body -X POST -H "X-API-Key: qwed_live_your_key" \
 ```
 
 Store `new_key_secret` immediately. QWED returns it only in this response.
-
----
-
-## Badge endpoints
-
-All badge endpoints return SVG images (`image/svg+xml`). You can embed them directly in Markdown or HTML.
-
-### GET /badge/verified
-
-Get a verified or failed badge SVG.
-
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `verified` | boolean | `true` | Whether to show a verified or failed badge |
-
-### GET /badge/status/{status}
-
-Get a badge for any verification status (e.g., `VERIFIED`, `FAILED`, `CORRECTED`, `BLOCKED`, `PENDING`, `ERROR`).
-
-### GET /badge/attestation/{attestation_id}
-
-Get a badge for a specific attestation by ID.
-
-### GET /badge/engine/{engine}
-
-Get a badge for a specific verification engine.
-
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `verified` | boolean | `true` | Whether to show a verified or failed badge |
-
-### GET /badge/custom
-
-Generate a custom badge with configurable label, message, color, and logo.
-
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `label` | string | `QWED` | Left side label |
-| `message` | string | `verified` | Right side message |
-| `color` | string | — | Hex color (e.g., `#00C853`) |
-| `logo` | boolean | `true` | Include QWED logo |
 
 ---
 

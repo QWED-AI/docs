@@ -87,7 +87,7 @@ result.verified == False  # But should be True
    ```
 3. **Check network latency:**
    ```bash
-   ping api.qwedai.com
+   curl -o /dev/null -sS -f -w "HTTP %{http_code} in %{time_total}s\n" http://localhost:8000/health  # your QWED server
    ```
 
 ---
@@ -110,7 +110,7 @@ QuotaExceededError: API quota exceeded
    print(f"Used: {status.used}, Remaining: {status.remaining}")
    ```
 2. **Upgrade plan:**
-   - Visit [https://qwedai.com/pricing](https://qwedai.com/pricing)
+   - Visit [https://qwedai.tech/pricing](https://qwedai.tech/pricing)
    - Contact sales for enterprise
 3. **Implement rate limiting:**
    ```python
@@ -132,8 +132,8 @@ QuotaExceededError: API quota exceeded
 
 1. **Use correct URL format:**
    ```text
-   ❌ docs.qwedai.com/integration/getting-started
-   ✅ docs.qwedai.com/docs/integration/getting-started
+   ❌ docs.qwedai.tech/integration/getting-started
+   ✅ docs.qwedai.tech/docs/integration/getting-started
    ```
 2. **Hard refresh:**
    - Windows: Ctrl \+ Shift \+ R
@@ -170,7 +170,7 @@ QuotaExceededError: API quota exceeded
    python test_qwed_integration.py
    ```
 3. **Search documentation:**
-   - [https://docs.qwedai.com](https://docs.qwedai.com)
+   - [https://docs.qwedai.tech](https://docs.qwedai.tech)
 
 ### Community support
 
@@ -179,7 +179,7 @@ QuotaExceededError: API quota exceeded
 
 ### Enterprise support
 
-- 📧 Email: [support@qwedai.com](mailto:support@qwedai.com)
+- 📧 Email: [support@qwedai.tech](mailto:support@qwedai.tech)
 - 💼 Slack Connect (Enterprise customers)
 - 📞 Emergency Hotline (Enterprise Pro\+)
 
@@ -202,7 +202,7 @@ When troubleshooting:
 
 ---
 
-**Still stuck?** Contact [support@qwedai.com](mailto:support@qwedai.com) with:
+**Still stuck?** Contact [support@qwedai.tech](mailto:support@qwedai.tech) with:
 
 - Error message
 - Code snippet
