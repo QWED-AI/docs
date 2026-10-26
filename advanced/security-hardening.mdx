@@ -234,6 +234,20 @@ Every sandbox container runs with hard resource and output bounds, and is always
 - **Guaranteed cleanup** — the container is force-removed in a `finally` block covering the whole post-creation lifecycle, including start failures, with one retry for transient daemon races. A cleanup failure is logged as a warning and never discards a valid verification result.
 - **Result size cap** — the sandbox result file is capped at 2 MB, enforced both inside the container during serialization and at host read-back. Result payloads stored in the verification audit log are additionally capped and always remain valid JSON, so the audit integrity verifier can parse capped entries.
 
+#### Pinned image and hardened container
+
+<Info>v8.0.0</Info>
+
+The sandbox image is pinned by digest (`amancevice/pandas@sha256:9257b889…`) instead of the movable `slim` tag. `QWED_SANDBOX_IMAGE` can name another image only by digest. QWED refuses any other value and uses the pinned image.
+
+Every sandbox container also runs with:
+
+- **Read-only root filesystem.** `/workspace` is the only writable path, and `HOME` and `TMPDIR` point at it.
+- **No capabilities.** The container drops all Linux capabilities and sets `no-new-privileges`.
+- **No privileged root.** The container runs as the owner of the private `0700` workspace directory. When the server process is root, each execution gets a fresh uid from `QWED_SANDBOX_UID_RANGE` (default `1879048192-2147483646`).
+
+A `userns-remap` daemon, a root process with a rootless daemon, or a daemon whose security options can't be read is reported as runtime unavailable rather than guessed. See [Sandbox image and container user](/advanced/self-hosting#sandbox-image-and-container-user).
+
 #### Fail-closed when `CodeVerifier` is unavailable or failing
 
 <Info>Updated May 2, 2026</Info>
