@@ -33,7 +33,7 @@ client = QWEDClient()
 
 # Check if constraints are satisfiable
 result = client.verify_logic("(AND (GT x 5) (LT x 10))")
-print(result.status)            # "SAT"
+print(result.status)            # "VERIFIED" (satisfiable)
 print(result.result["model"])   # {"x": "7"}
 ```
 
@@ -60,7 +60,7 @@ The parser accepts only the operator names in this table. Aliases such as `NE`, 
 
 ### Type rules
 
-Every variable has a sort: `Int`, `Real`, or `Bool`. An undeclared variable is an `Int`. Declare other sorts with `(VAR name Bool)`, or pass `variables=[{"name": "flag", "type": "Bool"}]` to the verifier.
+Every variable has a sort: `Int`, `Real`, or `Bool`. An undeclared variable is an `Int`. Declare other sorts in the `variables` argument of `DSLLogicVerifier.verify_from_dsl()`, for example `variables=[{"name": "flag", "type": "Bool"}]`. On `POST /verify/logic` the query is natural language, and the translator declares the variables it emits. A `(VAR flag Bool)` form inside a larger expression does not compile, even though the compiler's error message suggests it.
 
 The compiler rejects mixed Boolean and numeric operands instead of coercing `True` to `1`. A rejected program returns `ERROR`, never `SAT` or `VERIFIED`.
 
@@ -73,7 +73,7 @@ The compiler rejects mixed Boolean and numeric operands instead of coercing `Tru
 | `IFF` takes Boolean operands: comparisons, `Bool` variables, or `True`/`False` | `(IFF (GT x 1) (GTE x 2))` | `(IFF x y)` with `x`, `y` as `Int` |
 | A `FORALL`/`EXISTS` body must be Boolean | `(FORALL x (GTE (MULT x x) 0))` | `(FORALL x (PLUS x 1))` |
 
-For an undeclared name compared with a Boolean literal, the error tells you to add `(VAR name Bool)`. QWED does not infer the sort from the literal, because that would hide a translation that forgot the declaration.
+QWED does not infer the sort of an undeclared name from a Boolean literal, because that would hide a translation that forgot the declaration.
 
 ### Examples
 
@@ -100,17 +100,17 @@ For an undeclared name compared with a Boolean literal, the error tells you to a
 ```python
 # Satisfiable - has solution
 result = client.verify_logic("(AND (GT x 0) (LT x 100))")
-print(result.status)            # "SAT"
+print(result.status)            # "VERIFIED"
 print(result.result["model"])   # {"x": "50"}
 
 # Unsatisfiable - no solution
 result = client.verify_logic("(AND (GT x 10) (LT x 5))")
-print(result.status)            # "UNSAT" (x can't be > 10 AND < 5)
+print(result.status)            # "UNVERIFIABLE" (x can't be > 10 AND < 5)
 ```
 
 ### Finding all solutions
 
-The SDK client's `verify_logic()` returns a single SAT/UNSAT/UNKNOWN verdict with one model. For all-solutions enumeration, iterate with a low-level solver (e.g. `z3`) or use the `LogicVerifier` low-level API and extend constraints yourself:
+The SDK client's `verify_logic()` returns a single verdict with one model. For all-solutions enumeration, iterate with a low-level solver (e.g. `z3`) or use the `LogicVerifier` low-level API and extend constraints yourself:
 
 ```python
 from z3 import Int, Solver
@@ -131,7 +131,13 @@ while solver.check() == sat:
 
 ## Business rules
 
-These rules compare flags such as `has_id` with `True`. Declare each flag as `Bool`, or the compiler returns `ERROR` (see [Type rules](#type-rules)).
+These rules compare flags such as `has_id` with `True`, so each flag must be declared `Bool`, or the compiler returns `ERROR` (see [Type rules](#type-rules)). The examples run the DSL directly with `DSLLogicVerifier`, which takes the declarations in `variables`:
+
+```python
+from qwed_new.core.dsl_logic_verifier import DSLLogicVerifier
+
+verifier = DSLLogicVerifier()
+```
 
 ### Age verification
 
@@ -142,8 +148,10 @@ rule = """
     (EQ can_purchase True)
 )
 """
-# Declare has_id and can_purchase as Bool
-result = client.verify_logic(rule)
+result = verifier.verify_from_dsl(rule, variables=[
+    {"name": "has_id", "type": "Bool"},
+    {"name": "can_purchase", "type": "Bool"},
+])
 ```
 
 ### Discount eligibility
@@ -155,8 +163,7 @@ rule = """
     (IMPLIES (AND (EQ member True) (GT total 50)) (EQ discount 15))
 )
 """
-# Declare member as Bool
-result = client.verify_logic(rule)
+result = verifier.verify_from_dsl(rule, variables=[{"name": "member", "type": "Bool"}])
 ```
 
 ### Approval workflow
@@ -169,8 +176,7 @@ rule = """
          (GTE approvers 2))
 )
 """
-# Declare requires_approval as Bool
-result = client.verify_logic(rule)
+result = verifier.verify_from_dsl(rule, variables=[{"name": "requires_approval", "type": "Bool"}])
 ```
 
 ---
@@ -188,7 +194,7 @@ result = client.verify_logic(rule)
 - **Sort.** The bound variable takes its declared sort. If it isn't declared, it is an `Int`.
 - **Scope.** The binding applies inside the body only. A free variable with the same name outside the quantifier is a separate variable.
 - **Body.** The body must be Boolean, such as a comparison or a logical expression. A numeric body returns `ERROR`.
-- **Solver limits.** Quantified formulas can be hard for Z3. If Z3 returns `unknown`, for example on a timeout, the result is `UNKNOWN`. The `/verify/logic` endpoint reports it as `BLOCKED`, never as verified.
+- **Solver limits.** Quantified formulas can be hard for Z3. If Z3 returns `unknown`, for example on a timeout, `verify_from_dsl()` returns `UNKNOWN` and `POST /verify/logic` returns `BLOCKED`. Neither is verified.
 
 To quantify over a collection, quantify over a numeric variable and state the property with arithmetic and comparisons. The DSL has no uninterpreted functions, so a form like `(quantity item)` returns `BLOCKED` with `Unknown operator`.
 
@@ -196,11 +202,11 @@ To quantify over a collection, quantify over a numeric variable and state the pr
 
 ```python
 # Every number greater than 5 is also greater than 3
-result = client.verify_logic("(FORALL n (IMPLIES (GT n 5) (GT n 3)))")
+result = verifier.verify_from_dsl("(FORALL n (IMPLIES (GT n 5) (GT n 3)))")
 print(result.status)  # "SAT"
 
 # Not every integer is positive
-result = client.verify_logic("(FORALL x (GT x 0))")
+result = verifier.verify_from_dsl("(FORALL x (GT x 0))")
 print(result.status)  # "UNSAT"
 ```
 
@@ -208,11 +214,11 @@ print(result.status)  # "UNSAT"
 
 ```python
 # Some integer lies strictly between 0 and 10
-result = client.verify_logic("(EXISTS x (AND (GT x 0) (LT x 10)))")
+result = verifier.verify_from_dsl("(EXISTS x (AND (GT x 0) (LT x 10)))")
 print(result.status)  # "SAT"
 
 # No integer lies strictly between 0 and 1 (x is an Int by default)
-result = client.verify_logic("(EXISTS x (AND (GT x 0) (LT x 1)))")
+result = verifier.verify_from_dsl("(EXISTS x (AND (GT x 0) (LT x 1)))")
 print(result.status)  # "UNSAT"
 ```
 
@@ -220,7 +226,7 @@ print(result.status)  # "UNSAT"
 
 ```python
 # The quantified x and the free x are different variables
-result = client.verify_logic("(AND (FORALL x (GTE (MULT x x) 0)) (EQ x 3))")
+result = verifier.verify_from_dsl("(AND (FORALL x (GTE (MULT x x) 0)) (EQ x 3))")
 print(result.status)  # "SAT", with x = 3 in the model
 ```
 
@@ -290,7 +296,7 @@ Unknown operators, unsupported Python syntax, and solver errors still fail close
 ```python
 result = client.verify_logic("(AND (GT x 5) (LT x 0))")
 
-if result.status == "UNSAT":
+if result.status == "UNVERIFIABLE":
     print("No solution exists")
     print(f"Reason: {result.result.get('error')}")
     # "Constraints are contradictory: x > 5 conflicts with x < 0"
@@ -301,7 +307,7 @@ if result.status == "UNSAT":
 ## `LogicVerifier` returns `DiagnosticResult` (v6.0.0)
 
 <Info>
-**Introduced in v6.0.0.** `LogicVerifier` is the second engine — after `FactVerifier` — to conform to the unified [`DiagnosticResult` contract](/advanced/diagnostics). The legacy `LogicResult` dataclass has been removed from the verifier's return surface. The high-level SDK client (`client.verify_logic()`) and the `/verify/logic` API endpoint still return the same SAT/UNSAT/UNKNOWN shape shown above.
+**Introduced in v6.0.0.** `LogicVerifier` is the second engine — after `FactVerifier` — to conform to the unified [`DiagnosticResult` contract](/advanced/diagnostics). The legacy `LogicResult` dataclass has been removed from the verifier's return surface. The `/verify/logic` endpoint, and so `client.verify_logic()`, maps the DSL verdict instead: `SAT` is `VERIFIED` with the model as evidence, `UNSAT` is `UNVERIFIABLE`, and anything else (`UNKNOWN`, `ERROR`, `BLOCKED`) is `BLOCKED`. `DSLLogicVerifier.verify_from_dsl()` returns the raw `SAT`, `UNSAT`, `UNKNOWN`, `ERROR` or `BLOCKED`.
 </Info>
 
 If you call the low-level `LogicVerifier` class directly, every one of its nine public methods now returns a `DiagnosticResult`:
