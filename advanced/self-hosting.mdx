@@ -39,7 +39,9 @@ docker-compose ps
 # Required — server will not start without these
 API_KEY_SECRET=your-generated-secret
 QWED_CORS_ORIGINS=https://app.yourcompany.com
-QWED_AUDIT_SECRET_KEY=your-generated-audit-key  # signs the audit hash chain
+# Signs the audit hash chain. Generate once and keep it:
+#   python -c "import secrets; print(secrets.token_urlsafe(48))"
+QWED_AUDIT_SECRET_KEY=
 
 # Infrastructure
 DATABASE_URL=postgresql://user:pass@localhost:5432/qwed
@@ -91,7 +93,7 @@ docker build -t qwed-api .
 docker run -p 8000:8000 \
   -e QWED_API_KEY=... \
   -e API_KEY_SECRET=... \
-  -e QWED_AUDIT_SECRET_KEY=... \
+  -e QWED_AUDIT_SECRET_KEY \
   -e QWED_CORS_ORIGINS="https://app.yourcompany.com" \
   qwed-api
 ```

@@ -46,7 +46,9 @@ Before starting the stack, create a `.env` file in the `deploy/` directory with 
 DATABASE_URL=postgresql://qwed:your_password@postgres:5432/qwed_db
 QWED_CORS_ORIGINS=https://app.yourcompany.com
 API_KEY_SECRET=your-generated-secret
-QWED_AUDIT_SECRET_KEY=your-generated-audit-key
+# Signs the audit hash chain. Generate once and keep it:
+#   python -c "import secrets; print(secrets.token_urlsafe(48))"
+QWED_AUDIT_SECRET_KEY=
 
 # Optional
 REDIS_URL=redis://redis:6379/0
@@ -79,15 +81,23 @@ services:
       QWED_AUDIT_SECRET_KEY: ${QWED_AUDIT_SECRET_KEY:?QWED_AUDIT_SECRET_KEY is required}
 ```
 
-To run the image on its own, pass every required secret to `docker run`. Generate each one separately; `QWED_API_KEY_LOOKUP_SECRET` must differ from `QWED_JWT_SECRET_KEY`:
+To run the image on its own, pass every required secret to `docker run` from your shell, so no value is written into the command. Generating each one separately keeps `QWED_API_KEY_LOOKUP_SECRET` different from `QWED_JWT_SECRET_KEY`:
 
 ```bash
+# Generate each secret once and keep it. Changing the lookup or audit key later
+# invalidates existing API keys or audit signatures.
+for name in API_KEY_SECRET QWED_JWT_SECRET_KEY QWED_API_KEY_LOOKUP_SECRET QWED_AUDIT_SECRET_KEY; do
+  export "$name=$(python -c 'import secrets; print(secrets.token_urlsafe(48))')"
+done
+# For Postgres, also export DATABASE_URL from your secrets manager. Left unset,
+# docker run passes nothing and the server uses SQLite.
+
 docker run -p 8000:8000 \
-  -e DATABASE_URL=postgresql://qwed:your_password@db-host:5432/qwed_db \
-  -e API_KEY_SECRET=your-generated-secret \
-  -e QWED_JWT_SECRET_KEY=your-generated-jwt-secret \
-  -e QWED_API_KEY_LOOKUP_SECRET=your-generated-lookup-secret \
-  -e QWED_AUDIT_SECRET_KEY=your-generated-audit-key \
+  -e DATABASE_URL \
+  -e API_KEY_SECRET \
+  -e QWED_JWT_SECRET_KEY \
+  -e QWED_API_KEY_LOOKUP_SECRET \
+  -e QWED_AUDIT_SECRET_KEY \
   -e QWED_CORS_ORIGINS="https://app.yourcompany.com" \
   qwedai/qwed-verification:8.0.0
 ```
