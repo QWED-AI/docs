@@ -86,20 +86,26 @@ python -m uvicorn qwed_new.api.main:app --reload
 
 ### Docker image
 
-The `qwedai/qwed-verification` image on Docker Hub runs the API server on port 8000. Pass the required secrets when you start it:
+The `qwedai/qwed-verification` image on Docker Hub runs the API server on port 8000. Pass the required secrets from your shell when you start it:
 
 ```bash
+# Generate each secret once and keep it. Changing the lookup or audit key later
+# invalidates existing API keys or audit signatures.
+for name in API_KEY_SECRET QWED_JWT_SECRET_KEY QWED_API_KEY_LOOKUP_SECRET QWED_AUDIT_SECRET_KEY; do
+  export "$name=$(python -c 'import secrets; print(secrets.token_urlsafe(48))')"
+done
+
 docker run -p 8000:8000 \
   -e QWED_CORS_ORIGINS="http://localhost:3000" \
-  -e API_KEY_SECRET="..." \
-  -e QWED_JWT_SECRET_KEY="..." \
-  -e QWED_API_KEY_LOOKUP_SECRET="..." \
-  -e QWED_AUDIT_SECRET_KEY="..." \
-  qwedai/qwed-verification:latest
+  -e API_KEY_SECRET \
+  -e QWED_JWT_SECRET_KEY \
+  -e QWED_API_KEY_LOOKUP_SECRET \
+  -e QWED_AUDIT_SECRET_KEY \
+  qwedai/qwed-verification:8.0.0
 ```
 
 <Note>
-The image runs the API server from version 7.3.1. Earlier tags ran the QWED GitHub Action. To scan a repository, use the [GitHub Action](/advanced/github-action) instead of the image.
+The image runs the API server from version 8.0.0. Earlier tags ran the QWED GitHub Action. To scan a repository, use the [GitHub Action](/advanced/github-action) instead of the image.
 </Note>
 
 ### Infrastructure URLs
@@ -111,7 +117,7 @@ The image runs the API server from version 7.3.1. Earlier tags ran the QWED GitH
 | Prometheus | http://localhost:9090 |
 | Jaeger | http://localhost:16686 |
 
-> **Enterprise support coming soon:** Managed hosting and dedicated support. Contact support@qwedai.com
+> **Enterprise support coming soon:** Managed hosting and dedicated support. Contact support@qwedai.tech
 
 ---
 

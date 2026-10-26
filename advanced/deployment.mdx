@@ -35,7 +35,7 @@ docker build --target server -t qwed-core .
 The server image uses `/var/lib/qwed` as its working directory, which holds the default SQLite database. `UVICORN_HOST` and `UVICORN_PORT` set the bind address and port, and the health check follows `UVICORN_PORT`.
 
 <Warning>
-Docker Hub tags before 7.3.1 ran the GitHub Action, not the API server. `latest` tracks `main`, and versioned tags exist from 7.3.1. If you ran the image as a repository scanner, use the [GitHub Action](/advanced/github-action) instead.
+Docker Hub tags before 8.0.0 ran the GitHub Action, not the API server. `latest` tracks `main`, and versioned tags exist from 8.0.0. If you ran the image as a repository scanner, use the [GitHub Action](/advanced/github-action) instead.
 </Warning>
 
 ### Docker Compose
@@ -105,18 +105,25 @@ Access the services:
 
 ### Run the image without Compose
 
-Pass the required secrets to `docker run`:
+Pass the required secrets to `docker run` from your shell, so no value is written into the command:
 
 ```bash
+# Generate each secret once and keep it. Changing the lookup or audit key later
+# invalidates existing API keys or audit signatures.
+for name in API_KEY_SECRET QWED_JWT_SECRET_KEY QWED_API_KEY_LOOKUP_SECRET QWED_AUDIT_SECRET_KEY; do
+  export "$name=$(python -c 'import secrets; print(secrets.token_urlsafe(48))')"
+done
+export DATABASE_URL="postgresql://qwed:${POSTGRES_PASSWORD}@db-host:5432/qwed_db"
+
 docker run -d -p 8000:8000 \
   -v qwed-data:/var/lib/qwed \
   -e QWED_CORS_ORIGINS="https://app.yourcompany.com" \
-  -e API_KEY_SECRET="..." \
-  -e QWED_JWT_SECRET_KEY="..." \
-  -e QWED_API_KEY_LOOKUP_SECRET="..." \
-  -e QWED_AUDIT_SECRET_KEY="..." \
-  -e DATABASE_URL="postgresql://qwed:your_password@db-host:5432/qwed_db" \
-  qwedai/qwed-verification:7.3.1
+  -e API_KEY_SECRET \
+  -e QWED_JWT_SECRET_KEY \
+  -e QWED_API_KEY_LOOKUP_SECRET \
+  -e QWED_AUDIT_SECRET_KEY \
+  -e DATABASE_URL \
+  qwedai/qwed-verification:8.0.0
 ```
 
 Omit `DATABASE_URL` to use the SQLite database in the `qwed-data` volume.
@@ -155,7 +162,7 @@ For production environments, QWED ships Kubernetes manifests in `deploy/kubernet
    </Tip>
 
 3. **Deploy Application**
-   `deploy/kubernetes/deployment.yaml` pins `docker.io/qwedai/qwed-verification:7.3.1`. That tag is the first release of the API server image. Don't point the Deployment at an earlier tag, because earlier tags ran the GitHub Action.
+   `deploy/kubernetes/deployment.yaml` pins `docker.io/qwedai/qwed-verification:8.0.0`. That tag is the first release of the API server image. Don't point the Deployment at an earlier tag, because earlier tags ran the GitHub Action.
    ```bash
    kubectl apply -f deploy/kubernetes/deployment.yaml
    kubectl apply -f deploy/kubernetes/service.yaml

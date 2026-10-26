@@ -106,7 +106,7 @@ SETTINGS = {
 
 ### API server image
 
-The `qwedai/qwed-verification` image on Docker Hub runs the API server with uvicorn on port 8000. Docker Hub publishes `latest` from `main` and a versioned tag for each release from 7.3.1.
+The `qwedai/qwed-verification` image on Docker Hub runs the API server with uvicorn on port 8000. Docker Hub publishes `latest` from `main` and a versioned tag for each release from 8.0.0.
 
 The image:
 
@@ -116,34 +116,42 @@ The image:
 - Reads its bind address and port from `UVICORN_HOST` (default `0.0.0.0`) and `UVICORN_PORT` (default `8000`). The health check follows `UVICORN_PORT`, so change the port with `-e UVICORN_PORT=...` rather than a `--port` argument.
 
 <Warning>
-Tags before 7.3.1 ran the QWED GitHub Action, not the API server. If you ran the image as a repository scanner, use the [GitHub Action](/advanced/github-action) instead.
+Tags before 8.0.0 ran the QWED GitHub Action, not the API server. If you ran the image as a repository scanner, use the [GitHub Action](/advanced/github-action) instead.
 </Warning>
 
 ### Run the published image
 
+Pass the secrets from your shell, so no value is written into the command:
+
 ```bash
+# Generate each secret once and keep it. Changing the lookup or audit key later
+# invalidates existing API keys or audit signatures.
+for name in API_KEY_SECRET QWED_JWT_SECRET_KEY QWED_API_KEY_LOOKUP_SECRET QWED_AUDIT_SECRET_KEY; do
+  export "$name=$(python -c 'import secrets; print(secrets.token_urlsafe(48))')"
+done
+
 docker run -d -p 8000:8000 \
   -v qwed-data:/var/lib/qwed \
   -e QWED_CORS_ORIGINS="https://app.yourcompany.com" \
-  -e API_KEY_SECRET="..." \
-  -e QWED_JWT_SECRET_KEY="..." \
-  -e QWED_API_KEY_LOOKUP_SECRET="..." \
-  -e QWED_AUDIT_SECRET_KEY="..." \
-  qwedai/qwed-verification:7.3.1
+  -e API_KEY_SECRET \
+  -e QWED_JWT_SECRET_KEY \
+  -e QWED_API_KEY_LOOKUP_SECRET \
+  -e QWED_AUDIT_SECRET_KEY \
+  qwedai/qwed-verification:8.0.0
 ```
 
-The server refuses to start without `QWED_CORS_ORIGINS`, `QWED_JWT_SECRET_KEY`, or `QWED_API_KEY_LOOKUP_SECRET`. It also needs `API_KEY_SECRET`, and `QWED_AUDIT_SECRET_KEY` to sign the audit chain.
+The server refuses to start without any of `QWED_CORS_ORIGINS`, `API_KEY_SECRET`, `QWED_JWT_SECRET_KEY`, `QWED_API_KEY_LOOKUP_SECRET` and `QWED_AUDIT_SECRET_KEY`, and `QWED_API_KEY_LOOKUP_SECRET` must differ from `QWED_JWT_SECRET_KEY`. Also set `QWED_SIGNING_KEY` (an EC P-256 key), or attestations stop verifying after a restart or on another replica.
 
-To serve on a different port:
+To serve on a different port, with the same secrets exported:
 
 ```bash
 docker run -d -p 9000:9000 -e UVICORN_PORT=9000 \
   -e QWED_CORS_ORIGINS="https://app.yourcompany.com" \
-  -e API_KEY_SECRET="..." \
-  -e QWED_JWT_SECRET_KEY="..." \
-  -e QWED_API_KEY_LOOKUP_SECRET="..." \
-  -e QWED_AUDIT_SECRET_KEY="..." \
-  qwedai/qwed-verification:7.3.1
+  -e API_KEY_SECRET \
+  -e QWED_JWT_SECRET_KEY \
+  -e QWED_API_KEY_LOOKUP_SECRET \
+  -e QWED_AUDIT_SECRET_KEY \
+  qwedai/qwed-verification:8.0.0
 ```
 
 ### Build from source
@@ -156,7 +164,7 @@ docker build --target server -t qwed-api .
 
 ## Kubernetes
 
-The repository ships manifests in `deploy/kubernetes/`. The Deployment pins `docker.io/qwedai/qwed-verification:7.3.1`, the first tag that contains the API server. Fill in every value in `deploy/kubernetes/secret.yaml` before you apply it. See [Kubernetes deployment](/advanced/deployment#kubernetes-deployment).
+The repository ships manifests in `deploy/kubernetes/`. The Deployment pins `docker.io/qwedai/qwed-verification:8.0.0`, the first tag that contains the API server. Fill in every value in `deploy/kubernetes/secret.yaml` before you apply it. See [Kubernetes deployment](/advanced/deployment#kubernetes-deployment).
 
 ```yaml
 apiVersion: apps/v1
@@ -176,7 +184,7 @@ spec:
     spec:
       containers:
       - name: qwed-core
-        image: docker.io/qwedai/qwed-verification:7.3.1
+        image: docker.io/qwedai/qwed-verification:8.0.0
         ports:
         - containerPort: 8000
         envFrom:
@@ -186,7 +194,7 @@ spec:
             name: qwed-secrets
 ```
 
-> 🏢 **Enterprise Support Coming Soon:** Managed hosting, dedicated support, and SLA guarantees. Contact [support@qwedai.com](mailto:support@qwedai.com)
+> 🏢 **Enterprise Support Coming Soon:** Managed hosting, dedicated support, and SLA guarantees. Contact [support@qwedai.tech](mailto:support@qwedai.tech)
 
 ## Scaling
 
