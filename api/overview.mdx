@@ -6,11 +6,7 @@ description: "QWED RESTful API reference. Learn about base URLs, authentication 
 
 ## Base URL
 
-```text
-https://api.qwedai.com/v1
-```
-
-Or for local development:
+QWED has no hosted API. Use the address of the QWED server you run; locally it is:
 
 ```text
 http://localhost:8000
@@ -21,7 +17,7 @@ http://localhost:8000
 All verification requests require an API key. The health endpoints (`GET /health`, `GET /health/identity`) are unauthenticated by design:
 
 ```bash
-curl -H "X-API-Key: qwed_your_key" https://api.qwedai.com/v1/health
+curl -H "X-API-Key: qwed_your_key" http://localhost:8000/health
 ```
 
 ## Core endpoints
