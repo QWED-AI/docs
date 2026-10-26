@@ -70,8 +70,11 @@ QWED_METRICS_OPERATOR_USER_IDS=
 # Postgres (required)
 POSTGRES_USER=qwed
 POSTGRES_DB=qwed_db
-POSTGRES_PASSWORD=your_password
-DATABASE_URL=postgresql://qwed:your_password@postgres:5432/qwed_db
+POSTGRES_PASSWORD=
+# Must match the three values above. Build it as a postgresql:// URL with the
+# user, POSTGRES_PASSWORD, the host "postgres" (the Compose service), port 5432
+# and qwed_db, the same shape as deploy/.env.example shows.
+DATABASE_URL=
 
 # Grafana (required)
 GF_SECURITY_ADMIN_USER=admin
@@ -113,7 +116,8 @@ Pass the required secrets to `docker run` from your shell, so no value is writte
 for name in API_KEY_SECRET QWED_JWT_SECRET_KEY QWED_API_KEY_LOOKUP_SECRET QWED_AUDIT_SECRET_KEY; do
   export "$name=$(python -c 'import secrets; print(secrets.token_urlsafe(48))')"
 done
-export DATABASE_URL="postgresql://qwed:${POSTGRES_PASSWORD}@db-host:5432/qwed_db"
+# For Postgres, also export DATABASE_URL from your secrets manager. Left unset,
+# docker run passes nothing and the server uses SQLite in the qwed-data volume.
 
 docker run -d -p 8000:8000 \
   -v qwed-data:/var/lib/qwed \

@@ -74,9 +74,11 @@ QWED_METRICS_OPERATOR_USER_IDS=
 # Postgres (required)
 POSTGRES_USER=qwed
 POSTGRES_DB=qwed_db
-POSTGRES_PASSWORD=your-postgres-password
-# "postgres" is the Compose service name
-DATABASE_URL=postgresql://qwed:your-postgres-password@postgres:5432/qwed_db
+POSTGRES_PASSWORD=
+# Must match the three values above. Build it as a postgresql:// URL with the
+# user, POSTGRES_PASSWORD, the host "postgres" (the Compose service), port 5432
+# and qwed_db, the same shape as deploy/.env.example shows.
+DATABASE_URL=
 
 # Grafana (required)
 GF_SECURITY_ADMIN_USER=admin
