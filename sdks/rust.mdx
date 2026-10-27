@@ -8,9 +8,11 @@ description: "QWED Rust SDK documentation. Add via Cargo, use async/await with t
 
 ```toml
 [dependencies]
-qwed = "7.3"
+qwed = "8.0.0"
 tokio = { version = "1.0", features = ["rt-multi-thread", "macros"] }
 ```
+
+From 8.0.0, `VerificationResponse` has a public `attestation` field (`Option<String>`). It holds the server's ES256 attestation on a `VERIFIED` answer. If you build a `VerificationResponse` with a struct literal, for example in tests, add `attestation: None`. See [Upgrading to 8.0.0](/changelog#v8-0-0-—-attested-verdicts-and-upgrade-guide).
 
 ## Quick start
 
@@ -193,6 +195,7 @@ pub struct VerificationResponse {
     pub raw_status: String,
     pub admission: Option<Admission>,
     pub proof_ref: Option<String>,
+    pub attestation: Option<String>, // ES256 JWT on a VERIFIED answer
     pub agent_message: Option<String>,
     pub is_authoritative: Option<bool>,
     pub constraint_id: Option<String>,

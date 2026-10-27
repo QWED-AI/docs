@@ -138,6 +138,28 @@ docker run -d -p 8000:8000 \
 
 Omit `DATABASE_URL` to use the SQLite database in the `qwed-data` volume.
 
+### Attestation signing key
+
+Without a signing key, the server generates one per process, so its attestations stop verifying after a restart or on another replica. If you run more than one replica, or need tokens to survive restarts, generate an EC P-256 key once and mount it:
+
+```bash
+python -c "from cryptography.hazmat.primitives.asymmetric import ec; from cryptography.hazmat.primitives import serialization as s; print(ec.generate_private_key(ec.SECP256R1()).private_bytes(s.Encoding.PEM, s.PrivateFormat.PKCS8, s.NoEncryption()).decode())" > attestation-key.pem
+
+docker run -p 8000:8000 \
+  -v qwed-data:/var/lib/qwed \
+  -v "$PWD/attestation-key.pem:/run/secrets/attestation-key.pem:ro" \
+  -e QWED_SIGNING_KEY_FILE=/run/secrets/attestation-key.pem \
+  -e DATABASE_URL \
+  -e API_KEY_SECRET \
+  -e QWED_JWT_SECRET_KEY \
+  -e QWED_API_KEY_LOOKUP_SECRET \
+  -e QWED_AUDIT_SECRET_KEY \
+  -e QWED_CORS_ORIGINS="https://app.yourcompany.com" \
+  qwedai/qwed-verification:8.0.0
+```
+
+Keep the key file out of version control. See [Signing keys](/advanced/attestations#signing-keys).
+
 ### Docker requirement for code execution
 
 Both the Stats Engine and the Consensus Engine (in `high`/`maximum` mode) execute model-generated Python inside Docker containers. Docker is **required** — there are no in-process fallbacks. If Docker is unavailable, these endpoints return HTTP 503.
@@ -275,6 +297,9 @@ Run one worker per database. Every verification request appends an audit row, an
 | `QWED_API_KEY_LOOKUP_SECRET` | Secret for HMAC-SHA256 API-key lookup digests and agent token digests. Must differ from `QWED_JWT_SECRET_KEY`. Changing it invalidates existing API keys and agent tokens | None | **Yes** |
 | `QWED_JWT_SECRET_KEY` | Secret for signing JWTs. Keep it stable: changing it invalidates issued tokens | None | **Yes** |
 | `QWED_AUDIT_SECRET_KEY` | HMAC key that signs the per-organization audit hash chain. The server refuses to start without it. Rotating it invalidates the signatures on existing rows, so verify and archive the trail first. See [Audit trail setup](/advanced/compliance#3-audit-trail-setup) | None (must be set) | **Yes** |
+| `QWED_SIGNING_KEY` | From v8.0.0. The ES256 attestation signing key as unencrypted EC P-256 PEM text. In an env file, write newlines as `\n`. Set this or `QWED_SIGNING_KEY_FILE`, not both. Callers verify attestations against the public key at `/.well-known/jwks.json`. See [Signing keys](/advanced/attestations#signing-keys) | Unset (a key is generated per process) | Recommended |
+| `QWED_SIGNING_KEY_FILE` | From v8.0.0. Path to a file holding the signing key PEM, such as a mounted secret. Setting both key variables, or a key that is unreadable, not P-256, or encrypted, stops the server at startup | Unset | Recommended |
+| `QWED_ATTESTATION_TTL_SECONDS` | From v8.0.0. How long an attestation stays valid, in seconds, from `60` to `2592000` (30 days). Any other value stops the server at startup | `86400` (24 hours) | No |
 | `QWED_ENABLE_AUDIT_SEED` | Set to `1` to enable `POST /audit/seed`, which writes sample rows into the signed audit trail. Development only. Leave unset in production | Unset (route returns `404`) | No |
 | `QWED_METRICS_OPERATOR_USER_IDS` | Comma-separated user IDs allowed to read `/metrics`. Empty denies every caller | None | No |
 | `UVICORN_HOST` | Bind address of the API server in the Docker image | `0.0.0.0` | No |
