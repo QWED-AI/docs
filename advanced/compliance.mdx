@@ -21,7 +21,7 @@ The summary is not a SOC 2 report or an auditor's attestation. A SOC 2 report is
 
 **Prerequisites:**
 
-- An API key whose owner has the `owner` or `admin` role.
+- An API key whose owner has the `owner` or `admin` role, or a signed-in session (`Authorization: Bearer <jwt_token>`) for an `owner` or `admin`. See [Session sign-in for compliance endpoints](/api/endpoints#session-sign-in-for-compliance-endpoints).
 - `QWED_AUDIT_SECRET_KEY` set on the server. Without it, the audit trail check can't run and `audit_trail.status` is `NOT_VERIFIED`.
 
 **API endpoint:**
@@ -125,8 +125,20 @@ If an entry's stored `result` payload cannot be decoded as JSON, `verify_log_ent
 GET /admin/compliance/verify/{log_id}
 ```
 
+**Verify the whole trail or a period:**
+```http
+GET /admin/compliance/verify-trail?start={start}&end={end}
+```
+
+`start` and `end` are optional ISO 8601 datetimes. Omit both to check the whole chain. The response reports `status` (`VERIFIED`, `NO_ENTRIES`, or `NOT_VERIFIED`), the entry counts, and `first_failed_entry_id`, so you can see where the chain stops checking out. See [`GET /admin/compliance/verify-trail`](/api/endpoints#get-admin-compliance-verify-trail).
+
+```bash
+curl --fail-with-body -H "X-API-Key: qwed_live_your_admin_key" \
+  "http://localhost:8000/admin/compliance/verify-trail"
+```
+
 **Verify entire trail (Python SDK):**
-The API verifies one entry at a time for performance. For complete log verification, use the Python SDK or a custom script that queries the database directly.
+To verify the trail in-process without the API, call `verify_audit_trail` directly.
 
 ```python
 from qwed_new.core.audit_logger import AuditLogger, SecurityError

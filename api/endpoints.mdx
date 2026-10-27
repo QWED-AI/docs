@@ -1328,11 +1328,27 @@ Before QWED checks the role, the request must meet all of these conditions. Othe
 |----------|---------------|---------------------------|
 | `GET /admin/compliance/export/csv` | `owner`, `admin` | `403 Forbidden` |
 | `GET /admin/compliance/verify/{log_id}` | `owner`, `admin` | `404 Not Found` |
+| `GET /admin/compliance/verify-trail` | `owner`, `admin` | Not applicable (always your organization) |
 | `GET /admin/compliance/report/soc2/{org_id}` | `owner`, `admin` | `403 Forbidden` |
 | `GET /admin/security/threats/{org_id}` | `owner`, `admin` | `403 Forbidden` |
 | `POST /admin/keys/rotate` | `owner`, `admin`, `member` | `404 Not Found` |
 
 A caller whose role isn't allowed gets `403 Forbidden` with `"Insufficient permissions for this operation"`. A missing or invalid API key returns `401 Unauthorized`.
+
+### Session sign-in for compliance endpoints
+
+The four `/admin/compliance/*` endpoints also accept a signed-in session, so a dashboard user doesn't need to paste an API key into the browser. Send the `access_token` from [`POST /auth/signin`](/api/authentication) as a bearer token:
+
+```text
+Authorization: Bearer <jwt_token>
+```
+
+- The token must be valid and its user must exist. Otherwise QWED returns `401 Unauthorized`.
+- The user must be active, belong to an active organization, and hold the `owner` or `admin` role. Otherwise QWED returns `403 Forbidden`.
+- If you send both `X-API-Key` and a bearer token, QWED uses the API key.
+- The session's organization is the signed-in user's organization. Organization scoping works the same as with an API key.
+
+Other admin endpoints (`/admin/security/threats/{org_id}` and `/admin/keys/rotate`) accept only an API key. A bearer token alone returns `401 Unauthorized`.
 
 <Note>
 Before this change, every admin endpoint returned `401 Unauthorized`, even for valid owner and admin keys. Admin endpoints now authorize by role and are scoped to the caller's organization.
@@ -1397,7 +1413,49 @@ curl --fail-with-body -H "X-API-Key: qwed_live_your_key" \
   "http://localhost:8000/admin/compliance/report/soc2/1"
 ```
 
+`audit_trail.first_failed_entry_id` is the lowest entry ID that failed its signature or chain check, or `null` when none failed or the check couldn't run.
+
 See [Security activity summary](/advanced/compliance#1-security-activity-summary) for the full response and field reference.
+
+### GET /admin/compliance/verify-trail
+
+Check the signature and hash chain of every audit entry in your organization over a period. Use it to confirm the chain is intact up to a given entry, instead of calling `GET /admin/compliance/verify/{log_id}` once per entry. Owners and admins can call it with an API key or a signed-in session.
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `start` | ISO 8601 datetime (query, optional) | Start of the period. Omit for no lower bound. |
+| `end` | ISO 8601 datetime (query, optional) | End of the period. Omit for no upper bound. |
+
+With neither parameter, QWED checks the whole chain. QWED reads a time without a zone as UTC and converts any other offset to UTC. A `start` later than `end` returns `400 Bad Request`.
+
+```bash
+curl --fail-with-body -H "Authorization: Bearer $QWED_SESSION_TOKEN" \
+  "http://localhost:8000/admin/compliance/verify-trail?start=2026-10-01T00:00:00Z"
+```
+
+**Response:**
+
+```json
+{
+  "organization_id": 1,
+  "start": "2026-10-01T00:00:00+00:00",
+  "end": null,
+  "status": "NOT_VERIFIED",
+  "proof_ref": null,
+  "evidence": null,
+  "scope": "Signature and hash-chain check of the audit entries recorded in the period. It does not show that every request was recorded.",
+  "total_entries": 240,
+  "verified_entries": 238,
+  "failed_entries": 2,
+  "legacy_entries": 0,
+  "first_failed_entry_id": 1187,
+  "errors": ["..."],
+  "total_errors": 2,
+  "errors_truncated": false
+}
+```
+
+The fields after `end` match `audit_trail` in the [security activity summary](/advanced/compliance#audit-trail-status). `status` is `VERIFIED` (with `evidence` and a `sha256:` `proof_ref`) only when the period has entries and all pass. `NO_ENTRIES` means the period has none. `NOT_VERIFIED` means any entry failed, any entry is a legacy entry, or the check couldn't run. `first_failed_entry_id` names the lowest entry ID that failed, or is `null`.
 
 ### GET /admin/security/threats/{org_id}
 
