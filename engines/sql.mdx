@@ -141,6 +141,31 @@ print(result.developer_fields["issues"])
 | CREATE     | High     |
 | MERGE      | High     |
 
+### Dangerous functions
+
+<Info>New in v8.0.0 ([GHSA-45jv-2j44-4c2q](https://github.com/QWED-AI/qwed-verification/security/advisories/GHSA-45jv-2j44-4c2q))</Info>
+
+The SQL engine denies calls to functions that read or write server files, load code, or reach the OS or another server. The list is `DANGEROUS_SQL_FUNCTIONS`. It covers every dialect, whatever `dialect` you declare. A call anywhere in a statement, including inside a `SELECT`, is a `CRITICAL` issue with type `dangerous_function`. The query is not valid, sets `malicious_classification: true`, and is not admitted.
+
+| Dialect | Examples |
+| ------- | -------- |
+| SQLite | `load_extension`, `readfile`, `writefile` |
+| PostgreSQL | `pg_read_file`, `pg_ls_dir`, `lo_import`, `lo_export`, `dblink`, `set_config` |
+| MySQL / MariaDB | `load_file`, `sys_exec`, `sys_eval` |
+| SQL Server | `xp_cmdshell`, `xp_dirtree`, `sp_oacreate`, `openrowset` |
+| Oracle | `utl_file`, `utl_http`, `dbms_java`, `dbms_scheduler` |
+
+```python
+result = client.verify_sql("SELECT load_extension('/tmp/evil.so')")
+print(result.is_verified)                   # False
+print(result.result["issues"])
+# [{"severity": "CRITICAL", "type": "dangerous_function", ...}]
+```
+
+<Note>
+Before v8.0.0, `SQLVerifier` admitted calls such as `load_extension()`, `pg_read_file()`, and `xp_cmdshell()`. `QWEDClient.verify_sql` also answered from the local `SQLGuard` instead of the server. It now always calls `POST /verify/sql` and returns `UNVERIFIABLE` when the server can't be reached. See [SQLGuard](/sdks/guards#sqlguard) for the local pre-filter.
+</Note>
+
 ### Administrative commands
 
 The SQL engine also blocks administrative SQL commands by default:

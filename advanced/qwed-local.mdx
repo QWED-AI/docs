@@ -134,7 +134,11 @@ print(result.value)  # FALSE (contradiction!)
 print(result.evidence)  # {"method": "z3_sat", ...}
 ```
 
-### 3. Code security (AST)
+### 3. Code security (CodeVerifier)
+
+<Info>Changed in v8.0.0 ([GHSA-v8qq-v427-qrqc](https://github.com/QWED-AI/qwed-verification/security/advisories/GHSA-v8qq-v427-qrqc))</Info>
+
+`verify_code` runs QWED's [`CodeVerifier`](/engines/code#security-scanning-codeverifier) in process and admits the code with `admission_decision()`. Only admitted code is `verified=True` with `value="SAFE"`.
 
 ```python
 code = """
@@ -143,7 +147,8 @@ def safe_function():
 """
 
 result = client.verify_code(code)
-print(result.value)  # "SAFE"
+print(result.value)                   # "SAFE"
+print(result.evidence["admission"])   # "ADMIT"
 ```
 
 **Dangerous code detection:**
@@ -151,14 +156,23 @@ print(result.value)  # "SAFE"
 ```python
 dangerous_code = """
 import os
-eval(user_input)
+os.system("echo hello")
 """
 
 result = client.verify_code(dangerous_code)
-print(result.value)  # "UNSAFE"
-print(result.evidence["dangerous_patterns"])
-# ["Dangerous function: eval"]
+print(result.verified)                # False
+print(result.value)                   # "UNSAFE"
+print(result.evidence["admission"])   # "BLOCKED"
+print(result.evidence["issues"])      # CodeVerifier issues, e.g. process_execution
 ```
+
+`result.evidence` carries the verifier's `status`, `admission`, `constraint_id`, `critical_count`, `issues`, and `proof_ref`.
+
+`CodeVerifier` ships with the full `qwed` package. Without it, `verify_code` returns `verified=False` with `value="UNVERIFIABLE"` and an error. It never returns `SAFE`.
+
+<Warning>
+Before v8.0.0, `verify_code` used a local AST check that flagged only bare calls to `eval`, `exec`, `compile`, and `__import__`. Code such as `os.system(...)`, `subprocess.run(...)`, or `from os import system` came back `SAFE`. Cached code results from that check are not reused after you upgrade.
+</Warning>
 
 ---
 
@@ -373,7 +387,7 @@ for code in code_snippets:
     status = "🟢 SAFE" if result.verified else "🔴 UNSAFE"
     print(f"{status}: {code[:30]}...")
     if not result.verified:
-        print(f"  Issues: {result.evidence['dangerous_patterns']}")
+        print(f"  Issues: {result.evidence.get('issues', [])}")
 ```
 
 ### Example 3: batch processing with cache

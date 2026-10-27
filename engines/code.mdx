@@ -383,6 +383,10 @@ If generated code needs to run commands, route them through a reviewed, sandboxe
 Before v7.2.3, these calls were warnings and the code was admitted. See [GHSA-6rxr-gq43-694g](https://github.com/QWED-AI/qwed-verification/security/advisories/GHSA-6rxr-gq43-694g).
 </Note>
 
+### SDK clients use `CodeVerifier`, not `CodeGuard`
+
+As of v8.0.0, [`QWEDClient.verify_code`](/sdks/python#verify-code-code-language) always calls `POST /verify/code`, so `CodeVerifier` decides admission. When the server can't be reached, the client returns `UNVERIFIABLE`. [`QWEDLocal.verify_code`](/advanced/qwed-local#3-code-security-codeverifier) runs `CodeVerifier` in process. The [`CodeGuard`](/sdks/guards#codeguard) blocklist is a pre-filter only. It blocks reflective calls, `__builtins__`, dunder attributes, `importlib`, `builtins`, `ctypes`, `marshal`, and dotted imports, and it marks its own pass as `advisory`. See [GHSA-4rj3-8wqj-cqwc](https://github.com/QWED-AI/qwed-verification/security/advisories/GHSA-4rj3-8wqj-cqwc) and [GHSA-v8qq-v427-qrqc](https://github.com/QWED-AI/qwed-verification/security/advisories/GHSA-v8qq-v427-qrqc).
+
 ### Hardcoded OpenAI keys
 
 The code verifier flags hardcoded OpenAI API keys, including project-scoped (`sk-proj-`), service-account (`sk-svcacct-`), and admin (`sk-admin-`) keys as well as legacy `sk-` keys. Detection of the scoped formats was added in v7.2.3 ([GHSA-64xf-wffc-63fm](https://github.com/QWED-AI/qwed-verification/security/advisories/GHSA-64xf-wffc-63fm)).

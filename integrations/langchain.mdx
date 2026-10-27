@@ -94,6 +94,12 @@ print(result.output)    # "4"
 print(result.verified)  # True
 ```
 
+The tools, callback, and `QWEDVerifiedChain` read the client's `is_verified`, which follows the server's admission. `result.verified` is `True` only when the server admitted the output. A `BLOCKED` or `UNVERIFIABLE` result is never verified.
+
+<Warning>
+Before v8.0.0 ([GHSA-83v6-6h23-pvp4](https://github.com/QWED-AI/qwed-verification/security/advisories/GHSA-83v6-6h23-pvp4)), the integrations read a `verified` attribute that `QWEDClient` results don't have, so their checks raised. When you call `QWEDClient` directly, gate on `result.is_verified`.
+</Warning>
+
 ## LCEL integration
 
 Use with LangChain Expression Language:
@@ -105,7 +111,7 @@ def verify_output(text):
     from qwed_sdk import QWEDClient
     client = QWEDClient()
     result = client.verify(text)
-    return text if result.verified else f"[UNVERIFIED] {text}"
+    return text if result.is_verified else f"[UNVERIFIED] {text}"
 
 chain = prompt | llm | RunnableLambda(verify_output)
 ```
