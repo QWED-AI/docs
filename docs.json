@@ -523,7 +523,7 @@
   },
   "description": "Official documentation for QWED. Learn deterministic verification for LLMs and AI agents using formal methods, symbolic execution, and policy guards.",
   "banner": {
-    "content": "**QWED v7.3.0** fixes five security advisories and adds tenant scoping and DoS hardening. [See the release](https://github.com/QWED-AI/qwed-verification/releases/tag/v7.3.0)",
+    "content": "**QWED v8.0.0** signs every verified answer, fixes six security advisories, and changes some SDK types and settings. [Upgrade guide](/changelog#v8-0-0-—-attested-verdicts-and-upgrade-guide)",
     "dismissible": true
   },
   "seo": {

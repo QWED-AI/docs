@@ -16,6 +16,8 @@ All requests require an API key, except `GET /health` and `GET /health/identity`
 curl -H "X-API-Key: qwed_your_key" http://localhost:8000/health
 ```
 
+A key authenticates only while it is live: active, not revoked, and not past its expiry time. Since v7.3.0, QWED rejects expired and revoked keys on every authenticated path, including `/verify/*`, admin, and metrics routes, with `401 Unauthorized` or `403 Forbidden`. Keys issued by rotation expire after 90 days. Rotate a key before it expires.
+
 ### SDK authentication
 
 ```python
@@ -141,7 +143,7 @@ As of v7.2, QWED stores API keys as HMAC-SHA256 lookup digests keyed by a dedica
 **Breaking change.** There is no legacy fallback: API keys issued before v7.2 no longer authenticate and return `401 Unauthorized`. Each key must be re-issued once. The old raw key is never required:
 
 - **Portal or API:** sign in with your email and password to get a JWT, then call `POST /auth/api-keys` to mint a new key. This path needs no API key.
-- **Rotation by key ID:** call [`POST /admin/keys/rotate`](/api/endpoints#post-admin-keys-rotate) with the key's ID, authenticated with an already-working key in the same organization. Members can rotate only their own keys. Owners and admins can also rotate other users' keys, unless the key owner holds a higher role. Revoked or inactive keys can't be rotated.
+- **Rotation by key ID:** call [`POST /admin/keys/rotate`](/api/endpoints#post-admin-keys-rotate) with the key's ID, authenticated with an already-working key in the same organization. Members can rotate only their own keys. Owners and admins can also rotate other users' keys, unless the key owner holds a higher role. Revoked or inactive keys can't be rotated. Rotation is atomic: it mints at most one replacement key, even when several rotations of the same key run concurrently. Rotating a key that is already inactive mints nothing and returns `404 Not Found`.
 
 ```bash
 # Before (pre-v7.2 key): now rejected
@@ -208,6 +210,18 @@ curl -X POST http://localhost:8000/agents/42/verify \
   -H "Content-Type: application/json" \
   -d '{"query": "What is 2+2?"}'
 ```
+
+### Agent token storage
+
+QWED stores each agent token as an HMAC-SHA256 digest keyed with `QWED_API_KEY_LOOKUP_SECRET`, not as plain text. The token is shown only once, in the response to registration or re-issue. Store it when you receive it.
+
+Tokens issued before this change keep working. At startup, after its fail-closed checks, the server hashes any agent token still stored in plain text, in place. You don't need to re-register agents.
+
+To replace a token, for example one whose plain text might remain in a database backup, call [`POST /agents/{agent_id}/token/reissue`](/api/endpoints#post-agents-agent-id-token-reissue). QWED returns a new token and the old one stops working.
+
+<Warning>
+Agent token digests depend on `QWED_API_KEY_LOOKUP_SECRET`. Changing the secret invalidates every agent token as well as every API key. Re-issue agent tokens after changing it.
+</Warning>
 
 ## Scopes
 
@@ -278,9 +292,29 @@ Get the current authenticated user's information. Requires a `Bearer` token in t
 curl -H "Authorization: Bearer eyJhbG..." http://localhost:8000/auth/me
 ```
 
+### Roles on API-key and audit routes
+
+The `/auth/api-keys` and `/audit` routes authorize by the signed-in user's role. Roles rank from lowest to highest: `viewer`, `member`, `admin`, `owner`.
+
+| Route | `viewer` | `member` | `admin` | `owner` |
+|-------|----------|----------|---------|---------|
+| `POST /auth/api-keys` | No | Yes | Yes | Yes |
+| `GET /auth/api-keys` | Own keys | Own keys | All keys in the organization | All keys in the organization |
+| `DELETE /auth/api-keys/{key_id}` | Own keys | Own keys | Own keys, plus keys of users who don't rank higher | Any key in the organization |
+| `GET /audit/logs` | Yes | Yes | Yes | Yes |
+| `GET /audit/logs/{log_id}` | Yes | Yes | Yes | Yes |
+| `GET /audit/export` | No | No | Yes | Yes |
+| `POST /audit/seed` | No | No | Yes | Yes |
+
+Before QWED checks the role, it checks the user and organization. QWED returns `403 Forbidden` when:
+
+- The user is inactive (`"User is not active"`).
+- The user's organization is inactive or missing (`"Organization is not active"`).
+- The user's role isn't allowed on the route, including any role not listed above (`"Insufficient permissions for this operation"`).
+
 ### POST /auth/api-keys
 
-Generate a new API key for the current user's organization. Requires JWT authentication.
+Generate a new API key for the current user's organization. Requires JWT authentication and the `member`, `admin`, or `owner` role. A `viewer` gets `403 Forbidden`.
 
 **Request:**
 
@@ -305,30 +339,45 @@ Generate a new API key for the current user's organization. Requires JWT authent
 
 ### GET /auth/api-keys
 
-List all active API keys for the current user's organization.
+List active API keys. Admins and owners see every active key in their organization. Members and viewers see only their own keys.
+
+Each key includes `id`, `name`, `key_preview`, `created_at`, `last_used_at`, and `is_revoked`. QWED sets `last_used_at` after a key passes every authentication and authorization check, at most once a minute per key. A key that has never been used, or was refused by a check, keeps its previous value (`null` if never used). If QWED can't write `last_used_at`, the request still succeeds.
 
 ### DELETE /auth/api-keys/{key_id}
 
 Revoke an API key. Performs a soft delete.
 
+- Any role can revoke its own key.
+- An `admin` can revoke another user's key unless that user holds a higher role. Revoking an owner's key returns `403 Forbidden`.
+- An `owner` can revoke any key in the organization.
+- A `member` or `viewer` gets `404 Not Found` for a key they don't own, so the response doesn't confirm that the key exists.
+- A key ID that isn't a positive integer, or that belongs to another organization, returns `404 Not Found`.
+
+```bash
+curl --fail-with-body -X DELETE http://localhost:8000/auth/api-keys/12 \
+  -H "Authorization: Bearer eyJhbG..."
+```
+
 ## Audit endpoints
 
-These endpoints require JWT authentication (Bearer token) and return data scoped to the authenticated user's organization.
+These endpoints require JWT authentication (Bearer token) and return data scoped to the authenticated user's organization. Every role can read the log. Exporting it and seeding samples need `admin` or `owner`. See [Roles on API-key and audit routes](#roles-on-api-key-and-audit-routes).
 
 ### GET /audit/logs
 
-Get audit logs for the current organization.
+Get audit logs for the current organization, newest first.
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `limit` | integer | `50` | Maximum records (max 200) |
 | `status` | string | — | Filter by `verified` or `blocked` |
+| `before` | integer | — | Return only rows older than this log ID. Pass the `next_before` value from the previous page |
 
-Each entry includes `verdict`, the verdict stored in the row's result, and `entry_hash`, the row's hash in the signed audit chain.
+Each entry includes `verdict`, the verdict stored in the row's result, `admission`, the admission decision its route made, and `entry_hash`, the row's hash in the signed audit chain. Each entry also records who wrote it (`api_key_id`) and with which server release (`verifier_version`).
 
 ```json
 {
   "total": 1,
+  "next_before": null,
   "logs": [
     {
       "id": "42",
@@ -337,9 +386,12 @@ Each entry includes `verdict`, the verdict stored in the row's result, and `entr
       "engine_used": "MATH",
       "verdict": "VERIFIED",
       "status": "verified",
+      "admission": "ADMIT",
       "latency_ms": 0,
       "created_at": "2026-10-21T12:00:00+00:00",
-      "entry_hash": "3b1f...a9c2"
+      "entry_hash": "3b1f...a9c2",
+      "api_key_id": "7",
+      "verifier_version": "8.0.0"
     }
   ]
 }
@@ -347,19 +399,42 @@ Each entry includes `verdict`, the verdict stored in the row's result, and `entr
 
 | Field | Description |
 |-------|-------------|
+| `total` | Number of rows on this page, not in the whole log |
+| `next_before` | The last row's ID when the page is full (`limit` rows). `null` when the page is not full |
 | `verdict` | `VERIFIED`, `UNVERIFIABLE`, or `BLOCKED`, read from the stored result: `status` for a `/verify/*` result, `verdict` for a Verification Context document, or `details.result.status` for a `/verify/batch` item row. `null` for anything else, such as a truncated result, a logic engine's `SAT`, or an audit seed sample. Never derived from `is_verified` |
 | `status` | Unchanged for existing clients: `verified` or `blocked`, from the row's `is_verified` flag. Each route sets that flag by its own rule, so an `UNVERIFIABLE` result reads `blocked` |
+| `admission` | The admission decision the route made, as stored: `ADMIT` or `BLOCKED`. Rows from `POST /verification-context/from-diagnostic` store `ADMIT` or `DENY`, the Verification Context terms. `null` for routes that decide no admission (logic, stats, fact, image, RAG, process, consensus, and batch items other than code) and for rows written before QWED stored it |
 | `entry_hash` | The row's SHA-256 hash in the audit chain, as stored. `null` for legacy rows written before the API used the chain |
+| `api_key_id` | ID (as a string) of the API key that authenticated the request. `null` for rows written from a signed-in user session, by `POST /audit/seed`, or by `POST /agents/{agent_id}/verify` (which authenticates with an agent token), and for rows written before QWED recorded it |
+| `verifier_version` | The QWED server version that wrote the row. `null` for rows written before QWED recorded it |
+
+The entry hash covers `admission`, `api_key_id`, and `verifier_version`. Changing or clearing any of them on a stored row fails [integrity verification](/api/endpoints#get-admin-compliance-verify-log-id).
 
 <Warning>
-`verdict` is not an admission decision. `VERIFIED` means the check ran to a proof, not that the claim holds. A disproven identity or code proven unsafe is `VERIFIED` with `status` `blocked`. Don't gate on `verdict` alone. Neither field is an admission decision, because audit rows don't store one yet.
+`verdict` is not an admission decision. `VERIFIED` means the check ran to a proof, not that the claim holds. A disproven identity or code proven unsafe is `VERIFIED` with `status` `blocked`. Don't gate on `verdict` or `status`. Read `admission` for the decision the route made.
 </Warning>
+
+#### Paging through the log
+
+QWED orders rows by timestamp, then by ID, newest first, so the order is stable when two rows share a timestamp. To read the next page, pass `next_before` back as `before`. Stop when `next_before` is `null`. A full last page is followed by an empty page with `next_before: null`.
+
+```bash
+# First page
+curl --fail-with-body -H "Authorization: Bearer $TOKEN" \
+  "http://localhost:8000/audit/logs?limit=200"
+
+# Next page, using next_before from the previous response
+curl --fail-with-body -H "Authorization: Bearer $TOKEN" \
+  "http://localhost:8000/audit/logs?limit=200&before=1042"
+```
+
+A `before` ID that is not a log in your organization, or is outside the SQL `BIGINT` range (1 to 2<sup>63</sup>−1), returns `404 Not Found`.
 
 ### GET /audit/logs/{log_id}
 
-Get detailed information for a single audit log entry. Returns `404` for a log ID outside your organization.
+Get detailed information for a single audit log entry. Returns `404` for a log ID outside your organization or outside the SQL `BIGINT` range.
 
-The response has the same `verdict` and `status` fields as the list, plus the row's full chain entry as stored:
+The response has the same `verdict`, `status`, `admission`, `api_key_id`, and `verifier_version` fields as the list, plus the row's full chain entry as stored:
 
 | Field | Description |
 |-------|-------------|
@@ -371,5 +446,5 @@ These fields identify the chain entry. To check that it is intact, call [`GET /a
 
 ### GET /audit/export
 
-Export audit logs as a CSV file (up to 1,000 records).
+Export audit logs as a CSV file (up to 1,000 records). Requires the `admin` or `owner` role.
 

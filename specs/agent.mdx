@@ -152,6 +152,8 @@ Agents MUST register with QWED before use:
 }
 ```
 
+The `agent_token` appears only in the registration response and in the response to `POST /agents/{agent_id}/token/reissue`. The server stores an HMAC-SHA256 digest of the token, keyed with `QWED_API_KEY_LOOKUP_SECRET`, and authenticates agents by digest. Re-issuing a token retires the previous one.
+
 ### 3.3 Agent types
 
 | Type         | Description                          | Trust Level |

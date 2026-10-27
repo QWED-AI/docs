@@ -6,58 +6,92 @@ description: "Run QWED on your own infrastructure using Docker Compose. Quick st
 
 ## Quick start
 
+### Prerequisites
+
+- Docker with the Compose plugin (`docker compose`)
+- A clone of the `qwed-verification` repository
+
 ```bash
 # Clone the repository
 git clone https://github.com/QWED-AI/qwed-verification.git
 cd qwed-verification
 
-# Start with Docker Compose
-docker-compose up -d
+# Copy the settings template, then fill in every required value
+cp deploy/.env.example deploy/.env
+
+# Build the server image and start the stack from the repository root
+docker compose -f deploy/docker-compose.yml up -d
 
 # Check status
-docker-compose ps
+docker compose -f deploy/docker-compose.yml ps
 ```
+
+Compose builds the API server from the repository's `Dockerfile` (the `server` target) and waits for Postgres, Redis, and Jaeger to report healthy before it starts the API.
+
+<Warning>
+Compose refuses to start while `QWED_CORS_ORIGINS`, `API_KEY_SECRET`, `QWED_JWT_SECRET_KEY`, `QWED_API_KEY_LOOKUP_SECRET`, `QWED_AUDIT_SECRET_KEY`, or `DATABASE_URL` is empty. The Postgres container refuses to start while `POSTGRES_PASSWORD` is empty, and the Grafana container refuses to start while `GF_SECURITY_ADMIN_PASSWORD` is empty.
+</Warning>
 
 ## Services
 
 | Service | Port | Purpose |
 | --- | --- | --- |
-| QWED API | 8000 | Main API |
+| QWED API (`qwed-core`) | 8000 | Main API |
 | PostgreSQL | 5432 | Database |
 | Redis | 6379 | Cache & rate limiting |
-| Grafana | 3000 | Dashboards |
-| Prometheus | 9090 | Metrics |
+| Grafana | 3000 | Dashboards, with Prometheus and Jaeger data sources provisioned |
+| Prometheus | 9090 | Metrics. Scrapes the API at `qwed-core:8000` |
 | Jaeger | 16686 | Tracing |
+
+The API server keeps its data in the `qwed-data` volume. Postgres, Redis, Prometheus, and Grafana each have their own named volume, so data survives `docker compose down`.
 
 ## Configuration
 
 ### Environment variables
 
+`deploy/.env.example` lists every setting the Compose stack reads. Generate each secret separately:
+
 ```bash
-# .env file
-
-# Required — server will not start without these
-API_KEY_SECRET=your-generated-secret
-QWED_CORS_ORIGINS=https://app.yourcompany.com
-# Signs the audit hash chain. Generate once and keep it:
-#   python -c "import secrets; print(secrets.token_urlsafe(48))"
-QWED_AUDIT_SECRET_KEY=
-
-# Infrastructure
-DATABASE_URL=postgresql://user:pass@localhost:5432/qwed
-REDIS_URL=redis://localhost:6379
-
-# LLM provider
-ACTIVE_PROVIDER=openai
-OPENAI_API_KEY=sk-...
-
-# Required — server will not start without these
-API_KEY_SECRET=your-generated-secret  # python -c "import secrets; print(secrets.token_urlsafe(48))"
-QWED_CORS_ORIGINS=https://app.yourcompany.com
+python -c "import secrets; print(secrets.token_urlsafe(48))"
 ```
 
+```bash
+# deploy/.env
+
+# QWED API server (required)
+QWED_CORS_ORIGINS=https://app.yourcompany.com
+# Generate each secret separately and keep it:
+#   python -c "import secrets; print(secrets.token_urlsafe(48))"
+API_KEY_SECRET=
+# Changing them invalidates issued tokens and API keys, or breaks the signed
+# audit chain. The lookup secret must differ from the JWT secret.
+QWED_JWT_SECRET_KEY=
+QWED_API_KEY_LOOKUP_SECRET=
+QWED_AUDIT_SECRET_KEY=
+
+# Optional. User IDs allowed to read /metrics. Empty denies every caller.
+QWED_METRICS_OPERATOR_USER_IDS=
+
+# Postgres (required)
+POSTGRES_USER=qwed
+POSTGRES_DB=qwed_db
+POSTGRES_PASSWORD=
+# Must match the three values above. Build it as a postgresql:// URL with the
+# user, POSTGRES_PASSWORD, the host "postgres" (the Compose service), port 5432
+# and qwed_db, the same shape as deploy/.env.example shows.
+DATABASE_URL=
+
+# Grafana (required)
+GF_SECURITY_ADMIN_USER=admin
+# Generate a separate password the same way:
+#   python -c "import secrets; print(secrets.token_urlsafe(24))"
+GF_SECURITY_ADMIN_PASSWORD=
+```
+
+Postgres and Grafana receive only their own settings, not the API server's secrets. `deploy/.env` is git-ignored.
+
 <Warning>
-`API_KEY_SECRET` and `QWED_CORS_ORIGINS` are mandatory as of v5.0.0. `QWED_AUDIT_SECRET_KEY` is also mandatory: the server refuses to start without it. See the [deployment guide](/advanced/deployment#environment-variables-reference) for the full reference.
+`QWED_METRICS_OPERATOR_USER_IDS` is optional. Leave it empty and every caller, including the Prometheus scraper, gets denied on `/metrics`. Prometheus records `401` responses until you configure an operator. See [Prometheus metrics](#prometheus-metrics). See the [deployment guide](/advanced/deployment#environment-variables-reference) for the full variable reference.
 </Warning>
 
 ### API configuration
@@ -75,28 +109,43 @@ SETTINGS = {
 
 ## Docker
 
-### Build and run
+### API server image
 
-Build from the repository's `Dockerfile`. Its `server` target is the API server: uvicorn on port 8000 as a non-root user, with its data in `/var/lib/qwed`. The default target is the GitHub Action, so pass `--target server`. Pass the secrets from your shell, so no value is written into the command:
+The `qwedai/qwed-verification` image on Docker Hub runs the API server with uvicorn on port 8000. Docker Hub publishes `latest` from `main` and a versioned tag for each release from 8.0.0.
+
+The image:
+
+- Runs as a non-root user (UID 1000).
+- Uses `/var/lib/qwed` as its working directory. The default SQLite database (`sqlite:///./qwed.db`) lives there. Mount a volume at `/var/lib/qwed` to keep it, or set `DATABASE_URL` to use Postgres.
+- Has a health check that calls `GET /health` with the image's own Python.
+- Reads its bind address and port from `UVICORN_HOST` (default `0.0.0.0`) and `UVICORN_PORT` (default `8000`). The health check follows `UVICORN_PORT`, so change the port with `-e UVICORN_PORT=...` rather than a `--port` argument.
+
+<Warning>
+Tags before 8.0.0 ran the QWED GitHub Action, not the API server. If you ran the image as a repository scanner, use the [GitHub Action](/advanced/github-action) instead.
+</Warning>
+
+### Run the published image
+
+Pass the secrets from your shell, so no value is written into the command:
 
 ```bash
-docker build --target server -t qwed-api .
-
 # Generate each secret once and keep it. Changing the lookup or audit key later
 # invalidates existing API keys or audit signatures.
 for name in API_KEY_SECRET QWED_JWT_SECRET_KEY QWED_API_KEY_LOOKUP_SECRET QWED_AUDIT_SECRET_KEY; do
   export "$name=$(python -c 'import secrets; print(secrets.token_urlsafe(48))')"
 done
 
-docker run -p 8000:8000 \
+docker run -d -p 8000:8000 \
   -v qwed-data:/var/lib/qwed \
+  -e QWED_CORS_ORIGINS="https://app.yourcompany.com" \
   -e API_KEY_SECRET \
   -e QWED_JWT_SECRET_KEY \
   -e QWED_API_KEY_LOOKUP_SECRET \
   -e QWED_AUDIT_SECRET_KEY \
-  -e QWED_CORS_ORIGINS="https://app.yourcompany.com" \
-  qwed-api
+  qwedai/qwed-verification:8.0.0
 ```
+
+The server refuses to start without any of `QWED_CORS_ORIGINS`, `API_KEY_SECRET`, `QWED_JWT_SECRET_KEY`, `QWED_API_KEY_LOOKUP_SECRET` and `QWED_AUDIT_SECRET_KEY`, and `QWED_API_KEY_LOOKUP_SECRET` must differ from `QWED_JWT_SECRET_KEY`. Also set `QWED_SIGNING_KEY` (an EC P-256 key), or attestations stop verifying after a restart or on another replica.
 
 If you keep the values in a `.env` file instead, pass it with `--env-file .env`.
 
@@ -109,34 +158,57 @@ Optionally, add a signing key so attestations verify after a restart and on ever
 
 See [Signing keys](/advanced/attestations#signing-keys) and the [environment variables reference](/advanced/deployment#environment-variables-reference).
 
+To serve on a different port, with the same secrets exported:
+
+```bash
+docker run -d -p 9000:9000 -e UVICORN_PORT=9000 \
+  -v qwed-data:/var/lib/qwed \
+  -e QWED_CORS_ORIGINS="https://app.yourcompany.com" \
+  -e API_KEY_SECRET \
+  -e QWED_JWT_SECRET_KEY \
+  -e QWED_API_KEY_LOOKUP_SECRET \
+  -e QWED_AUDIT_SECRET_KEY \
+  qwedai/qwed-verification:8.0.0
+```
+
+### Build from source
+
+The repository's `Dockerfile` has two targets. `server` is the API server. `action` is the GitHub Action and stays the default target, so build the server with `--target server`:
+
+```bash
+docker build --target server -t qwed-api .
+```
+
 ## Kubernetes
+
+The repository ships manifests in `deploy/kubernetes/`. The Deployment pins `docker.io/qwedai/qwed-verification:8.0.0`, the first tag that contains the API server. Fill in every value in `deploy/kubernetes/secret.yaml` before you apply it. See [Kubernetes deployment](/advanced/deployment#kubernetes-deployment).
 
 ```yaml
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: qwed-api
+  name: qwed-core
+  namespace: qwed
 spec:
-  replicas: 3
+  replicas: 1
   selector:
     matchLabels:
-      app: qwed-api
+      app: qwed-core
   template:
     metadata:
       labels:
-        app: qwed-api
+        app: qwed-core
     spec:
       containers:
-      - name: qwed
-        image: qwed/qwed-api:latest
+      - name: qwed-core
+        image: docker.io/qwedai/qwed-verification:8.0.0
         ports:
         - containerPort: 8000
-        env:
-        - name: QWED_API_KEY
-          valueFrom:
-            secretKeyRef:
-              name: qwed-secrets
-              key: api-key
+        envFrom:
+        - configMapRef:
+            name: qwed-config
+        - secretRef:
+            name: qwed-secrets
 ```
 
 > 🏢 **Enterprise Support Coming Soon:** Managed hosting, dedicated support, and SLA guarantees. Contact [support@qwedai.tech](mailto:support@qwedai.tech)
