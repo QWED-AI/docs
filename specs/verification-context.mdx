@@ -98,10 +98,13 @@ The schema enforces two invariants:
 
 The critical case: a **proven-unsafe** artifact is `VERIFIED` (QWED proved it is unsafe) with admission `DENY`.
 
+**Proven false is the same case.** A claim the engine disproves (for example the math claim `2+2=5`) is `VERIFIED` with `is_valid: false` and admission `DENY`. It is never `UNVERIFIABLE`, which means the engine could neither prove nor disprove the claim.
+
 | Verdict | Truth | Admission (typical) |
 |---------|-------|---------------------|
 | `VERIFIED`, valid | Proven safe | `ADMIT` |
 | `VERIFIED`, unsafe | Proven unsafe | **`DENY`** |
+| `VERIFIED`, false | Proven false (counter-proof) | **`DENY`** |
 | `UNVERIFIABLE` | Not proven | `DENY` (fail-closed) |
 | `BLOCKED` | Verification failed | `DENY` (fail-closed) |
 
