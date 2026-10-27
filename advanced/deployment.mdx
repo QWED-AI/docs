@@ -82,7 +82,9 @@ DATABASE_URL=
 
 # Grafana (required)
 GF_SECURITY_ADMIN_USER=admin
-GF_SECURITY_ADMIN_PASSWORD=your_grafana_password
+# Generate a separate password the same way:
+#   python -c "import secrets; print(secrets.token_urlsafe(24))"
+GF_SECURITY_ADMIN_PASSWORD=
 
 # Optional overrides
 REDIS_URL=redis://redis:6379/0

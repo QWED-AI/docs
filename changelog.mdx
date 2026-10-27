@@ -262,6 +262,7 @@ See [Security activity summary](/advanced/compliance#1-security-activity-summary
 
 ```bash
 docker run -p 8000:8000 \
+  -v qwed-data:/var/lib/qwed \
   -e QWED_CORS_ORIGINS="https://app.yourcompany.com" \
   -e API_KEY_SECRET \
   -e QWED_JWT_SECRET_KEY \

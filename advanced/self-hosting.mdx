@@ -83,7 +83,9 @@ DATABASE_URL=
 
 # Grafana (required)
 GF_SECURITY_ADMIN_USER=admin
-GF_SECURITY_ADMIN_PASSWORD=your-grafana-password
+# Generate a separate password the same way:
+#   python -c "import secrets; print(secrets.token_urlsafe(24))"
+GF_SECURITY_ADMIN_PASSWORD=
 ```
 
 Postgres and Grafana receive only their own settings, not the API server's secrets. `deploy/.env` is git-ignored.
