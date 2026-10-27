@@ -34,7 +34,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Verify Calculation
-        uses: QWED-AI/qwed-verification@v7.1.0
+        uses: QWED-AI/qwed-verification@v8.0.0
         with:
           api_key: ${{ secrets.QWED_API_KEY }}
           action: verify
@@ -84,7 +84,7 @@ You can now specify which LLM provider and model the action uses. When you pass 
 
 ```yaml
 - name: Verify with Claude
-  uses: QWED-AI/qwed-verification@v7.1.0
+  uses: QWED-AI/qwed-verification@v8.0.0
   with:
     api_key: ${{ secrets.ANTHROPIC_API_KEY }}
     provider: anthropic
@@ -100,7 +100,7 @@ Set `mask_pii: "true"` to automatically redact personally identifiable informati
 
 ```yaml
 - name: Verify with PII masking
-  uses: QWED-AI/qwed-verification@v7.1.0
+  uses: QWED-AI/qwed-verification@v8.0.0
   with:
     api_key: ${{ secrets.QWED_API_KEY }}
     mask_pii: "true"
@@ -178,7 +178,7 @@ Every action mode (`verify`, `scan-secrets`, `scan-code`, `verify-shell`) emits 
 ```yaml
 - name: Verify math
   id: qwed
-  uses: QWED-AI/qwed-verification@v7.1.0
+  uses: QWED-AI/qwed-verification@v8.0.0
   with:
     action: verify
     engine: math
@@ -190,13 +190,35 @@ Every action mode (`verify`, `scan-secrets`, `scan-code`, `verify-shell`) emits 
   run: echo "proof_ref=${{ steps.qwed.outputs.proof_ref }}"
 ```
 
+### How verify mode decides
+
+<Info>Changed in v8.0.0 ([GHSA-jppc-7r58-7pjh](https://github.com/QWED-AI/qwed-verification/security/advisories/GHSA-jppc-7r58-7pjh))</Info>
+
+In `verify` mode, the Action gates its exit code and its `verified` and `admission` outputs on the Python SDK's `is_verified`, which follows the server's admission. The `verdict` output is the server's status. A `BLOCKED` or `UNVERIFIABLE` result is never admitted. The log line reports both values, for example:
+
+```text
+🔍 Verdict: VERIFIED · DENY
+```
+
+This line means the server reached a verdict but did not admit the content. With `fail_on_findings: true` (the default), the step fails. With the `code` engine, the Action always sends the code to the server's `CodeVerifier`. If the server can't be reached, the verdict is `UNVERIFIABLE · DENY`.
+
+### Output integrity
+
+<Info>Changed in v8.0.0 ([GHSA-j788-44pc-8hp3](https://github.com/QWED-AI/qwed-verification/security/advisories/GHSA-j788-44pc-8hp3))</Info>
+
+The Action writes each output to `GITHUB_OUTPUT` between random heredoc delimiters (`name<<qwed_<random>`). A newline in a value, such as the verifier's explanation, can't start another entry or overwrite `verified`. The Action also prints `::stop-commands::<random token>` when it starts, so the runner ignores workflow commands in anything the Action prints for the rest of the step.
+
+<Warning>
+Pin the Action to `QWED-AI/qwed-verification@v8.0.0` or later. In earlier versions, a newline in the explanation could set `verified=true`, and verify mode could admit a result the server had blocked. Gate downstream steps on `steps.<id>.outputs.admission == 'ADMIT'` and keep `fail_on_findings: true`.
+</Warning>
+
 ## Examples
 
 ### Verify math in PRs
 
 ```yaml
 - name: Check Math
-  uses: QWED-AI/qwed-verification@v7.1.0
+  uses: QWED-AI/qwed-verification@v8.0.0
   with:
     api_key: ${{ secrets.QWED_API_KEY }}
     action: verify
@@ -208,7 +230,7 @@ Every action mode (`verify`, `scan-secrets`, `scan-code`, `verify-shell`) emits 
 
 ```yaml
 - name: Check Logic
-  uses: QWED-AI/qwed-verification@v7.1.0
+  uses: QWED-AI/qwed-verification@v8.0.0
   with:
     api_key: ${{ secrets.QWED_API_KEY }}
     action: verify
@@ -220,7 +242,7 @@ Every action mode (`verify`, `scan-secrets`, `scan-code`, `verify-shell`) emits 
 
 ```yaml
 - name: Security Check
-  uses: QWED-AI/qwed-verification@v7.1.0
+  uses: QWED-AI/qwed-verification@v8.0.0
   with:
     api_key: ${{ secrets.QWED_API_KEY }}
     action: verify
@@ -232,7 +254,7 @@ Every action mode (`verify`, `scan-secrets`, `scan-code`, `verify-shell`) emits 
 
 ```yaml
 - name: Scan Code
-  uses: QWED-AI/qwed-verification@v7.1.0
+  uses: QWED-AI/qwed-verification@v8.0.0
   with:
     api_key: ${{ secrets.QWED_API_KEY }}
     action: scan-code

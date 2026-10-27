@@ -89,6 +89,21 @@ print(analyst.verification_summary())
 # {"total_outputs": 5, "verified": 4, "failed": 1}
 ```
 
+`verify_output()` starts every output as unverified. It sets `verified: True` only when the client's `is_verified` is `True`, which follows the server's admission:
+
+| Case | `verified` | `status` |
+| --- | --- | --- |
+| The server admits the output | `True` | Server status, for example `VERIFIED` |
+| The server does not admit the output | `False` | Server status, for example `UNVERIFIABLE` |
+| `VerificationConfig(enabled=False)` | `False` | `SKIPPED` |
+| The check raises an error | `False` | `ERROR` |
+
+`verification_summary()` counts only outputs with `verified: True`.
+
+<Warning>
+Before v8.0.0 ([GHSA-83v6-6h23-pvp4](https://github.com/QWED-AI/qwed-verification/security/advisories/GHSA-83v6-6h23-pvp4)), `verify_output()` started from `verified: True` and kept it when the check raised or verification was disabled. Don't rely on `verified=True` or verification rates from earlier versions.
+</Warning>
+
 ## QWEDVerifiedCrew
 
 Verify entire crew outputs:

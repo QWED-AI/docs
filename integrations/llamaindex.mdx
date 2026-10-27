@@ -48,6 +48,31 @@ response = verified_engine.query("Calculate the total cost")
 print(response.verified)
 ```
 
+## How responses are verified
+
+<Info>Changed in v8.0.0 ([GHSA-83v6-6h23-pvp4](https://github.com/QWED-AI/qwed-verification/security/advisories/GHSA-83v6-6h23-pvp4))</Info>
+
+`response.verified` is `True` only when a QWED engine checked the response and the server admitted it. The integration reads the client's `is_verified`, which follows the server's admission. Everything else fails closed:
+
+| Case | `verified` | `status` |
+| --- | --- | --- |
+| A math response the server admits | `True` | Server status, for example `VERIFIED` |
+| A math response the server does not admit | `False` | Server status, for example `BLOCKED` |
+| No QWED engine applies, or a fact query without source context | `False` | `UNVERIFIABLE` |
+| The check raises an error | `False` | `ERROR` |
+
+```python
+response = verified_engine.query("Where is the Eiffel Tower?")
+
+if not response.verified:
+    # UNVERIFIABLE, ERROR, or not admitted by the server
+    print(response.status)
+```
+
+<Warning>
+Before v8.0.0, `QWEDQueryEngine` returned `verified=True` with status `PASSED` for any response no engine checked, including fact-style queries. Don't rely on `verified=True` from earlier versions.
+</Warning>
+
 ## QWEDVerificationTransform
 
 Node postprocessor that verifies retrieved content:
@@ -64,6 +89,12 @@ engine = index.as_query_engine(
     ]
 )
 ```
+
+The transform sets `qwed_verified` in each node's metadata:
+
+- `True` only when a check ran and the server admitted the content.
+- `False` when the server refused the content or the check raised an error.
+- `False` together with `qwed_checked: False` when the node had nothing to check.
 
 ## QWEDCallbackHandler
 

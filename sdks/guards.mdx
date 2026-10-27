@@ -560,8 +560,10 @@ The following guards run on the QWED server and are applied automatically during
 Statically analyzes code for security risks using AST parsing (Python) or regex heuristics (Bash/Shell). Blocks Remote Code Execution (RCE) vectors before code reaches the verification engine.
 
 **Blocked Python patterns:**
-- Dangerous functions: `eval`, `exec`, `compile`, `open`, `system`, `popen`, `__import__`, `spawn`
-- Dangerous modules: `os`, `subprocess`, `sys`, `shutil`, `socket`, `pickle`, `pty`
+- Dangerous functions: `eval`, `exec`, `compile`, `open`, `system`, `popen`, `__import__`, `spawn`, called directly or as a method
+- Reflective calls: `getattr`, `setattr`, `delattr`, `globals`, `locals`, `vars`, `breakpoint`
+- The `__builtins__` name and any dunder attribute access, such as `().__class__.__base__`
+- Dangerous modules: `os`, `subprocess`, `sys`, `shutil`, `socket`, `pickle`, `pty`, `importlib`, `builtins`, `ctypes`, `marshal`, including dotted imports such as `import os.path` or `from os.path import join`
 
 **Blocked Shell patterns:**
 - RCE chains (`curl | bash`, `wget | sh`)
@@ -571,6 +573,20 @@ Statically analyzes code for security risks using AST parsing (Python) or regex 
 - Sensitive file access (`/etc/passwd`, `id_rsa`)
 - Credential hunting (`grep` for passwords/tokens)
 - Privilege escalation (`sudo`)
+
+`CodeGuard` is a blocklist pre-filter, not a verification. A pass returns `verified: True` with `advisory: True`, which means only that no listed pattern was found. Use `CodeGuard` to refuse code early, never to admit it. To admit code, use [`QWEDClient.verify_code`](/sdks/python#verify-code-code-language), which calls the server's `CodeVerifier`.
+
+```python
+from qwed_new.guards.code_guard import CodeGuard
+
+result = CodeGuard().verify_safety("getattr(__builtins__, 'ev' + 'al')('1')")
+print(result["verified"])    # False
+print(result["violations"])  # ["Forbidden reflective call: getattr()", "Forbidden name: __builtins__"]
+```
+
+<Note>
+Before v8.0.0, `CodeGuard` missed reflective calls, `__builtins__` access, and dotted imports, and `QWEDClient.verify_code` reported its pass as verified. See [GHSA-4rj3-8wqj-cqwc](https://github.com/QWED-AI/qwed-verification/security/advisories/GHSA-4rj3-8wqj-cqwc).
+</Note>
 
 ### PIIGuard
 
@@ -588,7 +604,15 @@ Local-first PII and secret detection using pre-compiled regex patterns. Scans re
 
 ### SQLGuard
 
-Validates SQL syntax using `sqlglot` and enforces read-only mutation policies. Blocks `DROP`, `DELETE`, `INSERT`, `UPDATE`, `ALTER`, `CREATE`, and `TRUNCATE` statements when mutation is not explicitly allowed.
+Validates SQL syntax using `sqlglot` and enforces read-only mutation policies. `SQLGuard` uses the same administrative, destructive, and read-only statement sets as the server's [`SQLVerifier`](/engines/sql). It rejects:
+
+- More than one statement, such as `SELECT 1; DROP TABLE users` (`MULTIPLE_STATEMENTS`)
+- Administrative statements anywhere in the query, such as `COPY`, `ATTACH`, `PRAGMA`, and `GRANT` (`ADMIN_COMMAND_BLOCKED`)
+- Destructive statements, `SELECT ... INTO`, and any non-read-only statement when mutation is not explicitly allowed (`DATA_MUTATION_BLOCKED`)
+- Calls to dangerous file, extension, network, and command functions, such as `load_extension()`, `pg_read_file()`, and `xp_cmdshell()` (`DANGEROUS_FUNCTION_BLOCKED`)
+- Invalid SQL syntax
+
+`SQLGuard` expands MySQL and MariaDB executable comments (`/*! ... */`) before it checks the query. With `allow_mutation=False` (the default), a pass means one read-only statement with no blocked function. It is a pre-filter, and the server's `SQLVerifier` decides admission. [`QWEDClient.verify_sql`](/sdks/python#verify-sql-query-schema-ddl-dialect) always calls the server.
 
 <ParamField path="allow_mutation" type="bool" default="false">
   When `false` (default), only `SELECT` and other read-only queries are permitted. Set to `true` only in trusted contexts.

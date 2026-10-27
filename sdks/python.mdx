@@ -21,13 +21,38 @@ client = QWEDClient(api_key="qwed_your_key")
 
 # Basic verification
 result = client.verify("Is 2+2=4?")
-print(result.verified)  # True
-print(result.status)    # "VERIFIED"
+print(result.is_verified)  # True
+print(result.status)       # "VERIFIED"
 ```
 
 <Note>
 As of v5.0.0, the `status` field may return `INCONCLUSIVE`, `BLOCKED`, or `UNKNOWN` in addition to `VERIFIED` and `ERROR`. Natural-language math queries return `INCONCLUSIVE` when the inner engine succeeds, because the LLM translation step is non-deterministic. See the [trust boundary documentation](/api/endpoints#post-%2Fverify%2Fnatural_language) for details.
 </Note>
+
+## How `is_verified` is decided
+
+<Info>Changed in v8.0.0 ([GHSA-jppc-7r58-7pjh](https://github.com/QWED-AI/qwed-verification/security/advisories/GHSA-jppc-7r58-7pjh))</Info>
+
+`VerificationResult.is_verified` follows the server's admission decision. The SDK applies the same rule as the server (`is_admitted()` in `qwed_sdk.models`):
+
+- If the response carries an `admission` field, only `ADMIT` admits. `BLOCKED` is never verified.
+- If the route returns no `admission`, `status` must be `VERIFIED` and `is_valid` must be `true`.
+
+A bare `is_valid: true` or `is_verified: true` in the response never admits on its own. The server flattens engine fields into the response, so a result that a gate blocked can still carry the engine's `is_valid: true`. The server's decision is also available as `result.admission`.
+
+```python
+result = client.verify_math("x**2 + 2*x + 1 = (x+1)**2")
+
+if result.is_verified:
+    run_downstream(result)
+else:
+    # BLOCKED, UNVERIFIABLE, or not admitted by the server
+    reject(result.status, result.admission)
+```
+
+<Warning>
+Before v8.0.0, the SDK set `is_verified` from a bare `is_valid` in the response. A result the server had marked `BLOCKED` or `UNVERIFIABLE` could read as verified. Upgrade to v8.0.0 or later.
+</Warning>
 
 ## Async client
 
@@ -38,7 +63,7 @@ import asyncio
 async def main():
     async with QWEDAsyncClient(api_key="qwed_...") as client:
         result = await client.verify("2+2=4")
-        print(result.verified)
+        print(result.is_verified)
 
 asyncio.run(main())
 ```
@@ -72,17 +97,20 @@ print(result.model)  # {"x": 6, "y": 9}
 
 ### verify_code(code, language)
 
-Check code for security vulnerabilities.
+Check code for security vulnerabilities with the server's [`CodeVerifier`](/engines/code#security-scanning-codeverifier).
 
 ```python
 result = client.verify_code(code, language="python")
-for vuln in result.vulnerabilities:
-    print(f"{vuln.severity}: {vuln.message}")
+if not result.is_verified:
+    print(result.status, result.admission)
+    print(result.result.get("issues", []))
 ```
+
+`verify_code` always sends the code to `POST /verify/code`, and `is_verified` follows the server's admission. If the client can't connect (`httpx.ConnectError`) or the request times out (`httpx.TimeoutException`), it returns `status="UNVERIFIABLE"` and `is_verified=False`. It never answers from the local [`CodeGuard`](/sdks/guards#codeguard) blocklist.
 
 ### verify_sql(query, schema_ddl, dialect)
 
-Validate SQL queries against a schema.
+Validate SQL queries against a schema with the server's [`SQLVerifier`](/engines/sql).
 
 ```python
 result = client.verify_sql(
@@ -90,7 +118,18 @@ result = client.verify_sql(
     schema_ddl="CREATE TABLE users (id INT, name TEXT)",
     dialect="postgresql"
 )
+print(result.is_verified)  # True only when the server admits the query
 ```
+
+`verify_sql` always sends the query to `POST /verify/sql`, and `is_verified` follows the server's admission. If the server can't be reached or the request times out, it returns `status="UNVERIFIABLE"` and `is_verified=False`. It never answers from the local [`SQLGuard`](/sdks/guards#sqlguard).
+
+<Warning>
+Before v8.0.0, `verify_code` and `verify_sql` answered from the local `CodeGuard` and `SQLGuard` when the full `qwed` package was installed, and reported a pass as `VERIFIED` without calling the server. Those blocklists missed reflective calls, stacked SQL statements, and dangerous SQL functions. If your code relied on offline `verify_code` or `verify_sql`, it now receives `UNVERIFIABLE` when the server is unreachable. See [GHSA-4rj3-8wqj-cqwc](https://github.com/QWED-AI/qwed-verification/security/advisories/GHSA-4rj3-8wqj-cqwc) and [GHSA-45jv-2j44-4c2q](https://github.com/QWED-AI/qwed-verification/security/advisories/GHSA-45jv-2j44-4c2q).
+</Warning>
+
+<Note>
+To check code without a server, use [`QWEDLocal.verify_code`](/advanced/qwed-local#3-code-security-codeverifier). It runs `CodeVerifier` in process and returns its admission in `evidence["admission"]`. Without the full `qwed` package, it returns `UNVERIFIABLE`.
+</Note>
 
 ### verify_fact(claim, context)
 
@@ -152,9 +191,11 @@ result = client.verify_consensus(
     mode="high",
     min_confidence=0.8
 )
-print(result.verified)     # True
-print(result.confidence)   # 0.95
+print(result.is_verified)                 # True
+print(result.result["meets_requirement"])  # True
 ```
+
+`verify_consensus` takes `status` from the server's response. `is_verified` is `True` only when the server returns `meets_requirement` exactly `True`, which it sets only for a `VERIFIED` result that meets `min_confidence`. A truthy value that is not `True` admits nothing.
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
