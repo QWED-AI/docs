@@ -39,6 +39,10 @@ GET /admin/compliance/report/soc2/{org_id}
 ```
 
 ### Audit trail verification
+Every `/verify/*` endpoint, the Verification Context routes, `POST /agents/{agent_id}/verify`, and `POST /audit/seed` append their audit rows through `AuditLogger`. `POST /verify/batch` appends one row per item, including failed items. Each new row is HMAC-signed and hash-chained to the previous row for the same organization. If QWED can't append the row, the request returns `500` with `audit persistence failed` instead of a result with no audit record. For a batch, the affected item is marked `failed` with that error and no result.
+
+`GET /audit/logs` and `GET /audit/logs/{log_id}` return each row's stored `verdict` and its chain fields (`entry_hash`, plus `previous_hash` and `hmac_signature` on the detail route). See [Audit endpoints](/api/authentication#audit-endpoints).
+
 Verify the cryptographic integrity of your audit logs. Verification detects edited entries, reordered entries, and removals that break a link between the entries that remain. It does not prove the trail is complete: deleting the newest entries leaves a valid chain, so detecting that needs a separately stored checkpoint of the latest hash.
 
 Per-entry verification covers three checks:
@@ -50,6 +54,14 @@ Per-entry verification covers three checks:
 <Note>
 Audit chains are isolated per organization. Hash linkage is verified only against prior entries belonging to the same `organization_id`, so cross-tenant activity cannot affect another organization's chain validity.
 </Note>
+
+#### Legacy entries
+
+Rows written before the API used the hash chain have no hash or signature. QWED treats an unchained row with no chained row before it as a legacy entry:
+
+- `verify_log_entry` returns `"legacy": true` and `"valid": false` for it. A legacy entry is never reported as valid.
+- The first chained row after the legacy rows opens a new chain segment with a `null` `previous_hash`.
+- An unchained row after a chained row is not legacy. QWED stops appending for that organization and verification fails.
 
 If an entry's stored `result` payload cannot be decoded as JSON, `verify_log_entry` fails closed with a `SecurityError` rather than reporting the entry as valid.
 
@@ -78,6 +90,18 @@ else:
     print(f"Integrity check failed: {result['errors']}")
 ```
 
+`verify_audit_trail` lists legacy entries under `legacy_entries`, separately from `failed_entries`. The trail stays `"valid": false` while any legacy entry is in range. To verify only the rows written since your upgrade, pass `start_date`:
+
+```python
+from datetime import datetime, timezone
+
+result = verifier.verify_audit_trail(
+    organization_id=1,
+    start_date=datetime(2026, 10, 17, tzinfo=timezone.utc),  # your upgrade time
+)
+print(result["legacy_entries"])  # [] once the range starts after the upgrade
+```
+
 <Note>
   `AuditLogger()` requires `QWED_AUDIT_SECRET_KEY` to be set in the environment, or the constructor must receive an explicit `secret_key` argument. Initialization fails closed otherwise.
 </Note>
@@ -89,6 +113,8 @@ Export all verification logs and security events as a CSV file to provide to you
 ```http
 GET /admin/compliance/export/csv?organization_id={org_id}
 ```
+
+The `Chain Status` column shows `Chained` for rows that carry a hash and `Legacy` for rows written before the hash chain. `Chained` only means a hash is present. The export does not re-verify the chain. Use `GET /admin/compliance/verify/{log_id}` or `verify_audit_trail` to verify rows.
 
 ---
 
@@ -143,7 +169,7 @@ requests.post("/verify/fact", json={
 Cryptographic logging is enabled by default, but you **must** configure the signing key before the audit logger will start. The audit logger fails closed when the signing key is missing or when chain continuity cannot be established.
 
 1.  **Set the signing key:**
-    Set `QWED_AUDIT_SECRET_KEY` to a secure, random string (at least 32 characters). The audit logger raises a `SecurityError` and refuses to initialize if this variable is not set.
+    Set `QWED_AUDIT_SECRET_KEY` to a secure, random string (at least 32 characters). The API server refuses to start if this variable is not set, and the audit logger raises a `SecurityError`. `qwed init` generates and persists a key in `.env` for local projects and never rotates an existing one.
     ```bash
     export QWED_AUDIT_SECRET_KEY="your-secure-production-key-here"
     ```
@@ -160,6 +186,10 @@ Cryptographic logging is enabled by default, but you **must** configure the sign
 
 ### Chain continuity across restarts
 On startup, `AuditLogger` loads the most recent persisted entry hash and uses it as the new chain head. New entries are bound to the persisted hash rather than a fresh in-memory root, so restarts do not produce a discontinuous trail.
+
+<Warning>
+Run one writer per database. `AuditLogger` keeps each organization's chain head in memory, so multiple worker processes or replicas appending to the same database are not supported. A second writer causes the next append to fail with a continuity error (`500 audit persistence failed`) rather than fork the chain. The shipped Dockerfile runs a single uvicorn worker.
+</Warning>
 
 If the in-memory chain head and the persisted chain head disagree at write time, `log_verification` raises a `SecurityError` instead of writing a misleading entry. Treat this as a tampering or replication-lag signal and investigate before restarting writes.
 
@@ -178,6 +208,11 @@ Regularly run the verification process (see "Audit trail verification" above) to
 - A previous entry that is missing its hash.
 - A `previous_hash` that does not match the prior entry's hash.
 - An entry whose recomputed hash or HMAC signature does not match the stored value.
+
+Verification does not detect removal of the newest entries. Deleting entries from the end of the trail leaves a valid chain. To detect truncation, store the latest entry hash outside the database and compare it on each verification run.
+
+### Sample data
+`POST /audit/seed` writes 10 sample rows, marked `{"sample": true}`, through the signed chain for development. It returns `404` and writes nothing unless the server runs with `QWED_ENABLE_AUDIT_SEED=1`. Leave it unset in production so sample rows never mix with a real trail.
 
 ### Long-term storage
 QWED uses the configured database (SQLite/PostgreSQL) for log storage. For high-volume compliance requirements:

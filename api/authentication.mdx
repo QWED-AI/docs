@@ -326,9 +326,50 @@ Get audit logs for the current organization.
 | `limit` | integer | `50` | Maximum records (max 200) |
 | `status` | string | — | Filter by `verified` or `blocked` |
 
+Each entry includes `verdict`, the verdict stored in the row's result, and `entry_hash`, the row's hash in the signed audit chain.
+
+```json
+{
+  "total": 1,
+  "logs": [
+    {
+      "id": "42",
+      "request_input": "x**2 + 2*x + 1 = (x+1)**2",
+      "verification_result": "{\"status\": \"VERIFIED\", ...}",
+      "engine_used": "MATH",
+      "verdict": "VERIFIED",
+      "status": "verified",
+      "latency_ms": 0,
+      "created_at": "2026-10-21T12:00:00+00:00",
+      "entry_hash": "3b1f...a9c2"
+    }
+  ]
+}
+```
+
+| Field | Description |
+|-------|-------------|
+| `verdict` | `VERIFIED`, `UNVERIFIABLE`, or `BLOCKED`, read from the stored result: `status` for a `/verify/*` result, `verdict` for a Verification Context document, or `details.result.status` for a `/verify/batch` item row. `null` for anything else, such as a truncated result, a logic engine's `SAT`, or an audit seed sample. Never derived from `is_verified` |
+| `status` | Unchanged for existing clients: `verified` or `blocked`, from the row's `is_verified` flag. Each route sets that flag by its own rule, so an `UNVERIFIABLE` result reads `blocked` |
+| `entry_hash` | The row's SHA-256 hash in the audit chain, as stored. `null` for legacy rows written before the API used the chain |
+
+<Warning>
+`verdict` is not an admission decision. `VERIFIED` means the check ran to a proof, not that the claim holds. A disproven identity or code proven unsafe is `VERIFIED` with `status` `blocked`. Don't gate on `verdict` alone. Neither field is an admission decision, because audit rows don't store one yet.
+</Warning>
+
 ### GET /audit/logs/{log_id}
 
-Get detailed information for a single audit log entry.
+Get detailed information for a single audit log entry. Returns `404` for a log ID outside your organization.
+
+The response has the same `verdict` and `status` fields as the list, plus the row's full chain entry as stored:
+
+| Field | Description |
+|-------|-------------|
+| `entry_hash` | The row's own hash |
+| `previous_hash` | The hash of the previous row in your organization's chain. `null` for the first row of a chain segment |
+| `hmac_signature` | The row's HMAC-SHA256 signature under `QWED_AUDIT_SECRET_KEY` |
+
+These fields identify the chain entry. To check that it is intact, call [`GET /admin/compliance/verify/{log_id}`](/api/endpoints#get-admin-compliance-verify-log-id).
 
 ### GET /audit/export
 
