@@ -1470,6 +1470,7 @@ Rotate an API key and return the new secret once. Owners, admins, and members ca
 - **Another user's key:** only an `owner` or `admin` can rotate it, and only when the key's owner doesn't hold a higher role. An admin can't rotate an owner's key. A member can't rotate anyone else's key. These cases return `403 Forbidden`.
 - **Organization scope:** the key must belong to your organization. A key ID in another organization returns `404 Not Found`, without revealing that the key exists.
 - **Live keys only:** QWED treats a revoked or inactive key as absent and returns `404 Not Found`. You can't rotate a dead credential into a new working secret.
+- **Atomic:** QWED revokes the old key and mints the replacement in one transaction. Concurrent rotations of the same key produce exactly one replacement. The others return `404 Not Found`.
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
