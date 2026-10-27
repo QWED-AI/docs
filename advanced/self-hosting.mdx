@@ -60,13 +60,14 @@ python -c "import secrets; print(secrets.token_urlsafe(48))"
 
 # QWED API server (required)
 QWED_CORS_ORIGINS=https://app.yourcompany.com
-API_KEY_SECRET=your-generated-secret
-# Keep the next three stable. Changing them invalidates issued tokens and
-# API keys, or breaks the signed audit chain. The lookup secret must differ
-# from the JWT secret.
-QWED_JWT_SECRET_KEY=your-generated-secret
-QWED_API_KEY_LOOKUP_SECRET=another-generated-secret
-QWED_AUDIT_SECRET_KEY=another-generated-secret
+# Generate each secret separately and keep it:
+#   python -c "import secrets; print(secrets.token_urlsafe(48))"
+API_KEY_SECRET=
+# Changing them invalidates issued tokens and API keys, or breaks the signed
+# audit chain. The lookup secret must differ from the JWT secret.
+QWED_JWT_SECRET_KEY=
+QWED_API_KEY_LOOKUP_SECRET=
+QWED_AUDIT_SECRET_KEY=
 
 # Optional. User IDs allowed to read /metrics. Empty denies every caller.
 QWED_METRICS_OPERATOR_USER_IDS=
@@ -144,6 +145,8 @@ docker run -d -p 8000:8000 \
 
 The server refuses to start without any of `QWED_CORS_ORIGINS`, `API_KEY_SECRET`, `QWED_JWT_SECRET_KEY`, `QWED_API_KEY_LOOKUP_SECRET` and `QWED_AUDIT_SECRET_KEY`, and `QWED_API_KEY_LOOKUP_SECRET` must differ from `QWED_JWT_SECRET_KEY`. Also set `QWED_SIGNING_KEY` (an EC P-256 key), or attestations stop verifying after a restart or on another replica.
 
+If you keep the values in a `.env` file instead, pass it with `--env-file .env`.
+
 To serve on a different port, with the same secrets exported:
 
 ```bash
@@ -210,12 +213,13 @@ spec:
 ### Performance tuning
 
 ```bash
-# Increase workers
-uvicorn qwed_new.api.main:app --workers 4
-
 # Enable connection pooling
 export QWED_DB_POOL_SIZE=20
 ```
+
+<Warning>
+Run one uvicorn worker per database. Multiple workers or replicas writing audit rows to the same database are not supported. Every verification request appends an audit row, and the audit logger keeps each organization's chain head in memory. With `--workers 4` or several replicas, a conflicting append makes the verification request fail with `500 audit persistence failed` instead of forking the chain. See [Chain continuity across restarts](/advanced/compliance#chain-continuity-across-restarts).
+</Warning>
 
 ### Availability limits
 
