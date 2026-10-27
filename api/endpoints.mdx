@@ -342,34 +342,53 @@ Verify logical constraints. Routes through the QWED Control Plane.
 
 **Response:**
 
+The response is a [`DiagnosticResult`](/advanced/diagnostics), with the control plane's own output under `developer_fields` and also copied to the top level. A `VERIFIED` result carries a signed `attestation`.
+
 ```json
 {
-  "status": "SAT",
+  "status": "VERIFIED",
+  "agent_message": "Logic constraints are satisfiable",
+  "developer_fields": {
+    "status": "SAT",
+    "model": {"x": "6", "y": "9"},
+    "dsl_code": "(AND (GT x 5) (LT x 10))",
+    "provider_used": "openai_compat"
+  },
+  "proof_ref": "sha256:4c1e…",
+  "is_authoritative": true,
+  "attestation": "eyJ…",
   "model": {"x": "6", "y": "9"},
+  "dsl_code": "(AND (GT x 5) (LT x 10))",
   "provider_used": "openai_compat"
 }
 ```
 
-The `provider_used` field indicates which LLM provider handled the translation step. This field is included in both success and error responses, which helps with debugging provider routing issues.
+| `status` | Solver result (`developer_fields.status`) | Meaning |
+|----------|-------------------------------------------|---------|
+| `VERIFIED` | `SAT` | Satisfiable: a solution exists, in `model` |
+| `UNVERIFIABLE` | `UNSAT` | Unsatisfiable: no solution exists |
+| `BLOCKED` | anything else (`ERROR`, `BLOCKED`, `UNKNOWN`) | Blocked by security policy, a translation or solver error, or a timeout |
 
-| Status | Meaning |
-|--------|---------|
-| `SAT` | Satisfiable — a solution exists |
-| `UNSAT` | Unsatisfiable — no solution possible |
-| `BLOCKED` | Request blocked by security policy (returns HTTP 403) |
-| `ERROR` | Internal verification error |
+The route makes no admission decision, so the response has no `admission`. The `provider_used` field shows which LLM provider handled the translation, in success and error responses alike.
 
 **Error response:**
 
 ```json
 {
-  "status": "ERROR",
-  "error": "Internal verification error",
+  "status": "BLOCKED",
+  "agent_message": "Internal verification error",
+  "developer_fields": {
+    "constraint_id": "api.logic.execution_error",
+    "provider_used": "openai_compat"
+  },
+  "proof_ref": null,
+  "is_authoritative": false,
+  "constraint_id": "api.logic.execution_error",
   "provider_used": "openai_compat"
 }
 ```
 
-The provider translation step runs under `QWED_PROVIDER_TIMEOUT` (default 30 seconds) and the Z3 solve under `QWED_Z3_TIMEOUT` (default 15 seconds). A timeout returns the `ERROR` response above.
+The provider translation step runs under `QWED_PROVIDER_TIMEOUT` (default 30 seconds) and the Z3 solve under `QWED_Z3_TIMEOUT` (default 15 seconds). A timeout returns `BLOCKED`.
 
 ---
 
@@ -827,17 +846,55 @@ Verify multiple items in a single request. Processes all items concurrently and 
 
 **Response:**
 
-Each entry in `items` is a per-item response. For math items the verdict is the [`DiagnosticResult`](/advanced/diagnostics) record nested under the item's `result` — the same three-layer verdict shape used by `POST /verify/math` — so batch and single-item math verifications share one contract:
+Each entry in `items` is a per-item response. An item's `result` is what the item type's own `/verify/*` route returns, so batch and single-item verifications share one contract. Every item type takes its route's trust step: QWED signs each `VERIFIED` result and enforces the attestation as mandatory. A `VERIFIED` item whose attestation cannot be issued, or does not match, is returned `BLOCKED` with no `proof_ref` (see [Attestation enforcement](#attestation-enforcement)).
 
-- `result.status` — `VERIFIED`, `UNVERIFIABLE`, or `BLOCKED`.
-- `result.agent_message` — short human-readable summary safe to surface to the caller.
-- `result.developer_fields` — engine detail (including the legacy `is_valid` flag for backward compatibility).
-- `result.proof_ref` — cryptographic hash of the retained proof artifact. Present only when `result.status == VERIFIED`; `null` otherwise. **This is the authority bit** — downstream gates must reject any item whose `proof_ref` is `null`.
-- `result.admission` — `ADMIT` or `BLOCKED` on math, SQL, and code items, the same decision `POST /verify/math`, `POST /verify/sql`, and `POST /verify/code` return. Natural-language items always carry `BLOCKED`. Logic and fact items carry no admission. Admit an item only when `admission` is `ADMIT`, `status` is `VERIFIED`, and `proof_ref` is set. A proven-malicious query or proven-unsafe code is `VERIFIED` with admission `BLOCKED`. A math item whose sides differ is `UNVERIFIABLE` with admission `BLOCKED` (see the table below), unlike `POST /verify/math`, which returns a proven-false identity as `VERIFIED`.
+Math, logic, and natural-language items return the [`DiagnosticResult`](/advanced/diagnostics) record under `result`:
+
+- `result.status`: `VERIFIED`, `UNVERIFIABLE`, or `BLOCKED`.
+- `result.agent_message`: short human-readable summary safe to surface to the caller.
+- `result.developer_fields`: engine detail (including the legacy `is_valid` flag for backward compatibility).
+- `result.proof_ref`: cryptographic hash of the retained proof artifact. Present only when `result.status == VERIFIED`; `null` otherwise. **This is the authority bit.** Downstream gates must reject any item whose `proof_ref` is `null`.
+- `result.admission`: `ADMIT` or `BLOCKED` on math, SQL, and code items, the same decision `POST /verify/math`, `POST /verify/sql`, and `POST /verify/code` return. Natural-language items always carry `BLOCKED`. Logic and fact items carry no admission. Admit an item only when `admission` is `ADMIT`, `status` is `VERIFIED`, and `proof_ref` is set. A proven-malicious query or proven-unsafe code is `VERIFIED` with admission `BLOCKED`. A math item whose sides differ is `UNVERIFIABLE` with admission `BLOCKED` (see the table below), unlike `POST /verify/math`, which returns a proven-false identity as `VERIFIED`.
+
+| Item type | `result` |
+|-----------|----------|
+| `math` | The `POST /verify/math` verdict. See [Math items](#math-items-proof-vs-simplification) below. |
+| `logic` | The `POST /verify/logic` response. `VERIFIED` with a `proof_ref` when the constraints are satisfiable (SAT), `UNVERIFIABLE` when they are unsatisfiable (UNSAT), and `BLOCKED` otherwise. The control plane's own output (`status: "SAT"`, `model`, `provider_used`) stays under `result.developer_fields`. |
+| `natural_language` | The `POST /verify/natural_language` response, with `admission`, which is always `BLOCKED`. Only the verdict is kept: `final_answer`, `translation`, and `trust_boundary` are not returned. |
+| `code`, `fact`, `sql` | The item type's route result, unchanged apart from the trust step. A code item's `admission` is decided on the enforced verdict. |
 
 QWED stores each math and SQL item's admission in its audit row, so `/audit/logs` shows it. Rows written before this change keep `admission: null`.
 
 A SQL item must include `params.schema_ddl`. An item without it is marked `failed` with the error `Missing 'schema_ddl'`, the same message `POST /verify/sql` returns, and carries no admission.
+
+<Warning>
+**Breaking change.** Batch logic items no longer report `SAT` or `UNSAT` as `result.status`. Gate on `result.status == "VERIFIED"` and a non-null `result.proof_ref`. Read the solver's raw status from `result.developer_fields.status` if you need it.
+</Warning>
+
+A logic item, for example:
+
+```json
+{
+  "id": "batch_abc123-1",
+  "query": "(AND (GT x 5) (LT y 10))",
+  "type": "logic",
+  "status": "completed",
+  "result": {
+    "status": "VERIFIED",
+    "agent_message": "Logic constraints are satisfiable",
+    "developer_fields": {
+      "status": "SAT",
+      "model": {"x": "6", "y": "9"},
+      "provider_used": "openai_compat"
+    },
+    "proof_ref": "sha256:4c1e…",
+    "is_authoritative": true
+  },
+  "latency_ms": 310.4
+}
+```
+
+The full response for two math items:
 
 ```json
 {
@@ -894,7 +951,7 @@ A SQL item must include `params.schema_ddl`. An item without it is marked `faile
 
 #### Math items: proof vs. simplification
 
-Math items are routed through the trust boundary (`enforce_trust_decision(require_attestation=True)` on VERIFIED, with a signed attestation issued via `create_verification_attestation`). Three outcomes are possible:
+Math items take the same trust step as `POST /verify/math`: QWED signs a `VERIFIED` identity and enforces the attestation as mandatory. The attestation's engine is `math`. Four outcomes are possible:
 
 | Result | `status` | `proof_ref` | When |
 |--------|----------|-------------|------|
@@ -902,8 +959,31 @@ Math items are routed through the trust boundary (`enforce_trust_decision(requir
 | Not equal | `UNVERIFIABLE` | `null` | Equality claim where the two sides do not simplify to the same expression. `developer_fields.is_valid` is `false` and `developer_fields.diff` shows the non-zero difference. |
 | Simplification only | `UNVERIFIABLE` | `null` | Expression without an equality (e.g., `x + x`). `developer_fields.simplified` contains the simplified form. |
 | Domain-restricted identity | `UNVERIFIABLE` | `null` | Equality whose sides are undefined at different points, such as `x/x = 1`. `constraint_id` is `math.domain_restricted_identity`, as on `POST /verify/math`. |
+| Signing failed | `BLOCKED` | `null` | Verified identity whose attestation could not be issued. See below. |
 
-If attestation signing fails on an otherwise-verified identity, the item is downgraded to `UNVERIFIABLE` with `developer_fields.constraint_id = "api.attestation.signing_error"` — a math result is never returned as `VERIFIED` without a signed proof.
+If attestation signing fails on an otherwise-verified identity, the item is `BLOCKED`, as on `POST /verify/math`. Previously it was downgraded to `UNVERIFIABLE`. A math result is never returned as `VERIFIED` without a signed proof.
+
+#### Attestation enforcement
+
+When QWED cannot issue or match the attestation for a `VERIFIED` result, the result is `BLOCKED` (fail closed). This applies to every batch item type and every verify route. The verdict that was not admitted stays beside the block in `developer_fields`:
+
+```json
+{
+  "status": "BLOCKED",
+  "agent_message": "Attestation unavailable — cannot sign VERIFIED result",
+  "developer_fields": {
+    "constraint_id": "api.attestation.signing_error",
+    "attestation_error": "SIGNING_FAILURE",
+    "engine": "math",
+    "verdict_status": "VERIFIED",
+    "verdict_proof_ref": "sha256:9f2c…"
+  },
+  "proof_ref": null,
+  "is_authoritative": false
+}
+```
+
+Don't admit a result on `verdict_status` or `verdict_proof_ref`. They record what the engine concluded for the audit trail, not an admitted verdict. See [Fail-closed contract](/advanced/attestations#fail-closed-contract).
 
 <Warning>
 Bare expressions (no `=`) always return `UNVERIFIABLE`. A successful symbolic simplification is not a verified claim. To get a `VERIFIED` outcome from a math item, submit an equality (e.g., `x + x = 2*x`).
@@ -1211,6 +1291,37 @@ X-Agent-Token: qwed_agent_...
 
 - **Exfiltration check:** Always runs on every agent verification request. If the query payload is flagged, the request is rejected with a `403`.
 - **MCP poison check:** Runs automatically when `tool_schema` is present. If the tool definition is flagged, the request is rejected with a `403`.
+
+**Response:**
+
+The route returns the enforced result with its `admission`, in the shape `POST /verify/natural_language` returns: the `DiagnosticResult` fields, with the engine's `developer_fields` also copied to the top level. QWED signs a `VERIFIED` result and enforces the attestation as mandatory. If the attestation cannot be issued or does not match, the result is `BLOCKED`, with `verdict_status` and `verdict_proof_ref` kept beside the block (see [Attestation enforcement](#attestation-enforcement)). The agent activity log records the same response.
+
+```json
+{
+  "status": "VERIFIED",
+  "agent_message": "Expression verified successfully",
+  "developer_fields": {
+    "status": "VERIFIED",
+    "calculated_value": 30.0,
+    "is_valid": true,
+    "translated_expression": "0.15 * 200",
+    "verification_scope": "translated_expression_only",
+    "query_semantics_verified": false
+  },
+  "proof_ref": "sha256:7a3d…",
+  "is_authoritative": true,
+  "calculated_value": 30.0,
+  "is_valid": true,
+  "translated_expression": "0.15 * 200",
+  "verification_scope": "translated_expression_only",
+  "query_semantics_verified": false,
+  "admission": "BLOCKED"
+}
+```
+
+Gate on `admission`, not `status`. A natural-language verdict covers the expression the query was translated into, so `admission` is `BLOCKED` unless the query semantics were verified.
+
+<Warning>**Breaking change:** This route used to return the control plane's raw response, which could still say `VERIFIED` after enforcement had blocked the result. Callers that read `translation`, `final_answer`, or `trust_boundary` from this route must move to `status`, `proof_ref`, and `admission`.</Warning>
 
 **Error responses:**
 
