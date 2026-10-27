@@ -1127,7 +1127,37 @@ Register a new AI agent with QWED for verified agentic workflows.
 }
 ```
 
-<Warning>Store the `agent_token` immediately — it cannot be retrieved again after registration.</Warning>
+<Warning>Store the `agent_token` immediately. QWED stores only a keyed digest of the token, so it can't be retrieved again. If you lose it, re-issue it with [`POST /agents/{agent_id}/token/reissue`](#post-agents-agent-id-token-reissue).</Warning>
+
+---
+
+### POST /agents/{agent_id}/token/reissue
+
+Issue a new token for an agent. The previous token stops working immediately. Use this to replace a lost token, or a token whose plain text might remain in a database backup from before QWED began storing agent tokens as digests.
+
+Authenticate with your API key in the `X-API-Key` header. The key's owner must hold the `member`, `admin`, or `owner` role, and the agent must belong to the key's organization.
+
+```bash
+curl --fail-with-body -X POST http://localhost:8000/agents/42/token/reissue \
+  -H "X-API-Key: qwed_live_..."
+```
+
+**Response:**
+
+```json
+{
+  "agent_id": 42,
+  "agent_token": "qwed_agent_...",
+  "message": "Agent token re-issued. Store it securely; the previous token no longer works."
+}
+```
+
+| Status | Meaning |
+|--------|---------|
+| `403` | The API key isn't live, or the key owner's role is below `member` |
+| `404` | No agent with this ID exists in your organization, including an agent in another organization |
+
+<Warning>The new `agent_token` is shown only once. Store it securely.</Warning>
 
 ---
 
@@ -1380,6 +1410,8 @@ Before QWED checks the role, the request must meet all of these conditions. Othe
 | `POST /admin/keys/rotate` | `owner`, `admin`, `member` | `404 Not Found` |
 
 A caller whose role isn't allowed gets `403 Forbidden` with `"Insufficient permissions for this operation"`. A missing or invalid API key returns `401 Unauthorized`.
+
+The JWT-authenticated `/auth/api-keys` and `/audit` routes use the same role ranking. See [Roles on API-key and audit routes](/api/authentication#roles-on-api-key-and-audit-routes).
 
 ### Session sign-in for compliance endpoints
 
