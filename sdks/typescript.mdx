@@ -19,13 +19,20 @@ pnpm add @qwed-ai/sdk
 ## Quick start
 
 ```typescript
-import { QWEDClient } from '@qwed-ai/sdk';
+import { QWEDClient, isAdmitted } from '@qwed-ai/sdk';
 
 const client = new QWEDClient({ apiKey: 'qwed_your_key' });
 
-const result = await client.verify('Is 2+2=4?');
-console.log(result.verified);  // true
-console.log(result.status);    // "VERIFIED"
+try {
+  const result = await client.verifyMath('2 + 2 = 4');
+  console.log(result.status);      // "VERIFIED"
+  console.log(result.admission);   // "ADMIT"
+  console.log(isAdmitted(result)); // true
+} catch (err) {
+  // A network error or a non-2xx response rejects with a QWEDError.
+  // Fail closed: treat the claim as not admitted.
+  console.error(err);
+}
 ```
 
 ## Configuration
@@ -38,7 +45,89 @@ const client = new QWEDClient({
 });
 ```
 
+## Reading a result
+
+Every `verify*` method except `verifyAgent` returns a `VerificationResponse` that models the server's [DiagnosticResult](/advanced/diagnostics) envelope.
+
+| Field | Meaning |
+|-------|---------|
+| `status` | `VERIFIED`, `UNVERIFIABLE`, or `BLOCKED`. `UNKNOWN` for a missing value or one this SDK doesn't recognize. |
+| `rawStatus` | The server's status text exactly as sent, such as `SAT` where `status` is `UNKNOWN`. Never used for admission. |
+| `admission` | `ADMIT` or `BLOCKED` where the endpoint makes a decision. `UNKNOWN` for a value this SDK doesn't recognize. Absent (`undefined`) where the endpoint makes no decision. |
+| `proof_ref` | Set only when `status` is `VERIFIED`. |
+| `attestation` | On a `VERIFIED` answer, the server's signed attestation, an ES256 JWT. Check it with `verifyAttestation`. |
+| `agent_message` | Human-readable explanation. |
+| `is_authoritative` | Whether the verdict is authoritative. |
+| `constraint_id` | The constraint that produced the verdict. |
+| `developer_fields` | Engine detail for debugging. |
+| any other key | The endpoint's own fields, such as `is_valid`, `issues`, or `error`, typed as `unknown`. |
+
+Numbers come from `JSON.parse`, so an integer above 2^53 or a long decimal is rounded. `JSON.stringify` of a parsed response writes the server's status text back as `status` when `status` is `UNKNOWN`, so a cached or logged response keeps it.
+
+### Gate on `isAdmitted()`
+
+Use `isAdmitted(result)` to decide whether to act on a result. Don't gate on `status` alone.
+
+`VERIFIED` means the engine reached a deterministic answer, not that the claim holds. `2 + 2 = 5` returns `VERIFIED · BLOCKED` because it's proven false. Unsafe code returns `VERIFIED · BLOCKED` because it's proven unsafe.
+
+`isAdmitted()` returns `true` only when all of these hold:
+
+- `admission` is `ADMIT`
+- `status` is `VERIFIED`
+- `proof_ref` is a non-empty string
+
+A missing or unknown admission is never admitted. Endpoints that make no admission decision (`/verify/logic`, `/verify/fact`, `/verify/rag`, `/verify/process`, and batch logic and fact items) are therefore never admitted. The top-level `verified` that `/verify/rag` and `/verify/process` send is their guard's own result. The parser replaces it, and the guard's value stays in `developer_fields.verified`.
+
+```typescript
+import { isAdmitted } from '@qwed-ai/sdk';
+
+try {
+  const result = await client.verifyCode(code, { language: 'python' });
+  if (isAdmitted(result)) {
+    run(code);
+  } else {
+    // VERIFIED · BLOCKED means proven unsafe. Anything else is not verified.
+    console.log('rejected:', result.status, result.admission, result.agent_message);
+  }
+} catch (err) {
+  // A network error or a non-2xx response rejects with a QWEDError.
+  // Fail closed: treat the claim as not admitted.
+  console.error(err);
+}
+```
+
+<Note>
+The `verified` field and `isVerified()` are deprecated. The parser always sets `verified` to `isAdmitted(result)`, whatever the body says, and `isVerified()` returns `isAdmitted()`.
+</Note>
+
+### Parsing responses yourself
+
+If you call the QWED API without the client, pass the parsed JSON body to `parseVerificationResponse()` or `parseBatchResponse()`. The client uses the same functions. They throw a `QWEDError` with code `QWED-SDK-PARSE-001` when a body isn't a verification result, and `QWED-SDK-PARSE-002` when a body isn't a batch job.
+
+```typescript
+import { parseVerificationResponse, isAdmitted } from '@qwed-ai/sdk';
+
+try {
+  const res = await fetch('http://localhost:8000/verify/math', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-API-Key': 'qwed_...' },
+    body: JSON.stringify({ expression: '2 + 2 = 4' }),
+  });
+  if (!res.ok) {
+    throw new Error(`QWED request failed: ${res.status} ${await res.text()}`);
+  }
+  const result = parseVerificationResponse(await res.json());
+  console.log(isAdmitted(result)); // true
+} catch (err) {
+  // Network error, non-2xx status, or a body that isn't a verification result
+  // (QWEDError QWED-SDK-PARSE-001). Fail closed: treat the claim as not admitted.
+  console.error(err);
+}
+```
+
 ## Verification methods
+
+Every method returns a promise that rejects with a `QWEDError` on a network error or a non-2xx response. The short examples below leave that out; wrap your calls as the examples above and [Error handling](#error-handling) show, and treat a rejected call as not admitted.
 
 ### verify(query)
 
@@ -54,7 +143,8 @@ Verify mathematical expressions.
 
 ```typescript
 const result = await client.verifyMath('x**2 + 2*x + 1 = (x+1)**2');
-console.log(result.verified);  // true
+console.log(isAdmitted(result)); // true for a true identity
+console.log(result.is_valid);    // true
 ```
 
 ### verifyLogic(query)
@@ -63,7 +153,9 @@ Verify logical constraints using QWED-Logic DSL.
 
 ```typescript
 const result = await client.verifyLogic('(AND (GT x 5) (LT y 10))');
-console.log(result.result?.model);  // { x: 6, y: 9 }
+// /verify/logic makes no admission decision: admission is undefined and
+// isAdmitted() is false, whatever the status.
+console.log(result.status, result.model);
 ```
 
 ### verifyCode(code, options)
@@ -72,9 +164,9 @@ Check code for security vulnerabilities.
 
 ```typescript
 const result = await client.verifyCode(code, { language: 'python' });
-for (const vuln of result.result?.vulnerabilities ?? []) {
-  console.log(`${vuln.severity}: ${vuln.message}`);
-}
+console.log(result.status, result.admission); // 'VERIFIED', 'BLOCKED' for unsafe code
+console.log(isAdmitted(result));              // false
+console.log(result.issues);                   // what was found (also in developer_fields.issues)
 ```
 
 ### verifyFact(claim, context)
@@ -86,7 +178,9 @@ const result = await client.verifyFact(
   'The company was founded in 2020',
   'Acme Corp was established in 2020 in San Francisco.'
 );
-console.log(result.verified);  // true
+// A heuristic match is not a proof: UNVERIFIABLE, with no admission.
+console.log(result.status);                // 'UNVERIFIABLE'
+console.log(result.deterministic_verdict); // 'SUPPORTED'
 ```
 
 ### verifySQL(query, schema)
@@ -116,9 +210,11 @@ const result = await client.verifyProcess(
   { mode: 'irac' }
 );
 
-console.log(result.verified);             // true
-console.log(result.result?.score);         // 1.0
-console.log(result.result?.missing_steps); // []
+// /verify/process makes no admission decision, so isAdmitted() is false.
+// The guard's own verdict is in developer_fields.verified.
+console.log(result.developer_fields?.verified); // true
+console.log(result.score);                      // 1.0
+console.log(result.missing_steps);              // []
 ```
 
 You can also verify custom milestones:
@@ -132,8 +228,8 @@ const result = await client.verifyProcess(
   }
 );
 
-console.log(result.result?.process_rate);       // 1.0
-console.log(result.result?.missed_milestones);  // []
+console.log(result.process_rate);       // 1.0
+console.log(result.missed_milestones);  // []
 ```
 
 | Parameter | Type | Default | Description |
@@ -158,10 +254,11 @@ const result = await client.verifyRAG(
   { maxDrmRate: '0' } // Zero tolerance
 );
 
-console.log(result.verified);                // false
-console.log(result.result?.drm_rate);        // 0.5
-console.log(result.result?.chunks_checked);  // 2
-console.log(result.result?.mismatched_count); // 1
+// /verify/rag makes no admission decision, so isAdmitted() is false.
+console.log(result.developer_fields?.verified); // false
+console.log(result.drm_rate);                   // 0.5
+console.log(result.chunks_checked);             // 2
+console.log(result.mismatched_count);           // 1
 ```
 
 | Parameter | Type | Default | Description |
@@ -172,25 +269,26 @@ console.log(result.result?.mismatched_count); // 1
 
 ### verifyBatch(items)
 
-Verify multiple items at once. The response is a `BatchResponse` whose `items` are per-item records — for math items the verdict is a [`DiagnosticResult`](/advanced/diagnostics) nested under each item's `result`, so inspect `result.status`, `result.agent_message`, `result.developer_fields`, and `result.proof_ref` individually instead of relying on an aggregate success rate.
+Verify multiple items at once. The response is a `BatchResponse` that mirrors the server's batch job: `job_id`, `status` (the job state: `pending`, `processing`, `completed`, `partial`, or `failed`), `progress_percent`, `total_items`, `completed_items`, `failed_items`, and `items`. There is no aggregate `summary`.
+
+Each item has an `id`, a `status` (the item state, such as `completed` or `failed`), and a `result` holding its [`DiagnosticResult`](/advanced/diagnostics). Gate each item with `isAdmitted(item.result)`. Math, code and SQL items carry their route's admission, so an item can be admitted. Natural-language items carry one too, but it is always `BLOCKED`, because nothing proves the translation. Logic and fact items make no decision, so they're never admitted.
 
 ```typescript
-const response = await client.verifyBatch([
+const batch = await client.verifyBatch([
   { query: '2+2=4', type: VerificationType.Math },
   { query: 'x + x', type: VerificationType.Math },
 ]);
 
-for (const item of response.items) {
-  const result = item.result ?? {};
-  if (result.status === 'VERIFIED' && result.proof_ref) {
-    // Authoritative — admissible for control flow
-    console.log('verified:', result.agent_message, result.proof_ref);
-  } else {
-    // UNVERIFIABLE or BLOCKED — must reject
-    console.log('rejected:', result.status, result.agent_message);
-  }
+console.log(batch.job_id, batch.status); // job state, such as 'completed' or 'partial'
+console.log(batch.completed_items, batch.failed_items, batch.total_items);
+for (const item of batch.items) {
+  console.log(item.query, item.result?.status, item.result?.proof_ref, isAdmitted(item.result));
 }
 ```
+
+<Note>
+A batch SQL item needs `params.schema_ddl`. The server fails an item without it with `Missing 'schema_ddl'`. The SDK's batch items send only a query and a type, so verify SQL with `verifySQL()` instead of in a batch.
+</Note>
 
 For `math` items, supply equality claims (e.g., `'x + x = 2*x'`) to receive proof results. Expressions without an `=` return `status: 'UNVERIFIABLE'` with the simplified form in `developer_fields.simplified`. The legacy `is_valid` boolean is preserved inside `developer_fields.is_valid` for backward compatibility.
 
@@ -283,10 +381,10 @@ All guard-related verification responses include IRAC-compliant audit fields for
 ```typescript
 const result = await client.verifyProcess(reasoningTrace, { mode: 'irac' });
 
-console.log(result.result?.['irac.issue']);       // What was evaluated
-console.log(result.result?.['irac.rule']);         // The rule being enforced
-console.log(result.result?.['irac.application']); // How the rule was applied
-console.log(result.result?.['irac.conclusion']);   // Final verdict
+console.log(result['irac.issue']);       // What was evaluated
+console.log(result['irac.rule']);         // The rule being enforced
+console.log(result['irac.application']); // How the rule was applied
+console.log(result['irac.conclusion']);   // Final verdict
 ```
 
 ## Risk codes
@@ -308,8 +406,13 @@ Security-related responses may include a `risk` field indicating the type of thr
 import {
   VerificationType,
   VerificationStatus,
+  Admission,
   VerificationResponse,
   BatchResponse,
+  BatchItemResult,
+  isAdmitted,
+  parseVerificationResponse,
+  parseBatchResponse,
   AgentRegistration,
   AgentVerificationResponse,
   AgentDecision,
@@ -337,29 +440,37 @@ enum VerificationType {
 
 ### VerificationStatus enum
 
-<Info>New in v5.0.0</Info>
-
-The `VerificationStatus` enum includes all possible status values returned by the verification API. Downstream consumers must handle `INCONCLUSIVE`, `BLOCKED`, and `UNKNOWN` as distinct outcomes.
+`VerificationStatus` is the diagnostic status of a verification (`DiagnosticResult.status`).
 
 ```typescript
 enum VerificationStatus {
   Verified = 'VERIFIED',
-  CorrectionNeeded = 'CORRECTION_NEEDED',
-  Inconclusive = 'INCONCLUSIVE',   // New in v5.0.0
-  Blocked = 'BLOCKED',             // New in v5.0.0
-  Unknown = 'UNKNOWN',             // New in v5.0.0
-  Error = 'ERROR',
+  Unverifiable = 'UNVERIFIABLE',
+  Blocked = 'BLOCKED',
+  Unknown = 'UNKNOWN',
 }
 ```
 
 | Status | Meaning |
 |--------|---------|
-| `VERIFIED` | Claim is formally verified |
-| `CORRECTION_NEEDED` | Claim is incorrect — correct value included in response |
-| `INCONCLUSIVE` | Verification succeeded on the translated expression but the LLM translation step is non-deterministic |
-| `BLOCKED` | Request blocked by security policy or fail-closed verification (e.g., identity sampling without formal proof) |
-| `UNKNOWN` | Verification could not produce a definitive result |
-| `ERROR` | Internal verification error |
+| `VERIFIED` | The engine reached a deterministic answer and `proof_ref` is set. The claim may still be proven false or unsafe. Check `admission`. |
+| `UNVERIFIABLE` | The claim couldn't be proven |
+| `BLOCKED` | Verification couldn't be attempted (parse error, policy, missing dependency) |
+| `UNKNOWN` | A missing status, or one this SDK version doesn't recognize. The server's text is in `rawStatus`. Never admitted. |
+
+`AgentVerificationResponse.verification.status` uses `AgentVerificationStatus`, which adds the math engine's `DISPROVEN`, `INCONCLUSIVE`, and `SYNTAX_ERROR`.
+
+### Admission enum
+
+`Admission` is the server's decision at its enforcement boundary. It's absent where the endpoint makes no decision.
+
+```typescript
+enum Admission {
+  Admit = 'ADMIT',     // The boundary may proceed with the verdict
+  Blocked = 'BLOCKED', // The boundary must not admit
+  Unknown = 'UNKNOWN', // A decision this SDK version doesn't recognize. Never admitted.
+}
+```
 
 ## Error handling
 

@@ -124,51 +124,39 @@ Main entry point for verifying natural language queries. Routes through the QWED
 
 **Response:**
 
-The response follows the `VerificationResult` schema. For math queries, the top-level `status` is `INCONCLUSIVE` because the LLM translation step is not formally verified — see [Trust boundary](/engines/math#trust-boundary) for details.
+The endpoint returns the [`DiagnosticResult`](/advanced/diagnostics) verdict that the control plane enforced for the translated expression, flattened with its developer fields, plus a separate `admission` decision. QWED no longer re-derives the verdict from the legacy engine dictionary, which turned every decided claim into `UNVERIFIABLE`.
 
 ```json
 {
-  "status": "INCONCLUSIVE",
-  "user_query": "What is 15% of 200?",
-  "translation": {
-    "expression": "0.15 * 200",
-    "claimed_answer": 30.0,
-    "reasoning": "15% as decimal is 0.15, multiply by 200",
-    "confidence": 0.95
-  },
-  "verification": {
-    "calculated_value": 30.0,
-    "is_correct": true,
-    "diff": 0.0
-  },
-  "trust_boundary": {
-    "query_interpretation_source": "llm_translation",
-    "query_semantics_verified": false,
-    "verification_scope": "translated_expression_only",
-    "deterministic_expression_evaluation": true,
-    "formal_proof": false,
-    "translation_claim_self_consistent": true,
-    "provider_used": "openai_compat",
-    "overall_status": "INCONCLUSIVE"
-  },
-  "final_answer": 30.0,
-  "provider_used": "openai_compat",
-  "latency_ms": 245.3
+  "status": "VERIFIED",
+  "agent_message": "Expression verified successfully",
+  "proof_ref": "sha256:...",
+  "is_authoritative": true,
+  "is_valid": true,
+  "calculated_value": 30.0,
+  "claimed_value": 30.0,
+  "translated_expression": "0.15 * 200",
+  "verification_scope": "translated_expression_only",
+  "query_semantics_verified": false,
+  "admission": "BLOCKED",
+  "developer_fields": { "...": "same fields as above" }
 }
 ```
 
-**Status values for natural language math verification:**
+| Field | Type | Description |
+|-------|------|-------------|
+| `status` | string | Verdict for the translated expression: `VERIFIED`, `UNVERIFIABLE`, or `BLOCKED` |
+| `is_valid` | boolean | `true` when the translated claim holds. A translated claim proven false is `VERIFIED` with `is_valid: false` |
+| `translated_expression` | string | The expression the LLM produced and the engine evaluated |
+| `verification_scope` | string | Always `"translated_expression_only"`. The verdict covers the translated expression, not your question |
+| `query_semantics_verified` | boolean | Always `false`. QWED cannot prove the translation means what you asked |
+| `admission` | string | Always `"BLOCKED"` (`DENY`) for this endpoint, even when the translated claim holds |
 
-| Status | Meaning |
-|--------|---------|
-| `INCONCLUSIVE` | Expression evaluation succeeded, but the LLM translation step is non-deterministic, so you cannot treat the result as a proven verdict on the original user query |
-| `ERROR` | The translated expression had a syntax error or the engine could not evaluate it |
-| `NOT_MATH_QUERY` | The query was not recognized as a mathematical question |
-| `BLOCKED` | Request blocked by security policy |
+Admission is always `BLOCKED` because the LLM translation itself is unverified, so QWED never admits the result as an answer to your question. The verdict itself is unchanged. The audit log row's `is_verified` follows admission, so it is always `false`. QWED returns `BLOCKED` as the verdict when the control plane returns a malformed diagnostic or when the output sanitizer rejects the translated expression.
 
-<Note>
-Previous versions set the `status` field to the inner engine result (e.g., `VERIFIED`). It now returns `INCONCLUSIVE` when the inner engine returns `VERIFIED` or `CORRECTION_NEEDED`, because the natural language pipeline involves a non-deterministic LLM translation step. Use the `trust_boundary` object to inspect the detailed verification breakdown. For fully deterministic results, use `POST /verify/math` directly.
-</Note>
+For a deterministic, admissible result, send the expression to [`POST /verify/math`](#post-verify-math) directly.
+
+The control plane also builds a `trust_boundary` record that describes what the pipeline proved. The control-plane response carries the enforced verdict as `diagnostic` together with `admission`.
 
 **`trust_boundary` fields:**
 
@@ -177,20 +165,21 @@ Previous versions set the `status` field to the inner engine result (e.g., `VERI
 | `query_interpretation_source` | string | Always `"llm_translation"` |
 | `query_semantics_verified` | boolean | Always `false` — QWED cannot verify that the LLM correctly interpreted the user's intent |
 | `verification_scope` | string | Always `"translated_expression_only"` — the attestation and enforcement below bind to the translated expression, not the natural-language `user_query` |
-| `deterministic_expression_evaluation` | boolean | `true` when the inner engine status was `VERIFIED` or `CORRECTION_NEEDED` |
+| `deterministic_expression_evaluation` | boolean | `true` when the inner engine status was `VERIFIED` or `DISPROVEN` |
 | `formal_proof` | boolean | Always `false` |
 | `translation_claim_self_consistent` | boolean | Whether the translated expression matched its own claimed answer |
 | `provider_used` | string | LLM provider used for translation |
 | `trust_enforced` | string | Status returned by the mandatory trust-boundary enforcement step. Matches `overall_status`. |
 | `attestation_policy` | string | Always `"mandatory"` — attestation admission is always required, never advisory |
 | `attestation_error` | string | Present only when the underlying attestation failed to sign. Machine-readable code (e.g. `SIGNING_FAILURE`, `CRYPTO_UNAVAILABLE`) explaining why the response was downgraded to `BLOCKED`. |
-| `overall_status` | string | Final status set from the enforced decision — never from the raw verifier verdict. Mirrors the top-level `status` field. |
+| `overall_status` | string | Final status set from the enforced decision — never from the raw verifier verdict. Mirrors the control-plane response `status`. |
 
 #### Mandatory attestation admission
 
 The control plane treats attestation as an admission gate, not a decoration:
 
 - The final `status` and `trust_boundary.overall_status` are set by `enforce_trust_decision(..., require_attestation=True)` after signing, not by the raw verifier verdict. A `VERIFIED` math result is only surfaced once `create_verification_attestation()` returns `ISSUED`.
+- A translated claim proven false is signed and attested like a true one, with `verified: false` in the attestation and `is_valid: false` in the verdict.
 - If attestation signing fails for any reason, the response is downgraded to `BLOCKED` (fail-closed). The attestation error code is echoed under `trust_boundary.attestation_error` and the top-level response omits the attestation token.
 - The attestation `qwed.query_hash` binds to the translated expression that the deterministic engine actually evaluated — not to the natural-language `user_query`. This matches the disclosed `verification_scope: "translated_expression_only"`: the natural-language query still appears in `response.user_query` for display, but downstream consumers verifying the attestation should hash the translated expression, not the user prose.
 
@@ -228,29 +217,71 @@ Verify mathematical expressions or equations using SymPy symbolic computation.
 
 ```json
 {
+  "status": "VERIFIED",
   "is_valid": true,
   "result": true,
   "left_side": "x**2 + 2*x + 1",
   "right_side": "(x + 1)**2",
   "simplified_difference": "0",
-  "message": "Identity is true"
+  "agent_message": "Identity is true",
+  "proof_ref": "sha256:...",
+  "attestation": "eyJ...",
+  "admission": "ADMIT"
 }
 ```
+
+Every response from this endpoint includes `admission`. Gate on `admission`, not on `status`: `ADMIT` only when `status` is `VERIFIED` and `is_valid` is `true`. A `VERIFIED` response also carries `proof_ref` and its signed `attestation`.
+
+| Outcome | Example | `status` | `is_valid` | `admission` |
+|---------|---------|----------|------------|-------------|
+| Proven true | `2 + 2 = 4` | `VERIFIED` | `true` | `ADMIT` |
+| Proven false | `2 + 2 = 5` | `VERIFIED` | `false` | `BLOCKED` |
+| Undecided symbolic difference | SymPy can't decide the difference is zero or non-zero | `UNVERIFIABLE` | `false` | `BLOCKED` |
+| Domain-restricted identity | `x/x = 1`, `(x**2-1)/(x-1) = x+1` | `UNVERIFIABLE` | `false` | `BLOCKED` |
+
+**Response (proven false):**
+
+```json
+{
+  "status": "VERIFIED",
+  "is_valid": false,
+  "result": false,
+  "left_side": "4",
+  "right_side": "5",
+  "simplified_difference": "-1",
+  "agent_message": "Identity is false",
+  "proof_ref": "sha256:...",
+  "attestation": "eyJ...",
+  "admission": "BLOCKED"
+}
+```
+
+A proven-false identity is a decided verdict, so `status` is `VERIFIED` and `proof_ref` is set. Previous versions returned `UNVERIFIABLE` for it.
+
+**Response (domain-restricted identity):** An identity that holds only after SymPy cancels a removable singularity returns `UNVERIFIABLE` with `constraint_id: "math.domain_restricted_identity"`. For example, `x/x = 1` is false at `x = 0`. See [Domain-restricted identities](/engines/math#domain-restricted-identities).
+
+The audit log row's `is_verified` follows `is_valid`, so a proven-false identity is logged as not verified.
 
 **Response (expression):**
 
 ```json
 {
+  "status": "VERIFIED",
   "is_valid": true,
   "value": 4.0,
+  "exact_value": "4",
   "simplified": "4",
-  "original": "2 + 2"
+  "original": "2 + 2",
+  "agent_message": "Expression evaluated",
+  "proof_ref": "sha256:...",
+  "attestation": "eyJ...",
+  "admission": "ADMIT"
 }
 ```
 
 Symbolic expressions that cannot be evaluated to a numeric value include `is_symbolic: true`. Expressions involving complex numbers include `is_complex: true`.
 
-**Ambiguous expressions:** Expressions with implicit multiplication after division (e.g., `1/2(3+1)`) are rejected with `is_valid: false`, `result: false`, and `status: "BLOCKED"`. The response includes `warning: "ambiguous"` and a `message` explaining why. Rewrite the expression with explicit parentheses or a `*` operator to remove the ambiguity.
+**Ambiguous expressions:** Expressions with implicit multiplication after division (e.g., `1/2(3+1)`) are rejected with `is_valid: false`, `result: false`, `status: "BLOCKED"`, and `admission: "BLOCKED"`. The response includes `warning: "ambiguous"` and an `agent_message` explaining why. Rewrite the expression with explicit parentheses or a `*` operator to remove the ambiguity.
 
 ```json
 {
@@ -258,16 +289,17 @@ Symbolic expressions that cannot be evaluated to a numeric value include `is_sym
   "result": false,
   "status": "BLOCKED",
   "warning": "ambiguous",
-  "message": "Expression may be ambiguous due to implicit multiplication after division",
-  "simplified": "..."
+  "agent_message": "Expression may be ambiguous due to implicit multiplication after division",
+  "simplified": "...",
+  "admission": "BLOCKED"
 }
 ```
 
-**Error cases:** Division by zero, `log(0)`, and square root of negative numbers in the real domain return `is_valid: false` with a descriptive `error` and `message`.
+**Error cases:** Division by zero, `log(0)`, and square root of negative numbers in the real domain return `status: "BLOCKED"`, `is_valid: false`, and `admission: "BLOCKED"`, with a descriptive `error` and `agent_message`.
 
-**Tolerance bounding:** When verifying an expression against an expected value with a `tolerance` parameter, the engine enforces a deterministic upper bound on the tolerance. The maximum allowed tolerance is `max(0.01, abs(calculated_value) * 0.01)`. If the requested tolerance exceeds this bound, the request returns a `BLOCKED` status. Invalid tolerance values (negative, `NaN`, `Infinity`, or non-numeric) are also rejected with `BLOCKED`.
+**Tolerance bounding:** This endpoint takes no `tolerance`. The bound applies to the engine method `VerificationEngine.verify_math(expression, expected, tolerance)`, which returns an engine dictionary without `admission`. When it verifies an expression against an expected value with a `tolerance` parameter, the engine enforces a deterministic upper bound on the tolerance. The maximum allowed tolerance is `max(0.01, abs(calculated_value) * 0.01)`. If the requested tolerance exceeds this bound, the request returns a `BLOCKED` status. Invalid tolerance values (negative, `NaN`, `Infinity`, or non-numeric) are also rejected with `BLOCKED`.
 
-**Response (tolerance exceeded):**
+**Engine dictionary (tolerance exceeded):**
 
 ```json
 {
@@ -801,6 +833,11 @@ Each entry in `items` is a per-item response. For math items the verdict is the 
 - `result.agent_message` — short human-readable summary safe to surface to the caller.
 - `result.developer_fields` — engine detail (including the legacy `is_valid` flag for backward compatibility).
 - `result.proof_ref` — cryptographic hash of the retained proof artifact. Present only when `result.status == VERIFIED`; `null` otherwise. **This is the authority bit** — downstream gates must reject any item whose `proof_ref` is `null`.
+- `result.admission` — `ADMIT` or `BLOCKED` on math, SQL, and code items, the same decision `POST /verify/math`, `POST /verify/sql`, and `POST /verify/code` return. Natural-language items always carry `BLOCKED`. Logic and fact items carry no admission. Admit an item only when `admission` is `ADMIT`, `status` is `VERIFIED`, and `proof_ref` is set. A proven-malicious query or proven-unsafe code is `VERIFIED` with admission `BLOCKED`. A math item whose sides differ is `UNVERIFIABLE` with admission `BLOCKED` (see the table below), unlike `POST /verify/math`, which returns a proven-false identity as `VERIFIED`.
+
+QWED stores each math and SQL item's admission in its audit row, so `/audit/logs` shows it. Rows written before this change keep `admission: null`.
+
+A SQL item must include `params.schema_ddl`. An item without it is marked `failed` with the error `Missing 'schema_ddl'`, the same message `POST /verify/sql` returns, and carries no admission.
 
 ```json
 {
@@ -826,6 +863,7 @@ Each entry in `items` is a per-item response. For math items the verdict is the 
           "diff": "0"
         },
         "proof_ref": "sha256:9f2c…",
+        "admission": "ADMIT",
         "is_authoritative": true
       },
       "latency_ms": 12.3
@@ -845,6 +883,7 @@ Each entry in `items` is a per-item response. For math items the verdict is the 
           "simplified": "2*x"
         },
         "proof_ref": null,
+        "admission": "BLOCKED",
         "is_authoritative": false
       },
       "latency_ms": 8.1
@@ -862,6 +901,7 @@ Math items are routed through the trust boundary (`enforce_trust_decision(requir
 | Verified identity | `VERIFIED` | `sha256:...` | Equality claim (e.g., `x**2 + 2*x + 1 = (x+1)**2`) simplifies to `0` **and** attestation signing succeeds. |
 | Not equal | `UNVERIFIABLE` | `null` | Equality claim where the two sides do not simplify to the same expression. `developer_fields.is_valid` is `false` and `developer_fields.diff` shows the non-zero difference. |
 | Simplification only | `UNVERIFIABLE` | `null` | Expression without an equality (e.g., `x + x`). `developer_fields.simplified` contains the simplified form. |
+| Domain-restricted identity | `UNVERIFIABLE` | `null` | Equality whose sides are undefined at different points, such as `x/x = 1`. `constraint_id` is `math.domain_restricted_identity`, as on `POST /verify/math`. |
 
 If attestation signing fails on an otherwise-verified identity, the item is downgraded to `UNVERIFIABLE` with `developer_fields.constraint_id = "api.attestation.signing_error"` — a math result is never returned as `VERIFIED` without a signed proof.
 
@@ -1087,7 +1127,37 @@ Register a new AI agent with QWED for verified agentic workflows.
 }
 ```
 
-<Warning>Store the `agent_token` immediately — it cannot be retrieved again after registration.</Warning>
+<Warning>Store the `agent_token` immediately. QWED stores only a keyed digest of the token, so it can't be retrieved again. If you lose it, re-issue it with [`POST /agents/{agent_id}/token/reissue`](#post-agents-agent-id-token-reissue).</Warning>
+
+---
+
+### POST /agents/{agent_id}/token/reissue
+
+Issue a new token for an agent. The previous token stops working immediately. Use this to replace a lost token, or a token whose plain text might remain in a database backup from before QWED began storing agent tokens as digests.
+
+Authenticate with your API key in the `X-API-Key` header. The key's owner must hold the `member`, `admin`, or `owner` role, and the agent must belong to the key's organization.
+
+```bash
+curl --fail-with-body -X POST http://localhost:8000/agents/42/token/reissue \
+  -H "X-API-Key: qwed_live_..."
+```
+
+**Response:**
+
+```json
+{
+  "agent_id": 42,
+  "agent_token": "qwed_agent_...",
+  "message": "Agent token re-issued. Store it securely; the previous token no longer works."
+}
+```
+
+| Status | Meaning |
+|--------|---------|
+| `403` | The API key isn't live, or the key owner's role is below `member` |
+| `404` | No agent with this ID exists in your organization, including an agent in another organization |
+
+<Warning>The new `agent_token` is shown only once. Store it securely.</Warning>
 
 ---
 
@@ -1334,11 +1404,29 @@ Before QWED checks the role, the request must meet all of these conditions. Othe
 |----------|---------------|---------------------------|
 | `GET /admin/compliance/export/csv` | `owner`, `admin` | `403 Forbidden` |
 | `GET /admin/compliance/verify/{log_id}` | `owner`, `admin` | `404 Not Found` |
+| `GET /admin/compliance/verify-trail` | `owner`, `admin` | Not applicable (always your organization) |
 | `GET /admin/compliance/report/soc2/{org_id}` | `owner`, `admin` | `403 Forbidden` |
 | `GET /admin/security/threats/{org_id}` | `owner`, `admin` | `403 Forbidden` |
 | `POST /admin/keys/rotate` | `owner`, `admin`, `member` | `404 Not Found` |
 
 A caller whose role isn't allowed gets `403 Forbidden` with `"Insufficient permissions for this operation"`. A missing or invalid API key returns `401 Unauthorized`.
+
+The JWT-authenticated `/auth/api-keys` and `/audit` routes use the same role ranking. See [Roles on API-key and audit routes](/api/authentication#roles-on-api-key-and-audit-routes).
+
+### Session sign-in for compliance endpoints
+
+The four `/admin/compliance/*` endpoints also accept a signed-in session, so a dashboard user doesn't need to paste an API key into the browser. Send the `access_token` from [`POST /auth/signin`](/api/authentication) as a bearer token:
+
+```text
+Authorization: Bearer <jwt_token>
+```
+
+- The token must be valid and its user must exist. Otherwise QWED returns `401 Unauthorized`.
+- The user must be active, belong to an active organization, and hold the `owner` or `admin` role. Otherwise QWED returns `403 Forbidden`.
+- If you send both `X-API-Key` and a bearer token, QWED uses the API key.
+- The session's organization is the signed-in user's organization. Organization scoping works the same as with an API key.
+
+Other admin endpoints (`/admin/security/threats/{org_id}` and `/admin/keys/rotate`) accept only an API key. A bearer token alone returns `401 Unauthorized`.
 
 <Note>
 Before this change, every admin endpoint returned `401 Unauthorized`, even for valid owner and admin keys. Admin endpoints now authorize by role and are scoped to the caller's organization.
@@ -1424,7 +1512,61 @@ The route is disabled by default. Set `QWED_ENABLE_AUDIT_SEED=1` on the server t
 
 ### GET /admin/compliance/report/soc2/{org_id}
 
-Generate a SOC 2 Type II compliance report for your organization. `org_id` must be your own organization ID. Another organization's ID returns `403 Forbidden`.
+Return a security activity summary for your organization over the last 90 days. `org_id` must be your own organization ID. Another organization's ID returns `403 Forbidden`.
+
+QWED computes every value from its own records. The response has `report_type` `"Security activity summary"`, `report_version` `"2.0"`, and a `disclaimer` stating that it is not a SOC 2 report or an auditor's attestation. The path keeps `soc2` for compatibility.
+
+- `metrics` counts verifications, security events (`security_events_by_type` groups them by recorded event type), active users, and active API keys.
+- `audit_trail` checks the signature and hash chain of every audit entry in the period. `status` is `VERIFIED` (with `evidence` and a `sha256:` `proof_ref`), `NO_ENTRIES`, or `NOT_VERIFIED`. The check fails closed: any failed or legacy entry, or a check that can't run (for example, `QWED_AUDIT_SECRET_KEY` unset), returns `NOT_VERIFIED`.
+
+```bash
+curl --fail-with-body -H "X-API-Key: qwed_live_your_key" \
+  "http://localhost:8000/admin/compliance/report/soc2/1"
+```
+
+`audit_trail.first_failed_entry_id` is the lowest entry ID that failed its signature or chain check, or `null` when none failed or the check couldn't run.
+
+See [Security activity summary](/advanced/compliance#1-security-activity-summary) for the full response and field reference.
+
+### GET /admin/compliance/verify-trail
+
+Check the signature and hash chain of every audit entry in your organization over a period. Use it to confirm the chain is intact up to a given entry, instead of calling `GET /admin/compliance/verify/{log_id}` once per entry. Owners and admins can call it with an API key or a signed-in session.
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `start` | ISO 8601 datetime (query, optional) | Start of the period. Omit for no lower bound. |
+| `end` | ISO 8601 datetime (query, optional) | End of the period. Omit for no upper bound. |
+
+With neither parameter, QWED checks the whole chain. QWED reads a time without a zone as UTC and converts any other offset to UTC. A `start` later than `end` returns `400 Bad Request`.
+
+```bash
+curl --fail-with-body -H "Authorization: Bearer $QWED_SESSION_TOKEN" \
+  "http://localhost:8000/admin/compliance/verify-trail?start=2026-10-01T00:00:00Z"
+```
+
+**Response:**
+
+```json
+{
+  "organization_id": 1,
+  "start": "2026-10-01T00:00:00+00:00",
+  "end": null,
+  "status": "NOT_VERIFIED",
+  "proof_ref": null,
+  "evidence": null,
+  "scope": "Signature and hash-chain check of the audit entries recorded in the period. It does not show that every request was recorded.",
+  "total_entries": 240,
+  "verified_entries": 238,
+  "failed_entries": 2,
+  "legacy_entries": 0,
+  "first_failed_entry_id": 1187,
+  "errors": ["..."],
+  "total_errors": 2,
+  "errors_truncated": false
+}
+```
+
+The fields after `end` match `audit_trail` in the [security activity summary](/advanced/compliance#audit-trail-status). `status` is `VERIFIED` (with `evidence` and a `sha256:` `proof_ref`) only when the period has entries and all pass. `NO_ENTRIES` means the period has none. `NOT_VERIFIED` means any entry failed, any entry is a legacy entry, or the check couldn't run. `first_failed_entry_id` names the lowest entry ID that failed, or is `null`.
 
 ### GET /admin/security/threats/{org_id}
 
@@ -1438,6 +1580,7 @@ Rotate an API key and return the new secret once. Owners, admins, and members ca
 - **Another user's key:** only an `owner` or `admin` can rotate it, and only when the key's owner doesn't hold a higher role. An admin can't rotate an owner's key. A member can't rotate anyone else's key. These cases return `403 Forbidden`.
 - **Organization scope:** the key must belong to your organization. A key ID in another organization returns `404 Not Found`, without revealing that the key exists.
 - **Live keys only:** QWED treats a revoked or inactive key as absent and returns `404 Not Found`. You can't rotate a dead credential into a new working secret.
+- **Atomic:** QWED revokes the old key and mints the replacement in one transaction. Concurrent rotations of the same key produce exactly one replacement. The others return `404 Not Found`.
 
 | Parameter | Type | Description |
 |-----------|------|-------------|

@@ -16,6 +16,8 @@ All requests require an API key, except `GET /health` and `GET /health/identity`
 curl -H "X-API-Key: qwed_your_key" http://localhost:8000/health
 ```
 
+A key authenticates only while it is live: active, not revoked, and not past its expiry time. Since v7.3.0, QWED rejects expired and revoked keys on every authenticated path, including `/verify/*`, admin, and metrics routes, with `401 Unauthorized` or `403 Forbidden`. Keys issued by rotation expire after 90 days. Rotate a key before it expires.
+
 ### SDK authentication
 
 ```python
@@ -141,7 +143,7 @@ As of v7.2, QWED stores API keys as HMAC-SHA256 lookup digests keyed by a dedica
 **Breaking change.** There is no legacy fallback: API keys issued before v7.2 no longer authenticate and return `401 Unauthorized`. Each key must be re-issued once. The old raw key is never required:
 
 - **Portal or API:** sign in with your email and password to get a JWT, then call `POST /auth/api-keys` to mint a new key. This path needs no API key.
-- **Rotation by key ID:** call [`POST /admin/keys/rotate`](/api/endpoints#post-admin-keys-rotate) with the key's ID, authenticated with an already-working key in the same organization. Members can rotate only their own keys. Owners and admins can also rotate other users' keys, unless the key owner holds a higher role. Revoked or inactive keys can't be rotated.
+- **Rotation by key ID:** call [`POST /admin/keys/rotate`](/api/endpoints#post-admin-keys-rotate) with the key's ID, authenticated with an already-working key in the same organization. Members can rotate only their own keys. Owners and admins can also rotate other users' keys, unless the key owner holds a higher role. Revoked or inactive keys can't be rotated. Rotation is atomic: it mints at most one replacement key, even when several rotations of the same key run concurrently. Rotating a key that is already inactive mints nothing and returns `404 Not Found`.
 
 ```bash
 # Before (pre-v7.2 key): now rejected
@@ -208,6 +210,18 @@ curl -X POST http://localhost:8000/agents/42/verify \
   -H "Content-Type: application/json" \
   -d '{"query": "What is 2+2?"}'
 ```
+
+### Agent token storage
+
+QWED stores each agent token as an HMAC-SHA256 digest keyed with `QWED_API_KEY_LOOKUP_SECRET`, not as plain text. The token is shown only once, in the response to registration or re-issue. Store it when you receive it.
+
+Tokens issued before this change keep working. At startup, after its fail-closed checks, the server hashes any agent token still stored in plain text, in place. You don't need to re-register agents.
+
+To replace a token, for example one whose plain text might remain in a database backup, call [`POST /agents/{agent_id}/token/reissue`](/api/endpoints#post-agents-agent-id-token-reissue). QWED returns a new token and the old one stops working.
+
+<Warning>
+Agent token digests depend on `QWED_API_KEY_LOOKUP_SECRET`. Changing the secret invalidates every agent token as well as every API key. Re-issue agent tokens after changing it.
+</Warning>
 
 ## Scopes
 
@@ -278,9 +292,29 @@ Get the current authenticated user's information. Requires a `Bearer` token in t
 curl -H "Authorization: Bearer eyJhbG..." http://localhost:8000/auth/me
 ```
 
+### Roles on API-key and audit routes
+
+The `/auth/api-keys` and `/audit` routes authorize by the signed-in user's role. Roles rank from lowest to highest: `viewer`, `member`, `admin`, `owner`.
+
+| Route | `viewer` | `member` | `admin` | `owner` |
+|-------|----------|----------|---------|---------|
+| `POST /auth/api-keys` | No | Yes | Yes | Yes |
+| `GET /auth/api-keys` | Own keys | Own keys | All keys in the organization | All keys in the organization |
+| `DELETE /auth/api-keys/{key_id}` | Own keys | Own keys | Own keys, plus keys of users who don't rank higher | Any key in the organization |
+| `GET /audit/logs` | Yes | Yes | Yes | Yes |
+| `GET /audit/logs/{log_id}` | Yes | Yes | Yes | Yes |
+| `GET /audit/export` | No | No | Yes | Yes |
+| `POST /audit/seed` | No | No | Yes | Yes |
+
+Before QWED checks the role, it checks the user and organization. QWED returns `403 Forbidden` when:
+
+- The user is inactive (`"User is not active"`).
+- The user's organization is inactive or missing (`"Organization is not active"`).
+- The user's role isn't allowed on the route, including any role not listed above (`"Insufficient permissions for this operation"`).
+
 ### POST /auth/api-keys
 
-Generate a new API key for the current user's organization. Requires JWT authentication.
+Generate a new API key for the current user's organization. Requires JWT authentication and the `member`, `admin`, or `owner` role. A `viewer` gets `403 Forbidden`.
 
 **Request:**
 
@@ -305,15 +339,26 @@ Generate a new API key for the current user's organization. Requires JWT authent
 
 ### GET /auth/api-keys
 
-List all active API keys for the current user's organization.
+List active API keys. Admins and owners see every active key in their organization. Members and viewers see only their own keys.
 
 ### DELETE /auth/api-keys/{key_id}
 
 Revoke an API key. Performs a soft delete.
 
+- Any role can revoke its own key.
+- An `admin` can revoke another user's key unless that user holds a higher role. Revoking an owner's key returns `403 Forbidden`.
+- An `owner` can revoke any key in the organization.
+- A `member` or `viewer` gets `404 Not Found` for a key they don't own, so the response doesn't confirm that the key exists.
+- A key ID that isn't a positive integer, or that belongs to another organization, returns `404 Not Found`.
+
+```bash
+curl --fail-with-body -X DELETE http://localhost:8000/auth/api-keys/12 \
+  -H "Authorization: Bearer eyJhbG..."
+```
+
 ## Audit endpoints
 
-These endpoints require JWT authentication (Bearer token) and return data scoped to the authenticated user's organization.
+These endpoints require JWT authentication (Bearer token) and return data scoped to the authenticated user's organization. Every role can read the log. Exporting it and seeding samples need `admin` or `owner`. See [Roles on API-key and audit routes](#roles-on-api-key-and-audit-routes).
 
 ### GET /audit/logs
 
@@ -371,5 +416,5 @@ These fields identify the chain entry. To check that it is intact, call [`GET /a
 
 ### GET /audit/export
 
-Export audit logs as a CSV file (up to 1,000 records).
+Export audit logs as a CSV file (up to 1,000 records). Requires the `admin` or `owner` role.
 

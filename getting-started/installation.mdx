@@ -72,22 +72,53 @@ qwed = "1.0"
 
 ## Full stack (self-hosted)
 
-For running the complete QWED stack locally:
+To run the complete QWED stack locally (API server, Postgres, Redis, Jaeger, Prometheus, and Grafana), use Docker Compose:
 
 ```bash
 # Clone the repository
 git clone https://github.com/QWED-AI/qwed-verification.git
 cd qwed-verification
 
-# Start infrastructure (Redis, Prometheus, Grafana, Jaeger)
-docker-compose up -d
+# Copy the settings template, then fill in every required value
+cp deploy/.env.example deploy/.env
 
-# Install dependencies
-pip install -e .
+# Build and start the stack from the repository root
+docker compose -f deploy/docker-compose.yml up -d
+```
 
-# Run the API
+Compose refuses to start while a required value in `deploy/.env` is empty. See [Self-hosting](/advanced/self-hosting#quick-start) for the full list.
+
+To run only the API server from source instead:
+
+```bash
+pip install -e ".[server]"
 python -m uvicorn qwed_new.api.main:app --reload
 ```
+
+### Docker image
+
+The `qwedai/qwed-verification` image on Docker Hub runs the API server on port 8000. Pass the required secrets from your shell when you start it:
+
+```bash
+# Generate each secret once and keep it. Changing the lookup or audit key later
+# invalidates existing API keys or audit signatures.
+for name in API_KEY_SECRET QWED_JWT_SECRET_KEY QWED_API_KEY_LOOKUP_SECRET QWED_AUDIT_SECRET_KEY; do
+  export "$name=$(python -c 'import secrets; print(secrets.token_urlsafe(48))')"
+done
+
+docker run -p 8000:8000 \
+  -v qwed-data:/var/lib/qwed \
+  -e QWED_CORS_ORIGINS="http://localhost:3000" \
+  -e API_KEY_SECRET \
+  -e QWED_JWT_SECRET_KEY \
+  -e QWED_API_KEY_LOOKUP_SECRET \
+  -e QWED_AUDIT_SECRET_KEY \
+  qwedai/qwed-verification:8.0.0
+```
+
+<Note>
+The image runs the API server from version 8.0.0. Earlier tags ran the QWED GitHub Action. To scan a repository, use the [GitHub Action](/advanced/github-action) instead of the image.
+</Note>
 
 ### Infrastructure URLs
 
