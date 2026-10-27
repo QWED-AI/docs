@@ -833,7 +833,7 @@ Each entry in `items` is a per-item response. For math items the verdict is the 
 - `result.agent_message` — short human-readable summary safe to surface to the caller.
 - `result.developer_fields` — engine detail (including the legacy `is_valid` flag for backward compatibility).
 - `result.proof_ref` — cryptographic hash of the retained proof artifact. Present only when `result.status == VERIFIED`; `null` otherwise. **This is the authority bit** — downstream gates must reject any item whose `proof_ref` is `null`.
-- `result.admission` — `ADMIT` or `BLOCKED` on math, SQL, and code items, the same decision `POST /verify/math`, `POST /verify/sql`, and `POST /verify/code` return. Natural-language items always carry `BLOCKED`. Logic and fact items carry no admission. Admit an item only when `admission` is `ADMIT`, `status` is `VERIFIED`, and `proof_ref` is set. A proven-false identity or a proven-malicious query is `VERIFIED` with admission `BLOCKED`.
+- `result.admission` — `ADMIT` or `BLOCKED` on math, SQL, and code items, the same decision `POST /verify/math`, `POST /verify/sql`, and `POST /verify/code` return. Natural-language items always carry `BLOCKED`. Logic and fact items carry no admission. Admit an item only when `admission` is `ADMIT`, `status` is `VERIFIED`, and `proof_ref` is set. A proven-malicious query or proven-unsafe code is `VERIFIED` with admission `BLOCKED`. A math item whose sides differ is `UNVERIFIABLE` with admission `BLOCKED` (see the table below), unlike `POST /verify/math`, which returns a proven-false identity as `VERIFIED`.
 
 QWED stores each math and SQL item's admission in its audit row, so `/audit/logs` shows it. Rows written before this change keep `admission: null`.
 

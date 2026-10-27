@@ -23,10 +23,16 @@ import { QWEDClient, isAdmitted } from '@qwed-ai/sdk';
 
 const client = new QWEDClient({ apiKey: 'qwed_your_key' });
 
-const result = await client.verifyMath('2 + 2 = 4');
-console.log(result.status);      // "VERIFIED"
-console.log(result.admission);   // "ADMIT"
-console.log(isAdmitted(result)); // true
+try {
+  const result = await client.verifyMath('2 + 2 = 4');
+  console.log(result.status);      // "VERIFIED"
+  console.log(result.admission);   // "ADMIT"
+  console.log(isAdmitted(result)); // true
+} catch (err) {
+  // A network error or a non-2xx response rejects with a QWEDError.
+  // Fail closed: treat the claim as not admitted.
+  console.error(err);
+}
 ```
 
 ## Configuration
@@ -75,12 +81,18 @@ A missing or unknown admission is never admitted. Endpoints that make no admissi
 ```typescript
 import { isAdmitted } from '@qwed-ai/sdk';
 
-const result = await client.verifyCode(code, { language: 'python' });
-if (isAdmitted(result)) {
-  run(code);
-} else {
-  // VERIFIED · BLOCKED means proven unsafe. Anything else is not verified.
-  console.log('rejected:', result.status, result.admission, result.agent_message);
+try {
+  const result = await client.verifyCode(code, { language: 'python' });
+  if (isAdmitted(result)) {
+    run(code);
+  } else {
+    // VERIFIED · BLOCKED means proven unsafe. Anything else is not verified.
+    console.log('rejected:', result.status, result.admission, result.agent_message);
+  }
+} catch (err) {
+  // A network error or a non-2xx response rejects with a QWEDError.
+  // Fail closed: treat the claim as not admitted.
+  console.error(err);
 }
 ```
 
@@ -114,6 +126,8 @@ try {
 ```
 
 ## Verification methods
+
+Every method returns a promise that rejects with a `QWEDError` on a network error or a non-2xx response. The short examples below leave that out; wrap your calls as the examples above and [Error handling](#error-handling) show, and treat a rejected call as not admitted.
 
 ### verify(query)
 
@@ -152,7 +166,7 @@ Check code for security vulnerabilities.
 const result = await client.verifyCode(code, { language: 'python' });
 console.log(result.status, result.admission); // 'VERIFIED', 'BLOCKED' for unsafe code
 console.log(isAdmitted(result));              // false
-console.log(result.issues);                   // what was found
+console.log(result.issues);                   // what was found (also in developer_fields.issues)
 ```
 
 ### verifyFact(claim, context)
