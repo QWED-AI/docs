@@ -68,7 +68,7 @@ result = client.verify_math("(a+b)^2 = a^2 + 2*a*b + b^2")
 
 # Algebraic identity - FALSE
 result = client.verify_math("(a+b)^2 = a^2 + b^2")
-# ✗ Not Verified: Missing 2ab term
+# ✗ Proven false: VERIFIED with is_valid false, admission DENY
 
 # Trig identity
 result = client.verify_math("sin(x)^2 + cos(x)^2 = 1")
@@ -80,6 +80,21 @@ Identity verification uses symbolic simplification first. If SymPy proves the id
 <Warning>
 Numerical sampling cannot prove equivalence. If all sample points agree but no formal proof was established, the engine now **fails closed** — returning `BLOCKED` with `is_equivalent: false`, `method: "numerical_sampling_rejected"`, and `confidence: 0.0`. Two expressions can match at fixed points without being algebraically identical, so sampling-only agreement is rejected outright. Treat `BLOCKED` results as unverified.
 </Warning>
+
+#### Domain-restricted identities
+
+An identity that holds only after SymPy cancels a removable singularity is not proven. For example, `x/x = 1` is false at `x = 0`, and `(x**2-1)/(x-1) = x+1` is false at `x = 1`. The engine reads the denominators from the expression before SymPy simplifies it. It returns `VERIFIED` only when both sides have the same singular factors.
+
+- `POST /verify/math` returns `UNVERIFIABLE` with `constraint_id: "math.domain_restricted_identity"` and admission `BLOCKED`.
+- `verify_identity` returns `status: "INCONCLUSIVE"` with `reason: "domain_mismatch"` and the same `constraint_id`.
+
+The same rule covers floor division and modulo (`x//x = 1`, `x % x = 0`). An identity with a free symbol that uses a function with poles or singular points (`tan`, `sec`, `log`, `factorial`) is never verified this way. Closed constants such as `factorial(5) = 120` still verify.
+
+```python
+result = client.verify_math("x/x = 1")
+# result.status == "UNVERIFIABLE"
+# constraint_id == "math.domain_restricted_identity"
+```
 
 ### 3. Derivatives
 
@@ -183,9 +198,47 @@ Cash flows with more than one sign change, or that fail to converge, are now rej
 
 ---
 
+## Verdicts and admission
+
+The math engine separates the verdict (did the engine decide the claim?) from admission (may you use the result?). A claim the engine proves false is a decided verdict. It is `VERIFIED` with `is_valid: false` and admission `DENY`, never `UNVERIFIABLE`. Gate on admission, not on the verdict alone.
+
+| Outcome | Example | Legacy engine status | Verdict | `is_valid` | Admission |
+| --- | --- | --- | --- | --- | --- |
+| Proven true | `2+2=4` | `VERIFIED` | `VERIFIED` | `true` | `ADMIT` |
+| Proven false | `2+2=5`, `(a+b)^2 = a^2 + b^2` | `DISPROVEN` | `VERIFIED` | `false` | `DENY` |
+| Undecided | Symbolic difference SymPy can't decide, float rounding residue, non-finite value | `INCONCLUSIVE` | `UNVERIFIABLE` | `false` | `DENY` |
+| Domain-restricted identity | `x/x = 1` | `INCONCLUSIVE` | `UNVERIFIABLE` | `false` | `DENY` |
+| Verification failed | Invalid input, units of different dimensions | `BLOCKED` | `BLOCKED` | `false` | `DENY` |
+
+The legacy engine status is the `status` field of the dictionary that `VerificationEngine` methods return. HTTP responses report admission `DENY` as `"admission": "BLOCKED"`.
+
+<Warning>
+`VerificationEngine` no longer emits `CORRECTION_NEEDED`. A mismatch decided by a concrete computation now returns `DISPROVEN`. If your code branches on `status == "CORRECTION_NEEDED"`, switch to `DISPROVEN` for engine dictionaries, or to `admission` and `is_valid` for API responses.
+</Warning>
+
+The engine returns `DISPROVEN` only when the mismatch is decided:
+
+- **Symbolic checks.** Derivatives, indefinite integrals, limits, and `/verify/math` identities are disproven only when SymPy decides the difference is non-zero. The difference can be decided outright, through the coefficients of a bounded polynomial, or at an exact witness point inside each symbol's declared domain. Otherwise the result is `INCONCLUSIVE`.
+- **Float residue.** A non-zero difference that comes from a float literal (`0.1 + 0.2 = 0.3` leaves `5.55e-17`) is `INCONCLUSIVE`, not `DISPROVEN`.
+- **Non-finite values.** A mismatch involving an overflowed value or a `NaN` claim is `INCONCLUSIVE`.
+- **Exact matrices and scalars.** Matrix `add`, `multiply`, `inverse`, `transpose`, and `determinant` read each float input as the decimal you wrote (`0.1` is `1/10`), so `[[0.1]] + [[0.2]]` vs `[[0.3]]` is `VERIFIED`. A claim inside the float rounding window is `INCONCLUSIVE`. A claimed matrix of the wrong shape is `DISPROVEN`.
+- **Unit conversion.** `verify_unit_conversion` uses exact unit definitions (1 lb = 0.45359237 kg, 1 US gal = 3.785411784 L). Converting between units of different dimensions, such as `m` to `kg`, returns `BLOCKED` instead of comparing the numbers.
+
+```python
+from qwed_new.core.verifier import VerificationEngine
+
+engine = VerificationEngine()
+
+engine.verify_math("2+2", 5)["status"]       # "DISPROVEN"
+engine.verify_math("2+2", 4)["status"]       # "VERIFIED"
+engine.verify_unit_conversion(1, "m", "kg", 1)["status"]  # "BLOCKED"
+```
+
+---
+
 ## Fail-closed semantics
 
-Three verification methods require an additional proof step before returning `VERIFIED`. When the underlying claim is ambiguous, incomplete, or numerically unproven, the engine returns `BLOCKED` or `CORRECTION_NEEDED` with structured diagnostics rather than a best-effort answer.
+Three verification methods require an additional proof step before returning `VERIFIED`. When the underlying claim is ambiguous, incomplete, or numerically unproven, the engine returns `BLOCKED` or `DISPROVEN` with structured diagnostics rather than a best-effort answer.
 
 ### `verify_statistics(statistic="mode")` — unique mode required
 
@@ -194,7 +247,7 @@ Three verification methods require an additional proof step before returning `VE
 | Condition | Status | Notes |
 | --- | --- | --- |
 | Exactly one value at max frequency, claim matches | `VERIFIED` | Unique mode |
-| Exactly one value at max frequency, claim differs | `CORRECTION_NEEDED` | `calculated` returned |
+| Exactly one value at max frequency, claim differs | `DISPROVEN` | `calculated` returned |
 | Two or more values tied at max frequency | `BLOCKED` | `ambiguous_modes` returned; result is independent of the claimed value |
 | All values equal (e.g., [5, 5, 5]) | `VERIFIED` (if claim matches) | Single distinct value at max frequency � unique mode |
 
@@ -236,15 +289,15 @@ Eigenvalue verification requires the claimed list to have the same length as the
 
 | Condition | Status | Notes |
 | --- | --- | --- |
-| `len(claimed) == len(calculated)` and all values match within `1e-6` | `VERIFIED` | Full agreement |
-| `len(claimed) == len(calculated)` and any value differs | `CORRECTION_NEEDED` | Values compared pairwise after sorting |
-| `len(claimed) != len(calculated)` (under- or over-complete) | `CORRECTION_NEEDED` | `calculated_count` and `claimed_count` returned |
+| `len(claimed) == len(calculated)` and all values match | `VERIFIED` | Full agreement |
+| `len(claimed) == len(calculated)` and any value differs | `DISPROVEN` | Values compared as complex numbers after sorting |
+| `len(claimed) != len(calculated)` (under- or over-complete) | `DISPROVEN` | `calculated_count` and `claimed_count` returned |
 
 Response fields on the cardinality-mismatch case:
 
 | Field | Type | Description |
 | --- | --- | --- |
-| `status` | string | `"CORRECTION_NEEDED"` |
+| `status` | string | `"DISPROVEN"` |
 | `error` | string | Message noting the mismatch and that all eigenvalues, including repeated roots, must be specified |
 | `calculated_eigenvalues` | list | Full eigenvalue list computed by SymPy (expanded by algebraic multiplicity) |
 | `claimed_eigenvalues` | list | The list you submitted |
@@ -252,24 +305,24 @@ Response fields on the cardinality-mismatch case:
 | `claimed_count` | integer | Length of `claimed_eigenvalues` |
 
 ```python
-# CORRECTION_NEEDED — claim omits the second eigenvalue
+# DISPROVEN — claim omits the second eigenvalue
 result = client.verify_matrix_operation(
     operation="eigenvalues",
     matrix=[[2, 0], [0, 3]],
     expected=[2],
 )
-# result["status"] == "CORRECTION_NEEDED"
+# result["status"] == "DISPROVEN"
 # result["calculated_count"] == 2
 # result["claimed_count"] == 1
 # result["calculated_eigenvalues"] == [2.0, 3.0]
 
-# CORRECTION_NEEDED — repeated root must be listed twice
+# DISPROVEN — repeated root must be listed twice
 result = client.verify_matrix_operation(
     operation="eigenvalues",
     matrix=[[2, 0], [0, 2]],
     expected=[2],
 )
-# result["status"] == "CORRECTION_NEEDED"
+# result["status"] == "DISPROVEN"
 # result["calculated_eigenvalues"] == [2.0, 2.0]
 
 # VERIFIED — full list including multiplicity
@@ -288,7 +341,7 @@ IRR verification now requires proof that Newton-Raphson converged before returni
 | Condition | Status | Notes |
 | --- | --- | --- |
 | Converged and claimed IRR matches within `tolerance` | `VERIFIED` | `converged: true`, `iterations_used` returned |
-| Converged and claimed IRR differs by more than `tolerance` | `CORRECTION_NEEDED` | `calculated_irr` returned |
+| Converged and claimed IRR differs by more than `tolerance` | `DISPROVEN` | `calculated_irr` returned |
 | All cash flows are zero | `BLOCKED` | IRR is undefined — any rate satisfies `NPV = 0` |
 | Zero sign changes (all cash flows same sign) | `BLOCKED` | No real IRR exists (Descartes' rule) |
 | More than one sign change in cash flows | `BLOCKED` | Multi-root ambiguity — multiple real IRRs may exist |
@@ -299,7 +352,7 @@ Response fields:
 
 | Field | Type | Description |
 | --- | --- | --- |
-| `status` | string | `"VERIFIED"`, `"CORRECTION_NEEDED"`, or `"BLOCKED"` |
+| `status` | string | `"VERIFIED"`, `"DISPROVEN"`, or `"BLOCKED"` |
 | `converged` | boolean | `true` only on successful convergence (present on `VERIFIED`) |
 | `iterations_used` | integer | Newton-Raphson iterations run (present on `VERIFIED` and iteration-related `BLOCKED` cases) |
 | `calculated_irr` | float | Present when Newton-Raphson converged |
@@ -351,19 +404,32 @@ result = client.verify_irr(
 ```
 
 <Warning>
-These three methods are behavior changes. Inputs that previously received `VERIFIED` — an ambiguous mode dataset, an under-specified eigenvalue list, or a cash-flow series with multiple sign changes — now return `BLOCKED` or `CORRECTION_NEEDED`. Treat both statuses as unverified and consume the structured diagnostic fields rather than relying on a numeric result.
+These three methods are behavior changes. Inputs that previously received `VERIFIED` — an ambiguous mode dataset, an under-specified eigenvalue list, or a cash-flow series with multiple sign changes — now return `BLOCKED` or `DISPROVEN`. Treat both statuses as not admitted and consume the structured diagnostic fields rather than relying on a numeric result.
 </Warning>
 
 ---
 
 ## Trust boundary
 
-When you verify a natural language math query through the `/verify/natural_language` endpoint, the response includes a `trust_boundary` object. This object describes exactly what the pipeline proved and what it did not.
+When you verify a natural language math query through the `/verify/natural_language` endpoint, the engine only decides the expression the LLM translated your question into. The response carries the enforced verdict for that expression, the scope it covers, and a separate admission decision.
 
 ```json
 {
-  "status": "INCONCLUSIVE",
-  "final_answer": 30.0,
+  "status": "VERIFIED",
+  "is_valid": true,
+  "translated_expression": "0.15 * 200",
+  "verification_scope": "translated_expression_only",
+  "query_semantics_verified": false,
+  "admission": "BLOCKED"
+}
+```
+
+Admission is always `BLOCKED` (`DENY`) for natural language queries, even when the translated claim holds, because nothing proves the translation means what you asked. A translated claim proven false is `VERIFIED` with `is_valid: false`.
+
+The control plane also records a `trust_boundary` object that describes exactly what the pipeline proved and what it did not:
+
+```json
+{
   "trust_boundary": {
     "query_interpretation_source": "llm_translation",
     "query_semantics_verified": false,
@@ -372,7 +438,7 @@ When you verify a natural language math query through the `/verify/natural_langu
     "formal_proof": false,
     "translation_claim_self_consistent": true,
     "provider_used": "openai_compat",
-    "overall_status": "INCONCLUSIVE"
+    "overall_status": "VERIFIED"
   }
 }
 ```
@@ -388,7 +454,7 @@ When you verify a natural language math query through the `/verify/natural_langu
 | `overall_status` | The response-level status reflecting the trust boundary |
 
 <Note>
-The overall status for natural language math queries is `INCONCLUSIVE` because, while QWED evaluates the expression deterministically, it cannot verify that the LLM correctly interpreted the user's intent. The `trust_boundary` gives you the information to decide whether the result is sufficient for your use case.
+QWED evaluates the translated expression deterministically, but it cannot verify that the LLM correctly interpreted your intent. That is why admission is always `BLOCKED` for natural language queries. Use `POST /verify/math` directly when you need an admissible result.
 </Note>
 
 ---
@@ -532,9 +598,9 @@ When math verification runs through the natural language pipeline (`POST /verify
     "formal_proof": false,
     "translation_claim_self_consistent": true,
     "provider_used": "openai",
-    "trust_enforced": "INCONCLUSIVE",
+    "trust_enforced": "VERIFIED",
     "attestation_policy": "mandatory",
-    "overall_status": "INCONCLUSIVE"
+    "overall_status": "VERIFIED"
   }
 }
 ```
@@ -544,7 +610,7 @@ When math verification runs through the natural language pipeline (`POST /verify
 | `query_interpretation_source` | string | Always `"llm_translation"` — indicates the query was interpreted by an LLM |
 | `query_semantics_verified` | boolean | Always `false` — QWED cannot verify that the LLM correctly interpreted the user's intent |
 | `verification_scope` | string | Always `"translated_expression_only"` — the attestation `qwed.query_hash` also binds to this translated expression, not the natural-language query |
-| `deterministic_expression_evaluation` | boolean | `true` when the inner engine status was `VERIFIED` or `CORRECTION_NEEDED` |
+| `deterministic_expression_evaluation` | boolean | `true` when the inner engine status was `VERIFIED` or `DISPROVEN` |
 | `formal_proof` | boolean | Always `false` — SymPy evaluation is deterministic but not a formal proof of the original query |
 | `translation_claim_self_consistent` | boolean | Whether the translated expression matched its own claimed answer |
 | `provider_used` | string | The LLM provider used for translation |
@@ -554,7 +620,7 @@ When math verification runs through the natural language pipeline (`POST /verify
 | `overall_status` | string | The top-level response status after trust boundary enforcement — always sourced from the enforced decision, never from the raw verifier verdict |
 
 <Note>
-Because the LLM translation step is non-deterministic, the natural language pipeline returns `INCONCLUSIVE` instead of `VERIFIED` even when the underlying expression evaluation succeeds. This prevents over-representing a translated-query evaluation as a proven user-query verdict. Use the direct `POST /verify/math` endpoint if you need a fully deterministic result without the LLM translation layer.
+Because the LLM translation step is non-deterministic, the natural language pipeline never admits a result: `admission` is always `BLOCKED`, even when the translated expression is `VERIFIED`. The verdict carries `verification_scope: "translated_expression_only"` and `query_semantics_verified: false`, so it can't be mistaken for proof of your question. Use the direct `POST /verify/math` endpoint if you need a fully deterministic result without the LLM translation layer.
 </Note>
 
 ### Mandatory attestation admission
@@ -723,7 +789,10 @@ These bounds are far above anything legitimate verification needs — `2^100`, `
 | Non-equality expression in batch verification | Returns `is_valid: false` with `status: "SIMPLIFIED"` — simplification is not a proof |
 | Oversized exponent, power tower, or huge factorial | Rejected before evaluation — see [Compute-cost bounds](#compute-cost-bounds) |
 | Ambiguous mode (multimodal data) | Returns "BLOCKED" with `ambiguous_modes` — only a unique mode can verify |
-| Incomplete or over-complete eigenvalue claim | Returns "CORRECTION_NEEDED" with `calculated_count`/`claimed_count` |
+| Incomplete or over-complete eigenvalue claim | Returns "DISPROVEN" with `calculated_count`/`claimed_count` |
+| Identity that only holds after cancelling a removable singularity (`x/x = 1`) | Returns "UNVERIFIABLE" with `constraint_id: math.domain_restricted_identity` |
+| Float rounding residue or non-finite value in a mismatch | Returns "INCONCLUSIVE" (`UNVERIFIABLE`), not disproven |
+| Unit conversion across dimensions (`m` to `kg`) | Returns "BLOCKED" |
 | IRR with multi-root, derivative stall, or non-convergence | Returns "BLOCKED" — no best-effort iterate is returned |
 | Float or complex constants in the expression | Verdict unchanged — a `precision.float-constants` advisory is attached to `advisory_checks` |
 

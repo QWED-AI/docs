@@ -8,7 +8,7 @@ description: "QWED Rust SDK documentation. Add via Cargo, use async/await with t
 
 ```toml
 [dependencies]
-qwed = "1.0"
+qwed = "7.3"
 tokio = { version = "1.0", features = ["rt-multi-thread", "macros"] }
 ```
 
@@ -20,11 +20,12 @@ use qwed::QWEDClient;
 #[tokio::main]
 async fn main() -> Result<(), qwed::Error> {
     let client = QWEDClient::new("qwed_your_key");
-    
-    let result = client.verify("Is 2+2=4?").await?;
-    println!("Verified: {}", result.verified);  // true
-    println!("Status: {:?}", result.status);    // Verified
-    
+
+    let result = client.verify_math("2 + 2 = 4").await?;
+    println!("Status: {:?}", result.status);       // Verified
+    println!("Admission: {:?}", result.admission); // Some(Admit)
+    println!("Admitted: {}", result.is_admitted()); // true
+
     Ok(())
 }
 ```
@@ -43,35 +44,94 @@ let client = QWEDClient::with_options(
 );
 ```
 
+## Reading a result
+
+Every verification method returns a `VerificationResponse` that models the server's [DiagnosticResult](/advanced/diagnostics) envelope.
+
+| Field | Type | Meaning |
+|-------|------|---------|
+| `status` | `VerificationStatus` | `Verified`, `Unverifiable`, or `Blocked`. `Unknown` for a value this SDK doesn't recognize. |
+| `raw_status` | `String` | The server's status text exactly as sent, such as `SAT` where `status` is `Unknown`. Never used for admission. |
+| `admission` | `Option<Admission>` | `Some(Admit)` or `Some(Blocked)` where the endpoint makes a decision. `Some(Unknown)` for a value this SDK doesn't recognise. `None` where the endpoint makes no decision. |
+| `proof_ref` | `Option<String>` | Set only when `status` is `Verified`. |
+| `attestation` | `Option<String>` | On a `Verified` answer, the server's signed attestation, an ES256 JWT. Check it with `client.verify_attestation`. |
+| `agent_message` | `Option<String>` | Human-readable explanation. |
+| `is_authoritative` | `Option<bool>` | Whether the verdict is authoritative. |
+| `constraint_id` | `Option<String>` | The constraint that produced the verdict. |
+| `developer_fields` | `Option<HashMap<String, Value>>` | Engine detail for debugging. |
+| `extra` | `HashMap<String, Value>` | The endpoint's own fields, such as `is_valid` or `issues`. |
+
+### Gate on `is_admitted()`
+
+Use `is_admitted()` to decide whether to act on a result. Don't gate on `status` alone.
+
+`Verified` means the engine reached a deterministic answer, not that the claim holds. `2 + 2 = 5` returns `Verified` with admission `Blocked` because it's proven false. Unsafe code returns `Verified` with admission `Blocked` because it's proven unsafe.
+
+`is_admitted()` returns `true` only when all of these hold:
+
+- `admission` is `Some(Admit)`
+- `status` is `Verified`
+- `proof_ref` is set
+
+A missing or `Unknown` admission is never admitted. Endpoints that make no admission decision (`/verify/logic`, `/verify/fact`, `/verify/rag`, `/verify/process`, and batch logic and fact items) are therefore never admitted. The `verified` field that `/verify/rag` and `/verify/process` send is their guard's own result, not an admission. It stays in `extra["verified"]` and `developer_fields`.
+
+```rust
+let result = client.verify_math("2 + 2 = 5").await?;
+if result.is_admitted() {
+    proceed();
+} else {
+    // Verified · Blocked: proven false, so reject.
+    reject(result.agent_message.as_deref().unwrap_or("not admitted"));
+}
+```
+
+<Note>
+`qwed::is_verified()` is deprecated and returns `is_admitted()`. A response body that doesn't match the envelope returns `Error::Serialization`.
+</Note>
+
 ## Methods
 
 ### verify
 
 ```rust
-let result = client.verify("2+2=4").await?;
+let result = client.verify("Is 15% of 200 equal to 30?").await?;
 ```
 
 ### verify\_math
 
 ```rust
 let result = client.verify_math("x**2 + 2*x + 1 = (x+1)**2").await?;
-println!("{}", result.verified);  // true
+println!("{}", result.is_admitted());  // true
+println!("{:?}", result.extra.get("is_valid"));  // Some(Bool(true))
 ```
 
 ### verify\_logic
 
 ```rust
 let result = client.verify_logic("(AND (GT x 5) (LT y 10))").await?;
-println!("{:?}", result.model);  // Some({"x": 6, "y": 9})
+// /verify/logic makes no admission decision, so is_admitted() is false.
+println!("{:?} {:?}", result.status, result.extra.get("model"));
 ```
 
 ### verify\_code
 
 ```rust
 let result = client.verify_code(code, "python").await?;
-for vuln in &result.vulnerabilities {
-    println!("{}: {}", vuln.severity, vuln.message);
+println!("{:?} {:?}", result.status, result.admission); // Verified Some(Blocked)
+println!("{}", result.is_admitted());                   // false
+if let Some(issues) = result.extra.get("issues") {
+    println!("{}", issues);
 }
+```
+
+### verify\_fact
+
+```rust
+let result = client.verify_fact(
+    "Paris is the capital of France",
+    "France is a country in Europe. Its capital city is Paris.",
+).await?;
+// /verify/fact makes no admission decision, so is_admitted() is false.
 ```
 
 ### verify\_sql
@@ -82,31 +142,62 @@ let result = client.verify_sql(query, schema, "postgresql").await?;
 
 ### verify\_batch
 
+`verify_batch` returns a `BatchResponse` that mirrors the server's batch job. Each item's verification answer is in `item.result`. Call `is_admitted()` on each `BatchResult` item. There is no aggregate `summary`. Math, code, and SQL items carry their route's admission, so a proven item can be admitted. Natural-language items always carry `BLOCKED`. Logic and fact items make no decision, so they're never admitted.
+
 ```rust
+use qwed::{BatchItem, VerificationType};
+
 let items = vec![
     BatchItem { query: "2+2=4".into(), r#type: Some(VerificationType::Math) },
     BatchItem { query: "3*3=9".into(), r#type: Some(VerificationType::Math) },
 ];
-let results = client.verify_batch(items).await?;
-println!("{:.1}%", results.summary.unwrap().success_rate);
+let batch = client.verify_batch(items).await?;
+println!("Job {} is {}", batch.job_id, batch.status); // job state, such as "completed"
+for item in &batch.items {
+    if let Some(result) = &item.result {
+        println!("{}: {:?}, admitted={}", item.id, result.status, item.is_admitted());
+    }
+}
 ```
+
+<Note>
+A batch SQL item needs `params.schema_ddl`. The server fails an item without it with `Missing 'schema_ddl'`. The SDK's batch items send only a query and a type, so verify SQL with `verify_sql` instead of in a batch.
+</Note>
+
+| Field | Type | Meaning |
+|-------|------|---------|
+| `job_id` | `String` | Batch job ID |
+| `status` | `String` | Job state: `pending`, `processing`, `completed`, `partial`, or `failed` |
+| `progress_percent` | `Option<f64>` | Job progress |
+| `total_items`, `completed_items`, `failed_items` | `Option<u32>` | Item counts |
+| `items` | `Vec<BatchResult>` | Per-item records with `id`, `status` (item state), `query`, `result`, `error`, and `latency_ms` |
 
 ## Types
 
 ```rust
 pub enum VerificationStatus {
     Verified,
-    Failed,
-    Corrected,
+    Unverifiable,
     Blocked,
-    Error,
+    Unknown,
+}
+
+pub enum Admission {
+    Admit,
+    Blocked,
+    Unknown,
 }
 
 pub struct VerificationResponse {
     pub status: VerificationStatus,
-    pub verified: bool,
-    pub engine: String,
-    pub result: Option<serde_json::Value>,
+    pub raw_status: String,
+    pub admission: Option<Admission>,
+    pub proof_ref: Option<String>,
+    pub agent_message: Option<String>,
+    pub is_authoritative: Option<bool>,
+    pub constraint_id: Option<String>,
+    pub developer_fields: Option<HashMap<String, serde_json::Value>>,
+    pub extra: HashMap<String, serde_json::Value>,
 }
 ```
 
@@ -114,9 +205,10 @@ pub struct VerificationResponse {
 
 ```rust
 match client.verify("test").await {
-    Ok(result) => println!("Verified: {}", result.verified),
+    Ok(result) => println!("Admitted: {}", result.is_admitted()),
     Err(qwed::Error::Auth) => eprintln!("Invalid API key"),
     Err(qwed::Error::RateLimit) => eprintln!("Rate limit exceeded"),
+    Err(qwed::Error::Serialization(e)) => eprintln!("Unexpected response: {}", e),
     Err(e) => eprintln!("Error: {}", e),
 }
 ```
