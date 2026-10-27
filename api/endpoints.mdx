@@ -1336,6 +1336,7 @@ Before QWED checks the role, the request must meet all of these conditions. Othe
 | `GET /admin/compliance/verify/{log_id}` | `owner`, `admin` | `404 Not Found` |
 | `GET /admin/compliance/report/soc2/{org_id}` | `owner`, `admin` | `403 Forbidden` |
 | `GET /admin/security/threats/{org_id}` | `owner`, `admin` | `403 Forbidden` |
+| `GET /admin/security/events` | `owner`, `admin` | Not applicable (own organization only) |
 | `POST /admin/keys/rotate` | `owner`, `admin`, `member` | `404 Not Found` |
 
 A caller whose role isn't allowed gets `403 Forbidden` with `"Insufficient permissions for this operation"`. A missing or invalid API key returns `401 Unauthorized`.
@@ -1429,6 +1430,52 @@ Generate a SOC 2 Type II compliance report for your organization. `org_id` must 
 ### GET /admin/security/threats/{org_id}
 
 Returns a real-time threat summary for your organization, including blocked injection attempts and anomalous patterns. `org_id` must be your own organization ID. Another organization's ID returns `403 Forbidden`.
+
+### GET /admin/security/events
+
+List your organization's security events, such as a leaked API key that QWED revoked automatically. Use this to review individual events. `GET /admin/security/threats/{org_id}` returns only a summary.
+
+Owners and admins can call this endpoint with an API key in the `X-API-Key` header or with a signed-in session (`Authorization: Bearer <jwt>`). When you send both, QWED uses the API key. QWED returns only events from your own organization.
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `limit` | integer | `50` | Maximum events, from 1 to 200 |
+| `before` | integer | — | Return only events older than this event ID. Pass the `next_before` value from the previous page |
+| `event_type` | string | — | Only events of this type, for example `SECRET_LEAK_AUTO_REVOKED` |
+
+```bash
+curl --fail-with-body -H "X-API-Key: qwed_live_your_key" \
+  "http://localhost:8000/admin/security/events?limit=50&event_type=SECRET_LEAK_AUTO_REVOKED"
+```
+
+**Response:**
+
+```json
+{
+  "total": 1,
+  "next_before": null,
+  "events": [
+    {
+      "id": "318",
+      "timestamp": "2026-10-22T09:14:03+00:00",
+      "event_type": "SECRET_LEAK_AUTO_REVOKED",
+      "severity": "high",
+      "security_layer": null,
+      "reason": "Public leak auto-revoked: source=github url=https://github.com/example/repo/blob/main/.env",
+      "query": "leaked key qwed_live_ab...",
+      "user_id": 12
+    }
+  ]
+}
+```
+
+Events come newest first, by timestamp and then ID, as on [`GET /audit/logs`](/api/authentication#paging-through-the-log). `next_before` is the last event's ID when the page is full, otherwise `null`. `total` is the number of events on this page. QWED replaces anything shaped like an API key (`qwed_live_…`, `qwed_test_…`) or agent token in `reason` and `query` with `[redacted credential]`.
+
+| Status | Meaning |
+|--------|---------|
+| 401 | No API key or bearer token |
+| 403 | Not an owner or admin, or an inactive user, organization, or key |
+| 404 | The `before` cursor is not an event in your organization, or is outside the SQL `BIGINT` range |
 
 ### POST /admin/keys/rotate
 
