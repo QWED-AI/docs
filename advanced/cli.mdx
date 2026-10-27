@@ -139,7 +139,7 @@ qwed init \
 | `--skip-tests` | Skip the engine smoke tests | `false` |
 
 <Note>
-API keys are never logged or displayed in full. The `.env` file is written atomically with owner-only permissions (`0600` on Unix) and symlink protection. `qwed init` auto-generates two server secrets on first run. `QWED_JWT_SECRET_KEY` signs JWTs. `QWED_API_KEY_LOOKUP_SECRET` derives the HMAC-SHA256 digests the server uses to look up API keys. Both are passed into the local server it starts. The fail-closed import check at server boot no longer trips on a fresh install.
+API keys are never logged or displayed in full. The `.env` file is written atomically with owner-only permissions (`0600` on Unix) and symlink protection. `qwed init` auto-generates three server secrets on first run. `QWED_JWT_SECRET_KEY` signs JWTs. `QWED_API_KEY_LOOKUP_SECRET` derives the HMAC-SHA256 digests the server uses to look up API keys. `QWED_AUDIT_SECRET_KEY` signs the audit hash chain, and the server refuses to start without it. All three are passed into the local server it starts. If the project-root `.env` already sets `QWED_AUDIT_SECRET_KEY`, `qwed init` reuses that value. The fail-closed import check at server boot no longer trips on a fresh install.
 </Note>
 
 **Local server runtime directory:**
@@ -163,7 +163,7 @@ The handshake runs on both paths: when `qwed init` reuses an already-running ser
 
 1. `qwed init` generates a fresh random nonce for each run (24 random bytes, URL-safe Base64).
 2. It calls [`GET /health/identity`](/api/endpoints#get-health-identity) with that nonce.
-3. The server returns HMAC-SHA256 proofs over the nonce, one under `QWED_JWT_SECRET_KEY` and one under `QWED_API_KEY_LOOKUP_SECRET`.
+3. The server returns HMAC-SHA256 proofs over the nonce under `QWED_JWT_SECRET_KEY`, `QWED_API_KEY_LOOKUP_SECRET`, and `QWED_AUDIT_SECRET_KEY` (`audit_hmac`). A server on a different audit key would write audit rows this project's server can't verify after a restart.
 4. `qwed init` computes the expected proofs from its local secrets and compares them in constant time.
 
 The secrets themselves never leave the server. Because each proof is bound to a one-time nonce, a captured response cannot be replayed in a later handshake. A narrow residual race is accepted by design: a local process that binds the port after it is released between the proof and the bootstrap could receive the key without holding either secret. Defending against that active local attacker is out of scope — the handshake addresses accidental staleness — so bootstrap only on hosts you control.
@@ -172,13 +172,13 @@ The handshake fails closed. `qwed init` prints `[x] Server identity check failed
 
 | Condition | Remediation |
 |---|---|
-| Local `QWED_JWT_SECRET_KEY` or `QWED_API_KEY_LOOKUP_SECRET` is empty | Re-run `qwed init` so fresh secrets are generated and persisted |
+| Local `QWED_JWT_SECRET_KEY`, `QWED_API_KEY_LOOKUP_SECRET`, or `QWED_AUDIT_SECRET_KEY` is empty | Re-run `qwed init` so fresh secrets are generated and persisted |
 | The identity endpoint is unreachable | Start (or restart) the local server, then re-run `qwed init` |
 | The server returns `404` — an older server without the endpoint | Upgrade the server to a version that exposes `GET /health/identity`, then re-run `qwed init` |
-| The server returns `503` — it is running with no secrets configured | Set `QWED_JWT_SECRET_KEY` and `QWED_API_KEY_LOOKUP_SECRET` in the server's environment, restart the server so it loads them, then re-run `qwed init` |
+| The server returns `503` — it is running with no secrets configured | Set `QWED_JWT_SECRET_KEY`, `QWED_API_KEY_LOOKUP_SECRET`, and `QWED_AUDIT_SECRET_KEY` in the server's environment, restart the server so it loads them, then re-run `qwed init` |
 | The server returns any other non-`200` status | Restart the local server, then re-run `qwed init` |
 | The response body is malformed | Restart the local server, then re-run `qwed init` |
-| One or both proofs don't match | Restart the server so it loads this project's `.env` secrets, then re-run `qwed init` |
+| Any proof doesn't match, including a server running an older release that returns no `audit_hmac` | Restart the server on the current release so it loads this project's `.env` secrets, then re-run `qwed init` |
 
 <Warning>
 Never bootstrap API keys against a server you don't recognize. If the identity check fails, stop whatever process holds the port before you re-run `qwed init`.
@@ -205,7 +205,7 @@ The following patterns are rejected:
 
 In non-interactive mode, the CLI checks three key sources: CLI argument, environment variable, and NVIDIA fallback. If all three resolve to a placeholder, the command reports that the key is required and exits. You get a clear error instead of a cryptic provider failure downstream.
 
-**Re-running `qwed init`:** Running the command again merges new values into your existing `.env` file. Existing variables that you don't reconfigure are preserved. Both server secrets — `QWED_JWT_SECRET_KEY` and `QWED_API_KEY_LOOKUP_SECRET` — are retained across re-runs and never rotated automatically, because rotating the lookup secret invalidates every previously issued API key's lookup digest. If your `.env` already sets `QWED_API_KEY_LOOKUP_SECRET` equal to `QWED_JWT_SECRET_KEY`, `qwed init` refuses to continue: reusing the JWT secret is a value the server will not boot with. Remove the offending line (a fresh, distinct value is generated) or set a distinct value manually. See [API key storage and migration](/api/authentication#api-key-storage-and-migration-v7-2) for why the lookup secret must stay stable.
+**Re-running `qwed init`:** Running the command again merges new values into your existing `.env` file. Existing variables that you don't reconfigure are preserved. All three server secrets (`QWED_JWT_SECRET_KEY`, `QWED_API_KEY_LOOKUP_SECRET`, and `QWED_AUDIT_SECRET_KEY`) are retained across re-runs and never rotated automatically. Rotating the lookup secret invalidates every previously issued API key's lookup digest. Rotating the audit key invalidates the signature on every audit row already written. Projects onboarded before the audit key was required have no `QWED_AUDIT_SECRET_KEY` in `.env`. Re-run `qwed init` to add one; your existing secrets are kept. If your `.env` already sets `QWED_API_KEY_LOOKUP_SECRET` equal to `QWED_JWT_SECRET_KEY`, `qwed init` refuses to continue: reusing the JWT secret is a value the server will not boot with. Remove the offending line (a fresh, distinct value is generated) or set a distinct value manually. See [API key storage and migration](/api/authentication#api-key-storage-and-migration-v7-2) for why the lookup secret must stay stable.
 
 ---
 
@@ -626,6 +626,7 @@ These are written to `.env` by `qwed init` and loaded automatically via `python-
 | `CUSTOM_MODEL` | NVIDIA NIM / Custom | Model name (default: `nvidia/nemotron-3-super-120b-a12b` for NVIDIA, `gpt-4o-mini` for custom) |
 | `QWED_JWT_SECRET_KEY` | All | JWT secret for local server authentication (auto-generated by `qwed init`, retained on re-run) |
 | `QWED_API_KEY_LOOKUP_SECRET` | All | HMAC-SHA256 key used to derive API-key lookup digests (auto-generated by `qwed init`, retained on re-run, must differ from `QWED_JWT_SECRET_KEY`). Never rotated automatically — see [API key storage and migration](/api/authentication#api-key-storage-and-migration-v7-2) |
+| `QWED_AUDIT_SECRET_KEY` | All | HMAC key that signs the audit hash chain. Required: the server refuses to start without it (auto-generated by `qwed init`, retained on re-run, never rotated automatically). See [Audit trail setup](/advanced/compliance#3-audit-trail-setup) |
 
 The recommended way to set these is via `qwed init`, which writes them to a `.env` file automatically. You can also export them manually.
 
