@@ -117,6 +117,11 @@ The `Verified` field and `qwed.IsVerified()` are deprecated. Decoding always set
 
 ```go
 result, err := client.Verify(ctx, "Is 15% of 200 equal to 30?")
+if err != nil {
+    log.Fatal(err)
+}
+// A natural-language verdict is never admitted: nothing proves the translation.
+fmt.Println(result.Status, result.Admission) // e.g. VERIFIED BLOCKED
 ```
 
 ### VerifyMath
@@ -167,6 +172,10 @@ fmt.Println(result.Status, result.AgentMessage)
 
 ```go
 result, err := client.VerifySQL(ctx, query, schema, "postgresql")
+if err != nil {
+    log.Fatal(err)
+}
+fmt.Println(result.IsAdmitted()) // true only for a read-only query the schema allows
 ```
 
 ### VerifyBatch

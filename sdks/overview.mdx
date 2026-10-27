@@ -47,11 +47,15 @@ cargo add qwed
 <Tabs>
   <Tab title="Python">
     ```python
+    import httpx
     from qwed_sdk import QWEDClient
-    
+
     client = QWEDClient(api_key="qwed_...")
-    result = client.verify("2+2=4")
-    print(result.verified)  # True
+    try:
+        result = client.verify_math("2+2=4")
+    except httpx.HTTPError as exc:
+        raise RuntimeError(f"QWED request failed: {exc}") from exc  # not a verdict
+    print(result.is_verified)  # True: the server admitted it
     ```
   </Tab>
   <Tab title="TypeScript">
@@ -59,8 +63,12 @@ cargo add qwed
     import { QWEDClient, isAdmitted } from '@qwed-ai/sdk';
     
     const client = new QWEDClient({ apiKey: 'qwed_...' });
-    const result = await client.verifyMath('2+2=4');
-    console.log(isAdmitted(result));  // true
+    try {
+      const result = await client.verifyMath('2+2=4');
+      console.log(isAdmitted(result));  // true
+    } catch (err) {
+      console.error(err);  // the request failed: not a verdict
+    }
     ```
   </Tab>
   <Tab title="Go">
