@@ -100,6 +100,15 @@ docker run -p 8000:8000 \
 
 If you keep the values in a `.env` file instead, pass it with `--env-file .env`.
 
+Optionally, add a signing key so attestations verify after a restart and on every replica. Without one, each process generates its own key. Mount an unencrypted EC P-256 PEM file and point `QWED_SIGNING_KEY_FILE` at it by adding these flags to `docker run`:
+
+```bash
+  -v "$PWD/attestation-key.pem:/run/secrets/attestation-key.pem:ro" \
+  -e QWED_SIGNING_KEY_FILE=/run/secrets/attestation-key.pem \
+```
+
+See [Signing keys](/advanced/attestations#signing-keys) and the [environment variables reference](/advanced/deployment#environment-variables-reference).
+
 ## Kubernetes
 
 ```yaml
