@@ -270,7 +270,7 @@ Run one worker per database. Every verification request appends an audit row, an
 | `API_KEY_SECRET` | Secret key for signing JWTs | None (must be set) | **YES** |
 | `QWED_CORS_ORIGINS` | Comma-separated list of allowed CORS origins | None (must be set) | **YES** |
 | `QWED_SKIP_ENV_INTEGRITY_CHECK` | Set to `true` to bypass startup environment integrity check | `false` | No |
-| `QWED_API_KEY_LOOKUP_SECRET` | Secret for HMAC-SHA256 API-key lookup digests. Must differ from `QWED_JWT_SECRET_KEY` | None | **Yes** |
+| `QWED_API_KEY_LOOKUP_SECRET` | Secret for HMAC-SHA256 API-key lookup digests and agent token digests. Must differ from `QWED_JWT_SECRET_KEY`. Changing it invalidates existing API keys and agent tokens | None | **Yes** |
 | `QWED_JWT_SECRET_KEY` | Secret for signing JWTs. Keep it stable: changing it invalidates issued tokens | None | **Yes** |
 | `QWED_AUDIT_SECRET_KEY` | HMAC key that signs the per-organization audit hash chain. The server refuses to start without it. Rotating it invalidates the signatures on existing rows, so verify and archive the trail first. See [Audit trail setup](/advanced/compliance#3-audit-trail-setup) | None (must be set) | **Yes** |
 | `QWED_ENABLE_AUDIT_SEED` | Set to `1` to enable `POST /audit/seed`, which writes sample rows into the signed audit trail. Development only. Leave unset in production | Unset (route returns `404`) | No |
