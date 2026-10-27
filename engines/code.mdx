@@ -358,9 +358,13 @@ Never treat `status == "VERIFIED"` as "safe to execute". Admission is a separate
 
 - `os.system`, `os.popen`, `os.startfile`
 - The `os.exec*`, `os.spawn*`, and `os.posix_spawn*` families
+- `os.fork`, `os.forkpty`, and `pty.fork`
 - `subprocess.*`
 - `pty.spawn`
 - `asyncio.create_subprocess_*`
+- Dynamic import and execution: `importlib.import_module`, `importlib.__import__`, `runpy.run_module`, and `runpy.run_path`
+- Native library loaders: `ctypes.CDLL`, `ctypes.cdll`, `ctypes.WinDLL`, `ctypes.windll`, `ctypes.OleDLL`, `ctypes.oledll`, and `ctypes.PyDLL`
+- Any call on the raw OS backend modules `posix` and `nt`
 
 Calls made through an aliased import are detected too, for example `import subprocess as sp`, `from os import system as run_it`, or `from os import *`. `verify_code()`, `verify_python_deep()`, and `POST /verify/code` all apply this rule.
 
@@ -380,8 +384,31 @@ print(result.developer_fields["issues"])
 If generated code needs to run commands, route them through a reviewed, sandboxed tool instead.
 
 <Note>
-Before v7.2.3, these calls were warnings and the code was admitted. See [GHSA-6rxr-gq43-694g](https://github.com/QWED-AI/qwed-verification/security/advisories/GHSA-6rxr-gq43-694g).
+Before v7.2.3, shell and subprocess calls were warnings and the code was admitted. See [GHSA-6rxr-gq43-694g](https://github.com/QWED-AI/qwed-verification/security/advisories/GHSA-6rxr-gq43-694g). Before v7.3.0, `fork`, dynamic import, `ctypes` loaders, `posix`/`nt`, and file and network access were warnings or undetected and the code was admitted. See [GHSA-4phf-6h72-9xfg](https://github.com/QWED-AI/qwed-verification/security/advisories/GHSA-4phf-6h72-9xfg).
 </Note>
+
+### File and network access is never admitted
+
+`CodeVerifier` reports file system and network I/O as a `CRITICAL` issue with type `file_or_network_access`, so the snippet is unsafe (`is_valid: false`) and `POST /verify/code` returns `admission: BLOCKED`. The following are covered, including through aliased imports:
+
+- The bare `open()` builtin and `io.open`
+- `shutil.*`, `pathlib.Path`, and file-mutating `os` calls such as `os.remove`, `os.rename`, `os.mkdir`, `os.chmod`, and `os.open`
+- `socket.socket`, `socket.create_connection`, and `socket.create_server`
+- `urllib.request`, `http.client`, `requests.*`, `httpx.*`, `aiohttp.*`, and `asyncio.open_connection`
+- `ftplib`, `smtplib`, `telnetlib`, `poplib`, and `imaplib`
+
+`os.path.*` is not flagged. That includes the string helpers such as `os.path.join` and `os.path.basename`, and also `os.path.exists`, `os.path.isfile` and `os.path.getsize`, which read file-system metadata without opening the file.
+
+```python
+result = code_verifier.verify_code(
+    "data = open('/etc/passwd').read()",
+    language="python",
+)
+print(result.developer_fields["is_valid"])     # False
+# [{"severity": "CRITICAL", "type": "file_or_network_access", ...}]
+```
+
+If generated code needs to read files or call the network, route that I/O through a reviewed, sandboxed tool.
 
 ### Hardcoded OpenAI keys
 

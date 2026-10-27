@@ -5,7 +5,7 @@ description: "Release notes for the QWED Protocol: version history, new guards, 
 
 All notable changes to the QWED platform, listed by release.
 
-Jump to: [Pinned sandbox image](#qwed-verification-—-pinned-sandbox-image-and-hardened-container) · [CrossHair in the Docker sandbox](#qwed-verification-—-crosshair-runs-only-in-the-docker-sandbox) · [Signed audit chain for API rows](#qwed-verification-—-api-audit-rows-written-through-the-signed-hash-chain) · [Logic DSL fixes](#qwed-verification-—-logic-dsl-compiles-iff-and-quantifiers-and-rejects-boolean-coercion) · [Go, TypeScript, and Rust SDK admission gating](#qwed-verification-—-go-typescript-and-rust-sdks-read-the-diagnosticresult-envelope) · [Signed Verification Context documents](#qwed-verification-—-signed-verification-context-documents-and-attestation-checks) · [Contacts moved to qwedai.tech](#qwed-verification-—-contacts-and-links-moved-to-qwedai-tech) · [Admin endpoint tenant scoping](#qwed-verification-—-tenant-scoped-admin-endpoints-and-working-rbac) · [`verify_fact` fails closed offline](#qwed-verification-—-verify_fact-fails-closed-offline-and-money-rejects-non-finite-amounts) · [Request caps and sandbox limits](#qwed-verification-—-request-body-caps-timeouts-and-sandbox-concurrency-limits) · [v7.2.3](#v7-2-3-—-code-secret-and-sql-verification-security-release) · [QWED-A2A runtime hardening](#qwed-a2a-—-request-size-limits-engine-budget-and-code-guard-hardening) · [QWED-Tax v0.2.1](#qwed-tax-v0-2-1-—-classification-claim-vocabulary-and-strict-facts) · [QWED-Legal v0.5.1](#qwed-legal-v0-5-1-—-deadlineguard-signing-anchor-allowlist) · [v7.2.2](#v7-2-2-—-verification-soundness-and-safety-hardening) · [Open Responses v0.6.1](#qwed-open-responses-v0-6-1-—-toolguard-verifies-client-action-items) · [QWED-Finance v3.0.1](#qwed-finance-v3-0-1-—-iso-20022-sanctions-and-queryguard-security-fixes) · [QWED-Legal date and input bounds](#qwed-legal-—-fail-closed-date-handling-and-input-bounds) · [Open Responses v0.6.0](#qwed-open-responses-v0-6-0-—-fail-closed-hardening) · [QWED-Legal fail-closed hardening](#qwed-legal-—-fail-closed-hardening-for-guards-diagnostics-and-github-action) · [`qwed init` server identity handshake](#qwed-verification-—-qwed-init-server-identity-handshake) · [Leaked key auto-revocation](#qwed-verification-—-leaked-api-key-auto-revocation-and-false-positive-feedback) · [API-key format spec](#qwed-verification-—-canonical-api-key-format-spec) · [Signed secret-scanning webhook](#qwed-verification-—-signed-secret-scanning-webhook-endpoint) · [v7.2.1](#v7-2-1-—-math-answer-comparison-security-patch) · [v7.2.0](#v7-2-0-—-precision-advisory-and-security-hardening-batch) · [v7.1.0](#v7-1-0-—-verification-context-v1-0-rollout) · [v7.0.0](#v7-0-0-—-full-diagnosticresult-engine-conformance)
+Jump to: [Pinned sandbox image](#qwed-verification-—-pinned-sandbox-image-and-hardened-container) · [CrossHair in the Docker sandbox](#qwed-verification-—-crosshair-runs-only-in-the-docker-sandbox) · [Signed audit chain for API rows](#qwed-verification-—-api-audit-rows-written-through-the-signed-hash-chain) · [Logic DSL fixes](#qwed-verification-—-logic-dsl-compiles-iff-and-quantifiers-and-rejects-boolean-coercion) · [Go, TypeScript, and Rust SDK admission gating](#qwed-verification-—-go-typescript-and-rust-sdks-read-the-diagnosticresult-envelope) · [Signed Verification Context documents](#qwed-verification-—-signed-verification-context-documents-and-attestation-checks) · [Contacts moved to qwedai.tech](#qwed-verification-—-contacts-and-links-moved-to-qwedai-tech) · [v7.3.0](#v7-3-0-—-five-advisories-tenant-scoping-and-credential-hardening) · [Admin endpoint tenant scoping](#qwed-verification-—-tenant-scoped-admin-endpoints-and-working-rbac) · [`verify_fact` fails closed offline](#qwed-verification-—-verify_fact-fails-closed-offline-and-money-rejects-non-finite-amounts) · [Request caps and sandbox limits](#qwed-verification-—-request-body-caps-timeouts-and-sandbox-concurrency-limits) · [v7.2.3](#v7-2-3-—-code-secret-and-sql-verification-security-release) · [QWED-A2A runtime hardening](#qwed-a2a-—-request-size-limits-engine-budget-and-code-guard-hardening) · [QWED-Tax v0.2.1](#qwed-tax-v0-2-1-—-classification-claim-vocabulary-and-strict-facts) · [QWED-Legal v0.5.1](#qwed-legal-v0-5-1-—-deadlineguard-signing-anchor-allowlist) · [v7.2.2](#v7-2-2-—-verification-soundness-and-safety-hardening) · [Open Responses v0.6.1](#qwed-open-responses-v0-6-1-—-toolguard-verifies-client-action-items) · [QWED-Finance v3.0.1](#qwed-finance-v3-0-1-—-iso-20022-sanctions-and-queryguard-security-fixes) · [QWED-Legal date and input bounds](#qwed-legal-—-fail-closed-date-handling-and-input-bounds) · [Open Responses v0.6.0](#qwed-open-responses-v0-6-0-—-fail-closed-hardening) · [QWED-Legal fail-closed hardening](#qwed-legal-—-fail-closed-hardening-for-guards-diagnostics-and-github-action) · [`qwed init` server identity handshake](#qwed-verification-—-qwed-init-server-identity-handshake) · [Leaked key auto-revocation](#qwed-verification-—-leaked-api-key-auto-revocation-and-false-positive-feedback) · [API-key format spec](#qwed-verification-—-canonical-api-key-format-spec) · [Signed secret-scanning webhook](#qwed-verification-—-signed-secret-scanning-webhook-endpoint) · [v7.2.1](#v7-2-1-—-math-answer-comparison-security-patch) · [v7.2.0](#v7-2-0-—-precision-advisory-and-security-hardening-batch) · [v7.1.0](#v7-1-0-—-verification-context-v1-0-rollout) · [v7.0.0](#v7-0-0-—-full-diagnosticresult-engine-conformance)
 
 ---
 
@@ -209,6 +209,58 @@ See the [Rust SDK](/sdks/rust#reading-a-result), [Go SDK](/sdks/go#reading-a-res
 - **`qwed init` signup address.** `qwed init` signs up its local bootstrap account with an `example.com` address. The organization slug is cut to fit the 64-character limit on an email local part, so a long organization name no longer makes signup fail with `422`.
 
 See [Verification Context specification](/specs/verification-context), [Go SDK](/sdks/go#configuration), and [Rust SDK](/sdks/rust#configuration).
+
+---
+
+## v7.3.0 — Five advisories, tenant scoping, and credential hardening
+
+**Released: October 16, 2026** · [GitHub Release ↗](https://github.com/QWED-AI/qwed-verification/releases/tag/v7.3.0) · [GitHub PR #458](https://github.com/QWED-AI/qwed-verification/pull/458) · [GitHub PR #453](https://github.com/QWED-AI/qwed-verification/pull/453) · [GitHub PR #454](https://github.com/QWED-AI/qwed-verification/pull/454) · [GitHub PR #455](https://github.com/QWED-AI/qwed-verification/pull/455) · [GitHub PR #457](https://github.com/QWED-AI/qwed-verification/pull/457)
+
+> v7.3.0 is a fail-closed security and soundness release. It covers five advisories published on October 16, 2026: [GHSA-6p94-4f75-g2wq](https://github.com/QWED-AI/qwed-verification/security/advisories/GHSA-6p94-4f75-g2wq), [GHSA-4phf-6h72-9xfg](https://github.com/QWED-AI/qwed-verification/security/advisories/GHSA-4phf-6h72-9xfg), [GHSA-j3x4-v3p2-4mq3](https://github.com/QWED-AI/qwed-verification/security/advisories/GHSA-j3x4-v3p2-4mq3), [GHSA-6cpx-8jrq-r7h3](https://github.com/QWED-AI/qwed-verification/security/advisories/GHSA-6cpx-8jrq-r7h3), and [GHSA-g25v-44j8-gg7x](https://github.com/QWED-AI/qwed-verification/security/advisories/GHSA-g25v-44j8-gg7x). Three of them complete earlier incomplete fixes. They affect all versions up to 7.2.3. Upgrading is recommended. It also rolls up the tenant-scoping, denial-of-service, and credential fixes listed below. No response field is removed or renamed. The soundness eval now covers 84 known-answer claims with 0 false accepts.
+
+<Warning>
+**Behaviour changes.** Every engine change is stricter and fails closed.
+
+- **Sandbox:** Stats and consensus code now runs under a module and builtin allowlist. Code that imports a module outside the allowlist (for example `os`, `sys`, or `subprocess`) fails with `ImportError`. See [Runtime module and builtin allowlist](/engines/stats#runtime-module-and-builtin-allowlist).
+- **SQL:** DML inside a CTE or subquery, administrative statements (`COPY`, `ATTACH`, `PRAGMA`, `CALL`, ...), and any root that isn't a read-only query (`SELECT`, `UNION`, `INTERSECT`, `EXCEPT`) are now denied. With `schema_ddl`, `SELECT *` is expanded and rejected when it covers a blocked column. Tautologies are folded by value (`OR 'a'='a'`, `OR 2>1`). All of these return `VERIFIED` with `developer_fields.is_valid: false`, which `admission_decision` maps to `BLOCKED`.
+- **Code:** `os.posix_spawn*`, `os.fork`, `pty.fork`, `importlib` and `runpy` dynamic import, `ctypes` loaders, the raw `posix`/`nt` modules, and file and network sinks, including the bare `open` builtin, are blocking findings.
+- **Logic:** The natural-language bridge rejects categorical string constants such as `tier == 'gold'` and returns `UNVERIFIABLE` or an error. Encode categories as integers.
+</Warning>
+
+### Security fixes (advisories)
+
+- **SQL statements are classified across the whole query tree** ([GHSA-6p94-4f75-g2wq](https://github.com/QWED-AI/qwed-verification/security/advisories/GHSA-6p94-4f75-g2wq), high). Destructive DML hidden in a CTE or subquery, administrative statements, and any top-level statement that isn't a read-only query are reported as invalid wherever they appear. Before, only the root statement type was checked. See [SQL engine](/engines/sql#statements-are-classified-across-the-whole-query-tree).
+- **Code verification blocks alternate process-execution routes and file or network sinks** ([GHSA-4phf-6h72-9xfg](https://github.com/QWED-AI/qwed-verification/security/advisories/GHSA-4phf-6h72-9xfg), high; completes GHSA-6rxr-gq43-694g). New `process_execution` and `file_or_network_access` findings are `CRITICAL`. See [Code engine](/engines/code#file-and-network-access-is-never-admitted).
+- **The code-execution sandbox isolates its namespace** ([GHSA-j3x4-v3p2-4mq3](https://github.com/QWED-AI/qwed-verification/security/advisories/GHSA-j3x4-v3p2-4mq3), high; completes GHSA-6rxr-gq43-694g). User code runs with reduced builtins and a guarded import that admits only analysis modules such as numpy, pandas, and scipy. It replaces a static denylist that could be bypassed through package re-exports and reflection.
+- **SQL `SELECT *` is expanded against the schema and tautologies are folded by value** ([GHSA-6cpx-8jrq-r7h3](https://github.com/QWED-AI/qwed-verification/security/advisories/GHSA-6cpx-8jrq-r7h3), moderate). See [Schema compliance](/engines/sql#schema-compliance).
+- **The logic natural-language bridge rejects string constants** ([GHSA-g25v-44j8-gg7x](https://github.com/QWED-AI/qwed-verification/security/advisories/GHSA-g25v-44j8-gg7x), moderate; completes GHSA-mfh5-3c8f-975p). Contradictory categorical claims could previously come back `VERIFIED`. See [Logic engine](/engines/logic#categorical-string-constants-fail-closed).
+
+### Soundness and access control
+
+- **Admin endpoints are scoped to the caller's tenant** and RBAC is enforced (#450). See [tenant-scoped admin endpoints](#qwed-verification-—-tenant-scoped-admin-endpoints-and-working-rbac).
+- **`Money` rejects `NaN` and infinite amounts**, and `verify_invoice_total` never raises (#451).
+- **The SDK's `verify_fact` fails closed** with `UNVERIFIABLE` when the service is unreachable (#449).
+
+### Hardening and resource limits
+
+- **Request bodies are capped and blocking work runs off the event loop** (#447). See [Request limits](/api/endpoints#request-limits).
+- **Concurrent sandbox containers are bounded** (#448). See [Availability limits](/advanced/self-hosting#availability-limits).
+- **API-key rotation is atomic** (#453). QWED revokes the old key and mints the replacement in one transaction, so concurrent rotations of the same key mint exactly one replacement. Rotating a key that is already inactive or revoked mints nothing and returns `404 Not Found`. See [`POST /admin/keys/rotate`](/api/endpoints#post-admin-keys-rotate).
+
+### Credential handling
+
+- **Expired and revoked API keys are rejected at the auth boundary** (#454). Before, an expired key that was still marked active kept authenticating on `/verify/*` routes. See [Authentication](/api/authentication#api-keys).
+- **Redis and Postgres connection URLs are redacted before logging** (#454), so an embedded password is never written to logs.
+- **Provider import is https-only** (#454). `qwed provider import` rejects `http://` URLs and any redirect that downgrades to `http://`. See [Custom providers](/getting-started/custom-providers#import-a-community-provider).
+- **Provider error messages are sanitized** (#455). The Anthropic, Azure OpenAI, Claude Opus, and Gemini providers log full SDK error detail for operators and raise a generic error to callers.
+
+### SDKs
+
+- **The Go module path is versioned** (#457). Import `github.com/QWED-AI/qwed-verification/sdk-go/v7`. Releases are tagged `sdk-go/vX.Y.Z`, so `go get github.com/QWED-AI/qwed-verification/sdk-go/v7@v7.3.0` resolves. See [Go SDK](/sdks/go).
+
+### Upgrading
+
+Pin `qwed==7.3.0` on PyPI, `@qwed-ai/sdk@7.3.0` on npm, `qwed = "7.3.0"` on crates.io, `qwedai/qwed-verification:7.3.0` on Docker, or `QWED-AI/qwed-verification@v7.3.0` as a GitHub Action, then redeploy. If your sandboxed stats or consensus code imports modules outside the allowlist, your SQL uses `SELECT *` over sensitive columns or runs non-`SELECT` statements, or your logic claims use string constants, expect those to be rejected after the upgrade.
 
 ---
 
