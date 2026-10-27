@@ -22,66 +22,99 @@ The easiest way to run QWED locally or on a single server is using Docker Compos
 
 ### Dockerfile
 
-A `Dockerfile` is provided in the root directory. It builds the QWED core service based on `python:3.13-slim-bookworm`, upgraded from Python 3.12 for reduced CVE exposure.
+The `Dockerfile` in the repository root has two targets:
+
+- **`server`**: The API server. Runs uvicorn on port 8000 as a non-root user (UID 1000), installs every server dependency from a hash-pinned lock file, and has a health check on `/health`. Docker Hub publishes this target as `qwedai/qwed-verification`.
+- **`action`**: The QWED GitHub Action. It stays the last, default target, so build the server with `--target server`.
 
 ```bash
-# Build the image manually
-docker build -t qwed-core:5.0.0 .
+# Build the API server image manually
+docker build --target server -t qwed-core .
 ```
+
+The server image uses `/var/lib/qwed` as its working directory, which holds the default SQLite database. `UVICORN_HOST` and `UVICORN_PORT` set the bind address and port, and the health check follows `UVICORN_PORT`.
+
+<Warning>
+Docker Hub tags before 8.0.0 ran the GitHub Action, not the API server. `latest` tracks `main`, and versioned tags exist from 8.0.0. If you ran the image as a repository scanner, use the [GitHub Action](/advanced/github-action) instead.
+</Warning>
 
 ### Docker Compose
 
-QWED provides a `docker-compose.yml` that orchestrates:
-- **qwed-core**: The main API server.
+`deploy/docker-compose.yml` orchestrates:
+- **qwed-core**: The main API server, built from the `server` target. Its data lives in the `qwed-data` volume.
 - **postgres**: Primary database.
 - **redis**: Cache and rate limiting.
 - **jaeger**: Distributed tracing.
-- **prometheus**: Metrics collection.
-- **grafana**: Observability dashboards.
+- **prometheus**: Metrics collection. Scrapes the API at `qwed-core:8000`.
+- **grafana**: Observability dashboards, with Prometheus and Jaeger data sources provisioned.
 
-Before starting the stack, create a `.env` file in the `deploy/` directory with the required environment variables:
+Before starting the stack, copy the settings template and fill in every required value:
 
 ```bash
-# Required — the server will not start without these
-DATABASE_URL=postgresql://qwed:your_password@postgres:5432/qwed_db
+cp deploy/.env.example deploy/.env
+```
+
+```bash
+# deploy/.env
+
+# QWED API server (required)
 QWED_CORS_ORIGINS=https://app.yourcompany.com
-API_KEY_SECRET=your-generated-secret
-# Signs the audit hash chain. Generate once and keep it:
+# Generate each secret separately and keep it:
 #   python -c "import secrets; print(secrets.token_urlsafe(48))"
+API_KEY_SECRET=
+# Changing them invalidates issued tokens and API keys, or breaks the signed
+# audit chain. The lookup secret must differ from the JWT secret.
+QWED_JWT_SECRET_KEY=
+QWED_API_KEY_LOOKUP_SECRET=
 QWED_AUDIT_SECRET_KEY=
 
-# Optional
+# Optional. User IDs allowed to read /metrics. Empty denies every caller.
+QWED_METRICS_OPERATOR_USER_IDS=
+
+# Postgres (required)
+POSTGRES_USER=qwed
+POSTGRES_DB=qwed_db
+POSTGRES_PASSWORD=
+# Must match the three values above. Build it as a postgresql:// URL with the
+# user, POSTGRES_PASSWORD, the host "postgres" (the Compose service), port 5432
+# and qwed_db, the same shape as deploy/.env.example shows.
+DATABASE_URL=
+
+# Grafana (required)
+GF_SECURITY_ADMIN_USER=admin
+# Generate a separate password the same way:
+#   python -c "import secrets; print(secrets.token_urlsafe(24))"
+GF_SECURITY_ADMIN_PASSWORD=
+
+# Optional overrides
 REDIS_URL=redis://redis:6379/0
 OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4317
-
-# Postgres
-POSTGRES_USER=qwed
-POSTGRES_PASSWORD=your_password
-POSTGRES_DB=qwed_db
-
-# Grafana
-GF_SECURITY_ADMIN_USER=admin
-GF_SECURITY_ADMIN_PASSWORD=your_grafana_password
 ```
 
 <Warning>
-`DATABASE_URL`, `QWED_CORS_ORIGINS`, and `API_KEY_SECRET` are **required**. Docker Compose will refuse to start if any of these are missing. The API server also refuses to start without `QWED_AUDIT_SECRET_KEY`. Generate `API_KEY_SECRET` and `QWED_AUDIT_SECRET_KEY` separately with:
+Docker Compose refuses to start while `QWED_CORS_ORIGINS`, `API_KEY_SECRET`, `QWED_JWT_SECRET_KEY`, `QWED_API_KEY_LOOKUP_SECRET`, `QWED_AUDIT_SECRET_KEY`, or `DATABASE_URL` is empty. The Postgres container refuses to start while `POSTGRES_PASSWORD` is empty. The Grafana container refuses to start while `GF_SECURITY_ADMIN_PASSWORD` is empty, instead of falling back to `admin`/`admin`. Generate each secret separately with:
 
 ```bash
 python -c "import secrets; print(secrets.token_urlsafe(48))"
 ```
 </Warning>
 
-If your `docker-compose.yml` lists the `qwed-core` environment explicitly, pass the audit key through:
+Start the stack from the repository root:
 
-```yaml
-services:
-  qwed-core:
-    environment:
-      QWED_AUDIT_SECRET_KEY: ${QWED_AUDIT_SECRET_KEY:?QWED_AUDIT_SECRET_KEY is required}
+```bash
+docker compose -f deploy/docker-compose.yml up -d
 ```
 
-To run the image on its own, pass every required secret to `docker run` from your shell, so no value is written into the command. Generating each one separately keeps `QWED_API_KEY_LOOKUP_SECRET` different from `QWED_JWT_SECRET_KEY`:
+Access the services:
+- **API**: http://localhost:8000
+- **API Docs**: http://localhost:8000/docs
+- **Grafana**: http://localhost:3000
+- **Prometheus**: http://localhost:9090
+- **Jaeger**: http://localhost:16686
+
+### Run the image without Compose
+
+Pass the required secrets to `docker run` from your shell, so no value is written into the command:
 
 ```bash
 # Generate each secret once and keep it. Changing the lookup or audit key later
@@ -90,31 +123,20 @@ for name in API_KEY_SECRET QWED_JWT_SECRET_KEY QWED_API_KEY_LOOKUP_SECRET QWED_A
   export "$name=$(python -c 'import secrets; print(secrets.token_urlsafe(48))')"
 done
 # For Postgres, also export DATABASE_URL from your secrets manager. Left unset,
-# docker run passes nothing and the server keeps a SQLite database in the
-# qwed-data volume, so it survives replacing the container.
+# docker run passes nothing and the server uses SQLite in the qwed-data volume.
 
-docker run -p 8000:8000 \
+docker run -d -p 8000:8000 \
   -v qwed-data:/var/lib/qwed \
-  -e DATABASE_URL \
+  -e QWED_CORS_ORIGINS="https://app.yourcompany.com" \
   -e API_KEY_SECRET \
   -e QWED_JWT_SECRET_KEY \
   -e QWED_API_KEY_LOOKUP_SECRET \
   -e QWED_AUDIT_SECRET_KEY \
-  -e QWED_CORS_ORIGINS="https://app.yourcompany.com" \
+  -e DATABASE_URL \
   qwedai/qwed-verification:8.0.0
 ```
 
-Start the stack:
-
-```bash
-docker-compose up -d
-```
-
-Access the services:
-- **API**: http://localhost:8000
-- **API Docs**: http://localhost:8000/docs
-- **Grafana**: http://localhost:3000
-- **Jaeger**: http://localhost:16686
+Omit `DATABASE_URL` to use the SQLite database in the `qwed-data` volume.
 
 ### Docker requirement for code execution
 
@@ -139,7 +161,7 @@ For production environments, QWED ships Kubernetes manifests in `deploy/kubernet
    ```
 
 2. **Configure Secrets & ConfigMaps**
-   Edit `deploy/kubernetes/secret.yaml` and replace all `__REPLACE_WITH_*__` placeholders with your real values. The `DATABASE_URL` is now stored in the Secret (not the ConfigMap) because it contains credentials.
+   Edit `deploy/kubernetes/secret.yaml` and fill in every value. The file ships with empty values for `DATABASE_URL`, `API_KEY_SECRET`, `QWED_JWT_SECRET_KEY`, `QWED_API_KEY_LOOKUP_SECRET`, `QWED_AUDIT_SECRET_KEY`, and your LLM provider key. The server refuses to start while the JWT or lookup secret is empty, and fails closed on the first audit write while the audit secret is empty. The `DATABASE_URL` is stored in the Secret (not the ConfigMap) because it contains credentials.
    ```bash
    kubectl apply -f deploy/kubernetes/configmap.yaml
    kubectl apply -f deploy/kubernetes/secret.yaml
@@ -150,6 +172,7 @@ For production environments, QWED ships Kubernetes manifests in `deploy/kubernet
    </Tip>
 
 3. **Deploy Application**
+   `deploy/kubernetes/deployment.yaml` pins `docker.io/qwedai/qwed-verification:8.0.0`. That tag is the first release of the API server image. Don't point the Deployment at an earlier tag, because earlier tags ran the GitHub Action.
    ```bash
    kubectl apply -f deploy/kubernetes/deployment.yaml
    kubectl apply -f deploy/kubernetes/service.yaml
@@ -212,9 +235,11 @@ sudo usermod -aG docker $USER
 
 ### 2. Python dependencies
 ```bash
-# Install dependencies
-pip install -e .
+# Install QWED with the API server extra
+pip install -e ".[server]"
 ```
+
+The `server` extra installs the Postgres drivers, the Redis and Prometheus clients, the OpenTelemetry packages, and the `docker` client (`docker>=7.0.0`). The code executor imports the `docker` client when the server loads, so install the extra even if Docker is not running.
 
 ### 3. Database setup
 Ensure PostgreSQL and Redis are running. Set the `DATABASE_URL` and `REDIS_URL` environment variables.
@@ -248,9 +273,12 @@ Run one worker per database. Every verification request appends an audit row, an
 | `QWED_CORS_ORIGINS` | Comma-separated list of allowed CORS origins | None (must be set) | **YES** |
 | `QWED_SKIP_ENV_INTEGRITY_CHECK` | Set to `true` to bypass startup environment integrity check | `false` | No |
 | `QWED_API_KEY_LOOKUP_SECRET` | Secret for HMAC-SHA256 API-key lookup digests and agent token digests. Must differ from `QWED_JWT_SECRET_KEY`. Changing it invalidates existing API keys and agent tokens | None | **Yes** |
-| `QWED_CORS_ORIGINS` | Comma-separated allowed CORS origins | None | **Yes** |
+| `QWED_JWT_SECRET_KEY` | Secret for signing JWTs. Keep it stable: changing it invalidates issued tokens | None | **Yes** |
 | `QWED_AUDIT_SECRET_KEY` | HMAC key that signs the per-organization audit hash chain. The server refuses to start without it. Rotating it invalidates the signatures on existing rows, so verify and archive the trail first. See [Audit trail setup](/advanced/compliance#3-audit-trail-setup) | None (must be set) | **Yes** |
 | `QWED_ENABLE_AUDIT_SEED` | Set to `1` to enable `POST /audit/seed`, which writes sample rows into the signed audit trail. Development only. Leave unset in production | Unset (route returns `404`) | No |
+| `QWED_METRICS_OPERATOR_USER_IDS` | Comma-separated user IDs allowed to read `/metrics`. Empty denies every caller | None | No |
+| `UVICORN_HOST` | Bind address of the API server in the Docker image | `0.0.0.0` | No |
+| `UVICORN_PORT` | Port of the API server in the Docker image. The image's health check follows it | `8000` | No |
 
 <Warning>
 `API_KEY_SECRET` no longer has a default value. The server will refuse to start if it is not set. This prevents accidental deployment with a weak default secret.
