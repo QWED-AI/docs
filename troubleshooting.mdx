@@ -313,7 +313,9 @@ The result status is `ERROR`. An undeclared variable is an `Int`, and QWED does 
 "(EQ flag True)"
 
 # Correct: declare flag as Bool
-verifier.verify_from_dsl("(EQ flag True)", variables=[{"name": "flag", "type": "Bool"}])
+result = verifier.verify_from_dsl("(EQ flag True)", variables=[{"name": "flag", "type": "Bool"}])
+if result.status not in ("SAT", "UNSAT"):
+    raise RuntimeError(f"Logic verification failed ({result.status}): {result.error}")
 ```
 
 ### Missing parentheses

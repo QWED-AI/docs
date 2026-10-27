@@ -33,8 +33,13 @@ client = QWEDClient()
 
 # Check if constraints are satisfiable
 result = client.verify_logic("(AND (GT x 5) (LT x 10))")
-print(result.status)            # "VERIFIED" (satisfiable)
-print(result.result["model"])   # {"x": "7"}
+if result.status == "VERIFIED":            # satisfiable
+    print(result.result["model"])          # {"x": "7"}
+elif result.status == "UNVERIFIABLE":      # unsatisfiable
+    print("No solution exists")
+else:
+    # BLOCKED: the query could not be translated or solved. Fail closed.
+    raise RuntimeError(f"Logic verification failed ({result.status}): {result.error}")
 ```
 
 ---
@@ -98,14 +103,16 @@ QWED does not infer the sort of an undeclared name from a Boolean literal, becau
 ### Basic check
 
 ```python
-# Satisfiable - has solution
-result = client.verify_logic("(AND (GT x 0) (LT x 100))")
-print(result.status)            # "VERIFIED"
-print(result.result["model"])   # {"x": "50"}
+def check(result):
+    if result.status == "VERIFIED":        # satisfiable: a model exists
+        return result.result["model"]
+    if result.status == "UNVERIFIABLE":    # unsatisfiable: no model
+        return None
+    # BLOCKED: the query could not be translated or solved. Fail closed.
+    raise RuntimeError(f"Logic verification failed ({result.status}): {result.error}")
 
-# Unsatisfiable - no solution
-result = client.verify_logic("(AND (GT x 10) (LT x 5))")
-print(result.status)            # "UNVERIFIABLE" (x can't be > 10 AND < 5)
+print(check(client.verify_logic("(AND (GT x 0) (LT x 100))")))  # {"x": "50"}
+print(check(client.verify_logic("(AND (GT x 10) (LT x 5))")))   # None: x can't be > 10 AND < 5
 ```
 
 ### Finding all solutions
@@ -271,7 +278,9 @@ When you verify a natural-language logic query, QWED translates it to DSL using 
 
 ```python
 result = client.verify_logic("x must be greater than 5 and less than 3")
-print(result.provider_used)  # "openai_compat"
+print(result.provider_used)  # "openai_compat", also set when the request fails
+if result.status == "BLOCKED":
+    raise RuntimeError(f"Logic verification failed: {result.error}")
 print(result.status)         # "UNVERIFIABLE" (unsatisfiable)
 ```
 
@@ -308,8 +317,10 @@ result = client.verify_logic("(AND (GT x 5) (LT x 0))")
 
 if result.status == "UNVERIFIABLE":
     print("No solution exists")
-    print(f"Reason: {result.result.get('error')}")
-    # "Constraints are contradictory: x > 5 conflicts with x < 0"
+    print(result.result.get("agent_message"))   # "Logic constraints are unsatisfiable"
+elif result.status == "BLOCKED":
+    # The query could not be translated or solved; error says why. Fail closed.
+    raise RuntimeError(f"Logic verification failed: {result.error}")
 ```
 
 ---

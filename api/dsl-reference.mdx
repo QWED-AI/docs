@@ -213,7 +213,13 @@ A compile error returns `ERROR`, never `SAT` or `VERIFIED`.
 **Python:**
 ```python
 result = client.verify_logic("(AND (GTE age 18) (LTE age 65))")
-# SAT with model: {age: 30}
+if result.status == "VERIFIED":            # SAT
+    print(result.result["model"])          # e.g. {"age": "18"}
+elif result.status == "UNVERIFIABLE":      # UNSAT
+    print("No age satisfies the rule")
+else:
+    # BLOCKED: the query could not be translated or solved. Fail closed.
+    raise RuntimeError(f"Logic verification failed ({result.status}): {result.error}")
 ```
 
 ### Example 2: budget constraint
@@ -294,7 +300,7 @@ from qwed import QWEDClient
 
 client = QWEDClient(api_key="qwed_your_key")
 
-# Simple constraint
+# Simple constraint: check the status before using the result, as below
 result = client.verify_logic("(GT x 5)")
 
 # Complex constraint
