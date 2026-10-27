@@ -59,7 +59,7 @@ qwed provider import https://raw.githubusercontent.com/my-org/qwed-providers/mai
 This downloads the YAML file, validates its structure, and saves it to `~/.qwed/providers.yaml`. After importing, the provider is immediately available in `qwed init`.
 
 <Note>
-Only `http` and `https` URLs are accepted. The download has a 10-second timeout. The imported YAML must contain `base_url` and `api_key_env` fields or it is rejected.
+Only `https` URLs are accepted. QWED rejects `http://` URLs before fetching, and rejects any redirect that downgrades to `http://`. The download has a 10-second timeout. The imported YAML must contain `base_url` and `api_key_env` fields or it is rejected.
 </Note>
 
 ### Example community YAML
@@ -141,6 +141,7 @@ Each provider gets its own entry in the `qwed init` wizard.
 - **Atomic writes.** The YAML file is written atomically with a temp-file-and-rename pattern to prevent partial writes.
 - **Slug sanitization.** Imported provider slugs are sanitized to lowercase alphanumeric characters and cannot shadow built-in provider names.
 - **Symlink protection.** File writes refuse to follow symlinks.
+- **HTTPS-only import.** `qwed provider import` refuses cleartext `http://` URLs and redirects, so a network attacker can't substitute a malicious provider config.
 
 ## Related docs
 
