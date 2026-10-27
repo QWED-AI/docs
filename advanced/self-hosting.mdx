@@ -39,6 +39,9 @@ docker-compose ps
 # Required — server will not start without these
 API_KEY_SECRET=your-generated-secret
 QWED_CORS_ORIGINS=https://app.yourcompany.com
+# Signs the audit hash chain. Generate once and keep it:
+#   python -c "import secrets; print(secrets.token_urlsafe(48))"
+QWED_AUDIT_SECRET_KEY=
 
 # Infrastructure
 DATABASE_URL=postgresql://user:pass@localhost:5432/qwed
@@ -54,7 +57,7 @@ QWED_CORS_ORIGINS=https://app.yourcompany.com
 ```
 
 <Warning>
-`API_KEY_SECRET` and `QWED_CORS_ORIGINS` are mandatory as of v5.0.0. See the [deployment guide](/advanced/deployment#environment-variables-reference) for the full reference.
+`API_KEY_SECRET` and `QWED_CORS_ORIGINS` are mandatory as of v5.0.0. `QWED_AUDIT_SECRET_KEY` is also mandatory: the server refuses to start without it. See the [deployment guide](/advanced/deployment#environment-variables-reference) for the full reference.
 </Warning>
 
 ### API configuration
@@ -72,27 +75,30 @@ SETTINGS = {
 
 ## Docker
 
-### API only
-
-```dockerfile
-FROM python:3.13-slim-bookworm
-WORKDIR /app
-COPY . .
-RUN pip install -e .
-EXPOSE 8000
-CMD ["uvicorn", "qwed_new.api.main:app", "--host", "0.0.0.0"]
-```
-
 ### Build and run
 
+Build from the repository's `Dockerfile`. Its `server` target is the API server: uvicorn on port 8000 as a non-root user, with its data in `/var/lib/qwed`. The default target is the GitHub Action, so pass `--target server`. Pass the secrets from your shell, so no value is written into the command:
+
 ```bash
-docker build -t qwed-api .
+docker build --target server -t qwed-api .
+
+# Generate each secret once and keep it. Changing the lookup or audit key later
+# invalidates existing API keys or audit signatures.
+for name in API_KEY_SECRET QWED_JWT_SECRET_KEY QWED_API_KEY_LOOKUP_SECRET QWED_AUDIT_SECRET_KEY; do
+  export "$name=$(python -c 'import secrets; print(secrets.token_urlsafe(48))')"
+done
+
 docker run -p 8000:8000 \
-  -e QWED_API_KEY=... \
-  -e API_KEY_SECRET=... \
+  -v qwed-data:/var/lib/qwed \
+  -e API_KEY_SECRET \
+  -e QWED_JWT_SECRET_KEY \
+  -e QWED_API_KEY_LOOKUP_SECRET \
+  -e QWED_AUDIT_SECRET_KEY \
   -e QWED_CORS_ORIGINS="https://app.yourcompany.com" \
   qwed-api
 ```
+
+If you keep the values in a `.env` file instead, pass it with `--env-file .env`.
 
 ## Kubernetes
 
@@ -137,12 +143,13 @@ spec:
 ### Performance tuning
 
 ```bash
-# Increase workers
-uvicorn qwed_new.api.main:app --workers 4
-
 # Enable connection pooling
 export QWED_DB_POOL_SIZE=20
 ```
+
+<Warning>
+Run one uvicorn worker per database. Multiple workers or replicas writing audit rows to the same database are not supported. Every verification request appends an audit row, and the audit logger keeps each organization's chain head in memory. With `--workers 4` or several replicas, a conflicting append makes the verification request fail with `500 audit persistence failed` instead of forking the chain. See [Chain continuity across restarts](/advanced/compliance#chain-continuity-across-restarts).
+</Warning>
 
 ### Availability limits
 
