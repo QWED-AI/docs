@@ -34,7 +34,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Verify Calculation
-        uses: QWED-AI/qwed-verification@v7.1.0
+        uses: QWED-AI/qwed-verification@v8.0.0
         with:
           api_key: ${{ secrets.QWED_API_KEY }}
           action: verify
@@ -65,9 +65,9 @@ Use these extension-specific actions when you want domain-focused checks in your
 | `query` | The user query (e.g., "Derivative of x^2"). Required for `math` and `logic` engines. | Conditional | - |
 | `llm_output` | The LLM output to verify. Required for the `code` engine. | Conditional | - |
 | `engine` | Verification engine: `math`, `logic`, `code`, `sql`, `shell` | No | `math` |
-| `paths` | Glob patterns for files to scan (e.g., `**/*.py,**/*.env`) | No | `.` |
+| `paths` | Comma-separated glob patterns for files to scan (e.g., `src/**/*.py`). Leave unset to use the mode default. See [Scan paths](#scan-paths) | No | `''` (mode default) |
 | `output_format` | Output format: `text`, `json`, `sarif`, `verification-context` | No | `text` |
-| `fail_on_findings` | Fail the action if security issues are found | No | `true` |
+| `fail_on_findings` | Fail the action if security issues are found or a scan is `UNVERIFIABLE` | No | `true` |
 
 <Note>
   Each engine requires different inputs:
@@ -84,7 +84,7 @@ You can now specify which LLM provider and model the action uses. When you pass 
 
 ```yaml
 - name: Verify with Claude
-  uses: QWED-AI/qwed-verification@v7.1.0
+  uses: QWED-AI/qwed-verification@v8.0.0
   with:
     api_key: ${{ secrets.ANTHROPIC_API_KEY }}
     provider: anthropic
@@ -100,13 +100,58 @@ Set `mask_pii: "true"` to automatically redact personally identifiable informati
 
 ```yaml
 - name: Verify with PII masking
-  uses: QWED-AI/qwed-verification@v7.1.0
+  uses: QWED-AI/qwed-verification@v8.0.0
   with:
     api_key: ${{ secrets.QWED_API_KEY }}
     mask_pii: "true"
     action: verify
     engine: logic
     query: "User john@example.com claims order total is correct"
+```
+
+### Scan paths
+
+The scan modes (`scan-code`, `verify-shell`, `scan-secrets`) read files from the workspace that match `paths`. When `paths` is unset, empty, `.`, or `./`, the action uses the mode's default patterns:
+
+| Mode | Default patterns |
+| --- | --- |
+| `scan-code` | `**/*.py` |
+| `verify-shell` | `**/*.sh` |
+| `scan-secrets` | `**/*.env`, `**/*.json`, `**/*.yaml`, `**/*.yml`, `**/*.toml`, `**/*.ini` |
+
+A scan is `VERIFIED` with `admission: ADMIT` only when all of the following hold:
+
+- At least one file was scanned across all the patterns. A single pattern that matches nothing doesn't deny the scan on its own.
+- Every pattern expanded without error.
+- Every matched file was read and, for `scan-code`, parsed as Python.
+- No findings were reported.
+
+Otherwise the verdict is `UNVERIFIABLE` with `admission: DENY` and an empty `proof_ref`. The step fails unless `fail_on_findings` is `"false"`. The following count as errors that deny the scan:
+
+- No file scanned at all: every pattern matched nothing (`files_scanned` is `0`).
+- A matched file that can't be read.
+- A Python file that doesn't parse.
+- An absolute pattern, a pattern using `..`, or a match that resolves outside the workspace, including a symlink to a file elsewhere. The action names the offending file in the error.
+
+Matches that aren't regular files, such as a symlinked directory, are ignored, and so are files outside the mode's type: `scan-code` keeps only `.py` files and `verify-shell` only `.sh` files. A file reached through more than one pattern or link is scanned once.
+
+`scan-secrets` scans only the files your `paths` match. It doesn't fall back to the default patterns when your `paths` match nothing.
+
+<Warning>
+**Behavior change in v8.0.0.** Jobs that passed before can now fail. A `paths` value under which no file is scanned, or a `scan-code` run that includes Python files that don't parse, now returns `UNVERIFIABLE · DENY`. Narrow `paths` to the files you want scanned.
+</Warning>
+
+```yaml
+- name: Scan source code
+  id: scan
+  uses: QWED-AI/qwed-verification@v8.0.0  # files_scanned needs v8.0.0 or later
+  with:
+    action: scan-code
+    paths: "src/**/*.py,scripts/**/*.py"
+
+- name: Report coverage
+  if: always()
+  run: echo "Scanned ${{ steps.scan.outputs.files_scanned }} files, verdict ${{ steps.scan.outputs.verdict }}"
 ```
 
 ## Outputs
@@ -116,6 +161,7 @@ Set `mask_pii: "true"` to automatically redact personally identifiable informati
 | `verified` | `true` if verification passed or no issues found |
 | `explanation` | Detailed proof or error explanation |
 | `findings_count` | Number of security issues found (for scan modes) |
+| `files_scanned` | Number of files scanned (for scan modes, from v8.0.0). `0` means the scan was not admitted |
 | `badge_url` | URL for QWED verified badge |
 | `sarif_file` | Path to SARIF output file (if `output_format=sarif`) |
 | `verdict` | [Verification Context v1.0](/specs/verification-context) verdict: `VERIFIED`, `UNVERIFIABLE`, or `BLOCKED` (v7.1.0) |
@@ -132,7 +178,7 @@ Every action mode (`verify`, `scan-secrets`, `scan-code`, `verify-shell`) emits 
 ```yaml
 - name: Verify math
   id: qwed
-  uses: QWED-AI/qwed-verification@v7.1.0
+  uses: QWED-AI/qwed-verification@v8.0.0
   with:
     action: verify
     engine: math
@@ -172,7 +218,7 @@ Pin the Action to `QWED-AI/qwed-verification@v8.0.0` or later. In earlier versio
 
 ```yaml
 - name: Check Math
-  uses: QWED-AI/qwed-verification@v7.1.0
+  uses: QWED-AI/qwed-verification@v8.0.0
   with:
     api_key: ${{ secrets.QWED_API_KEY }}
     action: verify
@@ -184,7 +230,7 @@ Pin the Action to `QWED-AI/qwed-verification@v8.0.0` or later. In earlier versio
 
 ```yaml
 - name: Check Logic
-  uses: QWED-AI/qwed-verification@v7.1.0
+  uses: QWED-AI/qwed-verification@v8.0.0
   with:
     api_key: ${{ secrets.QWED_API_KEY }}
     action: verify
@@ -196,7 +242,7 @@ Pin the Action to `QWED-AI/qwed-verification@v8.0.0` or later. In earlier versio
 
 ```yaml
 - name: Security Check
-  uses: QWED-AI/qwed-verification@v7.1.0
+  uses: QWED-AI/qwed-verification@v8.0.0
   with:
     api_key: ${{ secrets.QWED_API_KEY }}
     action: verify
@@ -208,7 +254,7 @@ Pin the Action to `QWED-AI/qwed-verification@v8.0.0` or later. In earlier versio
 
 ```yaml
 - name: Scan Code
-  uses: QWED-AI/qwed-verification@v7.1.0
+  uses: QWED-AI/qwed-verification@v8.0.0
   with:
     api_key: ${{ secrets.QWED_API_KEY }}
     action: scan-code

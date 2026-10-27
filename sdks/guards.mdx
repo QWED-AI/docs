@@ -612,7 +612,7 @@ Validates SQL syntax using `sqlglot` and enforces read-only mutation policies. `
 - Calls to dangerous file, extension, network, and command functions, such as `load_extension()`, `pg_read_file()`, and `xp_cmdshell()` (`DANGEROUS_FUNCTION_BLOCKED`)
 - Invalid SQL syntax
 
-`SQLGuard` expands MySQL and MariaDB executable comments (`/*! ... */`) before it checks the query. A pass means one read-only statement with no blocked function. It is a pre-filter, and the server's `SQLVerifier` decides admission. [`QWEDClient.verify_sql`](/sdks/python#verify-sql-query-schema-ddl-dialect) always calls the server.
+`SQLGuard` expands MySQL and MariaDB executable comments (`/*! ... */`) before it checks the query. With `allow_mutation=False` (the default), a pass means one read-only statement with no blocked function. It is a pre-filter, and the server's `SQLVerifier` decides admission. [`QWEDClient.verify_sql`](/sdks/python#verify-sql-query-schema-ddl-dialect) always calls the server.
 
 <ParamField path="allow_mutation" type="bool" default="false">
   When `false` (default), only `SELECT` and other read-only queries are permitted. Set to `true` only in trusted contexts.
