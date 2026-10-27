@@ -272,6 +272,10 @@ for (const item of batch.items) {
 }
 ```
 
+<Note>
+A batch SQL item needs `params.schema_ddl`. The server fails an item without it with `Missing 'schema_ddl'`. The SDK's batch items send only a query and a type, so verify SQL with `verifySQL()` instead of in a batch.
+</Note>
+
 For `math` items, supply equality claims (e.g., `'x + x = 2*x'`) to receive proof results. Expressions without an `=` return `status: 'UNVERIFIABLE'` with the simplified form in `developer_fields.simplified`. The legacy `is_valid` boolean is preserved inside `developer_fields.is_valid` for backward compatibility.
 
 ## Agent verification

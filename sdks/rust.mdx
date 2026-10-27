@@ -142,7 +142,7 @@ let result = client.verify_sql(query, schema, "postgresql").await?;
 
 ### verify\_batch
 
-`verify_batch` returns a `BatchResponse` that mirrors the server's batch job. Each item's verification answer is in `item.result`. Call `is_admitted()` on each `BatchResult` item. There is no aggregate `summary`.
+`verify_batch` returns a `BatchResponse` that mirrors the server's batch job. Each item's verification answer is in `item.result`. Call `is_admitted()` on each `BatchResult` item. There is no aggregate `summary`. Math, code, and SQL items carry their route's admission, so a proven item can be admitted. Natural-language items always carry `BLOCKED`. Logic and fact items make no decision, so they're never admitted.
 
 ```rust
 use qwed::{BatchItem, VerificationType};
@@ -159,6 +159,10 @@ for item in &batch.items {
     }
 }
 ```
+
+<Note>
+A batch SQL item needs `params.schema_ddl`. The server fails an item without it with `Missing 'schema_ddl'`. The SDK's batch items send only a query and a type, so verify SQL with `verify_sql` instead of in a batch.
+</Note>
 
 | Field | Type | Meaning |
 |-------|------|---------|

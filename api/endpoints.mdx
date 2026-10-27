@@ -799,6 +799,11 @@ Each entry in `items` is a per-item response. For math items the verdict is the 
 - `result.agent_message` — short human-readable summary safe to surface to the caller.
 - `result.developer_fields` — engine detail (including the legacy `is_valid` flag for backward compatibility).
 - `result.proof_ref` — cryptographic hash of the retained proof artifact. Present only when `result.status == VERIFIED`; `null` otherwise. **This is the authority bit** — downstream gates must reject any item whose `proof_ref` is `null`.
+- `result.admission` — `ADMIT` or `BLOCKED` on math, SQL, and code items, the same decision `POST /verify/math`, `POST /verify/sql`, and `POST /verify/code` return. Natural-language items always carry `BLOCKED`. Logic and fact items carry no admission. Admit an item only when `admission` is `ADMIT`, `status` is `VERIFIED`, and `proof_ref` is set. A proven-false identity or a proven-malicious query is `VERIFIED` with admission `BLOCKED`.
+
+QWED stores each math and SQL item's admission in its audit row, so `/audit/logs` shows it. Rows written before this change keep `admission: null`.
+
+A SQL item must include `params.schema_ddl`. An item without it is marked `failed` with the error `Missing 'schema_ddl'`, the same message `POST /verify/sql` returns, and carries no admission.
 
 ```json
 {
@@ -824,6 +829,7 @@ Each entry in `items` is a per-item response. For math items the verdict is the 
           "diff": "0"
         },
         "proof_ref": "sha256:9f2c…",
+        "admission": "ADMIT",
         "is_authoritative": true
       },
       "latency_ms": 12.3
@@ -843,6 +849,7 @@ Each entry in `items` is a per-item response. For math items the verdict is the 
           "simplified": "2*x"
         },
         "proof_ref": null,
+        "admission": "BLOCKED",
         "is_authoritative": false
       },
       "latency_ms": 8.1
@@ -860,6 +867,7 @@ Math items are routed through the trust boundary (`enforce_trust_decision(requir
 | Verified identity | `VERIFIED` | `sha256:...` | Equality claim (e.g., `x**2 + 2*x + 1 = (x+1)**2`) simplifies to `0` **and** attestation signing succeeds. |
 | Not equal | `UNVERIFIABLE` | `null` | Equality claim where the two sides do not simplify to the same expression. `developer_fields.is_valid` is `false` and `developer_fields.diff` shows the non-zero difference. |
 | Simplification only | `UNVERIFIABLE` | `null` | Expression without an equality (e.g., `x + x`). `developer_fields.simplified` contains the simplified form. |
+| Domain-restricted identity | `UNVERIFIABLE` | `null` | Equality whose sides are undefined at different points, such as `x/x = 1`. `constraint_id` is `math.domain_restricted_identity`, as on `POST /verify/math`. |
 
 If attestation signing fails on an otherwise-verified identity, the item is downgraded to `UNVERIFIABLE` with `developer_fields.constraint_id = "api.attestation.signing_error"` — a math result is never returned as `VERIFIED` without a signed proof.
 

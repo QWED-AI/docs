@@ -101,6 +101,7 @@ if result.is_admitted() { proceed(); }
 
 - **Admission gating.** `is_admitted()` (Rust), `IsAdmitted()` (Go), and `isAdmitted(response)` (TypeScript) return `true` only for `ADMIT` with `VERIFIED` and a non-empty `proof_ref`. `VERIFIED · BLOCKED` results, such as a false identity like `2 + 2 = 5` or unsafe code, are not admitted. A missing or unknown admission is never admitted.
 - **Batch items.** Rust's `BatchResult` and Go's `BatchResult` have their own `is_admitted()` / `IsAdmitted()`. In TypeScript, call `isAdmitted(item.result)`.
+- **Batch math and SQL items carry admission ([PR #503](https://github.com/QWED-AI/qwed-verification/pull/503)).** `/verify/batch` math and SQL items now return the `admission` their single-item route decides, and their audit rows store it. A proven math or SQL item is now admitted by the SDK helpers, as the same answer from `/verify/math` or `/verify/sql` already was. A batch math identity that holds only on a restricted domain, such as `x/x = 1`, is `UNVERIFIABLE`. A batch SQL item without `params.schema_ddl` fails with `Missing 'schema_ddl'`.
 - **TypeScript parsers.** `parseVerificationResponse()` and `parseBatchResponse()` are exported for responses you fetch yourself. They throw `QWEDError` with code `QWED-SDK-PARSE-001` or `QWED-SDK-PARSE-002` for a body that doesn't match.
 - **Rust errors.** A response body that doesn't match the envelope returns `Error::Serialization`.
 - **Go numbers.** Numbers in `Extra` and `DeveloperFields` decode as `json.Number` and keep their exact text.
