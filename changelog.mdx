@@ -5,7 +5,7 @@ description: "Release notes for the QWED Protocol: version history, new guards, 
 
 All notable changes to the QWED platform, listed by release.
 
-Jump to: [Pinned sandbox image](#qwed-verification-—-pinned-sandbox-image-and-hardened-container) · [CrossHair in the Docker sandbox](#qwed-verification-—-crosshair-runs-only-in-the-docker-sandbox) · [Signed audit chain for API rows](#qwed-verification-—-api-audit-rows-written-through-the-signed-hash-chain) · [Logic DSL fixes](#qwed-verification-—-logic-dsl-compiles-iff-and-quantifiers-and-rejects-boolean-coercion) · [Proven-false math claims](#qwed-verification-—-proven-false-math-claims-are-verified-with-admission-deny) · [GitHub Action scan paths](#qwed-verification-—-github-action-scans-use-mode-defaults-and-deny-empty-scans) · [Compliance session sign-in](#qwed-verification-—-session-sign-in-and-whole-chain-check-for-compliance-endpoints) · [Security activity summary](#qwed-verification-—-security-activity-summary-replaces-the-soc-2-report) · [Role checks and hashed agent tokens](#qwed-verification-—-role-checks-on-api-key-and-audit-routes-hashed-agent-tokens) · [Docker image runs the API server](#qwed-verification-—-docker-image-runs-the-api-server-and-the-compose-stack-builds) · [Signed Verification Context documents](#qwed-verification-—-signed-verification-context-documents-and-attestation-checks) · [Contacts moved to qwedai.tech](#qwed-verification-—-contacts-and-links-moved-to-qwedai-tech) · [v7.3.0](#v7-3-0-—-five-advisories-tenant-scoping-and-credential-hardening) · [Admin endpoint tenant scoping](#qwed-verification-—-tenant-scoped-admin-endpoints-and-working-rbac) · [`verify_fact` fails closed offline](#qwed-verification-—-verify_fact-fails-closed-offline-and-money-rejects-non-finite-amounts) · [Request caps and sandbox limits](#qwed-verification-—-request-body-caps-timeouts-and-sandbox-concurrency-limits) · [v7.2.3](#v7-2-3-—-code-secret-and-sql-verification-security-release) · [QWED-A2A runtime hardening](#qwed-a2a-—-request-size-limits-engine-budget-and-code-guard-hardening) · [QWED-Tax v0.2.1](#qwed-tax-v0-2-1-—-classification-claim-vocabulary-and-strict-facts) · [QWED-Legal v0.5.1](#qwed-legal-v0-5-1-—-deadlineguard-signing-anchor-allowlist) · [v7.2.2](#v7-2-2-—-verification-soundness-and-safety-hardening) · [Open Responses v0.6.1](#qwed-open-responses-v0-6-1-—-toolguard-verifies-client-action-items) · [QWED-Finance v3.0.1](#qwed-finance-v3-0-1-—-iso-20022-sanctions-and-queryguard-security-fixes) · [QWED-Legal date and input bounds](#qwed-legal-—-fail-closed-date-handling-and-input-bounds) · [Open Responses v0.6.0](#qwed-open-responses-v0-6-0-—-fail-closed-hardening) · [QWED-Legal fail-closed hardening](#qwed-legal-—-fail-closed-hardening-for-guards-diagnostics-and-github-action) · [`qwed init` server identity handshake](#qwed-verification-—-qwed-init-server-identity-handshake) · [Leaked key auto-revocation](#qwed-verification-—-leaked-api-key-auto-revocation-and-false-positive-feedback) · [API-key format spec](#qwed-verification-—-canonical-api-key-format-spec) · [Signed secret-scanning webhook](#qwed-verification-—-signed-secret-scanning-webhook-endpoint) · [v7.2.1](#v7-2-1-—-math-answer-comparison-security-patch) · [v7.2.0](#v7-2-0-—-precision-advisory-and-security-hardening-batch) · [v7.1.0](#v7-1-0-—-verification-context-v1-0-rollout) · [v7.0.0](#v7-0-0-—-full-diagnosticresult-engine-conformance)
+Jump to: [Pinned sandbox image](#qwed-verification-—-pinned-sandbox-image-and-hardened-container) · [CrossHair in the Docker sandbox](#qwed-verification-—-crosshair-runs-only-in-the-docker-sandbox) · [Signed audit chain for API rows](#qwed-verification-—-api-audit-rows-written-through-the-signed-hash-chain) · [Logic DSL fixes](#qwed-verification-—-logic-dsl-compiles-iff-and-quantifiers-and-rejects-boolean-coercion) · [Proven-false math claims](#qwed-verification-—-proven-false-math-claims-are-verified-with-admission-deny) · [GitHub Action scan paths](#qwed-verification-—-github-action-scans-use-mode-defaults-and-deny-empty-scans) · [Compliance session sign-in](#qwed-verification-—-session-sign-in-and-whole-chain-check-for-compliance-endpoints) · [Security activity summary](#qwed-verification-—-security-activity-summary-replaces-the-soc-2-report) · [Role checks and hashed agent tokens](#qwed-verification-—-role-checks-on-api-key-and-audit-routes-hashed-agent-tokens) · [Docker image runs the API server](#qwed-verification-—-docker-image-runs-the-api-server-and-the-compose-stack-builds) · [Go, TypeScript, and Rust SDK admission gating](#qwed-verification-—-go-typescript-and-rust-sdks-read-the-diagnosticresult-envelope) · [Signed Verification Context documents](#qwed-verification-—-signed-verification-context-documents-and-attestation-checks) · [Contacts moved to qwedai.tech](#qwed-verification-—-contacts-and-links-moved-to-qwedai-tech) · [v7.3.0](#v7-3-0-—-five-advisories-tenant-scoping-and-credential-hardening) · [Admin endpoint tenant scoping](#qwed-verification-—-tenant-scoped-admin-endpoints-and-working-rbac) · [`verify_fact` fails closed offline](#qwed-verification-—-verify_fact-fails-closed-offline-and-money-rejects-non-finite-amounts) · [Request caps and sandbox limits](#qwed-verification-—-request-body-caps-timeouts-and-sandbox-concurrency-limits) · [v7.2.3](#v7-2-3-—-code-secret-and-sql-verification-security-release) · [QWED-A2A runtime hardening](#qwed-a2a-—-request-size-limits-engine-budget-and-code-guard-hardening) · [QWED-Tax v0.2.1](#qwed-tax-v0-2-1-—-classification-claim-vocabulary-and-strict-facts) · [QWED-Legal v0.5.1](#qwed-legal-v0-5-1-—-deadlineguard-signing-anchor-allowlist) · [v7.2.2](#v7-2-2-—-verification-soundness-and-safety-hardening) · [Open Responses v0.6.1](#qwed-open-responses-v0-6-1-—-toolguard-verifies-client-action-items) · [QWED-Finance v3.0.1](#qwed-finance-v3-0-1-—-iso-20022-sanctions-and-queryguard-security-fixes) · [QWED-Legal date and input bounds](#qwed-legal-—-fail-closed-date-handling-and-input-bounds) · [Open Responses v0.6.0](#qwed-open-responses-v0-6-0-—-fail-closed-hardening) · [QWED-Legal fail-closed hardening](#qwed-legal-—-fail-closed-hardening-for-guards-diagnostics-and-github-action) · [`qwed init` server identity handshake](#qwed-verification-—-qwed-init-server-identity-handshake) · [Leaked key auto-revocation](#qwed-verification-—-leaked-api-key-auto-revocation-and-false-positive-feedback) · [API-key format spec](#qwed-verification-—-canonical-api-key-format-spec) · [Signed secret-scanning webhook](#qwed-verification-—-signed-secret-scanning-webhook-endpoint) · [v7.2.1](#v7-2-1-—-math-answer-comparison-security-patch) · [v7.2.0](#v7-2-0-—-precision-advisory-and-security-hardening-batch) · [v7.1.0](#v7-1-0-—-verification-context-v1-0-rollout) · [v7.0.0](#v7-0-0-—-full-diagnosticresult-engine-conformance)
 
 ---
 
@@ -281,6 +281,62 @@ docker run -p 8000:8000 \
 - **Kubernetes pins 8.0.0.** The manifest uses `docker.io/qwedai/qwed-verification:8.0.0`, the first server image. The Secret lists `QWED_JWT_SECRET_KEY`, `QWED_API_KEY_LOOKUP_SECRET`, and `QWED_AUDIT_SECRET_KEY`, and ships every value empty.
 
 See [Self-hosting](/advanced/self-hosting) and [Deployment](/advanced/deployment#docker-deployment).
+
+---
+
+## QWED Verification — Go, TypeScript, and Rust SDKs read the DiagnosticResult envelope
+
+**v8.0.0** · [GitHub PR #479](https://github.com/QWED-AI/qwed-verification/pull/479) · [GitHub PR #481](https://github.com/QWED-AI/qwed-verification/pull/481)
+
+> The Go (`sdk-go/v8`), TypeScript (`@qwed-ai/sdk`), and Rust (`qwed`) SDKs now model the server's [DiagnosticResult](/advanced/diagnostics) envelope and gate on admission. Previously, the SDKs read a top-level `verified` field that most endpoints don't send. Go's `Verified`, TypeScript's `verified`, and both `isVerified()` helpers were always false. Rust failed to deserialize every `verify*` response, and Go failed to decode `VerifyMath` and `VerifyLogic` responses.
+
+<Warning>
+**Breaking type changes.** Code that reads `verified`, `summary`, `engine`, or `result`, or matches on the old statuses, no longer compiles or no longer behaves the same.
+
+- **Statuses.** `VerificationStatus` is `VERIFIED`, `UNVERIFIABLE`, `BLOCKED`, or `Unknown`. The old `FAILED`, `CORRECTED`, `ERROR`, `TIMEOUT`, and `UNSUPPORTED` values are removed. Unknown server status text is kept in `raw_status` / `RawStatus` / `rawStatus` and is never admitted.
+- **New `Admission` enum.** `ADMIT`, `BLOCKED`, or `Unknown`. It's absent where the endpoint makes no decision: `/verify/logic`, `/verify/fact`, `/verify/rag`, `/verify/process`, and batch logic and fact items.
+- **Envelope fields.** Responses expose `status`, `admission`, `proof_ref`, `agent_message`, `is_authoritative`, `constraint_id`, and `developer_fields`. Endpoint fields such as `is_valid` and `issues` move to `extra` (Rust), `Extra` (Go), or top-level keys (TypeScript).
+- **Batch responses.** `BatchResponse` mirrors the batch job: `job_id`, `status`, `progress_percent`, `total_items`, `completed_items`, `failed_items`, and `items[]` with a per-item `result`. `summary` is removed.
+- **Deprecated.** `is_verified()` / `IsVerified()` / `isVerified()` and the `verified` / `Verified` fields now follow admission.
+
+Read `admission` and call the admission helper instead:
+
+```typescript
+// Before
+if (result.verified) { proceed(); }
+
+// After
+import { isAdmitted } from '@qwed-ai/sdk';
+if (isAdmitted(result)) { proceed(); }
+```
+
+```go
+// Before
+if result.Verified { proceed() }
+
+// After
+if result.IsAdmitted() { proceed() }
+```
+
+```rust
+// Before
+if result.verified { proceed(); }
+
+// After
+if result.is_admitted() { proceed(); }
+```
+</Warning>
+
+### What changed
+
+- **Admission gating.** `is_admitted()` (Rust), `IsAdmitted()` (Go), and `isAdmitted(response)` (TypeScript) return `true` only for `ADMIT` with `VERIFIED` and a non-empty `proof_ref`. `VERIFIED · BLOCKED` results, such as a false identity like `2 + 2 = 5` or unsafe code, are not admitted. A missing or unknown admission is never admitted.
+- **Batch items.** Rust's `BatchResult` and Go's `BatchResult` have their own `is_admitted()` / `IsAdmitted()`. In TypeScript, call `isAdmitted(item.result)`.
+- **Batch math and SQL items carry admission ([PR #503](https://github.com/QWED-AI/qwed-verification/pull/503)).** `/verify/batch` math and SQL items now return the `admission` their single-item route decides, and their audit rows store it. A proven math or SQL item is now admitted by the SDK helpers, as the same answer from `/verify/math` or `/verify/sql` already was. A batch math identity that holds only on a restricted domain, such as `x/x = 1`, is `UNVERIFIABLE`. A batch SQL item without `params.schema_ddl` fails with `Missing 'schema_ddl'`.
+- **TypeScript parsers.** `parseVerificationResponse()` and `parseBatchResponse()` are exported for responses you fetch yourself. They throw `QWEDError` with code `QWED-SDK-PARSE-001` or `QWED-SDK-PARSE-002` for a body that doesn't match.
+- **Rust errors.** A response body that doesn't match the envelope returns `Error::Serialization`.
+- **Go numbers.** Numbers in `Extra` and `DeveloperFields` decode as `json.Number` and keep their exact text.
+
+See the [Rust SDK](/sdks/rust#reading-a-result), [Go SDK](/sdks/go#reading-a-result), and [TypeScript SDK](/sdks/typescript#reading-a-result).
 
 ---
 

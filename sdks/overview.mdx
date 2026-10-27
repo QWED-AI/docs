@@ -12,7 +12,7 @@ QWED provides official SDKs for 4 languages.
 | ------------------------------ | ---------------------------- | -------- |
 | [Python](/sdks/python)         | `qwed`                       | ✅ Stable |
 | [TypeScript](/sdks/typescript) | `@qwed-ai/sdk`               | ✅ Stable |
-| [Go](/sdks/go)                 | `github.com/QWED-AI/qwed-verification/sdk-go/v7` | Tagged releases (`sdk-go/vX.Y.Z`) |
+| [Go](/sdks/go)                 | `github.com/QWED-AI/qwed-verification/sdk-go/v8` | Tagged releases (`sdk-go/vX.Y.Z`) |
 | [Rust](/sdks/rust)             | `qwed`                       | ✅ Stable |
 
 ## Feature comparison
@@ -36,7 +36,7 @@ pip install qwed
 npm install @qwed-ai/sdk
 
 # Go
-go get github.com/QWED-AI/qwed-verification/sdk-go/v7
+go get github.com/QWED-AI/qwed-verification/sdk-go/v8
 
 # Rust
 cargo add qwed
@@ -47,34 +47,45 @@ cargo add qwed
 <Tabs>
   <Tab title="Python">
     ```python
+    import httpx
     from qwed_sdk import QWEDClient
-    
+
     client = QWEDClient(api_key="qwed_...")
-    result = client.verify("2+2=4")
-    print(result.verified)  # True
+    try:
+        result = client.verify_math("2+2=4")
+    except httpx.HTTPError as exc:
+        raise RuntimeError(f"QWED request failed: {exc}") from exc  # not a verdict
+    print(result.is_verified)  # True: the server admitted it
     ```
   </Tab>
   <Tab title="TypeScript">
     ```typescript
-    import { QWEDClient } from '@qwed-ai/sdk';
+    import { QWEDClient, isAdmitted } from '@qwed-ai/sdk';
     
     const client = new QWEDClient({ apiKey: 'qwed_...' });
-    const result = await client.verify('2+2=4');
-    console.log(result.verified);  // true
+    try {
+      const result = await client.verifyMath('2+2=4');
+      console.log(isAdmitted(result));  // true
+    } catch (err) {
+      console.error(err);  // the request failed: not a verdict
+    }
     ```
   </Tab>
   <Tab title="Go">
     ```go
     client := qwed.NewClient("qwed_...")
-    result, _ := client.Verify(ctx, "2+2=4")
-    fmt.Println(result.Verified)  // true
+    result, err := client.VerifyMath(ctx, "2+2=4")
+    if err != nil {
+        log.Fatal(err) // the request failed: not a verdict
+    }
+    fmt.Println(result.IsAdmitted())  // true
     ```
   </Tab>
   <Tab title="Rust">
     ```rust
     let client = QWEDClient::new("qwed_...");
-    let result = client.verify("2+2=4").await?;
-    println!("{}", result.verified);  // true
+    let result = client.verify_math("2+2=4").await?;
+    println!("{}", result.is_admitted());  // true
     ```
   </Tab>
 </Tabs>

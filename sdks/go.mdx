@@ -7,13 +7,13 @@ description: "QWED Go SDK documentation. Install via go get, use context-based v
 ## Installation
 
 ```bash
-go get github.com/QWED-AI/qwed-verification/sdk-go/v7
+go get github.com/QWED-AI/qwed-verification/sdk-go/v8
 ```
 
-The module lives in the `sdk-go/` subdirectory and follows the main QWED version line, so its import path carries the `/v7` suffix. Releases are tagged `sdk-go/vX.Y.Z`. Pin a release with the version only:
+The module lives in the `sdk-go/` subdirectory and follows the main QWED version line, so its import path carries the `/v8` suffix from 8.0.0. Releases are tagged `sdk-go/vX.Y.Z`. Pin a release with the version only:
 
 ```bash
-go get github.com/QWED-AI/qwed-verification/sdk-go/v7@v7.3.0
+go get github.com/QWED-AI/qwed-verification/sdk-go/v8@v8.0.0
 ```
 
 ## Quick start
@@ -24,19 +24,21 @@ package main
 import (
     "context"
     "fmt"
-    qwed "github.com/QWED-AI/qwed-verification/sdk-go/v7"
+    "log"
+
+    qwed "github.com/QWED-AI/qwed-verification/sdk-go/v8"
 )
 
 func main() {
     client := qwed.NewClient("qwed_your_key")
-    
-    result, err := client.Verify(context.Background(), "Is 2+2=4?")
+
+    result, err := client.VerifyMath(context.Background(), "2 + 2 = 4")
     if err != nil {
-        panic(err)
+        log.Fatal(err)
     }
-    
-    fmt.Println(result.Verified)  // true
-    fmt.Println(result.Status)    // "VERIFIED"
+
+    fmt.Println(result.Status, result.Admission) // VERIFIED ADMIT
+    fmt.Println(result.IsAdmitted())             // true
 }
 ```
 
@@ -48,7 +50,7 @@ Pass options to `NewClient` to point the client at your self-hosted QWED server 
 import (
     "time"
 
-    qwed "github.com/QWED-AI/qwed-verification/sdk-go/v7"
+    qwed "github.com/QWED-AI/qwed-verification/sdk-go/v8"
 )
 
 client := qwed.NewClient("qwed_your_key",
@@ -57,64 +59,193 @@ client := qwed.NewClient("qwed_your_key",
 )
 ```
 
+## Reading a result
+
+Every verification method returns a `*VerificationResponse` that models the server's [DiagnosticResult](/advanced/diagnostics) envelope.
+
+| Field | Meaning |
+|-------|---------|
+| `Status` | `StatusVerified`, `StatusUnverifiable`, or `StatusBlocked`. `StatusUnknown` for a missing value or one this SDK doesn't recognize. |
+| `RawStatus` | The server's status text exactly as sent, such as `SAT` where `Status` is `StatusUnknown`. Never used for admission. |
+| `Admission` | `AdmissionAdmit` or `AdmissionBlocked` where the endpoint makes a decision. `AdmissionUnknown` for a value this SDK doesn't recognize. Empty (`""`) where the endpoint makes no decision. |
+| `ProofRef` | Set only when `Status` is `StatusVerified`. |
+| `Attestation` | On a `StatusVerified` answer, the server's signed attestation: an ES256 JWT whose header `kid` names a key at `GET /.well-known/jwks.json`. Check it with `client.VerifyAttestation`. Empty otherwise. |
+| `AgentMessage` | Human-readable explanation. |
+| `IsAuthoritative` | `*bool`. Whether the verdict is authoritative. |
+| `ConstraintID` | The constraint that produced the verdict. |
+| `DeveloperFields` | Engine detail for debugging. |
+| `Extra` | The endpoint's own fields, such as `is_valid`, `issues`, or `error`. |
+
+Numbers in `Extra` and `DeveloperFields` decode as `json.Number`, so they keep their exact text. `json.Marshal` writes `Extra` back beside the envelope fields. An `Extra` key never replaces an envelope field.
+
+### Gate on `IsAdmitted()`
+
+Use `IsAdmitted()` to decide whether to act on a result. Don't gate on `Status` alone.
+
+`VERIFIED` means the engine reached a deterministic answer, not that the claim holds. `2 + 2 = 5` returns `VERIFIED · BLOCKED` because it's proven false. Unsafe code returns `VERIFIED · BLOCKED` because it's proven unsafe.
+
+`IsAdmitted()` returns `true` only when all of these hold:
+
+- `Admission` is `AdmissionAdmit`
+- `Status` is `StatusVerified`
+- `ProofRef` is non-empty
+
+A missing or unknown admission is never admitted. Endpoints that make no admission decision (`/verify/logic`, `/verify/fact`, `/verify/rag`, `/verify/process`, and batch logic and fact items) are therefore never admitted. The top-level `verified` that `/verify/rag` and `/verify/process` send is their guard's own result. It stays in `Extra["verified"]` and `DeveloperFields["verified"]`.
+
+```go
+result, err := client.VerifyCode(ctx, code, "python")
+if err != nil {
+    log.Fatal(err)
+}
+switch {
+case result.IsAdmitted():
+    run(code)
+case result.Status == qwed.StatusVerified && result.Admission == qwed.AdmissionBlocked:
+    fmt.Println("proven unsafe:", result.AgentMessage)
+default:
+    fmt.Println("not verified:", result.Status, result.AgentMessage)
+}
+```
+
+<Note>
+The `Verified` field and `qwed.IsVerified()` are deprecated. Decoding always sets `Verified` to `IsAdmitted()`, whatever the body says, and `IsVerified()` returns `IsAdmitted()`.
+</Note>
+
 ## Methods
 
 ### Verify
 
 ```go
-result, err := client.Verify(ctx, "2+2=4")
+result, err := client.Verify(ctx, "Is 15% of 200 equal to 30?")
+if err != nil {
+    log.Fatal(err)
+}
+// A natural-language verdict is never admitted: nothing proves the translation.
+fmt.Println(result.Status, result.Admission) // e.g. VERIFIED BLOCKED
 ```
 
 ### VerifyMath
 
 ```go
 result, err := client.VerifyMath(ctx, "x**2 + 2*x + 1 = (x+1)**2")
-fmt.Println(result.Verified)  // true
+if err != nil {
+    log.Fatal(err)
+}
+fmt.Println(result.IsAdmitted())     // true
+fmt.Println(result.Extra["is_valid"]) // true
 ```
 
 ### VerifyLogic
 
 ```go
 result, err := client.VerifyLogic(ctx, "(AND (GT x 5) (LT y 10))")
-fmt.Println(result.Model)  // map[x:6 y:9]
+if err != nil {
+    log.Fatal(err)
+}
+// /verify/logic makes no admission decision: Admission is "" and IsAdmitted() is false.
+fmt.Println(result.Status, result.Extra["model"])
 ```
 
 ### VerifyCode
 
 ```go
 result, err := client.VerifyCode(ctx, code, "python")
-for _, vuln := range result.Vulnerabilities {
-    fmt.Printf("%s: %s\n", vuln.Severity, vuln.Message)
+if err != nil {
+    log.Fatal(err)
 }
+fmt.Println(result.Status, result.Admission) // VERIFIED BLOCKED
+fmt.Println(result.Extra["issues"])          // what was found
+```
+
+### VerifyFact
+
+```go
+result, err := client.VerifyFact(ctx, claim, factContext)
+if err != nil {
+    log.Fatal(err)
+}
+// /verify/fact makes no admission decision, so IsAdmitted() is false.
+fmt.Println(result.Status, result.AgentMessage)
 ```
 
 ### VerifySQL
 
 ```go
-result, err := client.VerifySQL(ctx, query, schema)
+result, err := client.VerifySQL(ctx, query, schema, "postgresql")
+if err != nil {
+    log.Fatal(err)
+}
+fmt.Println(result.IsAdmitted()) // true only for a read-only query the schema allows
 ```
 
 ### VerifyBatch
 
+`VerifyBatch` returns a `*BatchResponse` that mirrors the server's batch job. Each item's verification answer is in `item.Result`. Call `IsAdmitted()` on each item. There is no aggregate `Summary`. Math, code, and SQL items carry their route's admission, so a proven item can be admitted. Natural-language items always carry `BLOCKED`. Logic and fact items make no decision, so they're never admitted.
+
 ```go
 items := []qwed.BatchItem{
-    {Query: "2+2=4", Type: qwed.TypeMath},
-    {Query: "3*3=9", Type: qwed.TypeMath},
+    {Query: "2 + 2 = 4", Type: qwed.TypeMath},
+    {Query: "2 + 2 = 5", Type: qwed.TypeMath},
 }
-results, err := client.VerifyBatch(ctx, items)
-fmt.Println(results.Summary.SuccessRate)
+batch, err := client.VerifyBatch(ctx, items, nil)
+if err != nil {
+    log.Fatal(err)
+}
+// batch.Status is the job state: pending, processing, completed, partial, or failed.
+fmt.Println(batch.JobID, batch.Status, batch.CompletedItems, batch.FailedItems, batch.TotalItems)
+for _, item := range batch.Items {
+    // item.Status is the item state; item.Result is its verification answer.
+    fmt.Println(item.Query, item.Status, item.IsAdmitted())
+}
 ```
+
+<Note>
+A batch SQL item needs `params.schema_ddl`. The server fails an item without it with `Missing 'schema_ddl'`. The SDK's batch items send only a query and a type, so verify SQL with `VerifySQL` instead of in a batch.
+</Note>
 
 ## Types
 
 ```go
-type VerificationResult struct {
-    Status          string
-    Verified        bool
-    Engine          string
-    Result          map[string]interface{}
-    Vulnerabilities []Vulnerability
+type VerificationResponse struct {
+    Status          VerificationStatus     // VERIFIED, UNVERIFIABLE, BLOCKED, or UNKNOWN
+    RawStatus       string                 // the server's status text, such as SAT
+    Admission       Admission              // ADMIT, BLOCKED, UNKNOWN, or "" for no decision
+    ProofRef        string                 // set only for VERIFIED
+    Attestation     string                 // signed ES256 JWT on a VERIFIED answer
+    AgentMessage    string
+    IsAuthoritative *bool
+    ConstraintID    string
+    DeveloperFields map[string]interface{}
+    Extra           map[string]interface{} // the endpoint's own fields
+    Verified        bool                   // Deprecated: set to IsAdmitted()
 }
+
+func (r *VerificationResponse) IsAdmitted() bool
+
+type BatchResponse struct {
+    JobID           string
+    Status          string // job state
+    ProgressPercent float64
+    TotalItems      int
+    CompletedItems  int
+    FailedItems     int
+    CreatedAt       string
+    CompletedAt     string
+    Items           []BatchResult
+}
+
+type BatchResult struct {
+    ID        string
+    Status    string // item state
+    Query     string
+    Type      VerificationType
+    Result    *VerificationResponse
+    Error     string
+    LatencyMs float64
+    Verified  bool // Deprecated: set to IsAdmitted()
+}
+
+func (b *BatchResult) IsAdmitted() bool
 ```
 
 ## Error handling
@@ -122,10 +253,11 @@ type VerificationResult struct {
 ```go
 result, err := client.Verify(ctx, "test")
 if err != nil {
-    var qwedErr *qwed.Error
+    var qwedErr *qwed.QWEDError
     if errors.As(err, &qwedErr) {
         fmt.Println(qwedErr.Code)
         fmt.Println(qwedErr.Message)
+        fmt.Println(qwedErr.StatusCode)
     }
 }
 ```
