@@ -272,8 +272,13 @@ result = client.verify_logic("(AND (GTE age 18) (LTE age 65))")
 ```python
 result = client.verify_logic("(AND (GT x 5) (LT x 10))")
 
-print(result.status)            # "VERIFIED": SAT on /verify/logic
-print(result.result["model"])   # {"x": "6"}
+if result.status == "VERIFIED":          # SAT on /verify/logic
+    print(result.result["model"])        # {"x": "6"}
+elif result.status == "UNVERIFIABLE":    # UNSAT
+    print("No solution exists")
+else:
+    # BLOCKED: the query could not be translated or solved. Fail closed.
+    raise RuntimeError(f"Logic verification failed ({result.status}): {result.error}")
 ```
 
 The table above is the DSL verdict, which `DSLLogicVerifier.verify_from_dsl()` returns as is. `POST /verify/logic`, and so `client.verify_logic()`, maps it: `SAT` is `VERIFIED` with the model as evidence, `UNSAT` is `UNVERIFIABLE`, and anything else is `BLOCKED`. The route makes no admission decision, so the Python SDK's `is_verified` stays `False`; read `status` and the model.
@@ -303,6 +308,10 @@ result = client.verify_logic("""
 
 if result.status == "VERIFIED":
     print(f"Solution: x = {result.result['model']['x']}")
+elif result.status == "UNVERIFIABLE":
+    print("No solution exists")
+else:
+    raise RuntimeError(f"Logic verification failed ({result.status}): {result.error}")
 ```
 
 ### CLI
