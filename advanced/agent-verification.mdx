@@ -294,6 +294,20 @@ for entry in activity:
     print(f"{entry['timestamp']}: {entry['action_type']} -> {entry['decision']}")
 ```
 
+An agent reads its own activity with its token. Organization owners and admins can also list every agent in their organization with [`GET /agents`](/api/endpoints#get-agents) and read any of those agents' activity with an API key or a signed-in session, without the agent's token:
+
+```bash
+# List your organization's agents (owner or admin)
+curl --fail-with-body http://localhost:8000/agents \
+  -H "X-API-Key: $QWED_API_KEY"
+
+# Read an agent's 50 newest activity entries
+curl --fail-with-body "http://localhost:8000/agents/42/activity?limit=50" \
+  -H "X-API-Key: $QWED_API_KEY"
+```
+
+`limit` accepts `1` to `200`. See [`GET /agents/{agent_id}/activity`](/api/endpoints#get-agents-agent-id-activity) for the access rules and status codes.
+
 ## Runtime hardening
 
 <Info>New in v5.0.0</Info>
