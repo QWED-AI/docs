@@ -400,6 +400,7 @@ Each entry includes `verdict`, the verdict stored in the row's result, `admissio
 | Field | Description |
 |-------|-------------|
 | `total` | Number of rows on this page, not in the whole log |
+| `engine_used` | The row's domain, such as `MATH`, `NATURAL_LANGUAGE`, `LOGIC`, `STATS`, `FACT`, `CODE`, `SQL`, `IMAGE`, `RAG`, `PROCESS`, `CONSENSUS`, or `VERIFICATION_CONTEXT`. `/verify/natural_language`, `/agents/{agent_id}/verify`, and natural-language `/verify/batch` items write `NATURAL_LANGUAGE`. Their rows written before this fix read `MATH`. The domain is part of the signed, chained entry, so QWED doesn't rewrite those rows |
 | `next_before` | The last row's ID when the page is full (`limit` rows). `null` when the page is not full |
 | `verdict` | `VERIFIED`, `UNVERIFIABLE`, or `BLOCKED`, read from the stored result: `status` for a `/verify/*` result, `verdict` for a Verification Context document, or `details.result.status` for a `/verify/batch` item row. `null` for anything else, such as a truncated result, a logic engine's `SAT`, or an audit seed sample. Never derived from `is_verified` |
 | `status` | Unchanged for existing clients: `verified` or `blocked`, from the row's `is_verified` flag. Each route sets that flag by its own rule, so an `UNVERIFIABLE` result reads `blocked` |
@@ -446,5 +447,26 @@ These fields identify the chain entry. To check that it is intact, call [`GET /a
 
 ### GET /audit/export
 
-Export audit logs as a CSV file (up to 1,000 records). Requires the `admin` or `owner` role.
+Export your organization's audit log as a CSV file (`text/csv`). Requires the `admin` or `owner` role.
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `start` | datetime | — | Export only rows at or after this time |
+| `end` | datetime | — | Export only rows at or before this time |
+
+Pass `start` and `end` as ISO 8601 times. A time without a zone is read as UTC, and other offsets are converted. Without either, QWED doesn't bound that side of the period, so with neither you get the newest rows. `start` after `end` returns `400 Bad Request` with `"start must not be after end"`.
+
+```bash
+curl --fail-with-body -D headers.txt -o audit.csv \
+  -H "Authorization: Bearer $TOKEN" \
+  "http://localhost:8000/audit/export?start=2026-10-01T00:00:00Z"
+```
+
+The file has the same columns as [`GET /admin/compliance/export/csv`](/api/endpoints#csv-columns): `ID`, `Timestamp`, `User ID`, `API Key ID`, `Verifier Version`, `Domain`, `Query`, `Verdict`, `Admission`, `Is Verified (legacy)`, `Result`, `Entry Hash`, `HMAC Signature`, and `Chain Status`. `Verdict` and `Admission` are the stored values, as `verdict` and `admission` on [`GET /audit/logs`](#get-audit-logs). `Domain` is the same value as `engine_used`. A value QWED didn't record is an empty cell, and no cell is truncated. QWED prefixes an apostrophe to any cell that starts with `=`, `+`, `-`, `@`, a tab, a carriage return, or a line feed, so spreadsheet software doesn't run it as a formula.
+
+Rows are newest first, ordered by timestamp and then by ID. The export holds at most the newest 1,000 rows. When more rows matched, the response sets `X-Export-Truncated: true`, which CORS exposes to browser clients on allowed origins.
+
+<Note>
+Before this change, `GET /audit/export` wrote `is_verified` as `verified` or `blocked` under a `Status` column, with no admission or caller. Update any client that reads the old columns by name or position.
+</Note>
 

@@ -152,7 +152,7 @@ The endpoint returns the [`DiagnosticResult`](/advanced/diagnostics) verdict tha
 | `query_semantics_verified` | boolean | Always `false`. QWED cannot prove the translation means what you asked |
 | `admission` | string | Always `"BLOCKED"` (`DENY`) for this endpoint, even when the translated claim holds |
 
-Admission is always `BLOCKED` because the LLM translation itself is unverified, so QWED never admits the result as an answer to your question. The verdict itself is unchanged. The audit log row's `is_verified` follows admission, so it is always `false`. QWED returns `BLOCKED` as the verdict when the control plane returns a malformed diagnostic or when the output sanitizer rejects the translated expression.
+Admission is always `BLOCKED` because the LLM translation itself is unverified, so QWED never admits the result as an answer to your question. The verdict itself is unchanged. The audit log row's `is_verified` follows admission, so it is always `false`. The row's domain is `NATURAL_LANGUAGE`. Rows written before this fix store `MATH`, because the domain is part of each signed, chained entry and QWED doesn't rewrite it. QWED returns `BLOCKED` as the verdict when the control plane returns a malformed diagnostic or when the output sanitizer rejects the translated expression.
 
 For a deterministic, admissible result, send the expression to [`POST /verify/math`](#post-verify-math) directly.
 
@@ -995,7 +995,7 @@ The pre-v6.0 top-level `is_valid` field is preserved inside `developer_fields.is
 
 Each item runs under `QWED_BATCH_ITEM_TIMEOUT` (default 60 seconds). An item that times out is marked `failed` with its error recorded, and the rest of the job still completes.
 
-**Audit trail:** QWED appends one signed, hash-chained audit row per item, including failed items. Each row stores the item's query and a result with `batch_job_id`, `batch_item_id`, `batch_item_type`, `item_status`, and `details` (the item's `result` or `error`). The row's domain and `is_verified` follow the rule of the item type's own `/verify/*` route. If the audit append for an item fails, QWED marks that item `failed`, returns `"result": null` with `"error": "audit persistence failed"`, and counts it in `failed_items`. No item result is returned without its audit row.
+**Audit trail:** QWED appends one signed, hash-chained audit row per item, including failed items. Each row stores the item's query and a result with `batch_job_id`, `batch_item_id`, `batch_item_type`, `item_status`, and `details` (the item's `result` or `error`). The row's domain and `is_verified` follow the rule of the item type's own `/verify/*` route. For example, natural-language items store domain `NATURAL_LANGUAGE` and math items store `MATH`. If the audit append for an item fails, QWED marks that item `failed`, returns `"result": null` with `"error": "audit persistence failed"`, and counts it in `failed_items`. No item result is returned without its audit row.
 
 | Status | Description |
 |--------|-------------|
@@ -1331,7 +1331,7 @@ Gate on `admission`, not `status`. A natural-language verdict covers the express
 | 403 | Agent budget exceeded or request blocked by security checks |
 | 500 | Internal agent verification error, or `audit persistence failed` |
 
-**Audit trail:** Before QWED logs the agent activity and returns, it appends the same signed, hash-chained audit row that `POST /verify/natural_language` writes, plus the `agent_id`. If that append fails, the request returns `500` with `audit persistence failed` and no agent activity is logged.
+**Audit trail:** Before QWED logs the agent activity and returns, it appends the same signed, hash-chained audit row that `POST /verify/natural_language` writes, with domain `NATURAL_LANGUAGE`, plus the `agent_id`. If that append fails, the request returns `500` with `audit persistence failed` and no agent activity is logged.
 
 ---
 
@@ -1546,20 +1546,52 @@ Before this change, every admin endpoint returned `401 Unauthorized`, even for v
 
 ### GET /admin/compliance/export/csv
 
-Export your organization's audit trail as a CSV file (`text/csv`).
+Export your organization's audit trail for a period as a CSV file (`text/csv`). Use it to hand verification evidence to an auditor. [`GET /audit/export`](/api/authentication#get-audit-export) writes the same columns.
 
-The `Chain Status` column reports `Chained` when a row carries a hash and `Legacy` when it was written before the API used the hash chain. `Chained` doesn't mean the row was verified. Use [`GET /admin/compliance/verify/{log_id}`](#get-admin-compliance-verify-log-id) to verify it.
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `organization_id` | integer (query) | Required | Must be your own organization ID |
+| `start` | datetime (query) | 30 days before `end` | Export rows at or after this time |
+| `end` | datetime (query) | Now | Export rows at or before this time |
 
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `organization_id` | integer (query) | Must be your own organization ID |
+Pass `start` and `end` as ISO 8601 times. A time without a zone is read as UTC, and other offsets are converted. QWED applies the defaults first and then checks the period, so `start` after `end` returns `400 Bad Request` with `"start must not be after end"`. A `start` in the future with no `end` is also `400`, not an empty file.
 
 Passing another organization's ID returns `403 Forbidden` with `"Cannot access another organization's data"`.
 
 ```bash
-curl --fail-with-body -H "X-API-Key: qwed_live_your_admin_key" \
-  "http://localhost:8000/admin/compliance/export/csv?organization_id=12"
+curl --fail-with-body -D headers.txt -o audit.csv \
+  -H "X-API-Key: qwed_live_your_admin_key" \
+  "http://localhost:8000/admin/compliance/export/csv?organization_id=12&start=2026-10-01T00:00:00Z&end=2026-10-28T00:00:00Z"
 ```
+
+#### CSV columns
+
+QWED writes rows newest first, ordered by timestamp and then by ID. Both CSV exports write these columns:
+
+| Column | Description |
+|--------|-------------|
+| `ID` | The audit log ID |
+| `Timestamp` | When the row was written, in ISO 8601 UTC |
+| `User ID` | The user who wrote the row |
+| `API Key ID` | The API key that authenticated the request |
+| `Verifier Version` | The QWED server version that wrote the row |
+| `Domain` | The row's domain, the same value as `engine_used` on [`GET /audit/logs`](/api/authentication#get-audit-logs), for example `MATH`, `NATURAL_LANGUAGE`, `LOGIC`, or `CODE` |
+| `Query` | The stored query, in full |
+| `Verdict` | The stored verdict (`VERIFIED`, `UNVERIFIABLE`, or `BLOCKED`), as `verdict` on `/audit/logs` |
+| `Admission` | The stored admission decision, as `admission` on `/audit/logs` |
+| `Is Verified (legacy)` | `Yes` or `No`, from the row's `is_verified` flag. Each route sets this flag by its own rule. It is neither the verdict nor the admission |
+| `Result` | The stored result, in full |
+| `Entry Hash` | The row's hash in the signed audit chain |
+| `HMAC Signature` | The row's full HMAC-SHA256 signature |
+| `Chain Status` | `Chained` when the row carries a hash, `Legacy` when it was written before the API used the hash chain |
+
+A value that QWED didn't record is an empty cell. QWED doesn't truncate any cell. `Chained` doesn't mean the row was verified. Use [`GET /admin/compliance/verify/{log_id}`](#get-admin-compliance-verify-log-id) or [`GET /admin/compliance/verify-trail`](#get-admin-compliance-verify-trail) to verify rows.
+
+The query and result are caller-controlled. To stop spreadsheet software from running a cell as a formula, QWED prefixes an apostrophe (`'`) to any cell that starts with `=`, `+`, `-`, `@`, a tab, a carriage return, or a line feed. Strip that apostrophe if you compare a cell with the stored value.
+
+#### Row cap
+
+Each export holds at most the newest 1,000 rows in the period. When more rows matched, the response sets `X-Export-Truncated: true`. CORS exposes this header, so a browser client on another allowed origin can read it. To export older rows, request again with `end` set to the oldest `Timestamp` in the file, and skip rows whose `ID` you already have.
 
 ### GET /admin/compliance/verify/{log_id}
 
