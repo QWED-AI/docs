@@ -1525,20 +1525,25 @@ A caller whose role isn't allowed gets `403 Forbidden` with `"Insufficient permi
 
 The JWT-authenticated `/auth/api-keys` and `/audit` routes use the same role ranking. See [Roles on API-key and audit routes](/api/authentication#roles-on-api-key-and-audit-routes).
 
-### Session sign-in for compliance endpoints
+### Session sign-in for admin endpoints
 
-The four `/admin/compliance/*` endpoints also accept a signed-in session, so a dashboard user doesn't need to paste an API key into the browser. Send the `access_token` from [`POST /auth/signin`](/api/authentication) as a bearer token:
+The four `/admin/compliance/*` endpoints, `GET /admin/security/threats/{org_id}`, `GET /admin/security/events`, and `POST /admin/keys/rotate` also accept a signed-in session. A dashboard user doesn't need to paste an API key into the browser. Send the `access_token` from [`POST /auth/signin`](/api/authentication) as a bearer token:
 
 ```text
 Authorization: Bearer <jwt_token>
 ```
 
 - The token must be valid and its user must exist. Otherwise QWED returns `401 Unauthorized`.
-- The user must be active, belong to an active organization, and hold the `owner` or `admin` role. Otherwise QWED returns `403 Forbidden`.
-- If you send both `X-API-Key` and a bearer token, QWED uses the API key.
-- The session's organization is the signed-in user's organization. Organization scoping works the same as with an API key.
+- The user must be active, belong to an active organization, and hold a role the endpoint allows (see the table above). Otherwise QWED returns `403 Forbidden`.
+- If you send both `X-API-Key` and a bearer token, QWED uses the API key. If you send neither, QWED returns `401 Unauthorized`.
+- The session's organization is the signed-in user's organization. Organization scoping and role rules work the same as with an API key.
 
-Other admin endpoints (`/admin/security/threats/{org_id}` and `/admin/keys/rotate`) accept only an API key. A bearer token alone returns `401 Unauthorized`.
+```bash
+curl --fail-with-body -X POST -H "Authorization: Bearer eyJhbG..." \
+  "http://localhost:8000/admin/keys/rotate?key_id=42"
+```
+
+[`POST /agents/{agent_id}/token/reissue`](#post-agents-agent-id-token-reissue) still accepts only an API key. A bearer token alone returns `401 Unauthorized`.
 
 <Note>
 Before this change, every admin endpoint returned `401 Unauthorized`, even for valid owner and admin keys. Admin endpoints now authorize by role and are scoped to the caller's organization.
@@ -1684,6 +1689,13 @@ The fields after `end` match `audit_trail` in the [security activity summary](/a
 
 Returns a real-time threat summary for your organization, including blocked injection attempts and anomalous patterns. `org_id` must be your own organization ID. Another organization's ID returns `403 Forbidden`.
 
+Owners and admins can call this endpoint with an API key in the `X-API-Key` header or with a [signed-in session](#session-sign-in-for-admin-endpoints). The summary's `generated_at` and event timestamps are UTC with a `+00:00` offset.
+
+```bash
+curl --fail-with-body -H "Authorization: Bearer eyJhbG..." \
+  "http://localhost:8000/admin/security/threats/1"
+```
+
 ### GET /admin/security/events
 
 List your organization's security events, such as a leaked API key that QWED revoked automatically. Use this to review individual events. `GET /admin/security/threats/{org_id}` returns only a summary.
@@ -1734,7 +1746,7 @@ Events come newest first, by timestamp and then ID, as on [`GET /audit/logs`](/a
 
 ### POST /admin/keys/rotate
 
-Rotate an API key and return the new secret once. Owners, admins, and members can call this endpoint, subject to these rules:
+Rotate an API key and return the new secret once. Owners, admins, and members can call this endpoint with an API key in the `X-API-Key` header or with a [signed-in session](#session-sign-in-for-admin-endpoints). The same rules apply either way:
 
 - **Your own key:** any allowed role can rotate a key it owns.
 - **Another user's key:** only an `owner` or `admin` can rotate it, and only when the key's owner doesn't hold a higher role. An admin can't rotate an owner's key. A member can't rotate anyone else's key. These cases return `403 Forbidden`.

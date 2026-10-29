@@ -264,10 +264,13 @@ Create a new user and organization. Returns a JWT token for immediate use.
     "id": "1",
     "email": "user@example.com",
     "org_id": "1",
+    "org_name": "Acme Corp",
     "role": "owner"
   }
 }
 ```
+
+`org_name` is the organization's display name, or `null` if QWED can't read it.
 
 ### POST /auth/signin
 
@@ -284,6 +287,8 @@ Sign in an existing user.
 
 **Response:** Same format as `/auth/signup`.
 
+Sign-in returns `403 Forbidden` for a deactivated user (`"Account is deactivated"`) and for a user whose organization is inactive or missing (`"Organization is not active"`).
+
 ### GET /auth/me
 
 Get the current authenticated user's information. Requires a `Bearer` token in the `Authorization` header.
@@ -292,15 +297,56 @@ Get the current authenticated user's information. Requires a `Bearer` token in t
 curl -H "Authorization: Bearer eyJhbG..." http://localhost:8000/auth/me
 ```
 
+Returns the same `user` object as sign-up and sign-in, including `org_name`. QWED applies the user and organization checks in [Roles on API-key and audit routes](#roles-on-api-key-and-audit-routes) on every call. An inactive user or organization, or an unknown role, returns `403 Forbidden` even while the token is still valid.
+
+### GET /auth/users
+
+List the users of your organization, oldest first. Use this to show who is in the organization, or to name the owner of a key or the user behind a security event.
+
+Owners and admins can call this endpoint with a bearer token or with an API key in the `X-API-Key` header. When you send both, QWED uses the API key. Members and viewers get `403 Forbidden`.
+
+```bash
+curl --fail-with-body -H "Authorization: Bearer eyJhbG..." http://localhost:8000/auth/users
+```
+
+**Response:**
+
+```json
+[
+  {
+    "id": "1",
+    "email": "owner@example.com",
+    "role": "owner",
+    "is_active": true,
+    "created_at": "2026-03-20T12:00:00+00:00"
+  },
+  {
+    "id": "7",
+    "email": "former@example.com",
+    "role": "member",
+    "is_active": false,
+    "created_at": "2026-05-02T08:30:00+00:00"
+  }
+]
+```
+
+QWED returns only users of your own organization. Inactive users are included with `is_active` set to `false`. The response contains no password or permission data.
+
+| Status | Meaning |
+|--------|---------|
+| 401 | No API key or bearer token |
+| 403 | Not an owner or admin, or an inactive user, organization, or key |
+
 ### Roles on API-key and audit routes
 
-The `/auth/api-keys` and `/audit` routes authorize by the signed-in user's role. Roles rank from lowest to highest: `viewer`, `member`, `admin`, `owner`.
+The `/auth/api-keys`, `/auth/users`, and `/audit` routes authorize by the signed-in user's role. Roles rank from lowest to highest: `viewer`, `member`, `admin`, `owner`.
 
 | Route | `viewer` | `member` | `admin` | `owner` |
 |-------|----------|----------|---------|---------|
 | `POST /auth/api-keys` | No | Yes | Yes | Yes |
 | `GET /auth/api-keys` | Own keys | Own keys | All keys in the organization | All keys in the organization |
 | `DELETE /auth/api-keys/{key_id}` | Own keys | Own keys | Own keys, plus keys of users who don't rank higher | Any key in the organization |
+| `GET /auth/users` | No | No | Yes | Yes |
 | `GET /audit/logs` | Yes | Yes | Yes | Yes |
 | `GET /audit/logs/{log_id}` | Yes | Yes | Yes | Yes |
 | `GET /audit/export` | No | No | Yes | Yes |
@@ -342,6 +388,30 @@ Generate a new API key for the current user's organization. Requires JWT authent
 List active API keys. Admins and owners see every active key in their organization. Members and viewers see only their own keys.
 
 Each key includes `id`, `name`, `key_preview`, `created_at`, `last_used_at`, and `is_revoked`. QWED sets `last_used_at` after a key passes every authentication and authorization check, at most once a minute per key. A key that has never been used, or was refused by a check, keeps its previous value (`null` if never used). If QWED can't write `last_used_at`, the request still succeeds.
+
+Each key also includes:
+
+- `expires_at`: when the key expires, or `null` if it doesn't expire.
+- `rotation_required`: `true` when the key is flagged for rotation.
+- `owner`: the user the key belongs to, as `{"id": ..., "email": ...}`. It is `null` for a key with no user, or whose user isn't in the key's organization, so QWED never shows another organization's user.
+
+`created_at`, `last_used_at`, and `expires_at` always carry their UTC offset.
+
+```json
+[
+  {
+    "id": "12",
+    "name": "Production Key",
+    "key_preview": "qwed_live_ab...",
+    "created_at": "2026-03-20T12:00:00+00:00",
+    "last_used_at": "2026-10-28T09:14:03+00:00",
+    "is_revoked": false,
+    "expires_at": null,
+    "rotation_required": false,
+    "owner": {"id": "1", "email": "owner@example.com"}
+  }
+]
+```
 
 ### DELETE /auth/api-keys/{key_id}
 
