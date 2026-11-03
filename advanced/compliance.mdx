@@ -154,7 +154,12 @@ GET /admin/compliance/verify/{log_id}
 GET /admin/compliance/verify-trail?start={start}&end={end}
 ```
 
-`start` and `end` are optional ISO 8601 datetimes. Omit both to check the whole chain. The response reports `status` (`VERIFIED`, `NO_ENTRIES`, or `NOT_VERIFIED`), the entry counts, and `first_failed_entry_id`, so you can see where the chain stops checking out. See [`GET /admin/compliance/verify-trail`](/api/endpoints#get-admin-compliance-verify-trail).
+`start` and `end` are optional ISO 8601 datetimes. Omit both to check the whole chain. The response's `scope` names what QWED checked:
+
+- With neither `start` nor `end`: `"Signature and hash-chain check of every audit entry recorded for the organisation. It does not show that every request was recorded."`
+- With `start`, `end`, or both: `"Signature and hash-chain check of the audit entries recorded in the period. It does not show that every request was recorded."`
+
+The response also reports `status` (`VERIFIED`, `NO_ENTRIES`, or `NOT_VERIFIED`), the entry counts, and `first_failed_entry_id`, so you can see where the chain stops checking out. See [`GET /admin/compliance/verify-trail`](/api/endpoints#get-admin-compliance-verify-trail).
 
 ```bash
 curl --fail-with-body -H "X-API-Key: qwed_live_your_admin_key" \

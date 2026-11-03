@@ -1069,6 +1069,12 @@ Convert a [`DiagnosticResult`](/advanced/diagnostics) into a schema-valid Verifi
 - The server records the diagnostic but does not vouch for it. The caller's `agent_message` and `developer_fields` are kept under `developer_fields.caller_supplied` and decide nothing, `is_valid` included.
 - The admission is `DENY` unless `attestation_token` also signs `ADMIT` for this verdict (`qwed.admission`), as the token of an answer the server admitted does. An admitted document names the engine that signed the token, and this server's version, as its verifier. Your `verifier` and `verifier_version` are kept under `caller_supplied`.
 
+**Audit row:** QWED writes one audit row per call. The row stores the signed document exactly as returned, so it matches its attestation and passes [`POST /verification-context/validate`](#post-verification-context-validate) when you read it back from `GET /audit/logs`. Only the row's `query` is redacted for personal data (emails, phone numbers, SSNs, IP addresses).
+
+<Warning>
+The stored document keeps any personal data you put in `query` or `diagnostic`. Mask personal data before you call `from-diagnostic` if your audit log must not hold it. Rows written before this change hold a redacted copy of the document, which doesn't verify against its attestation.
+</Warning>
+
 | Status | Description |
 |--------|-------------|
 | 422 | The resulting document failed Verification Context validation, or the canonical encoding refuses it (for example, a lone surrogate in a string) |
@@ -1649,7 +1655,7 @@ Check the signature and hash chain of every audit entry in your organization ove
 | `start` | ISO 8601 datetime (query, optional) | Start of the period. Omit for no lower bound. |
 | `end` | ISO 8601 datetime (query, optional) | End of the period. Omit for no upper bound. |
 
-With neither parameter, QWED checks the whole chain. QWED reads a time without a zone as UTC and converts any other offset to UTC. A `start` later than `end` returns `400 Bad Request`.
+With neither parameter, QWED checks the whole chain, and `scope` reads `"Signature and hash-chain check of every audit entry recorded for the organisation. It does not show that every request was recorded."` With `start`, `end`, or both, `scope` names the period, as in the example below. Only the text differs. The status, counts, and `proof_ref` are computed the same way. QWED reads a time without a zone as UTC and converts any other offset to UTC. A `start` later than `end` returns `400 Bad Request`.
 
 ```bash
 curl --fail-with-body -H "Authorization: Bearer $QWED_SESSION_TOKEN" \
