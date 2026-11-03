@@ -11,23 +11,24 @@ Jump to: [Audit CSV exports and natural-language domain](#qwed-verification-—-
 
 ## QWED Verification — audit CSV exports carry verdict and admission; natural-language audit domain
 
-**Unreleased** · [GitHub PR #542](https://github.com/QWED-AI/qwed-verification/pull/542) · [GitHub PR #543](https://github.com/QWED-AI/qwed-verification/pull/543)
+**Unreleased** · [GitHub PR #542](https://github.com/QWED-AI/qwed-verification/pull/542) · [GitHub PR #543](https://github.com/QWED-AI/qwed-verification/pull/543) · [GitHub PR #546](https://github.com/QWED-AI/qwed-verification/pull/546)
 
-> Both CSV exports now write the same columns, including the stored verdict and admission, and take a period. Natural-language audit rows get their own domain.
+> Both CSV exports now write the same columns, including the stored verdict, admission, and latency, and take a period. Natural-language audit rows get their own domain, and every audit row stores its real latency.
 
 ### What changed
 
-- **Shared CSV columns.** [`GET /admin/compliance/export/csv`](/api/endpoints#get-admin-compliance-export-csv) and [`GET /audit/export`](/api/authentication#get-audit-export) write `ID`, `Timestamp`, `User ID`, `API Key ID`, `Verifier Version`, `Domain`, `Query`, `Verdict`, `Admission`, `Is Verified (legacy)`, `Result`, `Entry Hash`, `HMAC Signature`, and `Chain Status`. `Verdict` and `Admission` are the stored values, as `GET /audit/logs` returns them. A value QWED didn't record is an empty cell. No cell is truncated.
+- **Shared CSV columns.** [`GET /admin/compliance/export/csv`](/api/endpoints#get-admin-compliance-export-csv) and [`GET /audit/export`](/api/authentication#get-audit-export) write `ID`, `Timestamp`, `User ID`, `API Key ID`, `Verifier Version`, `Domain`, `Query`, `Verdict`, `Admission`, `Is Verified (legacy)`, `Result`, `Latency (ms)`, `Entry Hash`, `HMAC Signature`, and `Chain Status`. `Verdict` and `Admission` are the stored values, as `GET /audit/logs` returns them. A value QWED didn't record is an empty cell. No cell is truncated.
 - **Formula guard.** A cell that starts with `=`, `+`, `-`, `@`, a tab, a carriage return, or a line feed gets a leading apostrophe, so spreadsheet software doesn't run it as a formula.
 - **Export period.** Both exports take `start` and `end`. A time without a zone is UTC, and `start` after `end` returns `400`. Rows are newest first. The compliance export defaults to the 30 days before `end`, and `end` defaults to now. It checks the period after those defaults, so a future `start` with no `end` returns `400`.
 - **Row cap.** Both exports hold at most the newest 1,000 rows and set `X-Export-Truncated: true` when more matched. CORS exposes the header. The compliance export had no cap before.
 - **`NATURAL_LANGUAGE` audit domain.** `/verify/natural_language`, `/agents/{agent_id}/verify`, and natural-language `/verify/batch` items now write domain `NATURAL_LANGUAGE` (`engine_used` on `/audit/logs`, `Domain` in the CSV exports) instead of `MATH`. `/verify/math` and batch math items still write `MATH`. Rows already written keep `MATH`, because the domain is part of each signed, chained entry.
+- **Real latency in the audit log.** `GET /audit/logs` and `GET /audit/logs/{log_id}` returned `latency_ms` as a fixed `0`. QWED now stores each row's latency: whole milliseconds from the start of the HTTP request to the row's append, including the verifier and any LLM call. Rows written outside a request, and rows written before this change, return `null`. Both CSV exports carry it in a `Latency (ms)` column after `Result`, empty when `null`. The entry hash covers `latency_ms`, so changing or clearing it fails integrity verification. Rows hashed before this change still verify. QWED adds the `latency_ms` column to an existing database at startup. Upgrade every server process together, because an older process must not append to the same chain at the same time.
 
 <Warning>
 **Breaking for CSV consumers.** Update any client that reads the export columns by name or position.
 
 - **Before:** `GET /admin/compliance/export/csv` covered only the last 30 days, cut the query to 100 characters and the signature to 16, and had no verdict, admission, or result. `GET /audit/export` wrote `is_verified` as `verified` or `blocked` under `Status`, with no admission or caller.
-- **After:** Both write the 14 shared columns above in full. Read `Admission` for the decision. `Is Verified (legacy)` is the old flag as `Yes` or `No`.
+- **After:** Both write the 15 shared columns above in full. Read `Admission` for the decision. `Is Verified (legacy)` is the old flag as `Yes` or `No`.
 - **Audit domain:** Reports that group by `engine_used` or `Domain` now see `NATURAL_LANGUAGE` for new natural-language rows. `MATH` rows written before the upgrade can include natural-language requests.
 </Warning>
 

@@ -113,8 +113,9 @@ Every `/verify/*` endpoint, the Verification Context routes, `POST /agents/{agen
 - **`admission`**: the admission decision its route made (`ADMIT` or `BLOCKED`, or `ADMIT` or `DENY` for `POST /verification-context/from-diagnostic`). `null` for routes that decide no admission and for older rows.
 - **`api_key_id`**: the API key that authenticated the request. `null` for signed-in sessions, the audit seed, the agent route, and older rows.
 - **`verifier_version`**: the QWED server version that wrote the row.
+- **`latency_ms`**: whole milliseconds from the start of the request to the row's append. `null` for rows written outside a request and for older rows.
 
-The entry hash covers all three fields, so changing or clearing them on a stored row fails verification. Rows written before these fields existed still verify.
+The entry hash covers all four fields, so changing or clearing them on a stored row fails verification. Rows written before these fields existed still verify.
 
 To export the whole trail as evidence, page through `GET /audit/logs` with the `before` cursor until `next_before` is `null`. See [Audit endpoints](/api/authentication#audit-endpoints).
 
@@ -210,8 +211,8 @@ GET /admin/compliance/export/csv?organization_id={org_id}&start={start}&end={end
 Each row carries the stored verdict and admission, so the file shows the decision QWED made for each request:
 
 ```csv
-ID,Timestamp,User ID,API Key ID,Verifier Version,Domain,Query,Verdict,Admission,Is Verified (legacy),Result,Entry Hash,HMAC Signature,Chain Status
-42,2026-10-21T12:00:00+00:00,3,7,8.0.0,MATH,x**2 + 2*x + 1 = (x+1)**2,VERIFIED,ADMIT,Yes,"{""status"": ""VERIFIED"", ...}",3b1f...a9c2,9d4e...07ab,Chained
+ID,Timestamp,User ID,API Key ID,Verifier Version,Domain,Query,Verdict,Admission,Is Verified (legacy),Result,Latency (ms),Entry Hash,HMAC Signature,Chain Status
+42,2026-10-21T12:00:00+00:00,3,7,8.0.0,MATH,x**2 + 2*x + 1 = (x+1)**2,VERIFIED,ADMIT,Yes,"{""status"": ""VERIFIED"", ...}",184,3b1f...a9c2,9d4e...07ab,Chained
 ```
 
 - `Verdict` and `Admission` are the stored values, as `GET /audit/logs` returns them. A value QWED didn't record is an empty cell.

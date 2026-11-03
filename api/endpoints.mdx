@@ -1581,6 +1581,7 @@ QWED writes rows newest first, ordered by timestamp and then by ID. Both CSV exp
 | `Admission` | The stored admission decision, as `admission` on `/audit/logs` |
 | `Is Verified (legacy)` | `Yes` or `No`, from the row's `is_verified` flag. Each route sets this flag by its own rule. It is neither the verdict nor the admission |
 | `Result` | The stored result, in full |
+| `Latency (ms)` | The stored latency, as `latency_ms` on `/audit/logs`: whole milliseconds from the request start to the row's append. Empty for rows written outside a request or before QWED recorded latency |
 | `Entry Hash` | The row's hash in the signed audit chain |
 | `HMAC Signature` | The row's full HMAC-SHA256 signature |
 | `Chain Status` | `Chained` when the row carries a hash, `Legacy` when it was written before the API used the hash chain |

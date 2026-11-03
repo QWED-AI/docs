@@ -387,7 +387,7 @@ Each entry includes `verdict`, the verdict stored in the row's result, `admissio
       "verdict": "VERIFIED",
       "status": "verified",
       "admission": "ADMIT",
-      "latency_ms": 0,
+      "latency_ms": 184,
       "created_at": "2026-10-21T12:00:00+00:00",
       "entry_hash": "3b1f...a9c2",
       "api_key_id": "7",
@@ -408,8 +408,9 @@ Each entry includes `verdict`, the verdict stored in the row's result, `admissio
 | `entry_hash` | The row's SHA-256 hash in the audit chain, as stored. `null` for legacy rows written before the API used the chain |
 | `api_key_id` | ID (as a string) of the API key that authenticated the request. `null` for rows written from a signed-in user session, by `POST /audit/seed`, or by `POST /agents/{agent_id}/verify` (which authenticates with an agent token), and for rows written before QWED recorded it |
 | `verifier_version` | The QWED server version that wrote the row. `null` for rows written before QWED recorded it |
+| `latency_ms` | Whole milliseconds from the start of the HTTP request to the moment QWED appended the row. It includes the verifier, any LLM call, and everything else before the append. QWED measures it itself and never reads it from the verifier's or caller's result. `null` for rows written outside an HTTP request and for rows written before QWED recorded it |
 
-The entry hash covers `admission`, `api_key_id`, and `verifier_version`. Changing or clearing any of them on a stored row fails [integrity verification](/api/endpoints#get-admin-compliance-verify-log-id).
+The entry hash covers `admission`, `api_key_id`, `verifier_version`, and `latency_ms`. Changing or clearing any of them on a stored row fails [integrity verification](/api/endpoints#get-admin-compliance-verify-log-id).
 
 <Warning>
 `verdict` is not an admission decision. `VERIFIED` means the check ran to a proof, not that the claim holds. A disproven identity or code proven unsafe is `VERIFIED` with `status` `blocked`. Don't gate on `verdict` or `status`. Read `admission` for the decision the route made.
@@ -462,7 +463,7 @@ curl --fail-with-body -D headers.txt -o audit.csv \
   "http://localhost:8000/audit/export?start=2026-10-01T00:00:00Z"
 ```
 
-The file has the same columns as [`GET /admin/compliance/export/csv`](/api/endpoints#csv-columns): `ID`, `Timestamp`, `User ID`, `API Key ID`, `Verifier Version`, `Domain`, `Query`, `Verdict`, `Admission`, `Is Verified (legacy)`, `Result`, `Entry Hash`, `HMAC Signature`, and `Chain Status`. `Verdict` and `Admission` are the stored values, as `verdict` and `admission` on [`GET /audit/logs`](#get-audit-logs). `Domain` is the same value as `engine_used`. A value QWED didn't record is an empty cell, and no cell is truncated. QWED prefixes an apostrophe to any cell that starts with `=`, `+`, `-`, `@`, a tab, a carriage return, or a line feed, so spreadsheet software doesn't run it as a formula.
+The file has the same columns as [`GET /admin/compliance/export/csv`](/api/endpoints#csv-columns): `ID`, `Timestamp`, `User ID`, `API Key ID`, `Verifier Version`, `Domain`, `Query`, `Verdict`, `Admission`, `Is Verified (legacy)`, `Result`, `Latency (ms)`, `Entry Hash`, `HMAC Signature`, and `Chain Status`. `Verdict`, `Admission`, and `Latency (ms)` are the stored values, as `verdict`, `admission`, and `latency_ms` on [`GET /audit/logs`](#get-audit-logs). `Domain` is the same value as `engine_used`. A value QWED didn't record is an empty cell, and no cell is truncated. QWED prefixes an apostrophe to any cell that starts with `=`, `+`, `-`, `@`, a tab, a carriage return, or a line feed, so spreadsheet software doesn't run it as a formula.
 
 Rows are newest first, ordered by timestamp and then by ID. The export holds at most the newest 1,000 rows. When more rows matched, the response sets `X-Export-Truncated: true`, which CORS exposes to browser clients on allowed origins.
 
