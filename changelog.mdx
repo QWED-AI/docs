@@ -18,7 +18,7 @@ Jump to: [QWED-MCP v0.2.3](#qwed-mcp-v0-2-3-—-qwedai-com-no-longer-trusted-and
 ### What changed
 
 - **`qwedai.com` removed from trusted domains.** The built-in trusted list is now `github.com`, `gitlab.com`, `bitbucket.org`, `pypi.org`, and `npmjs.com`. qwed-mcp 0.2.2 and earlier still trust `qwedai.com`, so upgrade with `pip install --upgrade qwed-mcp`. To trust another domain, pass it in `trusted_domains`. See [`trusted_domains`](/mcp/tools#constructor-parameters).
-- **Requires `mcp>=1.30.0,<2`.** MCP Python SDK 1.30.0 patches GHSA-84m7-p3x7-pcfv, GHSA-rwrf-2pqf-9j8j, and GHSA-5h93-6whr-6q8j. MCP SDK 2.x removed the server API that qwed-mcp uses, so qwed-mcp stays on 1.x. qwed-mcp runs over stdio and uses neither the SDK's HTTP transports nor its bearer authentication.
+- **Requires `mcp>=1.30.0,<2`.** MCP Python SDK 1.30.0 patches GHSA-84m7-p3x7-pcfv, GHSA-rwrf-2pqf-9j8j, and GHSA-5h93-6whr-6q8j. MCP SDK 2.x removed the server API that qwed-mcp uses, so qwed-mcp stays on 1.x. qwed-mcp 0.2.2 allowed any `mcp>=1.2.0`, so a fresh install of 0.2.2 now picks up MCP SDK 2.x and fails at startup with `AttributeError: 'Server' object has no attribute 'list_tools'`; 0.2.3 fixes this. qwed-mcp runs over stdio and uses neither the SDK's HTTP transports nor its bearer authentication.
 - **Reports its own version.** The server now sends qwed-mcp's version to MCP clients during initialization, instead of the MCP SDK's version.
 
 ---
