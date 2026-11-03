@@ -344,6 +344,7 @@ Separate from symbolic execution, `CodeVerifier` scans code for security vulnera
 | Safe code | `VERIFIED` | `is_valid: true`, `is_safe: true`, `constraint_id: "code_verifier.code_safe"` | Present |
 | Unsafe code | `VERIFIED` (as-unsafe) | `is_valid: false`, `is_safe: false`, `critical_count`, `issues` | Present |
 | Empty code or non-string `language` | `BLOCKED` | `constraint_id: "code_verifier.unsupported_language"` | `null` |
+| Python that does not parse | `BLOCKED` | `constraint_id: "code_verifier.parse_error"` | `null` |
 | Internal error | `BLOCKED` | `constraint_id: "code_verifier.execution_error"` | `null` |
 
 Proving that a snippet is unsafe is a successful proof, so unsafe code is `VERIFIED`, never `BLOCKED`. `BLOCKED` is reserved for cases where verification itself failed, and blocked results carry no `proof_ref`.
@@ -385,6 +386,35 @@ If generated code needs to run commands, route them through a reviewed, sandboxe
 
 <Note>
 Before v7.2.3, shell and subprocess calls were warnings and the code was admitted. See [GHSA-6rxr-gq43-694g](https://github.com/QWED-AI/qwed-verification/security/advisories/GHSA-6rxr-gq43-694g). Before v7.3.0, `fork`, dynamic import, `ctypes` loaders, `posix`/`nt`, and file and network access were warnings or undetected and the code was admitted. See [GHSA-4phf-6h72-9xfg](https://github.com/QWED-AI/qwed-verification/security/advisories/GHSA-4phf-6h72-9xfg).
+</Note>
+
+### `eval`, `exec`, and `compile` are matched as names
+
+`CodeVerifier` reports `eval`, `exec`, `compile`, `__import__`, `getattr`, and `setattr` as a `CRITICAL` issue with type `dangerous_function`. The verifier matches these names on the Python AST, not as substrings of a line. Longer identifiers that only contain them are not flagged, so common safe calls are admitted:
+
+- `cur.execute("SELECT ?", params)`, which is parameterised SQL
+- `model.evaluate(x, y)` and `model.evaluate(ds, verbose=0)`
+- `re.compile(r"[0-9]+")`, when `re` is the standard `re` module
+- `compile_report()`, and the names inside longer words in strings and comments, such as `"executing job"`
+
+The matching is still strict where a name can reach the builtin another way. The verifier refuses the names when used as a value (`f = eval`), as a keyword argument, as a parameter or function name, in an import, as an attribute, or as a whole identifier in a string. It also follows strings built from literals, such as `"ex" + "ec"`. Longer helpers that run code or start a process, such as `exec_module` and the `os.exec*` family, stay refused. `model.eval()`, `model.evaluate(x)`, and `model.evaluate()` stay refused too. `ast.literal_eval` is admitted.
+
+```python
+result = code_verifier.verify_code(
+    "cur.execute('SELECT * FROM users WHERE id = ?', (user_id,))",
+    language="python",
+)
+print(result.developer_fields["is_valid"])     # True
+
+result = code_verifier.verify_code("f = eval\nf(user_input)", language="python")
+print(result.developer_fields["is_valid"])     # False
+# [{"severity": "CRITICAL", "type": "dangerous_function", ...}]
+```
+
+Python that does not parse is `BLOCKED` with `constraint_id: "code_verifier.parse_error"`, because the AST checks cannot run on it.
+
+<Note>
+Before this change, the verifier matched these names anywhere in a line, so `cur.execute(...)`, `model.evaluate(...)`, and `re.compile(...)` were refused as `dangerous_function`. Python that did not parse was reported safe unless a line matched one of the patterns.
 </Note>
 
 ### File and network access is never admitted
