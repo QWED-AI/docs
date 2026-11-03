@@ -118,6 +118,35 @@ result = client.verify_derivative(
 # ✓ Verified
 ```
 
+#### Derivatives in `/verify/math` identities
+
+`POST /verify/math` and `/verify/batch` math items evaluate `diff` and `Derivative` inside an identity, so you can state a derivative claim directly. `==` reads as `=`.
+
+```python
+client.verify_math("diff(x**2, x) == 2*x")
+# ✓ VERIFIED, is_valid true, admission ADMIT
+
+client.verify_math("diff(x**3, x, 2) = 6*x")
+# ✓ VERIFIED (second derivative)
+
+client.verify_math("diff(sqrt(x), x)*2*sqrt(x) = 1")
+# UNVERIFIABLE, constraint_id "math.domain_restricted_identity"
+```
+
+- **Order limit.** The total derivative order in one expression is at most 3, nested calls included. Each order multiplies the work that simplification has to do.
+- **No derivative inside a power, `factorial`, or `binomial`.** `diff(x**2, x)**2` is refused. A reciprocal or a root, such as `2*x/diff(x**2, x)` or `sqrt(diff(x**2, x))`, is allowed.
+- **Domain check.** The [domain check](#domain-restricted-identities) reads each evaluated derivative as well as the text. A derivative can be undefined where the expression it differentiates is defined. `diff(sqrt(x), x) = 1/(2*sqrt(x))` is `VERIFIED`, but `diff(sqrt(x), x)*2*sqrt(x) = 1` holds only for `x` other than 0, so it is `UNVERIFIABLE` with `math.domain_restricted_identity`.
+
+<Warning>
+Leibniz notation is refused, not read as symbols. `d/dx(x^2) = 2x`, `dy/dx`, `d(x^2)/dx`, `dy/dtheta`, and `d^2y/dx^2` return `BLOCKED` with `constraint_id: "math.parse_error"` and the message to write `diff(f, x)`. Write `diff(x^2, x) = 2*x` instead.
+
+The same refusal covers a name starting with `d` that SymPy splits into letters, because it would be read as `d` times the rest: `dx`, `dtheta`, `d2y`, and also `data` (read as `a**2*d*t`). A name the parser already knows, such as `delta`, `diff`, or a symbol you declare, is never refused. To use a `d`-prefixed name as a symbol, pass it in the parser's `extra_symbols`. A name with `_`, such as `distance_m`, is a symbol unless the rest is a variable used beside it (`dx_1` beside `x_1`).
+</Warning>
+
+#### Parse errors
+
+Input the parser refuses is `BLOCKED` with `constraint_id: "math.parse_error"` and the message `Expression could not be parsed`, as SQL and schema parse errors are. Leibniz notation gets the `diff(f, x)` message instead. The parser's own error text is not returned. Previously, such input returned `BLOCKED` with `api.math.execution_error` and `Internal verification error`. A `/verify/batch` math item the parser refuses gets the same `BLOCKED` result instead of a failed item.
+
 ### 4. Integrals
 
 Verify indefinite and definite integrals:
@@ -207,10 +236,16 @@ The math engine separates the verdict (did the engine decide the claim?) from ad
 | Proven true | `2+2=4` | `VERIFIED` | `VERIFIED` | `true` | `ADMIT` |
 | Proven false | `2+2=5`, `(a+b)^2 = a^2 + b^2` | `DISPROVEN` | `VERIFIED` | `false` | `DENY` |
 | Undecided | Symbolic difference SymPy can't decide, float rounding residue, non-finite value | `INCONCLUSIVE` | `UNVERIFIABLE` | `false` | `DENY` |
-| Domain-restricted identity | `x/x = 1` | `INCONCLUSIVE` | `UNVERIFIABLE` | `false` | `DENY` |
+| Domain-restricted identity | `x/x = 1`, `diff(sqrt(x), x)*2*sqrt(x) = 1` | `INCONCLUSIVE` | `UNVERIFIABLE` | `false` | `DENY` |
+| Undefined part | `log(0)**0 = 2` | n/a | `UNVERIFIABLE` (`math.undefined_part`) | `false` | `DENY` |
+| Parse error | `d/dx(x^2) = 2x`, unparseable text | n/a | `BLOCKED` (`math.parse_error`) | `false` | `DENY` |
 | Verification failed | Invalid input, units of different dimensions | `BLOCKED` | `BLOCKED` | `false` | `DENY` |
 
 The legacy engine status is the `status` field of the dictionary that `VerificationEngine` methods return. HTTP responses report admission `DENY` as `"admission": "BLOCKED"`.
+
+`POST /verify/math` and `/verify/batch` math items build the identity verdict with the same function, so both routes return the same verdict for the same claim.
+
+A claim with a side that has an undefined part is not disproven. SymPy evaluates some undefined parts away: `log(0)**0` becomes `1`, so `log(0)**0 = 2` looks like `1 = 2`. A part is undefined when it evaluates to `zoo` or `nan`. A symbol-free part is also undefined when it is not finite. Such a claim is `UNVERIFIABLE` with `constraint_id: "math.undefined_part"` and no attestation. `x/x = 2` and `2x^2 = 5` are still disproven.
 
 <Warning>
 `VerificationEngine` no longer emits `CORRECTION_NEEDED`. A mismatch decided by a concrete computation now returns `DISPROVEN`. If your code branches on `status == "CORRECTION_NEEDED"`, switch to `DISPROVEN` for engine dictionaries, or to `admission` and `is_valid` for API responses.
