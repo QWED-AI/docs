@@ -11,7 +11,7 @@ Jump to: [Session sign-in for key rotation and user list](#qwed-verification-—
 
 ## QWED Verification — session sign-in for key rotation and threats, richer key list, and user list
 
-**Unreleased** · [GitHub PR #531](https://github.com/QWED-AI/qwed-verification/pull/531) · [#540](https://github.com/QWED-AI/qwed-verification/pull/540) · [#541](https://github.com/QWED-AI/qwed-verification/pull/541)
+**Unreleased** · [GitHub PR #531](https://github.com/QWED-AI/qwed-verification/pull/531) · [#540](https://github.com/QWED-AI/qwed-verification/pull/540) · [#541](https://github.com/QWED-AI/qwed-verification/pull/541) · [#549](https://github.com/QWED-AI/qwed-verification/pull/549)
 
 > A dashboard signed in with a session can now rotate keys, read the threat summary, and list the organization's users without an API key. The key list and the user object return more of what QWED already stores.
 
@@ -26,6 +26,7 @@ Jump to: [Session sign-in for key rotation and user list](#qwed-verification-—
 
 - **Threat summary.** `GET /admin/security/threats/{org_id}` no longer fails on every call with the pinned SQLModel release. Its `generated_at` and event timestamps are now UTC with a `+00:00` offset.
 - **Inactive accounts on `/auth/me`.** `GET /auth/me` now applies the user-session checks. An inactive user or organization, or an unknown role, returns `403` instead of an answer from a still-valid token. Sign-in refuses a user whose organization is inactive with `403` `"Organization is not active"`.
+- **Passwords over 72 bytes.** `POST /auth/signup` and `POST /auth/signin` no longer return `500` for a password over 72 bytes in UTF-8. Sign-up refuses it with `400` `"Password must be at most 72 bytes"`, before checking the email. Sign-in answers `401` `"Invalid email or password"`. An account whose password was set over 72 bytes under bcrypt 4, which used only the first 72 bytes, can't sign in with that password.
 
 See [Session sign-in for admin endpoints](/api/endpoints#session-sign-in-for-admin-endpoints), [`GET /auth/users`](/api/authentication#get-auth-users), and [`GET /auth/api-keys`](/api/authentication#get-auth-api-keys).
 

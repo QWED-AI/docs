@@ -254,6 +254,8 @@ Create a new user and organization. Returns a JWT token for immediate use.
 }
 ```
 
+The password can be at most 72 bytes in UTF-8. bcrypt reads no more than 72 bytes, so QWED refuses a longer password with `400 Bad Request` and `"Password must be at most 72 bytes"`. Characters outside ASCII take more than one byte each, so a password with fewer than 72 characters can still be too long. QWED checks the length before it looks up the email, so the response is the same whether or not the email is registered.
+
 **Response:**
 
 ```json
@@ -286,6 +288,8 @@ Sign in an existing user.
 ```
 
 **Response:** Same format as `/auth/signup`.
+
+A password over 72 bytes in UTF-8 can't match any account. Sign-in returns `401 Unauthorized` with `"Invalid email or password"` for it, whether or not the email is registered.
 
 Sign-in returns `403 Forbidden` for a deactivated user (`"Account is deactivated"`) and for a user whose organization is inactive or missing (`"Organization is not active"`).
 
