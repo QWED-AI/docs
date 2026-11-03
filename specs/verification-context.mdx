@@ -148,7 +148,7 @@ The attestation authenticates the document relative to the issuer's key. It does
 
 Verification Context v1.0 is exposed across every QWED surface as of v7.1.0:
 
-- **API**: [`POST /verification-context/from-diagnostic`, `/validate`, and `/resolve`](/api/endpoints#verification-context-endpoints). `from-diagnostic` returns signed v1.1 documents, and `validate` and `resolve` check the attestation by default.
+- **API**: [`POST /verification-context/from-diagnostic`, `/validate`, and `/resolve`](/api/endpoints#verification-context-endpoints). `from-diagnostic` returns signed v1.1 documents, and `validate` and `resolve` check the attestation by default. The audit row of each `from-diagnostic` call stores the signed document as returned, so it still verifies when read back from the audit log. Only the row's `query` is redacted, and the stored document keeps any personal data in the request. See [audit row](/api/endpoints#post-verification-context-from-diagnostic).
 - **Python SDK**: client methods and re-exported types on `qwed_sdk`, plus `to_verification_context()` on the verifier classes (Math and the secure code executor convert through `create_verification_context_from_diagnostic()`). `validate_verification_context()` and `resolve_verification_context()` verify the attestation by default. See the [Python SDK](/sdks/python#verification-context).
 - **CLI**: the [`qwed context`](/advanced/cli#qwed-context-verification-context-utilities) command group. `validate` and `resolve` verify the attestation with `--server` or `--jwks-file` by default.
 - **GitHub Action** — `verdict`, `admission`, `proof_ref`, and `verification_context` [outputs](/advanced/github-action#outputs).
