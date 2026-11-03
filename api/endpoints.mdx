@@ -238,6 +238,10 @@ Every response from this endpoint includes `admission`. Gate on `admission`, not
 | Proven false | `2 + 2 = 5` | `VERIFIED` | `false` | `BLOCKED` |
 | Undecided symbolic difference | SymPy can't decide the difference is zero or non-zero | `UNVERIFIABLE` | `false` | `BLOCKED` |
 | Domain-restricted identity | `x/x = 1`, `(x**2-1)/(x-1) = x+1` | `UNVERIFIABLE` | `false` | `BLOCKED` |
+| Undefined part | `log(0)**0 = 2` | `UNVERIFIABLE` | `false` | `BLOCKED` |
+| Parse error | `d/dx(x^2) = 2x`, unparseable text | `BLOCKED` | `false` | `BLOCKED` |
+
+The expression can use `diff(f, x)` or `Derivative(f, x)`, for example `diff(x**2, x) == 2*x`. `==` reads as `=`. See [Derivatives in `/verify/math` identities](/engines/math#derivatives-in-verify-math-identities).
 
 **Response (proven false):**
 
@@ -259,6 +263,23 @@ Every response from this endpoint includes `admission`. Gate on `admission`, not
 A proven-false identity is a decided verdict, so `status` is `VERIFIED` and `proof_ref` is set. Previous versions returned `UNVERIFIABLE` for it.
 
 **Response (domain-restricted identity):** An identity that holds only after SymPy cancels a removable singularity returns `UNVERIFIABLE` with `constraint_id: "math.domain_restricted_identity"`. For example, `x/x = 1` is false at `x = 0`. See [Domain-restricted identities](/engines/math#domain-restricted-identities).
+
+**Response (undefined part):** A claim with a side that SymPy evaluates away from an undefined value (`zoo` or `nan`) is not disproven. For example, SymPy reads `log(0)**0` as `1`. `log(0)**0 = 2` returns `UNVERIFIABLE` with `constraint_id: "math.undefined_part"`, `agent_message: "A side of the identity is undefined"`, and no attestation. Previous versions returned a signed disproof.
+
+**Response (parse error):** Input the parser refuses returns `BLOCKED` with `constraint_id: "math.parse_error"`. The parser's own error text is not returned. Previous versions returned `api.math.execution_error` with `Internal verification error`.
+
+```json
+{
+  "status": "BLOCKED",
+  "is_valid": false,
+  "agent_message": "Expression could not be parsed",
+  "constraint_id": "math.parse_error",
+  "proof_ref": null,
+  "admission": "BLOCKED"
+}
+```
+
+Leibniz notation (`d/dx`, `dy/dx`, `d^2y/dx^2`) gets the same `BLOCKED` result with the message `Expression uses d/dx notation, or a name read as d times a variable, which cannot be read unambiguously; write diff(f, x) for a derivative`.
 
 The audit log row's `is_verified` follows `is_valid`, so a proven-false identity is logged as not verified.
 
@@ -854,7 +875,7 @@ Math, logic, and natural-language items return the [`DiagnosticResult`](/advance
 - `result.agent_message`: short human-readable summary safe to surface to the caller.
 - `result.developer_fields`: engine detail (including the legacy `is_valid` flag for backward compatibility).
 - `result.proof_ref`: cryptographic hash of the retained proof artifact. Present only when `result.status == VERIFIED`; `null` otherwise. **This is the authority bit.** Downstream gates must reject any item whose `proof_ref` is `null`.
-- `result.admission`: `ADMIT` or `BLOCKED` on math, SQL, and code items, the same decision `POST /verify/math`, `POST /verify/sql`, and `POST /verify/code` return. Natural-language items always carry `BLOCKED`. Logic and fact items carry no admission. Admit an item only when `admission` is `ADMIT`, `status` is `VERIFIED`, and `proof_ref` is set. A proven-malicious query or proven-unsafe code is `VERIFIED` with admission `BLOCKED`. A math item whose sides differ is `UNVERIFIABLE` with admission `BLOCKED` (see the table below), unlike `POST /verify/math`, which returns a proven-false identity as `VERIFIED`.
+- `result.admission`: `ADMIT` or `BLOCKED` on math, SQL, and code items, the same decision `POST /verify/math`, `POST /verify/sql`, and `POST /verify/code` return. Natural-language items always carry `BLOCKED`. Logic and fact items carry no admission. Admit an item only when `admission` is `ADMIT`, `status` is `VERIFIED`, and `proof_ref` is set. A proven-malicious query, proven-unsafe code, or a math claim proven false is `VERIFIED` with admission `BLOCKED`.
 
 | Item type | `result` |
 |-----------|----------|
@@ -912,14 +933,27 @@ The full response for two math items:
       "status": "completed",
       "result": {
         "status": "VERIFIED",
-        "agent_message": "Identity verified",
+        "agent_message": "Identity is true",
+        "query": "x**2 + 2*x + 1 = (x+1)**2",
+        "type": "math",
+        "is_valid": true,
+        "result": true,
+        "left_side": "x**2 + 2*x + 1",
+        "right_side": "(x + 1)**2",
+        "simplified_difference": "0",
+        "diff": "0",
         "developer_fields": {
           "query": "x**2 + 2*x + 1 = (x+1)**2",
           "type": "math",
           "is_valid": true,
+          "result": true,
+          "left_side": "x**2 + 2*x + 1",
+          "right_side": "(x + 1)**2",
+          "simplified_difference": "0",
           "diff": "0"
         },
         "proof_ref": "sha256:9f2c…",
+        "attestation": "eyJ...",
         "admission": "ADMIT",
         "is_authoritative": true
       },
@@ -951,15 +985,22 @@ The full response for two math items:
 
 #### Math items: proof vs. simplification
 
-Math items take the same trust step as `POST /verify/math`: QWED signs a `VERIFIED` identity and enforces the attestation as mandatory. The attestation's engine is `math`. Four outcomes are possible:
+Math items build the identity verdict with the same function as `POST /verify/math`, so an equality claim gets the same verdict on both routes. They take the same trust step: QWED signs a `VERIFIED` identity, true or proven false, and enforces the attestation as mandatory. The attestation's engine is `math`.
 
-| Result | `status` | `proof_ref` | When |
-|--------|----------|-------------|------|
-| Verified identity | `VERIFIED` | `sha256:...` | Equality claim (e.g., `x**2 + 2*x + 1 = (x+1)**2`) simplifies to `0` **and** attestation signing succeeds. |
-| Not equal | `UNVERIFIABLE` | `null` | Equality claim where the two sides do not simplify to the same expression. `developer_fields.is_valid` is `false` and `developer_fields.diff` shows the non-zero difference. |
-| Simplification only | `UNVERIFIABLE` | `null` | Expression without an equality (e.g., `x + x`). `developer_fields.simplified` contains the simplified form. |
-| Domain-restricted identity | `UNVERIFIABLE` | `null` | Equality whose sides are undefined at different points, such as `x/x = 1`. `constraint_id` is `math.domain_restricted_identity`, as on `POST /verify/math`. |
-| Signing failed | `BLOCKED` | `null` | Verified identity whose attestation could not be issued. See below. |
+Each equality item carries the route's messages (`Identity is true`, `Identity is false`, and so on) and fields (`left_side`, `right_side`, `simplified_difference`, `result`), and keeps its own `query`, `type`, and `diff`.
+
+| Result | `status` | `is_valid` | `proof_ref` | `admission` | When |
+|--------|----------|------------|-------------|-------------|------|
+| Verified identity | `VERIFIED` | `true` | `sha256:...` | `ADMIT` | Equality claim (e.g., `x**2 + 2*x + 1 = (x+1)**2`) simplifies to `0` **and** attestation signing succeeds. |
+| Proven false | `VERIFIED` | `false` | `sha256:...` | `BLOCKED` | SymPy decides the difference is non-zero (e.g., `2 + 2 = 5`). The item carries `attestation`. `diff` shows the non-zero difference. |
+| Undecided | `UNVERIFIABLE` | `false` | `null` | `BLOCKED` | SymPy can't decide the difference, or the difference only holds float residue. |
+| Undefined part | `UNVERIFIABLE` | `false` | `null` | `BLOCKED` | A side has a part that evaluates to `zoo` or `nan`, such as `log(0)**0 = 2`. `constraint_id` is `math.undefined_part`, as on `POST /verify/math`. |
+| Simplification only | `UNVERIFIABLE` | `false` | `null` | `BLOCKED` | Expression without an equality (e.g., `x + x`). `developer_fields.simplified` contains the simplified form. |
+| Domain-restricted identity | `UNVERIFIABLE` | `false` | `null` | `BLOCKED` | Equality whose sides are undefined at different points, such as `x/x = 1`. `constraint_id` is `math.domain_restricted_identity`, as on `POST /verify/math`. |
+| Parse error | `BLOCKED` | `false` | `null` | `BLOCKED` | The parser refuses the expression, including Leibniz notation such as `d/dx`. `constraint_id` is `math.parse_error`, as on `POST /verify/math`. |
+| Signing failed | `BLOCKED` | n/a | `null` | `BLOCKED` | Verified identity whose attestation could not be issued. See below. |
+
+Previously, a batch math claim proven false was `UNVERIFIABLE` with no `proof_ref`, and an expression the parser refused was a `failed` item carrying the parser's error text.
 
 If attestation signing fails on an otherwise-verified identity, the item is `BLOCKED`, as on `POST /verify/math`. Previously it was downgraded to `UNVERIFIABLE`. A math result is never returned as `VERIFIED` without a signed proof.
 
@@ -990,7 +1031,7 @@ Bare expressions (no `=`) always return `UNVERIFIABLE`. A successful symbolic si
 </Warning>
 
 <Info>
-The pre-v6.0 top-level `is_valid` field is preserved inside `developer_fields.is_valid` for backward compatibility, but new code should gate on `result.status == "VERIFIED"` and the presence of `result.proof_ref`. The batch response does not include a pass/fail aggregate because a boolean cannot represent the three-status verdict — count `items[].result.status == "VERIFIED"` entries directly if you need a success ratio.
+The pre-v6.0 top-level `is_valid` field is preserved inside `developer_fields.is_valid` for backward compatibility, but new code should gate on `result.admission == "ADMIT"`, `result.status == "VERIFIED"`, and the presence of `result.proof_ref`. A math claim proven false is `VERIFIED` with a `proof_ref`, so `status` alone does not mean the claim holds. The batch response does not include a pass/fail aggregate because a boolean cannot represent the three-status verdict — count `items[].result.status == "VERIFIED"` entries directly if you need a success ratio.
 </Info>
 
 Each item runs under `QWED_BATCH_ITEM_TIMEOUT` (default 60 seconds). An item that times out is marked `failed` with its error recorded, and the rest of the job still completes.
