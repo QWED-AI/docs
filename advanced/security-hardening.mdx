@@ -355,11 +355,28 @@ While QWED handles internal verification, you must implement the following "Huma
 - **Output monitoring**: Log and randomly audit verified outputs to ensure the verification engine itself hasn't been bypassed.
 
 #### LLM05: Supply-chain vulnerabilities
-- **Startup environment integrity**: QWED enforces environment integrity at startup by verifying all Python `.pth` startup hook files against a built-in allowlist. If any unrecognized `.pth` file is found, the server refuses to start. You can extend the allowlist for custom deployments using the `QWED_ALLOWED_STARTUP_PTH_FILES` environment variable (comma-separated list of filenames).
+- **Startup environment integrity**: QWED checks every Python `.pth` startup hook file in `site-packages` when the server starts. If a file is not on the allowlist, or an allowed file contains a suspicious pattern such as `exec(` or `__import__(`, the server refuses to start. Extend the allowlist for custom deployments with the `QWED_ALLOWED_STARTUP_PTH_FILES` environment variable, a comma-separated list. Each entry is one of two forms:
+
+  - **A file name** (`my_hook.pth`): QWED allows the file but still scans it for suspicious patterns.
+  - **A digest pin** (`my_hook.pth:sha256:<64 hex>`): QWED allows the file only while the SHA-256 of its exact contents matches the digest, and doesn't pattern-scan it. Any change to the file changes the digest. A pin overrides a plain name for the same file.
 
   ```bash
   export QWED_ALLOWED_STARTUP_PTH_FILES="my_custom_plugin.pth,internal_tool.pth"
   ```
+
+  Use a digest pin for a legitimate hook that contains a flagged pattern. In a Python 3.11 venv, setuptools' `distutils-precedence.pth` (which uses `__import__(`) and coverage's `a1_coverage.pth` (which uses `exec(`) both fail the pattern scan. Before digest pins, the only way past them was `QWED_SKIP_ENV_INTEGRITY_CHECK=true`. To take a file's digest, run:
+
+  ```bash
+  python -c "import hashlib,os,sys; p=sys.argv[1]; print(os.path.basename(p) + ':sha256:' + hashlib.sha256(open(p,'rb').read()).hexdigest())" path/to/site-packages/distutils-precedence.pth
+  ```
+
+  Put the printed `NAME.pth:sha256:<hex>` value in the variable:
+
+  ```bash
+  export QWED_ALLOWED_STARTUP_PTH_FILES="distutils-precedence.pth:sha256:<hex>,a1_coverage.pth:sha256:<hex>"
+  ```
+
+  QWED ships no built-in digests, because these files change between setuptools and coverage versions. When you upgrade the package that wrote a pinned file, take its digest again. A pinned file whose contents differ fails the check and is counted as `digest_mismatch`. An entry with a colon that isn't `NAME.pth:sha256:<64 hex>`, with `NAME` a file name and no directory, stops startup with a `ValueError` instead of being read as a name.
 
   If you need to bypass the environment integrity check entirely (for example, in development environments with non-standard `.pth` files), set `QWED_SKIP_ENV_INTEGRITY_CHECK=true`. The server will log a warning when this bypass is active.
 
@@ -368,7 +385,7 @@ While QWED handles internal verification, you must implement the following "Huma
   export QWED_SKIP_ENV_INTEGRITY_CHECK=true
   ```
 
-- **Startup hook detection**: Use [`StartupHookGuard`](/sdks/guards#startuphookguard) to scan for malicious `.pth` files in Python `site-packages` before your application starts. This defends against supply chain attacks that inject code-execution hooks via compromised PyPI packages.
+- **Startup hook detection**: Use [`StartupHookGuard`](/sdks/guards#startuphookguard) to scan for malicious `.pth` files in Python `site-packages` before your application starts. This defends against supply chain attacks that inject code-execution hooks via compromised PyPI packages. Pass `pinned_pth_digests` to allow a hook by its digest, or parse the same `QWED_ALLOWED_STARTUP_PTH_FILES` value with `parse_startup_hook_allowlist`.
 - **Network Isolation**: Run the QWED backend in a VPC without direct outbound internet access, except to specific LLM provider APIs (allowlist).
 - **Dependency Scanning**: Regularly scan your deployment container for vulnerabilities in system packages.
 
