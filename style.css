@@ -1,7 +1,7 @@
-/* QWED brand: code in JetBrains Mono, matching qwedai.tech. Headings and body
-   fonts are set in docs.json. */
-@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono&display=swap');
+/* QWED brand: code in Geist Mono, matching qwedai.tech. Headings and body
+   (Geist) are set in docs.json. */
+@import url('https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400..600&display=swap');
 
 code, pre, kbd, samp {
-  font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-family: 'Geist Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
