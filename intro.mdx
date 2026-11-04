@@ -6,7 +6,7 @@ icon: "shield-check"
 ---
 
 <Note>
-**QWED v7.2.0 is live** — you get fail-closed security hardening across expression parsing, auth, sandbox, and event loop, plus a new float-precision advisory. No breaking wire changes. [See what's new →](/releases)
+**QWED v8.0.0 is the current release.** Every `VERIFIED` answer now carries a signed attestation you can check against `/.well-known/jwks.json`. Some settings, response shapes, and SDK types change, so read the [upgrade steps](/changelog#v8-0-0-—-attested-verdicts-and-upgrade-guide) before you upgrade.
 </Note>
 
 ## What is QWED?
@@ -81,7 +81,7 @@ pip install qwed==8.0.0
 ```
 
 ```bash docker
-docker pull qwedai/qwed-verification:7.2.0
+docker pull qwedai/qwed-verification:8.0.0
 ```
 
 </CodeGroup>
@@ -135,14 +135,14 @@ qwed verify-logic "(AND (GT x 5) (LT y 10))"
   Explore core, analysis, and specialized engines.
 </Card>
 
-## What's new in v7.2.0
+## What's new in v8.0.0
 
 <AccordionGroup>
-  <Accordion title="Security hardening batch" icon="shield-check" defaultOpen>
-    v7.2.0 hardens expression parsing, auth, sandbox containment, and event-loop safety against RCE, auth DoS, and resource exhaustion — with no breaking wire changes. [Learn more →](/releases)
+  <Accordion title="Signed verdicts" icon="shield-check" defaultOpen>
+    The server signs the status, `proof_ref`, statement, and admission of every `VERIFIED` answer with an ES256 attestation. Check it against the public keys at `/.well-known/jwks.json`. Set `QWED_SIGNING_KEY` or `QWED_SIGNING_KEY_FILE` so attestations keep verifying across restarts and replicas. [Read about attestations →](/advanced/attestations)
   </Accordion>
-  <Accordion title="Precision advisory" icon="microchip">
-    When you verify expressions with binary floating-point constants, you will see a `precision.float-constants` advisory in `developer_fields.advisory_checks`. It never affects your verdict.
+  <Accordion title="Before you upgrade" icon="triangle-exclamation">
+    The server now refuses to start without `QWED_AUDIT_SECRET_KEY`. The Docker image runs the API server instead of the GitHub Action, and the Go module path moves to `/v8`. A math claim proven false is now `VERIFIED` with admission `DENY`, not `UNVERIFIABLE`. [Read the upgrade steps →](/changelog#v8-0-0-—-attested-verdicts-and-upgrade-guide)
   </Accordion>
 </AccordionGroup>
 
