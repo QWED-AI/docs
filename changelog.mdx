@@ -31,7 +31,7 @@ Jump to: [QWED-MCP v0.2.3](#qwed-mcp-v0-2-3-—-qwedai-com-no-longer-trusted-and
 
 ### What's new
 
-- **Attestations on every `VERIFIED` answer.** The server signs the status, `proof_ref`, and statement of each `VERIFIED` answer, and the admission on routes that decide one. Callers verify the token against the keys published at `/.well-known/jwks.json`. See [Attestations](/advanced/attestations).
+- **Attestations on every `VERIFIED` answer.** The server signs the status, `proof_ref`, and statement hash of each `VERIFIED` answer, and the admission on routes that decide one. Callers verify the token against the keys published at `/.well-known/jwks.json`. See [Attestations](/advanced/attestations).
 - **Configured signing key.** Set `QWED_SIGNING_KEY` (PEM text) or `QWED_SIGNING_KEY_FILE` (a path to a PEM file) to an unencrypted EC P-256 key. Attestations then verify across restarts and on every replica. Without either variable, each process generates its own key. See [Signing keys](/advanced/attestations#signing-keys).
 - **Attestation lifetime.** `QWED_ATTESTATION_TTL_SECONDS` sets how long a token stays valid. The default is `86400` (24 hours), and the allowed range is `60` to `2592000` (30 days).
 
