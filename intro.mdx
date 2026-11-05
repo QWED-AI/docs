@@ -81,9 +81,12 @@ pip install qwed==8.0.0
 The examples below use the `qwed` CLI that this installs. The `qwedai/qwed-verification:8.0.0` Docker image runs the API server instead; see [Self-hosting](/advanced/self-hosting#docker).
 
 ```bash
-# Verify a simple claim
-qwed verify "Is 2+2=5?"
-# -> CORRECTED: The answer is 4
+# Run every engine on known cases (no LLM needed)
+qwed test
+# Math:
+#   [ok] 2+2=4                  -> VERIFIED | ADMIT
+#   [ok] 2+2=5                  -> VERIFIED (false) | DENY
+#   ...
 
 # Verify logic constraints
 qwed verify-logic "(AND (GT x 5) (LT y 10))"
@@ -136,7 +139,7 @@ qwed verify-logic "(AND (GT x 5) (LT y 10))"
     The server signs the status, `proof_ref`, and statement hash of every `VERIFIED` answer with an ES256 attestation, and the admission on routes that decide one. Check it against the public keys at `/.well-known/jwks.json`. Set `QWED_SIGNING_KEY` or `QWED_SIGNING_KEY_FILE` so attestations keep verifying across restarts and replicas. [Read about attestations →](/advanced/attestations)
   </Accordion>
   <Accordion title="Before you upgrade" icon="triangle-exclamation">
-    The server now refuses to start without `QWED_AUDIT_SECRET_KEY`. The Docker image runs the API server instead of the GitHub Action, and the Go module path moves to `/v8`. A math claim proven false is now `VERIFIED` with admission `DENY`, not `UNVERIFIABLE`. [Read the upgrade steps →](/changelog#v8-0-0-—-attested-verdicts-and-upgrade-guide)
+    The server now refuses to start without `QWED_AUDIT_SECRET_KEY`. The Docker image runs the API server instead of the GitHub Action, and the Go module path moves to `/v8`. A math claim proven false is now `VERIFIED`, not `UNVERIFIABLE`, with admission `BLOCKED` in API and SDK responses (`DENY` in Verification Context documents and CLI output). [Read the upgrade steps →](/changelog#v8-0-0-—-attested-verdicts-and-upgrade-guide)
   </Accordion>
 </AccordionGroup>
 
