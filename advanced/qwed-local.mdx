@@ -58,6 +58,10 @@ pip install colorama click
 
 ## Quick start
 
+<Note>
+From v9.0.0, `QWEDLocal` needs `model=`. QWED names no default model, so pass a model ID your provider serves. Without one, `QWEDLocal` raises `ValueError`. The same applies to `verify()`.
+</Note>
+
 ### Option 1: Ollama (no per-call cost)
 
 ```bash
@@ -206,6 +210,7 @@ print(f"Hits: {stats.hits}, Misses: {stats.misses}")
 ```python
 client = QWEDLocal(
     provider="openai",
+    model="gpt-4o-mini",
     api_key="...",
     cache=False  # Always fresh
 )
@@ -322,6 +327,7 @@ Caching reduces repeated-query cost by skipping the LLM call.
 ```python
 client = QWEDLocal(
     provider="openai",
+    model="gpt-4o-mini",
     api_key="...",
     cache=True,
     cache_ttl=3600  # 1 hour TTL (default: 24 hours)
@@ -374,7 +380,7 @@ for fact in facts_to_check:
 import os
 from qwed_sdk import QWEDLocal
 
-client = QWEDLocal(provider="openai", api_key=os.getenv("OPENAI_API_KEY"))
+client = QWEDLocal(provider="openai", model="gpt-4o-mini", api_key=os.getenv("OPENAI_API_KEY"))
 
 code_snippets = [
     "def add(a, b): return a + b",
@@ -395,7 +401,7 @@ for code in code_snippets:
 ```python
 from qwed_sdk import QWEDLocal
 
-client = QWEDLocal(provider="openai", api_key="...")
+client = QWEDLocal(provider="openai", model="gpt-4o-mini", api_key="...")
 
 # Process 1000 math queries
 queries = ["What is 2+2?"] * 500 + ["What is 3+3?"] * 500

@@ -33,7 +33,7 @@ The wizard runs three steps:
 
 **Supported providers:**
 
-| Provider | Slug | Default model | Key env variable |
+| Provider | Slug | Credentials | Key format |
 |---|---|---|---|
 | NVIDIA NIM | `nvidia` | API key | Any key format |
 | OpenAI | `openai` | API key | `sk-...` or `sk-proj-...` |
@@ -132,7 +132,7 @@ qwed init \
 | `--provider` | Provider to configure (`nvidia`, `openai`, `anthropic`, `gemini`, `custom`) | Interactive prompt (or `nvidia` in non-interactive mode) |
 | `--api-key` | Provider API key (placeholder values are ignored) | Read from environment |
 | `--base-url` | Base URL for custom/OpenAI-compatible providers | Provider default |
-| `--model` | Default model for the provider | Provider default |
+| `--model` | Model for the provider, saved to its model variable (such as `OPENAI_MODEL`) | None. Interactive mode asks for one. With `--non-interactive`, pass `--model` or set the provider's model variable, or `qwed init` stops |
 | `--organization-name` | Organization name for API key bootstrap | Interactive prompt (or auto-generated) |
 | `--server-url` | Local QWED server URL | `http://localhost:8000` |
 | `--non-interactive` | Run without prompts (CI-friendly) | `false` |
@@ -395,17 +395,19 @@ qwed verify "Is (p AND q) satisfiable?" --model llama3
 
 **Options:**
 - `--provider, -p` - LLM provider (`openai`, `anthropic`, `gemini`)
-- `--model, -m` - Model name (e.g., `gpt-4o-mini`, `llama3`)
+- `--model, -m` - Model name (e.g., `gpt-4o-mini`, `llama3`). Without it, the CLI reads the selected provider's model variable (see [Provider-specific variables](#provider-specific-variables)). With an explicit `--base-url`, it reads no model variable, so pass `--model`
 - `--base-url` - Custom API endpoint (for Ollama: `http://localhost:11434/v1`)
-- `--api-key` - API key (or use `QWED_API_KEY` env var)
+- `--api-key` - API key (or use `QWED_API_KEY` env var). The provider `qwed init` saved gets a key only from `--api-key` on the command line or from its own key variable, never from `QWED_API_KEY`
 - `--no-cache` - Disable caching
 - `--quiet, -q` - Minimal output (for scripts)
 - `--mask-pii` - Mask PII (emails, phone numbers, etc.) before sending queries to the LLM
 
+QWED names no default model. When neither `--model` nor the provider's model variable is set, `qwed verify` stops with an error that names the variable to set.
+
 **Examples:**
 
 ```bash
-# Ollama (auto-detected)
+# Ollama (used when ACTIVE_PROVIDER is unset; reads OLLAMA_MODEL)
 qwed verify "2+2"
 
 # OpenAI
@@ -429,6 +431,8 @@ qwed interactive
 qwed interactive --provider openai
 qwed interactive --model llama3
 ```
+
+Without `--provider`, `qwed interactive` runs the provider `qwed init` saved in `ACTIVE_PROVIDER`, with its endpoint and key, as `qwed verify` does. It takes the model from `--model`, else from that provider's model variable, and stops with an error naming the variable when neither is set.
 
 **Usage:**
 
@@ -607,7 +611,9 @@ Set by `qwed init`. Tells the CLI which provider to use when no `--provider` or 
 export ACTIVE_PROVIDER=openai
 ```
 
-Valid values: `openai`, `anthropic`, `gemini`, `openai_compat`.
+Values the CLI runs: `ollama`, `openai-compatible` (or `openai_compat`), `openai`, `openai_direct` (run as `openai`), `anthropic`, and `gemini`. The CLI reads the value as the server does: in any case, with `-`, `_`, or a space. When `ACTIVE_PROVIDER` is unset, the CLI runs Ollama.
+
+A provider only the server runs, such as `azure_openai` or `auto`, stops `qwed verify` and `qwed interactive` with an error naming `ACTIVE_PROVIDER`. So does `anthropic` with `ANTHROPIC_ENDPOINT` set, because the CLI calls the Anthropic API directly.
 
 ### Provider-specific variables
 
@@ -616,14 +622,16 @@ These are written to `.env` by `qwed init` and loaded automatically via `python-
 | Variable | Provider | Description |
 |---|---|---|
 | `OPENAI_API_KEY` | OpenAI | Your OpenAI API key |
-| `OPENAI_MODEL` | OpenAI | Model name (default: `gpt-4o-mini`) |
+| `OPENAI_MODEL` | OpenAI | Model name. Required: QWED names no default |
 | `ANTHROPIC_API_KEY` | Anthropic | Your Anthropic API key |
-| `ANTHROPIC_MODEL` | Anthropic | Model name (default: `claude-sonnet-4-20250514`) |
-| `GOOGLE_API_KEY` | Google Gemini | Your Google API key |
-| `GEMINI_MODEL` | Google Gemini | Model name (default: `gemini-1.5-pro`) |
+| `ANTHROPIC_MODEL` | Anthropic | Model name. Required: QWED names no default |
+| `GOOGLE_API_KEY` | Google Gemini | Your Google API key (`GEMINI_API_KEY` is read when it is unset) |
+| `GEMINI_MODEL` | Google Gemini | Model name. Required: QWED names no default |
 | `CUSTOM_BASE_URL` | NVIDIA NIM / Custom | Endpoint URL (required for custom; default `https://integrate.api.nvidia.com/v1` for NVIDIA) |
 | `CUSTOM_API_KEY` | NVIDIA NIM / Custom | API key for the endpoint |
-| `CUSTOM_MODEL` | NVIDIA NIM / Custom | Model name (default: `nvidia/nemotron-3-super-120b-a12b` for NVIDIA, `gpt-4o-mini` for custom) |
+| `CUSTOM_MODEL` | NVIDIA NIM / Custom | Model name. Required: QWED names no default |
+| `OLLAMA_BASE_URL` | Ollama | Ollama endpoint (default: `http://localhost:11434/v1`) |
+| `OLLAMA_MODEL` | Ollama | Model name. Required: QWED names no default |
 | `QWED_JWT_SECRET_KEY` | All | JWT secret for local server authentication (auto-generated by `qwed init`, retained on re-run) |
 | `QWED_API_KEY_LOOKUP_SECRET` | All | HMAC-SHA256 key used to derive API-key lookup digests (auto-generated by `qwed init`, retained on re-run, must differ from `QWED_JWT_SECRET_KEY`). Never rotated automatically — see [API key storage and migration](/api/authentication#api-key-storage-and-migration-v7-2) |
 | `QWED_AUDIT_SECRET_KEY` | All | HMAC key that signs the audit hash chain. Required: the server refuses to start without it (auto-generated by `qwed init`, retained on re-run, never rotated automatically). See [Audit trail setup](/advanced/compliance#3-audit-trail-setup) |
@@ -642,11 +650,12 @@ Supported schemes include `sqlite`, `postgresql`, `mysql`, and `mariadb`. For SQ
 
 ### `QWED_API_KEY`
 
-Fallback API key when a provider-specific key is not set.
+API key that `qwed verify --api-key` reads when the flag is not given. It is used with an explicit `--provider`. It is never sent to the provider `qwed init` saved in `ACTIVE_PROVIDER`, because it may be your QWED server's key: set that provider's own key variable (such as `OPENAI_API_KEY`) instead.
 
 ```bash
 export QWED_API_KEY="sk-proj-..."
-qwed verify "2+2"
+export OPENAI_MODEL="gpt-4o-mini"
+qwed verify "2+2" --provider openai
 ```
 
 ### `QWED_QUIET`
@@ -668,19 +677,13 @@ When you run `qwed verify` without explicit flags, the CLI resolves the provider
 
 1. **Command-line flags** — `--provider` or `--base-url` take highest precedence
 2. **`ACTIVE_PROVIDER` env var** — set by `qwed init` or manually in `.env`
-3. **Ollama default** — falls back to `http://localhost:11434/v1` with model `llama3`
+3. **Ollama**: when `ACTIVE_PROVIDER` is unset, the CLI runs Ollama at `OLLAMA_BASE_URL` (default `http://localhost:11434/v1`)
 
 If you have run `qwed init`, the `ACTIVE_PROVIDER` value in your `.env` determines which provider and credentials are used automatically.
 
-### Default models
+### Models
 
-| Provider | Default model |
-|---|---|
-| NVIDIA NIM | `nvidia/nemotron-3-super-120b-a12b` |
-| OpenAI | `gpt-4o-mini` |
-| Anthropic | `claude-sonnet-4-20250514` |
-| Google Gemini | `gemini-1.5-pro` |
-| Custom (OpenAI-compatible) | `gpt-4o-mini` |
+QWED names no default model. Each provider runs the model you configure, from `--model` or the provider's model variable (`OPENAI_MODEL`, `ANTHROPIC_MODEL`, `GEMINI_MODEL`, `OLLAMA_MODEL`, or `CUSTOM_MODEL`). The value is sent to the provider unchanged, so any model ID it serves works. When no model is set, `qwed verify` and `qwed interactive` stop with an error that names the variable to set. Commands that call no model, such as `qwed test`, need none.
 
 ---
 
@@ -758,6 +761,7 @@ qwed verify "Is 17 a prime number?"
 #!/bin/bash
 export QWED_QUIET=1
 export QWED_API_KEY="sk-..."
+export OPENAI_MODEL="gpt-4o-mini"
 
 result=$(qwed verify "2+2" --provider openai)
 if [[ $result == *"VERIFIED"* ]]; then
@@ -772,6 +776,7 @@ fi
 ollama serve
 
 # Verify without API costs
+export OLLAMA_MODEL=llama3
 qwed interactive
 
 > What is the derivative of x^3?

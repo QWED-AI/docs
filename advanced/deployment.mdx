@@ -324,12 +324,16 @@ Run one worker per database. Every verification request appends an audit row, an
 ### AI providers
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `ACTIVE_PROVIDER` | Selected LLM provider | `azure_openai` |
+| `ACTIVE_PROVIDER` | Selected LLM provider: `openai`, `openai_direct`, `openai_compat`, `azure_openai`, `anthropic`, `claude_opus`, `gemini`, `ollama`, or `auto`. Any other value stops each request that needs a provider with an error naming `ACTIVE_PROVIDER` | `ollama` |
 | `AZURE_OPENAI_API_KEY` | API key for Azure OpenAI | - |
 | `AZURE_OPENAI_ENDPOINT` | Endpoint URL | - |
+| `AZURE_OPENAI_DEPLOYMENT` | Azure OpenAI deployment to run. Required for Azure OpenAI | - |
 | `ANTHROPIC_API_KEY` | API key for Anthropic | - |
+| `ANTHROPIC_MODEL` | Anthropic model to run. `ANTHROPIC_DEPLOYMENT` wins when set. Required for Anthropic | - |
 | `GOOGLE_API_KEY` | API key for Google Gemini (or `GEMINI_API_KEY`) | - |
-| `GEMINI_MODEL` | Gemini model name | `gemini-1.5-pro` |
+| `GEMINI_MODEL` | Gemini model to run. Required for Gemini | - |
+
+From v9.0.0, QWED names no default model. Set the model variable of the provider you use (`OPENAI_MODEL`, `AZURE_OPENAI_DEPLOYMENT`, `ANTHROPIC_MODEL`, `CLAUDE_OPUS_DEPLOYMENT`, `GEMINI_MODEL`, `OLLAMA_MODEL`, or `CUSTOM_MODEL`). The server still starts without one, because it builds a provider on first use. Logic, statistics, and fact requests that need the provider then fail with an error that names the variable. The natural-language routes answer `UNVERIFIABLE`. See [LLM configuration](/getting-started/llm-configuration#supported-llm-providers).
 
 ### Observability
 | Variable | Description | Default |
