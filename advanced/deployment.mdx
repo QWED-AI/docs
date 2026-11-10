@@ -321,6 +321,24 @@ Run one worker per database. Every verification request appends an audit row, an
 | `QWED_CROSSHAIR_IMAGE` | From v8.0.0. Local Docker image the Symbolic engine runs CrossHair in. Build it from `docker/crosshair-sandbox/Dockerfile`. QWED never pulls it at runtime | `qwed-crosshair-sandbox:0.0.101` |
 | `QWED_SKIP_ENV_INTEGRITY_CHECK` | Skip `.pth` file verification on startup | `false` |
 
+### Maths limits
+
+From v9.0.0, `/verify/math` and the maths items of `/verify/batch` run SymPy in a pool of worker processes. These settings size that pool. Unset or blank, each keeps its default.
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `QWED_MATH_WORKERS` | Worker processes. A whole number, at least `1` | `2` |
+| `QWED_MATH_TIMEOUT_SECONDS` | Time limit in seconds, from `0.001` to `3600`. It covers the wait for a free worker and then the run. A job that waits longer is `BLOCKED` (`math.capacity`). A job that runs longer is `UNVERIFIABLE` (`math.timeout`), and its worker is killed and replaced. Starting a new worker is not counted: the job waits up to 120 seconds for it, and a worker that does not start is `BLOCKED` (`math.worker_error`) | `10` |
+| `QWED_MATH_MAX_WAITING` | Jobs that may wait for a free worker. A whole number, at least `0`. A job that finds every worker busy and the queue full is `BLOCKED` (`math.capacity`) at once | `32` |
+| `QWED_MATH_WORKER_MEMORY_MB` | Memory limit of each worker in MB, on Linux only. A whole number, at least `0`. `0` turns the limit off. A job that runs out of memory is `BLOCKED` (`math.out_of_memory`) | `2048` |
+| `QWED_BATCH_MATH_BUDGET_SECONDS` | Time budget in seconds for the maths items of one batch job, at least `0`. It is wall-clock time from when the job starts, so time spent on the job's other items counts too. Each maths item keeps the time limit above, cut to what is left of the budget. An item reached with no budget left is not run (`batch.math_budget`). `0` means no maths item of a batch runs | `120` |
+
+<Warning>
+A value these settings cannot use stops the server at startup with an error naming the setting. That includes a value that is not a number, `inf` or `nan`, a value below its minimum, a fraction for a count, and a time limit over 3600 seconds. QWED never puts another value in its place.
+</Warning>
+
+`deploy/.env.example` and `deploy/kubernetes/configmap.yaml` list the five settings, commented out. `deploy/docker-compose.yml` passes them to the server by name, so one you don't set stays unset and keeps its default. Size the pool for your load.
+
 ### AI providers
 | Variable | Description | Default |
 |----------|-------------|---------|

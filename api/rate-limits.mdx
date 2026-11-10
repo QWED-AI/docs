@@ -136,6 +136,18 @@ Every outbound LLM provider call (translation and codegen for natural-language v
 
 Math expressions whose exact evaluation would be unboundedly expensive (huge integer literals, oversized exponents, power towers, large factorials) are rejected before evaluation. See [Math engine — compute-cost bounds](/engines/math#compute-cost-bounds).
 
+### Math time limit and worker pool
+
+From v9.0.0, `/verify/math` and the maths items of `/verify/batch` run in a fixed pool of worker processes. Unlike the limits above, the server operator sets these with the [maths limits settings](/advanced/deployment#maths-limits).
+
+| Outcome | Status | `constraint_id` |
+|---------|--------|-----------------|
+| The job runs past its time limit (default 10 seconds). Its worker is killed and replaced | `UNVERIFIABLE` | `math.timeout` |
+| Every worker is busy and the queue is full, or no worker frees up within the time limit | `BLOCKED` | `math.capacity` |
+| A batch job's maths budget (default 120 seconds) is used up before the item runs | `UNVERIFIABLE` | `batch.math_budget` |
+
+None of these results is admitted. On `math.capacity`, retry after a short delay.
+
 ## Per-IP limits on authentication endpoints
 
 Anonymous `/auth/*` routes such as `POST /auth/signup` and `POST /auth/signin` carry no API key, so the per-key limiter cannot apply. As of v7.2, these routes are rate limited per client IP instead. This blocks password-guessing and prevents unauthenticated requests from saturating the service with expensive password hashing.
