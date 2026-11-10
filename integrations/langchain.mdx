@@ -55,6 +55,18 @@ tools = [
 ]
 ```
 
+`QWEDLogicTool` sends the query to `POST /verify/logic`, where an LLM translates it into constraints. The server doesn't admit a logic result while that translation is unverified (see [Admission on the logic route](/engines/logic#admission-on-the-logic-route)), so the tool reports the solver's answer and why it is not admitted:
+
+| Server result | Tool output |
+|---------------|-------------|
+| `VERIFIED · ADMIT` | `✅ SAT: Satisfying assignment: ...` |
+| `VERIFIED`, not admitted | `⚠️ SAT, NOT ADMITTED: the translated constraints are satisfiable, with the assignment ..., but the constraints were translated from your query by an LLM, and that translation is not verified.` |
+| `UNVERIFIABLE`, solver `UNSAT` | `❌ UNSAT: no assignment satisfies the translated constraints. Not admitted: ...` |
+| Other `UNVERIFIABLE` | `⚠️ UNVERIFIABLE: <the server's message>` |
+| `BLOCKED` | `⛔ BLOCKED: <the server's message>` |
+
+Only an admitted result starts with `✅`.
+
 ### QWEDVerificationCallback
 
 Auto-verify all LLM outputs:

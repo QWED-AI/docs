@@ -342,7 +342,7 @@ Verify logical constraints. Routes through the QWED Control Plane.
 
 **Response:**
 
-The response is a [`DiagnosticResult`](/advanced/diagnostics), with the control plane's own output under `developer_fields` and also copied to the top level. A `VERIFIED` result carries a signed `attestation`.
+The response is a [`DiagnosticResult`](/advanced/diagnostics), with the control plane's own output under `developer_fields` and also copied to the top level, plus an `admission`. A `VERIFIED` result carries a signed `attestation`.
 
 ```json
 {
@@ -350,16 +350,25 @@ The response is a [`DiagnosticResult`](/advanced/diagnostics), with the control 
   "agent_message": "Logic constraints are satisfiable",
   "developer_fields": {
     "status": "SAT",
-    "model": {"x": "6", "y": "9"},
+    "model": {"x": "6"},
     "dsl_code": "(AND (GT x 5) (LT x 10))",
-    "provider_used": "openai_compat"
+    "declarations": {"x": "Int"},
+    "provider_used": "openai_compat",
+    "query_semantics_verified": false,
+    "query_interpretation_source": "llm_translation",
+    "verification_scope": "translated_expression_only",
+    "translated_expression": "(VAR x Int) (AND (GT x 5) (LT x 10))"
   },
   "proof_ref": "sha256:4c1e…",
   "is_authoritative": true,
   "attestation": "eyJ…",
-  "model": {"x": "6", "y": "9"},
+  "admission": "BLOCKED",
+  "model": {"x": "6"},
   "dsl_code": "(AND (GT x 5) (LT x 10))",
-  "provider_used": "openai_compat"
+  "provider_used": "openai_compat",
+  "query_semantics_verified": false,
+  "verification_scope": "translated_expression_only",
+  "translated_expression": "(VAR x Int) (AND (GT x 5) (LT x 10))"
 }
 ```
 
@@ -367,9 +376,11 @@ The response is a [`DiagnosticResult`](/advanced/diagnostics), with the control 
 |----------|-------------------------------------------|---------|
 | `VERIFIED` | `SAT` | Satisfiable: a solution exists, in `model` |
 | `UNVERIFIABLE` | `UNSAT` | Unsatisfiable: no solution exists |
-| `BLOCKED` | anything else (`ERROR`, `BLOCKED`, `UNKNOWN`) | Blocked by security policy, a translation or solver error, or a timeout |
+| `BLOCKED` | anything else (`ERROR`, `BLOCKED`, `UNKNOWN`) | Blocked by security policy, a translation or solver error, a timeout, or a translation that declares variables but states no constraint (`dsl_logic_verifier.no_constraint`) |
 
-The route makes no admission decision, so the response has no `admission`. The `provider_used` field shows which LLM provider handled the translation, in success and error responses alike.
+`status` covers only the constraints the LLM translated your question into, and nothing checks that they mean the question. So `admission` is `BLOCKED` on every logic result, as on `POST /verify/natural_language`: a satisfiable translation is `VERIFIED · BLOCKED`. The verdict names its scope with `query_semantics_verified: false`, `verification_scope: "translated_expression_only"` and `translated_expression`, the DSL after a `(VAR name Sort)` for each variable. The attestation signs the admission and binds `translated_expression`, so pass that as `query` when you [verify the attestation](/advanced/attestations#verifying-attestations). The audit row is stored as verified only when the result is admitted. Gate on `admission`, not on `status`. See [Admission on the logic route](/engines/logic#admission-on-the-logic-route).
+
+The `provider_used` field shows which LLM provider handled the translation, in success and error responses alike.
 
 **Error response:**
 
@@ -383,6 +394,7 @@ The route makes no admission decision, so the response has no `admission`. The `
   },
   "proof_ref": null,
   "is_authoritative": false,
+  "admission": "BLOCKED",
   "constraint_id": "api.logic.execution_error",
   "provider_used": "openai_compat"
 }
@@ -854,12 +866,12 @@ Math, logic, and natural-language items return the [`DiagnosticResult`](/advance
 - `result.agent_message`: short human-readable summary safe to surface to the caller.
 - `result.developer_fields`: engine detail (including the legacy `is_valid` flag for backward compatibility).
 - `result.proof_ref`: cryptographic hash of the retained proof artifact. Present only when `result.status == VERIFIED`; `null` otherwise. **This is the authority bit.** Downstream gates must reject any item whose `proof_ref` is `null`.
-- `result.admission`: `ADMIT` or `BLOCKED` on math, SQL, and code items, the same decision `POST /verify/math`, `POST /verify/sql`, and `POST /verify/code` return. Natural-language items always carry `BLOCKED`. Logic and fact items carry no admission. Admit an item only when `admission` is `ADMIT`, `status` is `VERIFIED`, and `proof_ref` is set. A proven-malicious query or proven-unsafe code is `VERIFIED` with admission `BLOCKED`. A math item whose sides differ is `UNVERIFIABLE` with admission `BLOCKED` (see the table below), unlike `POST /verify/math`, which returns a proven-false identity as `VERIFIED`.
+- `result.admission`: `ADMIT` or `BLOCKED` on math, SQL, and code items, the same decision `POST /verify/math`, `POST /verify/sql`, and `POST /verify/code` return. Natural-language and logic items always carry `BLOCKED`. Fact items carry no admission. Admit an item only when `admission` is `ADMIT`, `status` is `VERIFIED`, and `proof_ref` is set. A proven-malicious query or proven-unsafe code is `VERIFIED` with admission `BLOCKED`. A math item whose sides differ is `UNVERIFIABLE` with admission `BLOCKED` (see the table below), unlike `POST /verify/math`, which returns a proven-false identity as `VERIFIED`.
 
 | Item type | `result` |
 |-----------|----------|
 | `math` | The `POST /verify/math` verdict. See [Math items](#math-items-proof-vs-simplification) below. |
-| `logic` | The `POST /verify/logic` response. `VERIFIED` with a `proof_ref` when the constraints are satisfiable (SAT), `UNVERIFIABLE` when they are unsatisfiable (UNSAT), and `BLOCKED` otherwise. The control plane's own output (`status: "SAT"`, `model`, `provider_used`) stays under `result.developer_fields`. |
+| `logic` | The `POST /verify/logic` response, with `admission`, which is always `BLOCKED`. `VERIFIED` with a `proof_ref` when the translated constraints are satisfiable (SAT), `UNVERIFIABLE` when they are unsatisfiable (UNSAT), and `BLOCKED` otherwise. The control plane's own output (`status: "SAT"`, `model`, `provider_used`) and the scope fields stay under `result.developer_fields`. The item's audit row is stored as verified only when admitted. |
 | `natural_language` | The `POST /verify/natural_language` response, with `admission`, which is always `BLOCKED`. Only the verdict is kept: `final_answer`, `translation`, and `trust_boundary` are not returned. |
 | `code`, `fact`, `sql` | The item type's route result, unchanged apart from the trust step. A code item's `admission` is decided on the enforced verdict. |
 
@@ -868,7 +880,7 @@ QWED stores each math and SQL item's admission in its audit row, so `/audit/logs
 A SQL item must include `params.schema_ddl`. An item without it is marked `failed` with the error `Missing 'schema_ddl'`, the same message `POST /verify/sql` returns, and carries no admission.
 
 <Warning>
-**Breaking change.** Batch logic items no longer report `SAT` or `UNSAT` as `result.status`. Gate on `result.status == "VERIFIED"` and a non-null `result.proof_ref`. Read the solver's raw status from `result.developer_fields.status` if you need it.
+**Breaking change.** Batch logic items no longer report `SAT` or `UNSAT` as `result.status`. Read the solver's raw status from `result.developer_fields.status` if you need it. A logic item is never admitted while the translation is unverified: its `result.admission` is `BLOCKED`, even when `result.status` is `VERIFIED`.
 </Warning>
 
 A logic item, for example:
@@ -885,10 +897,14 @@ A logic item, for example:
     "developer_fields": {
       "status": "SAT",
       "model": {"x": "6", "y": "9"},
-      "provider_used": "openai_compat"
+      "provider_used": "openai_compat",
+      "query_semantics_verified": false,
+      "verification_scope": "translated_expression_only",
+      "translated_expression": "(VAR x Int) (VAR y Int) (AND (GT x 5) (LT y 10))"
     },
     "proof_ref": "sha256:4c1e…",
-    "is_authoritative": true
+    "is_authoritative": true,
+    "admission": "BLOCKED"
   },
   "latency_ms": 310.4
 }

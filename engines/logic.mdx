@@ -42,6 +42,20 @@ else:
     raise RuntimeError(f"Logic verification failed ({result.status}): {result.error}")
 ```
 
+### Admission on the logic route
+
+`POST /verify/logic` takes a natural-language question. An LLM translates it into DSL constraints, and Z3 decides only those constraints. Nothing checks that the constraints mean what you asked. For example, "Prove x > 5 implies x > 10" translated to `(AND (GT x 5) (GT x 10))` is satisfiable, so it comes back `VERIFIED`.
+
+QWED therefore admits a logic result the same way it admits a natural-language verdict: not until the translation itself is verified. The response carries `admission`, and it is `BLOCKED`:
+
+- A satisfiable translation is `VERIFIED · BLOCKED`. `VERIFIED` still means the translated constraints are satisfiable, and `model` holds an assignment.
+- An unsatisfiable translation is `UNVERIFIABLE · BLOCKED`.
+- A translation, compile or solver failure is `BLOCKED · BLOCKED`.
+
+The verdict names its scope in `developer_fields` (also copied to the top level): `query_semantics_verified: false`, `verification_scope: "translated_expression_only"` and `translated_expression`, the decided statement. `translated_expression` is the DSL after a `(VAR name Sort)` for each variable, because the sort changes the answer: `(AND (GT x 0) (LT x 1))` is satisfiable for a `Real` `x` and not for an `Int` one. The attestation signs the admission and binds `translated_expression`, not your question. The audit row is stored as verified only when the result is admitted.
+
+Read the model as the solver's answer about the translated constraints. Don't act on it as an answer to your question. Gate on `admission`, not on `status`.
+
 ---
 
 ## QWED-Logic DSL
@@ -351,7 +365,7 @@ elif result.status == "BLOCKED":
 ## `LogicVerifier` returns `DiagnosticResult` (v6.0.0)
 
 <Info>
-**Introduced in v6.0.0.** `LogicVerifier` is the second engine — after `FactVerifier` — to conform to the unified [`DiagnosticResult` contract](/advanced/diagnostics). The legacy `LogicResult` dataclass has been removed from the verifier's return surface. The `/verify/logic` endpoint, and so `client.verify_logic()`, maps the DSL verdict instead: `SAT` is `VERIFIED` with the model as evidence, `UNSAT` is `UNVERIFIABLE`, and anything else (`UNKNOWN`, `ERROR`, `BLOCKED`) is `BLOCKED`. `DSLLogicVerifier.verify_from_dsl()` returns the raw `SAT`, `UNSAT`, `UNKNOWN`, `ERROR` or `BLOCKED`.
+**Introduced in v6.0.0.** `LogicVerifier` is the second engine — after `FactVerifier` — to conform to the unified [`DiagnosticResult` contract](/advanced/diagnostics). The legacy `LogicResult` dataclass has been removed from the verifier's return surface. The `/verify/logic` endpoint, and so `client.verify_logic()`, maps the DSL verdict instead: `SAT` is `VERIFIED` with the model as evidence, `UNSAT` is `UNVERIFIABLE`, and anything else (`UNKNOWN`, `ERROR`, `BLOCKED`) is `BLOCKED`. The route's admission is `BLOCKED` (see [Admission on the logic route](#admission-on-the-logic-route)). `DSLLogicVerifier.verify_from_dsl()` returns the raw `SAT`, `UNSAT`, `UNKNOWN`, `ERROR` or `BLOCKED`. A program that only declares variables, such as `(VAR x Int)`, states no constraint and returns `BLOCKED` with `dsl_logic_verifier.no_constraint`.
 </Info>
 
 If you call the low-level `LogicVerifier` class directly, every one of its nine public methods now returns a `DiagnosticResult`:
@@ -430,6 +444,21 @@ Two fail-closed behaviors ship with the migration:
 | `dsl_compiler.type_validation` | A variable is declared with a malformed type such as `"BitVec"` (missing width), `"BitVec[]"`, or `"BitVec[abc]"`. The engine no longer silently defaults to 32-bit; you must declare a valid `BitVec[N]` with `N ≥ 1`. |
 
 Other `constraint_id`s used by the engine: `logic_verifier.invalid_constraint`, `logic_verifier.unknown_quantifier`, and `logic_verifier.execution_error`.
+
+### Checks that state nothing are not verified
+
+An empty set of constraints is satisfiable, and premises that contradict each other imply any conclusion. Neither tells you anything, so the engine refuses both:
+
+| Method | Input | Result |
+| --- | --- | --- |
+| `verify_logic`, `verify_bitvector`, `verify_array`, `verify_with_quantifiers` | No constraint is asserted | `BLOCKED` with `logic_verifier.no_constraint` |
+| `prove_theorem`, `check_implication` | The premises contradict each other | `UNVERIFIABLE` with `logic_verifier.vacuous_premises`. `developer_fields.unsat_core` lists the premises that conflict |
+| `prove_theorem`, `check_implication` | Z3 cannot decide whether the premises can all hold | `UNVERIFIABLE` with `logic_verifier.premises_undecided` |
+| Any method | A constraint, premise, conclusion or quantifier body that is not a Boolean formula, such as `"None"`, `"[]"`, a tuple or a number | `BLOCKED` |
+
+The engine checks the premises before the proof, and the two solves share one `timeout_ms` budget. For example, from the premises `x > 5` and `x < 3`, `prove_theorem` returns `UNVERIFIABLE` for the conclusion `x == 100`, not `VERIFIED`.
+
+Pass each constraint as its own list entry. A string that holds a list, such as `"[x > 5, x < 3]"`, is not split into constraints: it is `BLOCKED`.
 
 ### Migrating from `LogicResult`
 
@@ -511,6 +540,11 @@ result.developer_fields["constraint_id"]         # "dsl_compiler.type_validation
 ---
 
 ## Next steps
+
+- [DSL reference](/api/dsl-reference) - Complete operator documentation
+- [Verification diagnostics](/advanced/diagnostics) - The 3-layer `DiagnosticResult` model
+- [Code engine](./code) - Verify code correctness
+- [SQL engine](./sql) - Verify SQL queriess
 
 - [DSL reference](/api/dsl-reference) - Complete operator documentation
 - [Verification diagnostics](/advanced/diagnostics) - The 3-layer `DiagnosticResult` model

@@ -75,7 +75,7 @@ Use `is_admitted()` to decide whether to act on a result. Don't gate on `status`
 - `status` is `Verified`
 - `proof_ref` is set
 
-A missing or `Unknown` admission is never admitted. Endpoints that make no admission decision (`/verify/logic`, `/verify/fact`, `/verify/rag`, `/verify/process`, and batch logic and fact items) are therefore never admitted. The `verified` field that `/verify/rag` and `/verify/process` send is their guard's own result, not an admission. It stays in `extra["verified"]` and `developer_fields`.
+A missing or `Unknown` admission is never admitted. Endpoints that make no admission decision (`/verify/fact`, `/verify/rag`, `/verify/process`, and batch fact items) are therefore never admitted. `/verify/logic` and batch logic items return admission `BLOCKED` while the translation of the query is unverified, so they are not admitted either. The `verified` field that `/verify/rag` and `/verify/process` send is their guard's own result, not an admission. It stays in `extra["verified"]` and `developer_fields`.
 
 ```rust
 let result = client.verify_math("2 + 2 = 5").await?;
@@ -111,7 +111,8 @@ println!("{:?}", result.extra.get("is_valid"));  // Some(Bool(true))
 
 ```rust
 let result = client.verify_logic("(AND (GT x 5) (LT y 10))").await?;
-// /verify/logic makes no admission decision, so is_admitted() is false.
+// /verify/logic returns admission BLOCKED while the translation is unverified,
+// so is_admitted() is false even when the status is VERIFIED.
 println!("{:?} {:?}", result.status, result.extra.get("model"));
 ```
 
