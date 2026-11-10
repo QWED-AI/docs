@@ -749,26 +749,44 @@ Verify the structural integrity of LLM reasoning traces. Supports IRAC structura
 | `mode` | string | No | `irac` | `irac` or `milestones` |
 | `milestones` | string[] | Conditional | — | Required when `mode` is `milestones` |
 
-**Response (IRAC mode):**
+<Info>Changed after v9.1.0 (unreleased)</Info>
+
+<Warning>
+`/verify/process` never returns `VERIFIED`. The guard only looks for IRAC keywords, or for milestone keywords that the request names itself, so it can't show that the reasoning is right. The route returns `UNVERIFIABLE` whether the guard passes or fails, with no `proof_ref` and no attestation, and the audit row is not stored as verified. The guard's own result is advisory only.
+</Warning>
+
+**Response (IRAC mode, all steps found):**
 
 ```json
 {
-  "verified": true,
-  "score": 1.0,
-  "missing_steps": [],
-  "mechanism": "Regex Pattern Matching (Deterministic)"
+  "status": "UNVERIFIABLE",
+  "agent_message": "The trace has the expected markers, but keyword matching does not verify the reasoning",
+  "proof_ref": null,
+  "is_authoritative": false,
+  "constraint_id": "api.process.advisory_only",
+  "advisory_checks": [
+    {
+      "name": "process_guard",
+      "advisory_only": true,
+      "constraint_id": "api.process.guard",
+      "details": {
+        "verified": true,
+        "score": 1.0,
+        "missing_steps": [],
+        "mechanism": "Regex Pattern Matching (Deterministic)"
+      }
+    }
+  ]
 }
 ```
 
-**Response (milestones mode):**
+| Field | Description |
+|-------|-------------|
+| `status` | Always `UNVERIFIABLE` for a completed check; `BLOCKED` on an internal error (`api.process.execution_error`) |
+| `constraint_id` | `api.process.advisory_only` when the guard found every step or milestone, `api.process.guard_failed` when it did not |
+| `advisory_checks[0].details` | The guard's result: `verified`, `score`, `missing_steps` and the `irac.*` audit fields in IRAC mode; `verified`, `process_rate` and `missed_milestones` in milestones mode |
 
-```json
-{
-  "verified": true,
-  "process_rate": 1.0,
-  "missed_milestones": []
-}
-```
+The example leaves out `developer_fields`, which repeats `constraint_id` and `advisory_checks`. The response has no top-level `verified`. Use `advisory_checks[0].details` as a structure check (for example, to reject a trace with missing steps), not as a verdict.
 
 | Status | Description |
 |--------|-------------|
@@ -803,17 +821,45 @@ Verify that retrieved RAG chunks originate from the expected source document. Pr
 
 <Note>`max_drm_rate` accepts only string values for symbolic precision. Use fraction notation like `"1/10"` instead of `0.1`.</Note>
 
-**Response:**
+<Info>Changed after v9.1.0 (unreleased)</Info>
+
+<Warning>
+`/verify/rag` never returns `VERIFIED`. The guard compares the document labels on the chunks with `target_document_id` and `max_drm_rate`, and the request supplies all three. The server holds no documents, so it can't show that the retrieval is right. The route returns `UNVERIFIABLE` whether the guard passes or fails, with no `proof_ref` and no attestation, and the audit row is not stored as verified. The guard's own result is advisory only.
+</Warning>
+
+**Response (one chunk from the wrong document):**
 
 ```json
 {
-  "verified": false,
-  "risk": "DOCUMENT_RETRIEVAL_MISMATCH",
-  "drm_rate": 0.5,
-  "chunks_checked": 2,
-  "mismatched_count": 1
+  "status": "UNVERIFIABLE",
+  "agent_message": "RAG context mismatch detected",
+  "proof_ref": null,
+  "is_authoritative": false,
+  "constraint_id": "api.rag.guard_failed",
+  "advisory_checks": [
+    {
+      "name": "rag_guard",
+      "advisory_only": true,
+      "constraint_id": "api.rag.guard",
+      "details": {
+        "verified": false,
+        "risk": "DOCUMENT_RETRIEVAL_MISMATCH",
+        "drm_rate": 0.5,
+        "chunks_checked": 2,
+        "mismatched_count": 1
+      }
+    }
+  ]
 }
 ```
+
+| Field | Description |
+|-------|-------------|
+| `status` | Always `UNVERIFIABLE` for a completed check; `BLOCKED` on an internal error (`api.rag.execution_error`) |
+| `constraint_id` | `api.rag.advisory_only` when the guard passed, `api.rag.guard_failed` when it did not |
+| `advisory_checks[0].details` | The guard's result: `verified`, `drm_rate`, `chunks_checked`, `mismatched_count`, and `risk` when it found a mismatch |
+
+The example leaves out `developer_fields`, which repeats `constraint_id` and `advisory_checks`, and the guard's `message` and per-chunk `details`. The response has no top-level `verified`.
 
 | Status | Description |
 |--------|-------------|

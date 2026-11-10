@@ -5,6 +5,10 @@ description: "Verify the structural integrity and process adherence of LLM reaso
 
 The Process Verifier ensures AI-driven workflows follow deterministic process steps — not just correct answers, but correct *procedures*. It moves verification from "black box" (output only) to "glass box" (reasoning trace).
 
+<Warning>
+The Process Verifier checks structure by keyword. It can't show that the reasoning is right. After v9.1.0 (unreleased), [`POST /verify/process`](/api/endpoints#post-verify-process) always returns `UNVERIFIABLE`, and the guard's result is advisory only, in `advisory_checks[0].details`. The GitHub Action's `verify-process` mode reports `UNVERIFIABLE · DENY`. Use the result to reject traces with missing steps, not to admit a trace.
+</Warning>
+
 ## When to use
 
 Use the Process Verifier when you need to:

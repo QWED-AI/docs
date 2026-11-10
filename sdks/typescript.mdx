@@ -76,7 +76,7 @@ Use `isAdmitted(result)` to decide whether to act on a result. Don't gate on `st
 - `status` is `VERIFIED`
 - `proof_ref` is a non-empty string
 
-A missing or unknown admission is never admitted. Endpoints that make no admission decision (`/verify/logic`, `/verify/fact`, `/verify/rag`, `/verify/process`, and batch logic and fact items) are therefore never admitted. The top-level `verified` that `/verify/rag` and `/verify/process` send is their guard's own result. The parser replaces it, and the guard's value stays in `developer_fields.verified`.
+A missing or unknown admission is never admitted. Endpoints that make no admission decision (`/verify/logic`, `/verify/fact`, `/verify/rag`, `/verify/process`, and batch logic and fact items) are therefore never admitted. `/verify/rag` and `/verify/process` return `UNVERIFIABLE`: their guards check only data the request supplies, so the guard's result is advisory only, in `developer_fields.advisory_checks`. An older server also sent the guard's result as a top-level `verified`. The parser replaces it, and the guard's value stays in `developer_fields.verified`.
 
 ```typescript
 import { isAdmitted } from '@qwed-ai/sdk';
@@ -210,11 +210,14 @@ const result = await client.verifyProcess(
   { mode: 'irac' }
 );
 
-// /verify/process makes no admission decision, so isAdmitted() is false.
-// The guard's own verdict is in developer_fields.verified.
-console.log(result.developer_fields?.verified); // true
-console.log(result.score);                      // 1.0
-console.log(result.missing_steps);              // []
+// /verify/process always returns UNVERIFIABLE, so isAdmitted() is false.
+// The guard's own result is advisory only.
+type AdvisoryCheck = { details: Record<string, unknown> };
+const [check] = result.advisory_checks as AdvisoryCheck[];
+console.log(result.status);                 // 'UNVERIFIABLE'
+console.log(check.details.verified);        // true
+console.log(check.details.score);           // 1.0
+console.log(check.details.missing_steps);   // []
 ```
 
 You can also verify custom milestones:
@@ -228,8 +231,9 @@ const result = await client.verifyProcess(
   }
 );
 
-console.log(result.process_rate);       // 1.0
-console.log(result.missed_milestones);  // []
+const [milestoneCheck] = result.advisory_checks as Array<{ details: Record<string, unknown> }>;
+console.log(milestoneCheck.details.process_rate);       // 1.0
+console.log(milestoneCheck.details.missed_milestones);  // []
 ```
 
 | Parameter | Type | Default | Description |
@@ -254,11 +258,14 @@ const result = await client.verifyRAG(
   { maxDrmRate: '0' } // Zero tolerance
 );
 
-// /verify/rag makes no admission decision, so isAdmitted() is false.
-console.log(result.developer_fields?.verified); // false
-console.log(result.drm_rate);                   // 0.5
-console.log(result.chunks_checked);             // 2
-console.log(result.mismatched_count);           // 1
+// /verify/rag always returns UNVERIFIABLE, so isAdmitted() is false.
+// The guard's own result is advisory only.
+const [check] = result.advisory_checks as Array<{ details: Record<string, unknown> }>;
+console.log(result.status);                  // 'UNVERIFIABLE'
+console.log(check.details.verified);         // false
+console.log(check.details.drm_rate);         // 0.5
+console.log(check.details.chunks_checked);   // 2
+console.log(check.details.mismatched_count); // 1
 ```
 
 | Parameter | Type | Default | Description |
@@ -376,15 +383,16 @@ console.log(budget.requests.max_per_hour);
 
 ## IRAC audit fields
 
-All guard-related verification responses include IRAC-compliant audit fields for compliance reporting:
+All guard-related verification responses include IRAC-compliant audit fields for compliance reporting. For `verifyProcess`, they are in the advisory guard result:
 
 ```typescript
 const result = await client.verifyProcess(reasoningTrace, { mode: 'irac' });
+const [check] = result.advisory_checks as Array<{ details: Record<string, unknown> }>;
 
-console.log(result['irac.issue']);       // What was evaluated
-console.log(result['irac.rule']);         // The rule being enforced
-console.log(result['irac.application']); // How the rule was applied
-console.log(result['irac.conclusion']);   // Final verdict
+console.log(check.details['irac.issue']);       // What was evaluated
+console.log(check.details['irac.rule']);         // The rule being enforced
+console.log(check.details['irac.application']); // How the rule was applied
+console.log(check.details['irac.conclusion']);   // Final verdict
 ```
 
 ## Risk codes

@@ -92,7 +92,7 @@ Use `IsAdmitted()` to decide whether to act on a result. Don't gate on `Status` 
 - `Status` is `StatusVerified`
 - `ProofRef` is non-empty
 
-A missing or unknown admission is never admitted. Endpoints that make no admission decision (`/verify/logic`, `/verify/fact`, `/verify/rag`, `/verify/process`, and batch logic and fact items) are therefore never admitted. The top-level `verified` that `/verify/rag` and `/verify/process` send is their guard's own result. It stays in `Extra["verified"]` and `DeveloperFields["verified"]`.
+A missing or unknown admission is never admitted. Endpoints that make no admission decision (`/verify/logic`, `/verify/fact`, `/verify/rag`, `/verify/process`, and batch logic and fact items) are therefore never admitted. `/verify/rag` and `/verify/process` return `StatusUnverifiable`: their guards check only data the request supplies, so the guard's result is advisory only, in `DeveloperFields["advisory_checks"]`. An older server also sent the guard's result as a top-level `verified`. It stays in `Extra["verified"]` and `DeveloperFields["verified"]`.
 
 ```go
 result, err := client.VerifyCode(ctx, code, "python")
