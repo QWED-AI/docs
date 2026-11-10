@@ -137,6 +137,18 @@ Matches that aren't regular files, such as a symlinked directory, are ignored, a
 
 `scan-secrets` scans only the files your `paths` match. It doesn't fall back to the default patterns when your `paths` match nothing.
 
+### What scan-code checks
+
+<Info>Changed in v9.0.0 ([GHSA-hg73-j3qv-w4vh](https://github.com/QWED-AI/qwed-verification/security/advisories/GHSA-hg73-j3qv-w4vh))</Info>
+
+`scan-code` matches dangerous calls by name and also runs [`CodeVerifier`](/engines/code#security-scanning-codeverifier) on each Python file. It takes `CodeVerifier`'s code- and process-execution findings, so calls reached through a from-import, an alias or `importlib`, such as `from os import system; system(...)`, are findings. Before v9.0.0, these passed with a green badge. `scan-code` doesn't take `CodeVerifier`'s file and network findings, because repository code normally reads files and calls the network.
+
+- A `getattr`, `setattr` or `delattr` call with a constant name is checked as that attribute.
+- A call whose attribute name is computed at run time can't be checked. It is reported as a warning, counted in the `warnings_count` output. Warnings don't fail the scan. In SARIF output they are results at level `warning`.
+- A Python file whose coding declaration is not UTF-8 is not read, and the scan is `UNVERIFIABLE · DENY`.
+
+A passing scan means no known dangerous pattern was found. It doesn't mean the code is safe.
+
 <Warning>
 **Behavior change in v8.0.0.** Jobs that passed before can now fail. A `paths` value under which no file is scanned, or a `scan-code` run that includes Python files that don't parse, now returns `UNVERIFIABLE · DENY`. Narrow `paths` to the files you want scanned.
 </Warning>
@@ -162,6 +174,7 @@ Matches that aren't regular files, such as a symlinked directory, are ignored, a
 | `explanation` | Detailed proof or error explanation |
 | `findings_count` | Number of security issues found (for scan modes) |
 | `files_scanned` | Number of files scanned (for scan modes, from v8.0.0). `0` means the scan was not admitted |
+| `warnings_count` | Number of `scan-code` warnings: attribute access by a computed name, which is not checked and doesn't fail the scan (from v9.0.0) |
 | `badge_url` | URL for QWED verified badge |
 | `sarif_file` | Path to SARIF output file (if `output_format=sarif`) |
 | `verdict` | [Verification Context v1.0](/specs/verification-context) verdict: `VERIFIED`, `UNVERIFIABLE`, or `BLOCKED` (v7.1.0) |
