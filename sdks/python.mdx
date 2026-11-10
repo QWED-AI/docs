@@ -354,7 +354,7 @@ assert resolve_document_proof_ref(document)
 
 ### to_verification_context() on verifiers
 
-Every verification engine that defines `to_verification_context()` maps its `DiagnosticResult` to a Verification Context document: the Code, Consensus, DSL Logic, Fact, Graph Fact, Image, Logic, Reasoning, Schema, SQL, Stats, and Symbolic verifier classes, plus the `BatchFactVerifier` and `MultiVLMVerifier` helpers. Math and the secure code executor do not define the method — pass their `DiagnosticResult` to [`create_verification_context_from_diagnostic()`](#create_verification_context_from_diagnosticdiagnostic-query-verifier) instead:
+Every verification engine that defines `to_verification_context()` maps its `DiagnosticResult` to a Verification Context document: the Code, Consensus, DSL Logic, Fact, Graph Fact, Image, Logic, Reasoning, Schema, SQL, Stats, and Symbolic verifier classes, plus the `BatchFactVerifier` and `MultiVLMVerifier` helpers. Math and the secure code executor do not define the method — pass their `DiagnosticResult` to [`create_verification_context_from_diagnostic()`](#create_verification_context_from_diagnostic-diagnostic-query-verifier) instead:
 
 ```python
 # Verifiers that define the method — convert the DiagnosticResult they return
