@@ -133,7 +133,7 @@ docker run -d -p 8000:8000 \
   -e QWED_API_KEY_LOOKUP_SECRET \
   -e QWED_AUDIT_SECRET_KEY \
   -e DATABASE_URL \
-  qwedai/qwed-verification:8.0.0
+  qwedai/qwed-verification:9.1.0
 ```
 
 Omit `DATABASE_URL` to use the SQLite database in the `qwed-data` volume.
@@ -155,7 +155,7 @@ docker run -p 8000:8000 \
   -e QWED_API_KEY_LOOKUP_SECRET \
   -e QWED_AUDIT_SECRET_KEY \
   -e QWED_CORS_ORIGINS="https://app.yourcompany.com" \
-  qwedai/qwed-verification:8.0.0
+  qwedai/qwed-verification:9.1.0
 ```
 
 Keep the key file out of version control. See [Signing keys](/advanced/attestations#signing-keys).
@@ -194,7 +194,7 @@ For production environments, QWED ships Kubernetes manifests in `deploy/kubernet
    </Tip>
 
 3. **Deploy Application**
-   `deploy/kubernetes/deployment.yaml` pins `docker.io/qwedai/qwed-verification:8.0.0`. That tag is the first release of the API server image. Don't point the Deployment at an earlier tag, because earlier tags ran the GitHub Action.
+   `deploy/kubernetes/deployment.yaml` pins `docker.io/qwedai/qwed-verification:9.1.0`. The first tag of the API server image is 8.0.0. Don't point the Deployment at an earlier tag, because earlier tags ran the GitHub Action.
    ```bash
    kubectl apply -f deploy/kubernetes/deployment.yaml
    kubectl apply -f deploy/kubernetes/service.yaml

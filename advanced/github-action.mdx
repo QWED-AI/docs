@@ -34,7 +34,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Verify Calculation
-        uses: QWED-AI/qwed-verification@v8.0.0
+        uses: QWED-AI/qwed-verification@v9.1.0
         with:
           api_key: ${{ secrets.QWED_API_KEY }}
           action: verify
@@ -84,7 +84,7 @@ You can now specify which LLM provider and model the action uses. When you pass 
 
 ```yaml
 - name: Verify with Claude
-  uses: QWED-AI/qwed-verification@v8.0.0
+  uses: QWED-AI/qwed-verification@v9.1.0
   with:
     api_key: ${{ secrets.ANTHROPIC_API_KEY }}
     provider: anthropic
@@ -100,7 +100,7 @@ Set `mask_pii: "true"` to automatically redact personally identifiable informati
 
 ```yaml
 - name: Verify with PII masking
-  uses: QWED-AI/qwed-verification@v8.0.0
+  uses: QWED-AI/qwed-verification@v9.1.0
   with:
     api_key: ${{ secrets.QWED_API_KEY }}
     mask_pii: "true"
@@ -144,7 +144,7 @@ Matches that aren't regular files, such as a symlinked directory, are ignored, a
 ```yaml
 - name: Scan source code
   id: scan
-  uses: QWED-AI/qwed-verification@v8.0.0  # files_scanned needs v8.0.0 or later
+  uses: QWED-AI/qwed-verification@v9.1.0  # files_scanned needs v8.0.0 or later
   with:
     action: scan-code
     paths: "src/**/*.py,scripts/**/*.py"
@@ -178,7 +178,7 @@ Every action mode (`verify`, `scan-secrets`, `scan-code`, `verify-shell`) emits 
 ```yaml
 - name: Verify math
   id: qwed
-  uses: QWED-AI/qwed-verification@v8.0.0
+  uses: QWED-AI/qwed-verification@v9.1.0
   with:
     action: verify
     engine: math
@@ -218,7 +218,7 @@ Pin the Action to `QWED-AI/qwed-verification@v8.0.0` or later. In earlier versio
 
 ```yaml
 - name: Check Math
-  uses: QWED-AI/qwed-verification@v8.0.0
+  uses: QWED-AI/qwed-verification@v9.1.0
   with:
     api_key: ${{ secrets.QWED_API_KEY }}
     action: verify
@@ -230,7 +230,7 @@ Pin the Action to `QWED-AI/qwed-verification@v8.0.0` or later. In earlier versio
 
 ```yaml
 - name: Check Logic
-  uses: QWED-AI/qwed-verification@v8.0.0
+  uses: QWED-AI/qwed-verification@v9.1.0
   with:
     api_key: ${{ secrets.QWED_API_KEY }}
     action: verify
@@ -242,7 +242,7 @@ Pin the Action to `QWED-AI/qwed-verification@v8.0.0` or later. In earlier versio
 
 ```yaml
 - name: Security Check
-  uses: QWED-AI/qwed-verification@v8.0.0
+  uses: QWED-AI/qwed-verification@v9.1.0
   with:
     api_key: ${{ secrets.QWED_API_KEY }}
     action: verify
@@ -254,7 +254,7 @@ Pin the Action to `QWED-AI/qwed-verification@v8.0.0` or later. In earlier versio
 
 ```yaml
 - name: Scan Code
-  uses: QWED-AI/qwed-verification@v8.0.0
+  uses: QWED-AI/qwed-verification@v9.1.0
   with:
     api_key: ${{ secrets.QWED_API_KEY }}
     action: scan-code

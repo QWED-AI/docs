@@ -6,8 +6,8 @@ description: "QWED Protocol release history with download links, installation in
 
 ## Current release
 
-<Card title="v8.0.0 — Attested verdicts and upgrade guide" icon="shield-check" href="https://github.com/QWED-AI/qwed-verification/releases/tag/v8.0.0">
-  Major release. Every `VERIFIED` answer carries an ES256 attestation you can check against `/.well-known/jwks.json`, and Verification Context v1.1 documents are signed by the server that issued them. The Docker image runs the API server, and the Go module path moves to `/v8`. Several settings, response shapes, and SDK types change, so read the [upgrade steps](/changelog#v8-0-0-—-attested-verdicts-and-upgrade-guide) before you upgrade.
+<Card title="v9.1.0 — Allowlist admission for Python code" icon="shield-check" href="https://github.com/QWED-AI/qwed-verification/releases/tag/v9.1.0">
+  Minor release with one security fix (GHSA-9r7q-mx75-hcj7). `CodeVerifier` admits Python code only when the modules, builtins and special attributes it uses are listed, so code that 9.0.0 admitted may now be refused. The server reads `.env` before any of its settings. Read the [upgrade steps](/changelog#v9-1-0-—-allowlist-admission-for-python-code) before you upgrade.
 </Card>
 
 ### Install
@@ -15,23 +15,23 @@ description: "QWED Protocol release history with download links, installation in
 <CodeGroup>
 
 ```bash pip
-pip install qwed==8.0.0
+pip install qwed==9.1.0
 ```
 
 ```bash docker
-docker pull qwedai/qwed-verification:8.0.0
+docker pull qwedai/qwed-verification:9.1.0
 ```
 
 ```bash npm
-npm install @qwed-ai/sdk@8.0.0
+npm install @qwed-ai/sdk@9.1.0
 ```
 
 ```bash cargo
-cargo add qwed@8.0.0
+cargo add qwed@9.1.0
 ```
 
 ```bash go
-go get github.com/QWED-AI/qwed-verification/sdk-go/v8@v8.0.0
+go get github.com/QWED-AI/qwed-verification/sdk-go/v9@v9.1.0
 ```
 
 </CodeGroup>
@@ -41,6 +41,18 @@ go get github.com/QWED-AI/qwed-verification/sdk-go/v8@v8.0.0
 ## Release history
 
 <AccordionGroup>
+
+<Accordion title="v9.0.0 — Eleven advisories and models you configure (November 6, 2026)" icon="shield-check">
+  **Major release.** Fixes eleven advisories in code, maths, SQL and logic verification, the GitHub Action and sign-up. Each LLM provider runs the model you configure, the CSV exports change their columns, `/verify/math` runs in worker processes with a time limit, and the Go module path moves to `/v9`.
+
+  [Full Release Notes →](/changelog#v9-0-0-—-eleven-advisories-and-models-you-configure) · [GitHub Release ↗](https://github.com/QWED-AI/qwed-verification/releases/tag/v9.0.0)
+</Accordion>
+
+<Accordion title="v8.0.0 — Attested verdicts and upgrade guide (October 26, 2026)" icon="shield-check">
+  **Major release.** Every `VERIFIED` answer carries an ES256 attestation you can check against `/.well-known/jwks.json`, and Verification Context v1.1 documents are signed by the server that issued them. The Docker image runs the API server, and the Go module path moves to `/v8`.
+
+  [Full Release Notes →](/changelog#v8-0-0-—-attested-verdicts-and-upgrade-guide) · [GitHub Release ↗](https://github.com/QWED-AI/qwed-verification/releases/tag/v8.0.0)
+</Accordion>
 
 <Accordion title="v7.3.0 — Five advisories, tenant scoping and DoS hardening" icon="shield-check">
   Fail-closed security and soundness release covering five advisories (whole-tree SQL command classification, code-verifier process/file-network sinks, sandbox namespace isolation, SQL schema and tautology checks, logic DSL string constants), plus tenant-scoped admin endpoints, denial-of-service caps and credential-handling fixes. No breaking wire changes.
