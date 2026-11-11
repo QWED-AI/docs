@@ -115,7 +115,7 @@ On regex engines without lookaround support (for example, RE2), use an explicit 
 (?:^|[^A-Za-z0-9_-])(qwed_live_[A-Za-z0-9_-]{43})(?:[^A-Za-z0-9_-]|$)
 ```
 
-The registered pattern names are `QWED_LIVE_API_KEY` (v2) and `QWED_LIVE_API_KEY_V1` (v1). QWED receives signed leak reports for these patterns at [`POST /webhooks/secret-scanning`](/api/endpoints#post-webhooks-secret-scanning).
+The registered pattern names are `QWED_LIVE_API_KEY` (v2) and `QWED_LIVE_API_KEY_V1` (v1). QWED receives signed leak reports for these patterns at [`POST /webhooks/secret-scanning`](/api/endpoints#post-%2Fwebhooks%2Fsecret-scanning).
 
 ### Masking keys
 
@@ -143,7 +143,7 @@ As of v7.2, QWED stores API keys as HMAC-SHA256 lookup digests keyed by a dedica
 **Breaking change.** There is no legacy fallback: API keys issued before v7.2 no longer authenticate and return `401 Unauthorized`. Each key must be re-issued once. The old raw key is never required:
 
 - **Portal or API:** sign in with your email and password to get a JWT, then call `POST /auth/api-keys` to mint a new key. This path needs no API key.
-- **Rotation by key ID:** call [`POST /admin/keys/rotate`](/api/endpoints#post-admin-keys-rotate) with the key's ID, authenticated with an already-working key in the same organization. Members can rotate only their own keys. Owners and admins can also rotate other users' keys, unless the key owner holds a higher role. Revoked or inactive keys can't be rotated. Rotation is atomic: it mints at most one replacement key, even when several rotations of the same key run concurrently. Rotating a key that is already inactive mints nothing and returns `404 Not Found`.
+- **Rotation by key ID:** call [`POST /admin/keys/rotate`](/api/endpoints#post-%2Fadmin%2Fkeys%2Frotate) with the key's ID, authenticated with an already-working key in the same organization or, from v9.0.0, a [signed-in session](/api/endpoints#session-sign-in-for-admin-endpoints). Members can rotate only their own keys. Owners and admins can also rotate other users' keys, unless the key owner holds a higher role. Revoked or inactive keys can't be rotated. Rotation is atomic: it mints at most one replacement key, even when several rotations of the same key run concurrently. Rotating a key that is already inactive mints nothing and returns `404 Not Found`.
 
 ```bash
 # Before (pre-v7.2 key): now rejected
@@ -217,7 +217,7 @@ QWED stores each agent token as an HMAC-SHA256 digest keyed with `QWED_API_KEY_L
 
 Tokens issued before this change keep working. At startup, after its fail-closed checks, the server hashes any agent token still stored in plain text, in place. You don't need to re-register agents.
 
-To replace a token, for example one whose plain text might remain in a database backup, call [`POST /agents/{agent_id}/token/reissue`](/api/endpoints#post-agents-agent-id-token-reissue). QWED returns a new token and the old one stops working.
+To replace a token, for example one whose plain text might remain in a database backup, call [`POST /agents/{agent_id}/token/reissue`](/api/endpoints#post-%2Fagents%2F%2Ftoken%2Freissue). QWED returns a new token and the old one stops working.
 
 <Warning>
 Agent token digests depend on `QWED_API_KEY_LOOKUP_SECRET`. Changing the secret invalidates every agent token as well as every API key. Re-issue agent tokens after changing it.
@@ -254,6 +254,8 @@ Create a new user and organization. Returns a JWT token for immediate use.
 }
 ```
 
+The password can be at most 72 bytes in UTF-8. bcrypt reads no more than 72 bytes, so QWED refuses a longer password with `400 Bad Request` and `"Password must be at most 72 bytes"`. Characters outside ASCII take more than one byte each, so a password with fewer than 72 characters can still be too long. QWED checks the length before it looks up the email, so the response is the same whether or not the email is registered.
+
 **Response:**
 
 ```json
@@ -264,10 +266,13 @@ Create a new user and organization. Returns a JWT token for immediate use.
     "id": "1",
     "email": "user@example.com",
     "org_id": "1",
+    "org_name": "Acme Corp",
     "role": "owner"
   }
 }
 ```
+
+`org_name` is the organization's display name, or `null` if QWED can't read it.
 
 ### POST /auth/signin
 
@@ -284,6 +289,10 @@ Sign in an existing user.
 
 **Response:** Same format as `/auth/signup`.
 
+A password over 72 bytes in UTF-8 can't match any account. Sign-in returns `401 Unauthorized` with `"Invalid email or password"` for it, whether or not the email is registered.
+
+Sign-in returns `403 Forbidden` for a deactivated user (`"Account is deactivated"`) and for a user whose organization is inactive or missing (`"Organization is not active"`).
+
 ### GET /auth/me
 
 Get the current authenticated user's information. Requires a `Bearer` token in the `Authorization` header.
@@ -292,15 +301,56 @@ Get the current authenticated user's information. Requires a `Bearer` token in t
 curl -H "Authorization: Bearer eyJhbG..." http://localhost:8000/auth/me
 ```
 
+Returns the same `user` object as sign-up and sign-in, including `org_name`. QWED applies the user and organization checks in [Roles on API-key and audit routes](#roles-on-api-key-and-audit-routes) on every call. An inactive user or organization, or an unknown role, returns `403 Forbidden` even while the token is still valid.
+
+### GET /auth/users
+
+List the users of your organization, oldest first. Use this to show who is in the organization, or to name the owner of a key or the user behind a security event.
+
+Owners and admins can call this endpoint with a bearer token or with an API key in the `X-API-Key` header. When you send both, QWED uses the API key. Members and viewers get `403 Forbidden`.
+
+```bash
+curl --fail-with-body -H "Authorization: Bearer eyJhbG..." http://localhost:8000/auth/users
+```
+
+**Response:**
+
+```json
+[
+  {
+    "id": "1",
+    "email": "owner@example.com",
+    "role": "owner",
+    "is_active": true,
+    "created_at": "2026-03-20T12:00:00Z"
+  },
+  {
+    "id": "7",
+    "email": "former@example.com",
+    "role": "member",
+    "is_active": false,
+    "created_at": "2026-05-02T08:30:00Z"
+  }
+]
+```
+
+QWED returns only users of your own organization. Inactive users are included with `is_active` set to `false`. The response contains no password or permission data.
+
+| Status | Meaning |
+|--------|---------|
+| 401 | No API key or bearer token, or an invalid or expired bearer token |
+| 403 | An invalid, revoked, or expired API key; not an owner or admin; or an inactive user, organization, or key |
+
 ### Roles on API-key and audit routes
 
-The `/auth/api-keys` and `/audit` routes authorize by the signed-in user's role. Roles rank from lowest to highest: `viewer`, `member`, `admin`, `owner`.
+The `/auth/api-keys`, `/auth/users`, and `/audit` routes authorize by the signed-in user's role. Roles rank from lowest to highest: `viewer`, `member`, `admin`, `owner`.
 
 | Route | `viewer` | `member` | `admin` | `owner` |
 |-------|----------|----------|---------|---------|
 | `POST /auth/api-keys` | No | Yes | Yes | Yes |
 | `GET /auth/api-keys` | Own keys | Own keys | All keys in the organization | All keys in the organization |
 | `DELETE /auth/api-keys/{key_id}` | Own keys | Own keys | Own keys, plus keys of users who don't rank higher | Any key in the organization |
+| `GET /auth/users` | No | No | Yes | Yes |
 | `GET /audit/logs` | Yes | Yes | Yes | Yes |
 | `GET /audit/logs/{log_id}` | Yes | Yes | Yes | Yes |
 | `GET /audit/export` | No | No | Yes | Yes |
@@ -342,6 +392,30 @@ Generate a new API key for the current user's organization. Requires JWT authent
 List active API keys. Admins and owners see every active key in their organization. Members and viewers see only their own keys.
 
 Each key includes `id`, `name`, `key_preview`, `created_at`, `last_used_at`, and `is_revoked`. QWED sets `last_used_at` after a key passes every authentication and authorization check, at most once a minute per key. A key that has never been used, or was refused by a check, keeps its previous value (`null` if never used). If QWED can't write `last_used_at`, the request still succeeds.
+
+Each key also includes:
+
+- `expires_at`: when the key expires, or `null` if it doesn't expire.
+- `rotation_required`: `true` when the key is flagged for rotation.
+- `owner`: the user the key belongs to, as `{"id": ..., "email": ...}`. It is `null` for a key with no user, or whose user isn't in the key's organization, so QWED never shows another organization's user.
+
+`created_at`, `last_used_at`, and `expires_at` always carry their UTC offset.
+
+```json
+[
+  {
+    "id": "12",
+    "name": "Production Key",
+    "key_preview": "qwed_live_ab...",
+    "created_at": "2026-03-20T12:00:00Z",
+    "last_used_at": "2026-10-28T09:14:03Z",
+    "is_revoked": false,
+    "expires_at": null,
+    "rotation_required": false,
+    "owner": {"id": "1", "email": "owner@example.com"}
+  }
+]
+```
 
 ### DELETE /auth/api-keys/{key_id}
 
@@ -387,7 +461,7 @@ Each entry includes `verdict`, the verdict stored in the row's result, `admissio
       "verdict": "VERIFIED",
       "status": "verified",
       "admission": "ADMIT",
-      "latency_ms": 0,
+      "latency_ms": 184,
       "created_at": "2026-10-21T12:00:00+00:00",
       "entry_hash": "3b1f...a9c2",
       "api_key_id": "7",
@@ -400,6 +474,7 @@ Each entry includes `verdict`, the verdict stored in the row's result, `admissio
 | Field | Description |
 |-------|-------------|
 | `total` | Number of rows on this page, not in the whole log |
+| `engine_used` | The row's domain, such as `MATH`, `NATURAL_LANGUAGE`, `LOGIC`, `STATS`, `FACT`, `CODE`, `SQL`, `IMAGE`, `RAG`, `PROCESS`, `CONSENSUS`, or `VERIFICATION_CONTEXT`. `/verify/natural_language`, `/agents/{agent_id}/verify`, and natural-language `/verify/batch` items write `NATURAL_LANGUAGE`. Their rows written before this fix read `MATH`. The domain is part of the signed, chained entry, so QWED doesn't rewrite those rows |
 | `next_before` | The last row's ID when the page is full (`limit` rows). `null` when the page is not full |
 | `verdict` | `VERIFIED`, `UNVERIFIABLE`, or `BLOCKED`, read from the stored result: `status` for a `/verify/*` result, `verdict` for a Verification Context document, or `details.result.status` for a `/verify/batch` item row. `null` for anything else, such as a truncated result, a logic engine's `SAT`, or an audit seed sample. Never derived from `is_verified` |
 | `status` | Unchanged for existing clients: `verified` or `blocked`, from the row's `is_verified` flag. Each route sets that flag by its own rule, so an `UNVERIFIABLE` result reads `blocked` |
@@ -407,8 +482,9 @@ Each entry includes `verdict`, the verdict stored in the row's result, `admissio
 | `entry_hash` | The row's SHA-256 hash in the audit chain, as stored. `null` for legacy rows written before the API used the chain |
 | `api_key_id` | ID (as a string) of the API key that authenticated the request. `null` for rows written from a signed-in user session, by `POST /audit/seed`, or by `POST /agents/{agent_id}/verify` (which authenticates with an agent token), and for rows written before QWED recorded it |
 | `verifier_version` | The QWED server version that wrote the row. `null` for rows written before QWED recorded it |
+| `latency_ms` | Whole milliseconds from the start of the HTTP request to when QWED began writing the audit row, before it waits for the append lock. It includes the verifier, any LLM call, and everything else before that point. QWED measures it itself and never reads it from the verifier's or caller's result. `null` for rows written outside an HTTP request and for rows written before QWED recorded it |
 
-The entry hash covers `admission`, `api_key_id`, and `verifier_version`. Changing or clearing any of them on a stored row fails [integrity verification](/api/endpoints#get-admin-compliance-verify-log-id).
+The entry hash covers `admission`, `api_key_id`, `verifier_version`, and `latency_ms`. Changing or clearing any of them on a stored row fails [integrity verification](/api/endpoints#get-%2Fadmin%2Fcompliance%2Fverify%2F).
 
 <Warning>
 `verdict` is not an admission decision. `VERIFIED` means the check ran to a proof, not that the claim holds. A disproven identity or code proven unsafe is `VERIFIED` with `status` `blocked`. Don't gate on `verdict` or `status`. Read `admission` for the decision the route made.
@@ -442,9 +518,30 @@ The response has the same `verdict`, `status`, `admission`, `api_key_id`, and `v
 | `previous_hash` | The hash of the previous row in your organization's chain. `null` for the first row of a chain segment |
 | `hmac_signature` | The row's HMAC-SHA256 signature under `QWED_AUDIT_SECRET_KEY` |
 
-These fields identify the chain entry. To check that it is intact, call [`GET /admin/compliance/verify/{log_id}`](/api/endpoints#get-admin-compliance-verify-log-id).
+These fields identify the chain entry. To check that it is intact, call [`GET /admin/compliance/verify/{log_id}`](/api/endpoints#get-%2Fadmin%2Fcompliance%2Fverify%2F).
 
 ### GET /audit/export
 
-Export audit logs as a CSV file (up to 1,000 records). Requires the `admin` or `owner` role.
+Export your organization's audit log as a CSV file (`text/csv`). Requires the `admin` or `owner` role.
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `start` | datetime | — | Export only rows at or after this time |
+| `end` | datetime | — | Export only rows at or before this time |
+
+Pass `start` and `end` as ISO 8601 times. A time without a zone is read as UTC, and other offsets are converted. Without either, QWED doesn't bound that side of the period, so with neither you get the newest rows. `start` after `end` returns `400 Bad Request` with `"start must not be after end"`.
+
+```bash
+curl --fail-with-body -D headers.txt -o audit.csv \
+  -H "Authorization: Bearer $TOKEN" \
+  "http://localhost:8000/audit/export?start=2026-10-01T00:00:00Z"
+```
+
+The file has the same columns as [`GET /admin/compliance/export/csv`](/api/endpoints#csv-columns): `ID`, `Timestamp`, `User ID`, `API Key ID`, `Verifier Version`, `Domain`, `Query`, `Verdict`, `Admission`, `Is Verified (legacy)`, `Result`, `Latency (ms)`, `Entry Hash`, `HMAC Signature`, and `Chain Status`. `Verdict`, `Admission`, and `Latency (ms)` are the stored values, as `verdict`, `admission`, and `latency_ms` on [`GET /audit/logs`](#get-audit-logs). `Domain` is the same value as `engine_used`. A value QWED didn't record is an empty cell, and no cell is truncated. QWED prefixes an apostrophe to any cell that starts with `=`, `+`, `-`, `@`, a tab, a carriage return, or a line feed, so spreadsheet software doesn't run it as a formula.
+
+Rows are newest first, ordered by timestamp and then by ID. The export holds at most the newest 1,000 rows. When more rows matched, the response sets `X-Export-Truncated: true`, otherwise `false`; CORS exposes it to browser clients on allowed origins.
+
+<Note>
+Before this change, `GET /audit/export` wrote `is_verified` as `verified` or `blocked` under a `Status` column, with no admission or caller. Update any client that reads the old columns by name or position.
+</Note>
 
