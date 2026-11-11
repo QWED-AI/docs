@@ -31,8 +31,9 @@ client = AgentService()
 
 agent = client.register_agent(
     name="DataAnalyst",
-    agent_type="supervised",  # supervised, autonomous, trusted
+    agent_type="supervised",  # a label; trust comes from trust_level
     principal_id="user_123",
+    trust_level=1,  # 0 untrusted, 1 supervised (default), 2 autonomous, 3 trusted
     permissions={
         "allowed_engines": ["math", "logic", "sql"],
         "blocked_tools": ["execute_code"],
@@ -77,7 +78,9 @@ decision = client.verify_action(
 if decision["decision"] == "APPROVED":
     execute_query(query=query)
 elif decision["decision"] == "DENIED":
-    print("Action blocked:", decision["error"])
+    # Context, registration and unknown-action denials carry "error";
+    # policy denials list the failed checks instead.
+    print("Action blocked:", decision.get("error") or decision["verification"]["checks_failed"])
 elif decision["decision"] == "PENDING":
     request_human_approval()
 elif decision["decision"] == "BUDGET_EXCEEDED":
@@ -160,7 +163,7 @@ state_hash = hashlib.sha256(db_snapshot.encode()).hexdigest()
 
 decision = client.verify_action(
     agent_id=agent_id,
-    action=AgentAction(action_type="execute_sql", query="UPDATE orders SET status = 'shipped'"),
+    action=AgentAction(action_type="execute_sql", query="SELECT status FROM orders WHERE id = 42"),
     context=ActionContext(
         conversation_id="conv_orders",
         step_number=4,
@@ -169,6 +172,8 @@ decision = client.verify_action(
     )
 )
 ```
+
+Only an approved action's fingerprint is recorded. A query with `UPDATE`, `DELETE`, `DROP` or `TRUNCATE` is critical risk, which a supervised agent is denied, so this example uses a `SELECT`.
 
 The guard tracks a sliding window of the last 20 action+state fingerprints per conversation. If the same fingerprint appears 3 or more times, the action is halted with `QWED-AGENT-LOOP-004`.
 
@@ -228,23 +233,27 @@ To allow a custom tool, add it to the safe operations list in your `ToolApproval
 
 ## Risk assessment
 
-Actions are assessed for risk:
+A tool action takes its risk from `TOOL_RISK_LEVELS`. An engine action is critical when its `query` (or `code`) contains `DROP`, `DELETE`, `TRUNCATE` or `UPDATE`, or `eval(`, `exec(`, `os.system` or `subprocess`; otherwise it is low.
 
-| Risk | Examples |
+| Risk | Tool actions |
 |------|----------|
-| LOW | read_file, database_read |
-| MEDIUM | send_email, api_call |
-| HIGH | file_write, database_write |
-| CRITICAL | execute_code, file_delete, DROP |
+| LOW | `database_read`, `file_read` |
+| MEDIUM | `send_email`, `api_call` |
+| HIGH | `file_write` |
+| CRITICAL | `database_write`, `execute_code`, `file_delete` |
 
 ## Decision matrix
 
+With the default `risk_threshold="medium"`, and when the permission checks pass:
+
 | Trust Level | LOW Risk | MEDIUM Risk | HIGH Risk | CRITICAL Risk |
 |-------------|----------|-------------|-----------|---------------|
-| 0 (Untrusted) | PENDING | DENIED | DENIED | DENIED |
-| 1 (Supervised) | APPROVED | PENDING | DENIED | DENIED |
-| 2 (Autonomous) | APPROVED | APPROVED | PENDING | DENIED |
+| 0 (Untrusted) | APPROVED | APPROVED | PENDING | DENIED |
+| 1 (Supervised) | APPROVED | APPROVED | PENDING | DENIED |
+| 2 (Autonomous) | APPROVED | APPROVED | APPROVED | DENIED |
 | 3 (Trusted) | APPROVED | APPROVED | APPROVED | APPROVED |
+
+Critical risk needs trust level 3. Risk above `risk_threshold` is `PENDING` below trust level 2. Pass `risk_threshold="low"` to `verify_action` to send medium-risk actions to `PENDING` too.
 
 ## Tool approval policy
 
@@ -292,19 +301,26 @@ print(budget)
 # }
 ```
 
-`verify_action` enforces two of these limits: the daily cost (`QWED-AGENT-BUDGET-001`) and the requests per hour (`QWED-AGENT-BUDGET-002`). `max_per_day` and `current_day` are reported but not enforced, so an agent that stays under its hourly limit isn't stopped at its daily request count.
+`verify_action` enforces two of these limits: the daily cost (`QWED-AGENT-BUDGET-001`) and the requests per hour (`QWED-AGENT-BUDGET-002`). The daily cost is an estimate, not your actual spending: each approved action adds a fixed $0.01, whatever it costs to run. Enforce your real spending limits separately. `max_per_day` and `current_day` are reported but not enforced, so an agent that stays under its hourly limit isn't stopped at its daily request count.
 
 ## Activity logging
 
-Set `QWED_AGENT_ID` and `QWED_AGENT_TOKEN` to the `agent_id` and `agent_token` that registration returned before you run this example.
+`AgentService` logs every `verify_action` decision in memory. Read an agent's entries with `get_agent_activity`:
+
+```python
+for entry in client.get_agent_activity(agent_id, limit=10):
+    print(entry["timestamp"], entry["action_type"], entry["decision"], entry["risk_level"])
+```
+
+A QWED server keeps its own activity log for agents registered with the server. `AgentService` doesn't register agents with the server, so register the agent with [`POST /agents/register`](/api/endpoints#post-%2Fagents%2Fregister) and set `QWED_AGENT_ID` and `QWED_AGENT_TOKEN` to the `agent_id` and `agent_token` it returned before you run this example.
 
 ```python
 import os
 
 import requests
 
-# An agent reads its own activity with its own ID and token, as returned at
-# registration: agent["agent_id"] and agent["agent_token"]
+# An agent reads its own activity with the ID and token that
+# POST /agents/register returned
 agent_id = os.environ["QWED_AGENT_ID"]
 agent_token = os.environ["QWED_AGENT_TOKEN"]
 response = requests.get(
