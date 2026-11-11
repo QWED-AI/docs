@@ -147,7 +147,7 @@ docker run -d -p 8000:8000 \
 
 The server refuses to start without any of `QWED_CORS_ORIGINS`, `API_KEY_SECRET`, `QWED_JWT_SECRET_KEY`, `QWED_API_KEY_LOOKUP_SECRET` and `QWED_AUDIT_SECRET_KEY`, and `QWED_API_KEY_LOOKUP_SECRET` must differ from `QWED_JWT_SECRET_KEY`. Also set `QWED_SIGNING_KEY` (an EC P-256 key), or attestations stop verifying after a restart or on another replica.
 
-If you keep the values in a `.env` file instead, pass it with `--env-file .env`.
+The server names no model. For requests that use a provider (natural-language, logic, statistics, and fact), also pass the provider's settings, for example `-e ACTIVE_PROVIDER -e OPENAI_API_KEY -e OPENAI_MODEL`. The container doesn't read the `qwed init` settings on your host. If you keep the values in a `.env` file instead, pass it with `--env-file .env`.
 
 Optionally, add a signing key so attestations verify after a restart and on every replica. Without one, each process generates its own key. Mount an unencrypted EC P-256 PEM file and point `QWED_SIGNING_KEY_FILE` at it by adding these flags to `docker run`:
 

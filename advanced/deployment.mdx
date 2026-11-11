@@ -105,6 +105,20 @@ Start the stack from the repository root:
 docker compose -f deploy/docker-compose.yml up -d
 ```
 
+The `qwed-core` service passes no provider settings to the container, so a model or key written only in `deploy/.env` doesn't reach the server, and requests that use a provider fail. Pass them with an override file next to `deploy/docker-compose.yml`; Compose fills `${...}` from `deploy/.env`, so the values stay there:
+
+```yaml
+# deploy/docker-compose.override.yml
+services:
+  qwed-core:
+    environment:
+      - ACTIVE_PROVIDER=${ACTIVE_PROVIDER}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - OPENAI_MODEL=${OPENAI_MODEL}
+```
+
+Add `ACTIVE_PROVIDER`, the provider's key, and its model (here `OPENAI_API_KEY` and `OPENAI_MODEL`) to `deploy/.env`: an unset one is passed empty. Then start with `docker compose -f deploy/docker-compose.yml -f deploy/docker-compose.override.yml up -d`, using the variables of the provider you run.
+
 Access the services:
 - **API**: http://localhost:8000
 - **API Docs**: http://localhost:8000/docs
@@ -136,7 +150,7 @@ docker run -d -p 8000:8000 \
   qwedai/qwed-verification:9.1.0
 ```
 
-Omit `DATABASE_URL` to use the SQLite database in the `qwed-data` volume.
+Omit `DATABASE_URL` to use the SQLite database in the `qwed-data` volume. The server names no model. For requests that use a provider (natural-language, logic, statistics, and fact), also pass the provider's settings, for example `-e ACTIVE_PROVIDER -e OPENAI_API_KEY -e OPENAI_MODEL`. The container doesn't read the `qwed init` settings on your host. The same applies to the signing-key command below.
 
 ### Attestation signing key
 
@@ -345,12 +359,16 @@ From v9.1.0, `deploy/.env.example` and `deploy/kubernetes/configmap.yaml` list t
 ### AI providers
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `ACTIVE_PROVIDER` | Selected LLM provider | `azure_openai` |
+| `ACTIVE_PROVIDER` | Selected LLM provider: `openai`, `openai_direct`, `openai_compat`, `azure_openai`, `anthropic`, `claude_opus`, `gemini`, `ollama`, or `auto`. Any other value stops each request that needs a provider with an error naming `ACTIVE_PROVIDER` | `ollama` |
 | `AZURE_OPENAI_API_KEY` | API key for Azure OpenAI | - |
 | `AZURE_OPENAI_ENDPOINT` | Endpoint URL | - |
+| `AZURE_OPENAI_DEPLOYMENT` | Azure OpenAI deployment to run. Required for Azure OpenAI | - |
 | `ANTHROPIC_API_KEY` | API key for Anthropic | - |
+| `ANTHROPIC_MODEL` | Anthropic model to run. `ANTHROPIC_DEPLOYMENT` wins when set. Required for Anthropic | - |
 | `GOOGLE_API_KEY` | API key for Google Gemini (or `GEMINI_API_KEY`) | - |
-| `GEMINI_MODEL` | Gemini model name | `gemini-1.5-pro` |
+| `GEMINI_MODEL` | Gemini model to run. Required for Gemini | - |
+
+From v9.0.0, QWED names no default model. Set the model variable of the provider you use (`OPENAI_MODEL`, `AZURE_OPENAI_DEPLOYMENT`, `ANTHROPIC_MODEL`, `CLAUDE_OPUS_DEPLOYMENT`, `GEMINI_MODEL`, `OLLAMA_MODEL`, or `CUSTOM_MODEL`). The server still starts without one, because it builds a provider on first use. Logic, statistics, and fact requests that need the provider then fail with an error that names the variable. The natural-language routes answer `UNVERIFIABLE`. See [LLM configuration](/getting-started/llm-configuration#supported-llm-providers).
 
 ### Observability
 | Variable | Description | Default |

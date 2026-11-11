@@ -116,6 +116,8 @@ docker run -p 8000:8000 \
   qwedai/qwed-verification:9.1.0
 ```
 
+The server names no model. For requests that use a provider (natural-language, logic, statistics, and fact), also pass the provider's settings, for example `-e ACTIVE_PROVIDER -e OPENAI_API_KEY -e OPENAI_MODEL`. The container doesn't read the `qwed init` settings on your host.
+
 <Note>
 The image runs the API server from version 8.0.0. Earlier tags ran the QWED GitHub Action. To scan a repository, use the [GitHub Action](/advanced/github-action) instead of the image.
 </Note>
