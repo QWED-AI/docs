@@ -43,9 +43,12 @@ agent = client.register_agent(
     }
 )
 
-print(agent["agent_id"])     # agent_1a2b3c4d5e6f
+agent_id = agent["agent_id"]
+print(agent_id)               # agent_1a2b3c4d5e6f
 print(agent["agent_token"])  # qwed_agent_xyz...
 ```
+
+The examples below use this `agent_id`.
 
 <Warning>
 With a QWED server, the `agent_token` that `POST /agents/register` returns is shown only once. QWED stores an HMAC-SHA256 digest of it, keyed with `QWED_API_KEY_LOOKUP_SECRET`, so it can't be retrieved later. To replace a lost or exposed token, call [`POST /agents/{agent_id}/token/reissue`](/api/endpoints#post-%2Fagents%2F%2Ftoken%2Freissue). The old token stops working.
@@ -56,21 +59,23 @@ With a QWED server, the `agent_token` that `POST /agents/register` returns is sh
 Before an agent executes an action, you must provide an `ActionContext` with a `conversation_id` and a monotonically increasing `step_number`. These fields are **required** — requests without them are rejected.
 
 ```python
+query = "SELECT * FROM users"
+
 decision = client.verify_action(
-    agent_id="agent_abc123",
+    agent_id=agent_id,
     action=AgentAction(
         action_type="execute_sql",
-        query="SELECT * FROM users",
+        query=query,
     ),
     context=ActionContext(
-        conversation_id="conv_xyz",
+        conversation_id="conv_users",
         step_number=1,
         user_intent="Get user list",
     )
 )
 
 if decision["decision"] == "APPROVED":
-    execute_query(query)
+    execute_query(query=query)
 elif decision["decision"] == "DENIED":
     print("Action blocked:", decision["error"])
 elif decision["decision"] == "PENDING":
@@ -78,6 +83,10 @@ elif decision["decision"] == "PENDING":
 elif decision["decision"] == "BUDGET_EXCEEDED":
     print("Budget limit reached:", decision["error"])
 ```
+
+<Warning>
+`APPROVED` is the agent decision: the action passed the agent's permissions, budget, risk and conversation checks. `AgentService` doesn't verify the SQL itself. Before you run the query, verify it with the [SQL engine](/engines/sql) and run it with least-privilege database credentials.
+</Warning>
 
 ## Conversation controls
 
@@ -101,32 +110,32 @@ The `step_number` must be strictly greater than any previously committed step wi
 ```python
 # Step 1: approved
 client.verify_action(
-    agent_id="agent_abc123",
+    agent_id=agent_id,
     action=AgentAction(action_type="calculate", query="2+2"),
-    context=ActionContext(conversation_id="conv_1", step_number=1)
+    context=ActionContext(conversation_id="conv_steps", step_number=1)
 )
 
 # Step 2: same action, still approved (first repeat)
 client.verify_action(
-    agent_id="agent_abc123",
+    agent_id=agent_id,
     action=AgentAction(action_type="calculate", query="2+2"),
-    context=ActionContext(conversation_id="conv_1", step_number=2)
+    context=ActionContext(conversation_id="conv_steps", step_number=2)
 )
 
 # Step 3: same action again — denied as repetitive loop
 result = client.verify_action(
-    agent_id="agent_abc123",
+    agent_id=agent_id,
     action=AgentAction(action_type="calculate", query="2+2"),
-    context=ActionContext(conversation_id="conv_1", step_number=3)
+    context=ActionContext(conversation_id="conv_steps", step_number=3)
 )
 # result["decision"] == "DENIED"
 # result["error"]["code"] == "QWED-AGENT-LOOP-003"
 
 # Step 3 retry: a different action succeeds on the same step number
 client.verify_action(
-    agent_id="agent_abc123",
+    agent_id=agent_id,
     action=AgentAction(action_type="verify_logic", query="x > 1"),
-    context=ActionContext(conversation_id="conv_1", step_number=3)
+    context=ActionContext(conversation_id="conv_steps", step_number=3)
 )
 ```
 
@@ -150,10 +159,10 @@ db_snapshot = get_database_checksum()
 state_hash = hashlib.sha256(db_snapshot.encode()).hexdigest()
 
 decision = client.verify_action(
-    agent_id="agent_abc123",
+    agent_id=agent_id,
     action=AgentAction(action_type="execute_sql", query="UPDATE orders SET status = 'shipped'"),
     context=ActionContext(
-        conversation_id="conv_xyz",
+        conversation_id="conv_orders",
         step_number=4,
         pre_action_state_hash=state_hash,
         state_source="db_snapshot",
@@ -261,33 +270,29 @@ Before v5.0.2, unknown tools with a risk score below 0.3 were auto-approved. If 
 
 ### Adding tools to the allowlist
 
-Register custom tools as safe operations when configuring your agent's permissions:
+The safe and dangerous lists are set in `ToolApprovalSystem.__init__` (`safe_operations` and `dangerous_operations`). To allow a custom tool, add it to `safe_operations` on the instance that approves your tool calls:
 
 ```python
-agent = client.register_agent(
-    name="DataAnalyst",
-    agent_type="supervised",
-    principal_id="user_123",
-    permissions={
-        "allowed_engines": ["math", "logic", "sql"],
-        "allowed_tools": ["my_custom_tool", "fetch_report"],
-        "blocked_tools": ["execute_code"],
-    },
-    budget={"max_daily_cost_usd": 100}
-)
+from qwed_new.core.tool_approval import tool_approval
+
+tool_approval.safe_operations.add("fetch_report")
 ```
+
+Agent permissions don't change these lists. `AgentService` stores a `permissions["allowed_tools"]` list but doesn't check it: it checks only `blocked_tools` and `allowed_engines`. To let an agent use a custom action type, register it in `ACTION_ENGINES` or `TOOL_RISK_LEVELS`; see [Registered action enforcement](#registered-action-enforcement).
 
 ## Budget enforcement
 
 ```python
 # Check remaining budget
-budget = client.get_agent_budget("agent_abc123")
+budget = client.get_agent_budget(agent_id)
 print(budget)
 # {
 #   "cost": {"max_daily_usd": 100, "current_daily_usd": 45.50},
 #   "requests": {"max_per_hour": 500, "current_hour": 123, "max_per_day": 10000, "current_day": 840}
 # }
 ```
+
+`verify_action` enforces two of these limits: the daily cost (`QWED-AGENT-BUDGET-001`) and the requests per hour (`QWED-AGENT-BUDGET-002`). `max_per_day` and `current_day` are reported but not enforced, so an agent that stays under its hourly limit isn't stopped at its daily request count.
 
 ## Activity logging
 
@@ -350,13 +355,13 @@ The step number must increase with each action in a conversation. Attempts to re
 
 <Info>New in v5.1.1</Info>
 
-Every `verify_action` call must reference an `action_type` that QWED has registered semantics for. Action types must be either bound to a verification engine or registered as a governed tool with a known risk level. Engine examples: `calculate` → `math`, `execute_sql` → `sql`. Tool examples: `read_database`, `send_email`. Action types outside those two registries are denied with `QWED-AGENT-ACTION-001` before any risk assessment runs.
+Every `verify_action` call must reference an `action_type` that QWED has registered semantics for. Action types must be either bound to a verification engine or registered as a governed tool with a known risk level. Engine examples: `calculate` → `math`, `execute_sql` → `sql`. Tool examples: `database_read`, `send_email`. Action types outside those two registries are denied with `QWED-AGENT-ACTION-001` before any risk assessment runs.
 
 ```python
 result = client.verify_action(
-    agent_id="agent_abc123",
+    agent_id=agent_id,
     action=AgentAction(action_type="do_arbitrary_thing", query="..."),
-    context=ActionContext(conversation_id="conv_1", step_number=1),
+    context=ActionContext(conversation_id="conv_unknown", step_number=1),
 )
 # {
 #   "decision": "DENIED",
@@ -391,11 +396,11 @@ Actions are fingerprinted deterministically using `action_type`, `query`, `code`
 ```python
 # Step 1: approved
 client.verify_action(agent_id, action=AgentAction(action_type="calculate", query="2+2"),
-    context=ActionContext(conversation_id="conv_1", step_number=1))
+    context=ActionContext(conversation_id="conv_replay", step_number=1))
 
 # Step 1 again: DENIED (replay)
 client.verify_action(agent_id, action=AgentAction(action_type="calculate", query="2+2"),
-    context=ActionContext(conversation_id="conv_1", step_number=1))
+    context=ActionContext(conversation_id="conv_replay", step_number=1))
 # -> {"decision": "DENIED", "error": {"code": "QWED-AGENT-LOOP-002"}}
 ```
 
@@ -449,9 +454,9 @@ Anything else — including custom action names, typos, and forward-compatible n
 
 ```python
 result = client.verify_action(
-    agent_id="agent_abc123",
+    agent_id=agent_id,
     action=AgentAction(action_type="transfer_funds_internal_v2", query="Move funds between ledgers"),
-    context=ActionContext(conversation_id="conv_1", step_number=1),
+    context=ActionContext(conversation_id="conv_transfer", step_number=1),
 )
 
 # {
@@ -471,6 +476,8 @@ Key behaviors to plan for:
 
 ## Framework integration
 
+These integrations verify through the QWED API with `QWEDClient`. They don't take an agent ID, so the `AgentService` checks on this page don't apply to them.
+
 ### LangChain
 
 ```python
@@ -478,7 +485,7 @@ from qwed_sdk.langchain import QWEDVerificationCallback
 
 agent = initialize_agent(
     tools=[...],
-    callbacks=[QWEDVerificationCallback(agent_id="agent_abc123")]
+    callbacks=[QWEDVerificationCallback(api_key="qwed_...")]
 )
 ```
 
@@ -490,7 +497,7 @@ from qwed_sdk.crewai import QWEDVerifiedAgent
 analyst = QWEDVerifiedAgent(
     role="Analyst",
     goal="Analyze data",
-    agent_id="agent_abc123"
+    api_key="qwed_...",
 )
 ```
 
