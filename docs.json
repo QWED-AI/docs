@@ -3,17 +3,17 @@
   "theme": "aspen",
   "name": "QWED Documentation",
   "colors": {
-    "primary": "#2340D9",
-    "light": "#9AABFF",
-    "dark": "#2340D9"
+    "primary": "#B23E10",
+    "light": "#FF9A6B",
+    "dark": "#C8461A"
   },
   "fonts": {
     "heading": {
-      "family": "Bricolage Grotesque",
-      "weight": 700
+      "family": "Geist",
+      "weight": 600
     },
     "body": {
-      "family": "Instrument Sans"
+      "family": "Geist"
     }
   },
   "favicon": "/images/brand/favicon.svg",
@@ -394,8 +394,8 @@
     ]
   },
   "logo": {
-    "light": "/images/brand/qwed-lockup-cobalt.svg",
-    "dark": "/images/brand/qwed-lockup-cobalt-white.svg",
+    "light": "/images/brand/qwed-lockup.svg",
+    "dark": "/images/brand/qwed-lockup-white.svg",
     "href": "https://docs.qwedai.tech"
   },
   "navbar": {
@@ -541,8 +541,8 @@
   },
   "background": {
     "color": {
-      "dark": "#0C0D11",
-      "light": "#FFFFFF"
+      "dark": "#0E1714",
+      "light": "#F6F7F5"
     }
   }
 }
