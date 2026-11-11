@@ -166,6 +166,8 @@ export ANTHROPIC_MODEL=claude-sonnet-4-20250514
 
 Key format: `sk-ant-...` — get yours at [console.anthropic.com/settings/keys](https://console.anthropic.com/settings/keys).
 
+The Anthropic provider doesn't send `temperature`, `top_p`, or `top_k`. The anthropic SDK has had no sampling parameters since 1.0, and Anthropic API version `2026-10-21`, which the 2.x SDK sends, refuses them. Claude samples with the model's defaults, and no QWED setting overrides them. Sampling can vary the translations Claude returns and the verdicts `verify_fact` and `verify_image` return. QWED's fact and image verifiers record those verdicts only as advisory checks, never as `VERIFIED`.
+
 ### Local LLMs (Ollama)
 
 No API key needed. Install Ollama, pull a model, and configure QWED:
@@ -233,6 +235,8 @@ export ACTIVE_PROVIDER=claude_opus
 export CLAUDE_OPUS_API_KEY=sk-ant-your-key
 export CLAUDE_OPUS_DEPLOYMENT=claude-opus-4-5
 ```
+
+Like the Anthropic provider, the Claude Opus provider doesn't send `temperature` and samples with the model's defaults. Sampling can vary translations and the verdicts `verify_fact` and `verify_image` return. QWED records those verdicts only as advisory checks, never as `VERIFIED`.
 
 ---
 
@@ -395,7 +399,9 @@ For translation accuracy, use one of the following (in order of preference):
 
 ### Is the LLM translation deterministic?
 
-We set `temperature=0` for reproducibility, but LLMs are inherently probabilistic. That's why **QWED verification is essential** — it provides the determinism guarantee.
+No. LLMs are inherently probabilistic. The Anthropic and Claude Opus providers don't send `temperature`, so Claude samples with the model's defaults. Sampling can vary translations and the verdicts `verify_fact` and `verify_image` return. QWED's fact and image verifiers record those verdicts only as advisory checks, never as `VERIFIED`. The OpenAI, Azure OpenAI, OpenAI-compatible, Gemini, and Ollama providers send `temperature=0.0`, which reduces variation but doesn't remove it.
+
+That's why **QWED verification is essential**. The deterministic engines give the same verdict for the same translation. They check the expression the model produced, not whether it matches your question, so two different translations of one question can get different verdicts.
 
 ---
 

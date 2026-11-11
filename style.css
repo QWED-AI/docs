@@ -5,3 +5,14 @@
 code, pre, kbd, samp {
   font-family: 'Geist Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
+
+/* Headings tracked in as on qwedai.tech: -0.035em on the page title and
+   section headings, -0.01em on subsections. */
+#page-title,
+.mdx-content > h2 {
+  letter-spacing: -0.035em;
+}
+
+.mdx-content > h3 {
+  letter-spacing: -0.01em;
+}
