@@ -146,6 +146,12 @@ print(result.developer_fields["issues"])
 
 Tautologies are detected by value, not by matching fixed text shapes. The engine constant-folds every column-free comparison, so `OR 1=1`, `OR 'a'='a'`, `OR 1=1.0`, `OR 2>1`, and arithmetic forms are all reported as `injection_tautology`. A `WHERE` or `HAVING` clause whose whole predicate folds to true, such as `WHERE 1`, is flagged too.
 
+<Info>Changed in v9.0.0 ([GHSA-jvhg-jw63-gr5g](https://github.com/QWED-AI/qwed-verification/security/advisories/GHSA-jvhg-jw63-gr5g))</Info>
+
+Constant folding also covers `IN`, `IS`, `LIKE` and `ILIKE`, `BETWEEN`, `/`, `%`, `||`, `COALESCE`, `CAST`, `ABS`, and `EXISTS` over a `SELECT` with no `FROM`. `AND` and `OR` short-circuit on a constant operand, and a column compared with itself, such as `id = id`, is treated as always true (it is true for every non-`NULL` value). Filters such as `id = 5 OR 1 IN (1)`, `NOT (id = 5 AND 1 = 0)` and `id = 5 OR id = id` are now tautologies: the query has `is_valid: false` and `malicious_classification: true`, and is not admitted.
+
+A filter predicate that reads no column but can't be worked out may still be always true, so the query is not admitted. The result is `BLOCKED` with `is_valid: false`, an issue of type `unevaluated_constant_predicate`, and `constraint_id: "sql_verifier.unevaluated_predicate"`. When the same query also has a proven tautology, the tautology decides the result: `VERIFIED` with `constraint_id: "sql_verifier.malicious"` and `malicious_classification: true`. It doesn't set `malicious_classification`, because nothing proves malice. Compare against a column or remove the constant condition; check that removing it doesn't change which rows the query returns.
+
 ### Stacked queries
 
 A query that holds two or more statements, such as `SELECT 1; DROP TABLE users`, is reported as `stacked_queries`. The query is not valid, sets `malicious_classification: true`, and is not admitted.

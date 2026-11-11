@@ -421,7 +421,7 @@ Before v9.0.0, the verifier matched these names anywhere in a line, so `cur.exec
 
 ### File and network access is never admitted
 
-`CodeVerifier` reports file system and network I/O as a `CRITICAL` issue with type `file_or_network_access`, so the snippet is unsafe (`is_valid: false`) and `POST /verify/code` returns `admission: BLOCKED`. The following are covered, including through aliased imports:
+`CodeVerifier` reports file system and network I/O that the code itself calls as a `CRITICAL` issue with type `file_or_network_access`, so the snippet is unsafe (`is_valid: false`) and `POST /verify/code` returns `admission: BLOCKED`. The following are covered, including through aliased imports:
 
 - The bare `open()` builtin and `io.open`
 - `shutil.*`, `pathlib.Path`, and file-mutating `os` calls such as `os.remove`, `os.rename`, `os.mkdir`, `os.chmod`, and `os.open`
@@ -429,7 +429,7 @@ Before v9.0.0, the verifier matched these names anywhere in a line, so `cur.exec
 - `urllib.request`, `http.client`, `requests.*`, `httpx.*`, `aiohttp.*`, and `asyncio.open_connection`
 - `ftplib`, `smtplib`, `telnetlib`, `poplib`, and `imaplib`
 
-`os.path.*` is not flagged. That includes the string helpers such as `os.path.join` and `os.path.basename`, and also `os.path.exists`, `os.path.isfile` and `os.path.getsize`, which read file-system metadata without opening the file.
+This check doesn't flag `os.path.*`. The string helpers such as `os.path.join` and `os.path.basename` are admitted. From v9.1.0, the `os.path` functions that read the file system, such as `os.path.exists`, `os.path.isfile` and `os.path.getsize`, are refused by the allowlist (`attribute_not_admitted`); see [Only listed modules, builtins and attributes are admitted](#only-listed-modules-builtins-and-attributes-are-admitted).
 
 ```python
 result = code_verifier.verify_code(
@@ -440,7 +440,62 @@ print(result.developer_fields["is_valid"])     # False
 # [{"severity": "CRITICAL", "type": "file_or_network_access", ...}]
 ```
 
-If generated code needs to read files or call the network, route that I/O through a reviewed, sandboxed tool.
+These checks cover calls the code makes by name. They don't see the objects your executor puts in the code's namespace: see the note under [Only listed modules, builtins and attributes are admitted](#only-listed-modules-builtins-and-attributes-are-admitted). If generated code needs to read files or call the network, route that I/O through a reviewed, sandboxed tool.
+
+### Only listed modules, builtins and attributes are admitted
+
+<Info>Changed in v9.1.0 ([GHSA-9r7q-mx75-hcj7](https://github.com/QWED-AI/qwed-verification/security/advisories/GHSA-9r7q-mx75-hcj7))</Info>
+
+`CodeVerifier` admits Python code only when everything it uses is on QWED's lists. Lists of dangerous calls can't be complete: before v9.1.0, code that used `io.FileIO`, `urllib3`, `pickle.Unpickler`, `multiprocessing` or `os.environ` was `VERIFIED · ADMIT`. Python code is now admitted only when all of the following hold:
+
+- Every module it imports, and every name it uses from that module, is on the list. The list holds standard-library modules that compute without files, the network, processes, the environment or the import system, such as `math`, `json`, `re`, `datetime`, `decimal`, `collections` and `itertools`. Third-party modules, such as `numpy`, `pandas` and `requests`, are not admitted, and nor are `asyncio`, `logging`, `subprocess`, `importlib` or `pathlib`. An import is refused even if the code calls nothing from the module.
+- Every builtin it reads is listed. A read of `open`, `eval`, `exec`, `compile`, `__import__`, `vars`, `globals`, `locals`, `getattr`, `setattr`, `delattr`, `help`, `license`, `credits`, `copyright`, `breakpoint`, `memoryview` or `__build_class__` is refused, also where the name is the code's own variable or parameter. Rename the variable, for example to `help_text`. `print`, `input`, `exit` and `quit` are admitted.
+- Every special attribute (`__x__`) it uses is listed. The protocol methods, such as `__init__`, `__len__` and `__eq__`, and plain data, such as `__name__` and `__doc__`, are listed. Attributes such as `__func__`, `__wrapped__`, `__get__`, `__getstate__`, `__reduce__`, `__dict__` and `__class__` are refused.
+- It reads no attribute's value by a name made at run time. `hasattr(obj, name)` is admitted: it only answers whether the attribute exists, although the lookup can run a property. `.format` and `.format_map` need a template written in the code with no attribute in a field, such as `"{} items".format(n)`. Use an f-string otherwise. A class pattern with positional parts, such as `case Point(x, y)`, needs a class whose `__match_args__` is fixed.
+- It uses no module as a value (`m = json`), writes to no module (`json.dumps = f`), and reads no frame or traceback.
+
+Admission checks the code's text, not the objects your executor puts in its namespace. A name the code uses but doesn't define, such as `f` in `f("/etc/passwd")`, isn't checked, so if your executor binds `f` to `open`, admitted code can read files. Expose only the objects and callables the code needs.
+
+Each refusal is a `CRITICAL` issue that names the module, builtin or attribute in its `pattern`. The issue `type` is one of `module_not_admitted`, `attribute_not_admitted`, `module_reference`, `module_write`, `builtin_not_admitted`, `special_attribute`, `frame_introspection` or `dynamic_lookup`.
+
+```python
+from qwed_new.core.code_verifier import CodeVerifier
+
+code_verifier = CodeVerifier()
+result = code_verifier.verify_code("import numpy as np\nprint(np.mean([1, 2, 3]))", language="python")
+print(result.developer_fields["is_valid"])     # False
+# [{"severity": "CRITICAL", "type": "module_not_admitted", "pattern": "numpy", ...}]
+
+result = code_verifier.verify_code("import math\nprint(math.sqrt(16))", language="python")
+print(result.developer_fields["is_valid"])     # True
+```
+
+<Warning>
+**Upgrading to v9.1.0.** `POST /verify/code`, `QWEDLocal.verify_code` and the CLI can refuse code that v9.0.0 admitted. Read the issues on the result: each one names what to remove or replace.
+</Warning>
+
+#### Trusted modules
+
+`CodeVerifier(trusted_modules=...)` takes top-level module names that your own runtime confines, such as a sandbox with its own import guard. Code may use a trusted module although it is not on the list, also as a value or by writing to it. The allowlist's module checks skip a trusted module, so don't rely on them for one. The checks from earlier releases still apply to it, such as the code-running modules and file, network and process calls: `CodeVerifier(trusted_modules=["timeit"])` still refuses `import timeit`. The builtin, attribute and frame checks also still apply.
+
+```python
+from qwed_new.core.code_verifier import CodeVerifier
+
+sandbox_verifier = CodeVerifier(trusted_modules=["numpy", "pandas"])
+```
+
+QWED's code-execution sandbox passes `numpy`, `pandas`, `scipy`, `sklearn`, `statsmodels` and `patsy` as trusted, so the Stats engine still runs code that uses them.
+
+### Code hidden from the checks is refused
+
+<Info>Changed in v9.0.0</Info>
+
+Before v9.0.0, the following code was `VERIFIED · ADMIT` because the checks never saw what it ran. It is now refused:
+
+- **Modules taken by name from the import system** ([GHSA-qrp4-p44j-m484](https://github.com/QWED-AI/qwed-verification/security/advisories/GHSA-qrp4-p44j-m484)): `__loader__.load_module(...)`, `importlib.util.module_from_spec`, the importlib bootstrap, `pkgutil.resolve_name`, `pydoc.locate`, and any read of `sys.modules`.
+- **Modules that run strings as code** ([GHSA-jrxf-9jh4-86w7](https://github.com/QWED-AI/qwed-verification/security/advisories/GHSA-jrxf-9jh4-86w7)): importing `timeit`, `cProfile`, `profile`, `pdb`, `bdb`, `code`, `codeop`, `trace`, `doctest`, `logging.config` or `idlelib`. File readers such as `tarfile`, `zipfile`, `codecs.open`, `linecache`, `fileinput`, `glob`, `tempfile`, `sqlite3`, `shelve` and `dbm` are file access.
+- **Code in strings that typing evaluates** ([GHSA-p75q-7rg5-ff46](https://github.com/QWED-AI/qwed-verification/security/advisories/GHSA-p75q-7rg5-ff46)): string annotations and `ForwardRef` strings that hold a call, lambda, comprehension or assignment expression. `__forward_code__`, `__forward_arg__`, `__annotations__` and `__annotate__` are dangerous attributes.
+- **A source encoding other than UTF-8** ([GHSA-pr6c-cqg8-6w5r](https://github.com/QWED-AI/qwed-verification/security/advisories/GHSA-pr6c-cqg8-6w5r)): under a `utf-7` or `unicode_escape` coding declaration, text checked as a comment can decode to statements when the code runs. A coding declaration whose codec is not UTF-8 is a `CRITICAL` issue of type `source_encoding`. Save the file as UTF-8, then remove the declaration or declare `utf-8`.
 
 ### SDK clients use `CodeVerifier`, not `CodeGuard`
 
