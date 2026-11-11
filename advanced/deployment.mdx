@@ -117,7 +117,7 @@ services:
       - OPENAI_MODEL=${OPENAI_MODEL}
 ```
 
-Then start with `docker compose -f deploy/docker-compose.yml -f deploy/docker-compose.override.yml up -d`, using the variables of the provider you run.
+Add `ACTIVE_PROVIDER`, the provider's key, and its model (here `OPENAI_API_KEY` and `OPENAI_MODEL`) to `deploy/.env`: an unset one is passed empty. Then start with `docker compose -f deploy/docker-compose.yml -f deploy/docker-compose.override.yml up -d`, using the variables of the provider you run.
 
 Access the services:
 - **API**: http://localhost:8000
