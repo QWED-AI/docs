@@ -401,7 +401,7 @@ For translation accuracy, use one of the following (in order of preference):
 
 No. LLMs are inherently probabilistic. The Anthropic and Claude Opus providers don't send `temperature`, so Claude samples with the model's defaults. Sampling can vary translations and the verdicts `verify_fact` and `verify_image` return. QWED's fact and image verifiers record those verdicts only as advisory checks, never as `VERIFIED`. The OpenAI, Azure OpenAI, OpenAI-compatible, Gemini, and Ollama providers send `temperature=0.0`, which reduces variation but doesn't remove it.
 
-That's why **QWED verification is essential**. The deterministic engines check each translation and provide the determinism guarantee.
+That's why **QWED verification is essential**. The deterministic engines give the same verdict for the same translation. They check the expression the model produced, not whether it matches your question, so two different translations of one question can get different verdicts.
 
 ---
 
