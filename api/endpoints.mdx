@@ -1069,6 +1069,12 @@ Convert a [`DiagnosticResult`](/advanced/diagnostics) into a schema-valid Verifi
 - The server records the diagnostic but does not vouch for it. The caller's `agent_message` and `developer_fields` are kept under `developer_fields.caller_supplied` and decide nothing, `is_valid` included.
 - The admission is `DENY` unless `attestation_token` also signs `ADMIT` for this verdict (`qwed.admission`), as the token of an answer the server admitted does. An admitted document names the engine that signed the token, and this server's version, as its verifier. Your `verifier` and `verifier_version` are kept under `caller_supplied`.
 
+**Audit row:** Each successful call writes one audit row; a `422` or a signing failure writes none. The row stores the signed document exactly as returned, so its attestation matches the stored document: read back from `GET /audit/logs`, it verifies with [`POST /verification-context/validate`](#post-%2Fverification-context%2Fvalidate) until the attestation expires (24 hours by default) and while the server keeps the signing key. Only the row's `query` is redacted for personal data (emails, phone numbers, SSNs, IP addresses). The redaction matches patterns and misses some forms, such as a phone number written `(415) 555-1212` or an IPv6 address, so treat the `query` column as possibly holding personal data.
+
+<Warning>
+The stored document keeps any personal data you put in `query` or `diagnostic`, including the diagnostic's `agent_message` and `developer_fields`, which are stored as sent. To keep it out of the audit log, mask personal data in the query of the original verification and send that query unchanged to `from-diagnostic`. For a `VERIFIED` diagnostic the attestation covers the query, so masking it only here makes the document `BLOCKED`. Rows written before this change hold a redacted copy of the document, which may not verify against its attestation: it fails when the redaction changed a signed field.
+</Warning>
+
 | Status | Description |
 |--------|-------------|
 | 422 | The resulting document failed Verification Context validation, or the canonical encoding refuses it (for example, a lone surrogate in a string) |
@@ -1762,7 +1768,7 @@ Check the signature and hash chain of every audit entry in your organization ove
 | `start` | ISO 8601 datetime (query, optional) | Start of the period. Omit for no lower bound. |
 | `end` | ISO 8601 datetime (query, optional) | End of the period. Omit for no upper bound. |
 
-With neither parameter, QWED checks the whole chain. QWED reads a time without a zone as UTC and converts any other offset to UTC. A `start` later than `end` returns `400 Bad Request`.
+With neither parameter, QWED checks the whole chain, and `scope` reads `"Signature and hash-chain check of every audit entry recorded for the organisation. It does not show that every request was recorded."` With `start`, `end`, or both, `scope` names the period, as in the example below. Only the text differs. The status, counts, and `proof_ref` are computed the same way. QWED reads a time without a zone as UTC and converts any other offset to UTC. A `start` later than `end` returns `400 Bad Request`.
 
 ```bash
 curl --fail-with-body -H "Authorization: Bearer $QWED_SESSION_TOKEN" \
