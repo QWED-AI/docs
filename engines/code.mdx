@@ -429,7 +429,7 @@ Before v9.0.0, the verifier matched these names anywhere in a line, so `cur.exec
 - `urllib.request`, `http.client`, `requests.*`, `httpx.*`, `aiohttp.*`, and `asyncio.open_connection`
 - `ftplib`, `smtplib`, `telnetlib`, `poplib`, and `imaplib`
 
-`os.path.*` is not flagged. That includes the string helpers such as `os.path.join` and `os.path.basename`, and also `os.path.exists`, `os.path.isfile` and `os.path.getsize`, which read file-system metadata without opening the file.
+This check doesn't flag `os.path.*`. The string helpers such as `os.path.join` and `os.path.basename` are admitted. From v9.1.0, the `os.path` functions that read the file system, such as `os.path.exists`, `os.path.isfile` and `os.path.getsize`, are refused by the allowlist (`attribute_not_admitted`); see [Only listed modules, builtins and attributes are admitted](#only-listed-modules-builtins-and-attributes-are-admitted).
 
 ```python
 result = code_verifier.verify_code(
@@ -453,6 +453,8 @@ If generated code needs to read files or call the network, route that I/O throug
 - Every special attribute (`__x__`) it uses is listed. The protocol methods, such as `__init__`, `__len__` and `__eq__`, and plain data, such as `__name__` and `__doc__`, are listed. Attributes such as `__func__`, `__wrapped__`, `__get__`, `__getstate__`, `__reduce__`, `__dict__` and `__class__` are refused.
 - It reads no attribute's value by a name made at run time. `hasattr(obj, name)` is admitted: it only answers whether the attribute exists, although the lookup can run a property. `.format` and `.format_map` need a template written in the code with no attribute in a field, such as `"{} items".format(n)`. Use an f-string otherwise. A class pattern with positional parts, such as `case Point(x, y)`, needs a class whose `__match_args__` is fixed.
 - It uses no module as a value (`m = json`), writes to no module (`json.dumps = f`), and reads no frame or traceback.
+
+Admission checks the code's text, not the objects your executor puts in its namespace. A name the code uses but doesn't define, such as `f` in `f("/etc/passwd")`, isn't checked, so if your executor binds `f` to `open`, admitted code can read files. Expose only the objects and callables the code needs.
 
 Each refusal is a `CRITICAL` issue that names the module, builtin or attribute in its `pattern`. The issue `type` is one of `module_not_admitted`, `attribute_not_admitted`, `module_reference`, `module_write`, `builtin_not_admitted`, `special_attribute`, `frame_introspection` or `dynamic_lookup`.
 

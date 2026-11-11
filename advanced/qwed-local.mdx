@@ -172,7 +172,7 @@ print(result.evidence["issues"])      # CodeVerifier issues, e.g. process_execut
 
 `result.evidence` carries the verifier's `status`, `admission`, `constraint_id`, `critical_count`, `issues`, and `proof_ref`.
 
-From v9.1.0, `CodeVerifier` admits only code that uses listed standard-library modules, builtins and attributes, so code that imports a third-party module such as `numpy` is not admitted. See [Only listed modules, builtins and attributes are admitted](/engines/code#only-listed-modules-builtins-and-attributes-are-admitted). `QWEDLocal` does not serve code results it cached before v9.1.0.
+From v9.1.0, `CodeVerifier` admits Python code only when the modules and module names it uses, its builtins, and its special attributes are on QWED's lists. `QWEDLocal` uses the default lists with no trusted modules, so code that imports a third-party module such as `numpy` is not admitted. See [Only listed modules, builtins and attributes are admitted](/engines/code#only-listed-modules-builtins-and-attributes-are-admitted). `QWEDLocal` does not serve code results it cached before v9.1.0.
 
 `CodeVerifier` ships with the full `qwed` package. Without it, `verify_code` returns `verified=False` with `value="UNVERIFIABLE"` and an error. It never returns `SAFE`.
 

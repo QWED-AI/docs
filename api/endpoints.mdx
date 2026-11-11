@@ -517,7 +517,7 @@ Validate SQL queries against a provided schema. Returns the unified [`Diagnostic
 }
 ```
 
-A proven-malicious query returns `status: "VERIFIED"` with `developer_fields.is_valid: false`, `developer_fields.malicious_classification: true`, and `admission: "BLOCKED"` — proving malice is a successful proof, so the truth verdict is preserved while admission is denied. `BLOCKED` status is reserved for verification failures: `sql_verifier.parse_error`, `sql_verifier.schema_parse_error`, `sql_verifier.complexity_limit_exceeded`, and `sql_verifier.execution_error`. See the [SQL engine](/engines/sql) page for the full contract.
+A proven-malicious query returns `status: "VERIFIED"` with `developer_fields.is_valid: false`, `developer_fields.malicious_classification: true`, and `admission: "BLOCKED"` — proving malice is a successful proof, so the truth verdict is preserved while admission is denied. `BLOCKED` status is reserved for verification failures: `sql_verifier.parse_error`, `sql_verifier.schema_parse_error`, `sql_verifier.complexity_limit_exceeded`, `sql_verifier.execution_error`, and, from v9.0.0, `sql_verifier.unevaluated_predicate` (a filter predicate that reads no data and can't be worked out). See the [SQL engine](/engines/sql) page for the full contract.
 
 ---
 
