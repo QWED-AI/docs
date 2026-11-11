@@ -154,8 +154,17 @@ The engine counts statements from the parsed query. A `;` inside a string litera
 
 ```sql
 SELECT * FROM users WHERE name = 'a;b'
+```
+
+```sql
 SELECT $$a;b$$
+```
+
+```sql
 SELECT * FROM users /* ; */
+```
+
+```sql
 SELECT * FROM users; -- note
 ```
 
@@ -169,7 +178,7 @@ Where a database could split the text differently from the parser, the engine st
 A query that does not parse also counts every `;`. The engine applies these checks both to the query as given and with MySQL executable comments expanded.
 
 <Note>
-Before this change, any `;` before the last character marked the query as `stacked_queries`, so a `;` in a string or a trailing comment was refused.
+Before v9.0.0, any `;` before the last character marked the query as `stacked_queries`, so a `;` in a string or a trailing comment was refused.
 </Note>
 
 ## Subqueries and complexity limits
@@ -199,7 +208,7 @@ print(result.developer_fields["complexity"]["subquery_depth"])  # 1
 ```
 
 <Note>
-Before this change, every query with a parenthesised subquery was `BLOCKED` with `sql_verifier.execution_error`, and the subquery depth limit never ran for those queries. A `UNION` of two plain `SELECT` statements reported a `subquery_depth` of `1`.
+Before v9.0.0, every query with a parenthesised subquery was `BLOCKED` with `sql_verifier.execution_error`, and the subquery depth limit never ran for those queries. A `UNION` of two plain `SELECT` statements reported a `subquery_depth` of `1`.
 </Note>
 
 ## Destructive operations
