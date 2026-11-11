@@ -108,7 +108,7 @@ if response["admission"] == "ADMIT":
 - **Batch math signing failure is `BLOCKED`.** It was `UNVERIFIABLE`. The attestation's engine is `math` (was `batch_math`).
 - **`POST /agents/{agent_id}/verify`** returns the enforced result with its `admission`, not the control plane's raw response, which could still say `VERIFIED` after enforcement blocked it. The agent activity log records the same response.
 
-See [`POST /verify/batch`](/api/endpoints#post-verify-batch), [`POST /agents/{agent_id}/verify`](/api/endpoints#post-agents-agent-id-verify), and [Attestation enforcement](/api/endpoints#attestation-enforcement).
+See [`POST /verify/batch`](/api/endpoints#post-%2Fverify%2Fbatch), [`POST /agents/{agent_id}/verify`](/api/endpoints#post-%2Fagents%2F%2Fverify), and [Attestation enforcement](/api/endpoints#attestation-enforcement).
 
 ---
 
@@ -132,7 +132,7 @@ The entry hash covers `admission`, `api_key_id`, and `verifier_version`. QWED ad
 **Don't roll back past this release.** Upgrade every QWED process together. An older release can't verify rows written with the new fields. When such a row is an organization's chain head, the older release refuses every further append for that organization and its verify routes return `500` (fail closed).
 </Warning>
 
-See [Audit endpoints](/api/authentication#audit-endpoints), [`GET /admin/security/events`](/api/endpoints#get-admin-security-events), and [Audit trail verification](/advanced/compliance#audit-trail-verification).
+See [Audit endpoints](/api/authentication#audit-endpoints), [`GET /admin/security/events`](/api/endpoints#get-%2Fadmin%2Fsecurity%2Fevents), and [Audit trail verification](/advanced/compliance#audit-trail-verification).
 
 ---
 
@@ -155,7 +155,7 @@ See [Audit endpoints](/api/authentication#audit-endpoints), [`GET /admin/securit
 - **The LlamaIndex, CrewAI, and LangChain integrations fail closed** ([GHSA-83v6-6h23-pvp4](https://github.com/QWED-AI/qwed-verification/security/advisories/GHSA-83v6-6h23-pvp4), high). They read `is_verified`. A response no engine checked is `UNVERIFIABLE`, and an error is unverified.
 - **The GitHub Action's outputs can't be injected** ([GHSA-j788-44pc-8hp3](https://github.com/QWED-AI/qwed-verification/security/advisories/GHSA-j788-44pc-8hp3), low). Outputs are written with a random heredoc delimiter, and the Action stops workflow commands for the rest of its step. Verify mode gates on `is_verified` and reports the server's verdict, for example `VERIFIED · DENY`.
 
-See [Python SDK](/sdks/python#how-is-verified-is-decided), [Guards](/sdks/guards#codeguard), [SQL engine](/engines/sql#dangerous-functions), [QWEDLocal](/advanced/qwed-local#3-code-security-codeverifier), [LlamaIndex](/integrations/llamaindex), [CrewAI](/integrations/crewai), [LangChain](/integrations/langchain), and [GitHub Action](/advanced/github-action#how-verify-mode-decides).
+See [Python SDK](/sdks/python#how-is_verified-is-decided), [Guards](/sdks/guards#codeguard), [SQL engine](/engines/sql#dangerous-functions), [QWEDLocal](/advanced/qwed-local#3-code-security-codeverifier), [LlamaIndex](/integrations/llamaindex), [CrewAI](/integrations/crewai), [LangChain](/integrations/langchain), and [GitHub Action](/advanced/github-action#how-verify-mode-decides).
 
 ---
 
@@ -300,7 +300,7 @@ if response["admission"] != "ADMIT":
 - **`POST /verify/natural_language` returns the enforced verdict.** The response carries the control-plane verdict with `admission`, `translated_expression`, `verification_scope: translated_expression_only`, and `query_semantics_verified: false`. Admission is always `DENY` because the LLM translation is unverified.
 - **`qwed init` and `qwed test` print the verdict with its admission.** For example, `2+2=5 -> VERIFIED (false) | DENY`. A failed self-check prints `FAILED`, and the closing line reads `All engines ready.`
 
-See [Math engine — Verdicts and admission](/engines/math#verdicts-and-admission), [`POST /verify/math`](/api/endpoints#post-verify-math), and [CLI reference](/advanced/cli).
+See [Math engine — Verdicts and admission](/engines/math#verdicts-and-admission), [`POST /verify/math`](/api/endpoints#post-%2Fverify%2Fmath), and [CLI reference](/advanced/cli).
 
 ---
 
@@ -344,7 +344,7 @@ curl --fail-with-body -H "Authorization: Bearer $QWED_SESSION_TOKEN" \
   "http://localhost:8000/admin/compliance/verify-trail"
 ```
 
-See [Session sign-in for compliance endpoints](/api/endpoints#session-sign-in-for-compliance-endpoints) and [`GET /admin/compliance/verify-trail`](/api/endpoints#get-admin-compliance-verify-trail).
+See [Session sign-in for compliance endpoints](/api/endpoints#session-sign-in-for-compliance-endpoints) and [`GET /admin/compliance/verify-trail`](/api/endpoints#get-%2Fadmin%2Fcompliance%2Fverify-trail).
 
 ---
 
@@ -397,7 +397,7 @@ See [Security activity summary](/advanced/compliance#1-security-activity-summary
 - **Role checks on `/auth/api-keys` and `/audit` (#483).** These routes previously required only a signed-in user, so any role could create keys, list and revoke every key in the organization, and export the audit log. Now creating a key needs `member` or higher. Members and viewers list and revoke only their own keys. Admins can revoke keys of users who don't rank higher, and owners can revoke any key in the organization. Every role can read audit logs. `GET /audit/export` and `POST /audit/seed` need `admin` or `owner`. See [Roles on API-key and audit routes](/api/authentication#roles-on-api-key-and-audit-routes).
 - **Fail-closed user checks (#483).** An inactive user, an inactive or missing organization, or an unknown role gets `403 Forbidden`. A member or viewer gets `404 Not Found` for another user's key. An invalid key ID returns `404 Not Found` instead of a server error.
 - **Agent tokens stored as keyed digests (#487).** QWED stores agent tokens as HMAC-SHA256 digests keyed with `QWED_API_KEY_LOOKUP_SECRET`, instead of plain text. A token is shown only once, at registration or re-issue. At startup, the server hashes existing plaintext tokens in place, so they keep working. Changing `QWED_API_KEY_LOOKUP_SECRET` now invalidates agent tokens as well as API keys. See [Agent token storage](/api/authentication#agent-token-storage).
-- **New `POST /agents/{agent_id}/token/reissue` (#487).** Members and above can issue a new token for an agent in their own organization. The old token stops working. Another organization's agent returns `404 Not Found`. See [`POST /agents/{agent_id}/token/reissue`](/api/endpoints#post-agents-agent-id-token-reissue).
+- **New `POST /agents/{agent_id}/token/reissue` (#487).** Members and above can issue a new token for an agent in their own organization. The old token stops working. Another organization's agent returns `404 Not Found`. See [`POST /agents/{agent_id}/token/reissue`](/api/endpoints#post-%2Fagents%2F%2Ftoken%2Freissue).
 
 ---
 
@@ -499,7 +499,7 @@ See the [Rust SDK](/sdks/rust#reading-a-result), [Go SDK](/sdks/go#reading-a-res
 ### What changed
 
 - **Spec v1.1.** A [v1.1 document](/specs/verification-context#version-1-1-and-the-issuer-attestation) carries `attestation`: an ES256 JWT of type `qwed-context+jwt` that signs the hash of every other field, with the verdict, admission, and `proof_ref`.
-- **Signed documents.** [`POST /verification-context/from-diagnostic`](/api/endpoints#post-verification-context-from-diagnostic) returns v1.1 documents. A failure to sign is a `500`, not an unsigned document. A document the canonical encoding refuses is a `422`.
+- **Signed documents.** [`POST /verification-context/from-diagnostic`](/api/endpoints#post-%2Fverification-context%2Ffrom-diagnostic) returns v1.1 documents. A failure to sign is a `500`, not an unsigned document. A document the canonical encoding refuses is a `422`.
 - **API checks.** `POST /verification-context/validate` and `/resolve` take `require_attestation` (default `true`) and check the attestation with the server's key. A document with none returns `attestation_required`; one that doesn't verify or isn't this document's returns `attestation_invalid`.
 - **Python SDK.** `validate_verification_context()` and `resolve_verification_context()` verify the attestation against the server's JWKS first, and raise `KeysUnavailableError` if they can't fetch the keys. `verify_document_attestation()` returns the claims. See [Python SDK](/sdks/python#verification-context).
 - **CLI.** `qwed context validate` and `resolve` verify the attestation with `--server` or `--jwks-file`. See [CLI reference](/advanced/cli#qwed-context-verification-context-utilities).
@@ -564,7 +564,7 @@ See [Verification Context specification](/specs/verification-context), [Go SDK](
 
 - **Request bodies are capped and blocking work runs off the event loop** (#447). See [Request limits](/api/endpoints#request-limits).
 - **Concurrent sandbox containers are bounded** (#448). See [Availability limits](/advanced/self-hosting#availability-limits).
-- **API-key rotation is atomic** (#453). QWED revokes the old key and mints the replacement in one transaction, so concurrent rotations of the same key mint exactly one replacement. Rotating a key that is already inactive or revoked mints nothing and returns `404 Not Found`. See [`POST /admin/keys/rotate`](/api/endpoints#post-admin-keys-rotate).
+- **API-key rotation is atomic** (#453). QWED revokes the old key and mints the replacement in one transaction, so concurrent rotations of the same key mint exactly one replacement. Rotating a key that is already inactive or revoked mints nothing and returns `404 Not Found`. See [`POST /admin/keys/rotate`](/api/endpoints#post-%2Fadmin%2Fkeys%2Frotate).
 
 ### Credential handling
 
@@ -620,7 +620,7 @@ if result.status == "UNVERIFIABLE":
 
 ### What changed
 
-- **`verify_fact` fails closed when the service is unreachable (#449).** On a connection failure or a connect or read timeout, the Python SDK returns `status="UNVERIFIABLE"` and `is_verified=False` with a message explaining that remote verification was unavailable. Previously, a connection failure returned `VERIFIED` after only the local PII scan, and a timeout raised an exception. See [`verify_fact`](/sdks/python#verify-fact-claim-context).
+- **`verify_fact` fails closed when the service is unreachable (#449).** On a connection failure or a connect or read timeout, the Python SDK returns `status="UNVERIFIABLE"` and `is_verified=False` with a message explaining that remote verification was unavailable. Previously, a connection failure returned `VERIFIED` after only the local PII scan, and a timeout raised an exception. See [`verify_fact`](/sdks/python#verify_fact-claim-context).
 - **`Money` rejects non-finite amounts (#451).** `Money("NaN")`, `Money("Infinity")`, and `Money(float("inf"))` raise `ValueError`.
 - **`verify_invoice_total` never raises on invalid input (#451).** Invalid amounts, a negative or non-finite `tolerance`, or a non-`Decimal` `tolerance` return `(False, reason)` instead of raising. Currency mismatches still return `(False, "Currency mismatch: ...")`.
 
@@ -1032,12 +1032,12 @@ See [LiabilityGuard](/legal/guards#fail-closed-behavior-on-non-finite-and-out-of
 
 ### What changed
 
-- **New `GET /health/identity` endpoint.** Takes a caller-supplied `nonce` (1–128 characters) and returns HMAC-SHA256 proofs over it under `QWED_JWT_SECRET_KEY` and `QWED_API_KEY_LOOKUP_SECRET`. Returns `400` for a missing or oversized nonce and `503` when server secrets aren't configured. The secrets never leave the server. See [`GET /health/identity`](/api/endpoints#get-health-identity).
+- **New `GET /health/identity` endpoint.** Takes a caller-supplied `nonce` (1–128 characters) and returns HMAC-SHA256 proofs over it under `QWED_JWT_SECRET_KEY` and `QWED_API_KEY_LOOKUP_SECRET`. Returns `400` for a missing or oversized nonce and `503` when server secrets aren't configured. The secrets never leave the server. See [`GET /health/identity`](/api/endpoints#get-%2Fhealth%2Fidentity).
 - **Nonce-bound, replay-safe handshake.** `qwed init` generates a fresh nonce on every run and compares the proofs against locally computed values in constant time. A captured response is useless for any later handshake.
 - **Runs on reused and freshly spawned servers.** A reused server can be foreign or stale even when secrets were retained. A fresh spawn can lose a port race after the health poll.
 - **Fails closed.** A mismatch, a `404` from an older server, any other non-`200` status, a malformed response, an unreachable server, or missing local secrets stops `qwed init` with exit status `1` before any key is issued. Each message tells you to restart the local server or re-run `qwed init`.
 
-See [`qwed init`](/advanced/cli#qwed-init-onboarding-and-bootstrap) and [troubleshooting](/troubleshooting#qwed-init-fails-with-server-identity-check-failed).
+See [`qwed init`](/advanced/cli#qwed-init-onboarding-and-bootstrap) and [troubleshooting](/troubleshooting#qwed-init-fails-with-%E2%80%9Cserver-identity-check-failed%E2%80%9D).
 
 ---
 
@@ -1085,7 +1085,7 @@ See [API key format](/api/authentication#api-key-format) for patterns, checksum 
 
 ### What changed
 
-- **New public endpoint.** `POST /webhooks/secret-scanning` accepts a JSON array of leaked-token matches, verifies the `Github-Public-Key-Identifier` and `Github-Public-Key-Signature` headers against GitHub's published signing keys, and hands verified batches to the revocation sink in the background. See [`POST /webhooks/secret-scanning`](/api/endpoints#post-webhooks-secret-scanning) for the full request/response contract.
+- **New public endpoint.** `POST /webhooks/secret-scanning` accepts a JSON array of leaked-token matches, verifies the `Github-Public-Key-Identifier` and `Github-Public-Key-Signature` headers against GitHub's published signing keys, and hands verified batches to the revocation sink in the background. See [`POST /webhooks/secret-scanning`](/api/endpoints#post-%2Fwebhooks%2Fsecret-scanning) for the full request/response contract.
 - **Raw-body signature verification.** The signature is verified over the exact bytes received; the body is never re-serialized. Nothing in the payload is parsed or logged until the signature is proven genuine.
 - **P-256 pinning at key-load.** Signing keys are pinned to `secp256r1` when the PEM is loaded, so a future keys-list entry on another curve is dropped at load rather than silently trusted at verify time.
 - **6-hour key cache with rotation retry.** Signing keys are cached in-process for 6 hours with an `ETag`-conditional refetch. On an unknown `key_identifier`, QWED refetches the list exactly once (throttled to one forced refetch per 60 s after a success, 10 s after a failure) and retries. A dead or throttled key service fails closed to `503`.

@@ -154,7 +154,7 @@ The endpoint returns the [`DiagnosticResult`](/advanced/diagnostics) verdict tha
 
 Admission is always `BLOCKED` because the LLM translation itself is unverified, so QWED never admits the result as an answer to your question. The verdict itself is unchanged. The audit log row's `is_verified` follows admission, so it is always `false`. QWED returns `BLOCKED` as the verdict when the control plane returns a malformed diagnostic or when the output sanitizer rejects the translated expression.
 
-For a deterministic, admissible result, send the expression to [`POST /verify/math`](#post-verify-math) directly.
+For a deterministic, admissible result, send the expression to [`POST /verify/math`](#post-%2Fverify%2Fmath) directly.
 
 The control plane also builds a `trust_boundary` record that describes what the pipeline proved. The control-plane response carries the enforced verdict as `diagnostic` together with `admission`.
 
@@ -1207,7 +1207,7 @@ Register a new AI agent with QWED for verified agentic workflows.
 }
 ```
 
-<Warning>Store the `agent_token` immediately. QWED stores only a keyed digest of the token, so it can't be retrieved again. If you lose it, re-issue it with [`POST /agents/{agent_id}/token/reissue`](#post-agents-agent-id-token-reissue).</Warning>
+<Warning>Store the `agent_token` immediately. QWED stores only a keyed digest of the token, so it can't be retrieved again. If you lose it, re-issue it with [`POST /agents/{agent_id}/token/reissue`](#post-%2Fagents%2F%2Ftoken%2Freissue).</Warning>
 
 ---
 
@@ -1362,7 +1362,7 @@ Submit an agent tool call for risk evaluation before execution. Unknown tools (n
 
 ### GET /agents/{agent_id}/activity
 
-Retrieve the activity log for a specific agent. Activity entries are not signed or hash-chained. The signed record of each agent verification is its row in the organization's audit log (see [`GET /audit/logs`](/api/authentication#get-audit-logs)).
+Retrieve the activity log for a specific agent. Activity entries are not signed or hash-chained. The signed record of each agent verification is its row in the organization's audit log (see [`GET /audit/logs`](/api/authentication#get-%2Faudit%2Flogs)).
 
 **Headers:**
 
@@ -1548,7 +1548,7 @@ Before this change, every admin endpoint returned `401 Unauthorized`, even for v
 
 Export your organization's audit trail as a CSV file (`text/csv`).
 
-The `Chain Status` column reports `Chained` when a row carries a hash and `Legacy` when it was written before the API used the hash chain. `Chained` doesn't mean the row was verified. Use [`GET /admin/compliance/verify/{log_id}`](#get-admin-compliance-verify-log-id) to verify it.
+The `Chain Status` column reports `Chained` when a row carries a hash and `Legacy` when it was written before the API used the hash chain. `Chained` doesn't mean the row was verified. Use [`GET /admin/compliance/verify/{log_id}`](#get-%2Fadmin%2Fcompliance%2Fverify%2F) to verify it.
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
