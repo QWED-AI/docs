@@ -397,7 +397,7 @@ Before v7.2.3, shell and subprocess calls were warnings and the code was admitte
 - `re.compile(r"[0-9]+")` in a snippet that has `import re`. Without the import in the snippet, `re.compile` is refused, because the verifier can't tell that `re` is the standard module
 - `compile_report()`, and the names inside longer words in strings and comments, such as `"executing job"`
 
-The matching is still strict where a name can reach the builtin another way. The verifier refuses the names when used as a value (`f = eval`), as a keyword argument, as a parameter or function name, in an import, as an attribute, or as a whole identifier in a string. It also follows strings built from literals, such as `"ex" + "ec"`. Longer helpers that run code or start a process, such as `exec_module` and the `os.exec*` family, stay refused. `model.eval()`, `model.evaluate(x)`, and `model.evaluate()` stay refused too. `ast.literal_eval` is admitted.
+The matching is still strict where a name can reach the builtin another way. The verifier refuses the names when used as a value (`f = eval`), as a keyword argument, as a parameter or function name, in an import, as an attribute, or as a whole identifier in a string. It also follows names built from literals with `+` or `%`, such as `"ex" + "ec"`. It doesn't follow names built with `join` or `chr`. Longer helpers that run code or start a process, such as `exec_module` and the `os.exec*` family, stay refused. `model.eval()`, `model.evaluate(x)`, and `model.evaluate()` stay refused too. `ast.literal_eval` is admitted.
 
 ```python
 result = code_verifier.verify_code(
@@ -408,8 +408,9 @@ print(result.developer_fields["is_valid"])     # True
 
 result = code_verifier.verify_code("f = eval\nf(user_input)", language="python")
 print(result.developer_fields["is_valid"])     # False
+print(result.developer_fields["issues"])
 # [{"severity": "CRITICAL", "type": "dangerous_function", ...},
-#  {"severity": "CRITICAL", "type": "builtin_not_admitted", ...}]
+#  {"severity": "CRITICAL", "type": "builtin_not_admitted", ...}]   # second issue from v9.1.0
 ```
 
 Python that does not parse is `BLOCKED` with `constraint_id: "code_verifier.parse_error"`, because the AST checks cannot run on it.

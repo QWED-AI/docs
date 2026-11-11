@@ -202,9 +202,10 @@ except httpx.HTTPError as exc:
     # Request failed (network error or non-2xx). Fail closed: do not run the SQL.
     raise RuntimeError(f"SQL verification unavailable: {exc}") from exc
 
-print(result.status)                                          # "VERIFIED"
-print(result.developer_fields["is_valid"])                    # True
-print(result.developer_fields["complexity"]["subquery_depth"])  # 1
+fields = result.result["developer_fields"]                 # the SDK keeps the full response in result.result
+print(result.status)                                       # "VERIFIED"
+print(fields["is_valid"])                                  # True
+print(fields["complexity"]["subquery_depth"])               # 1
 ```
 
 <Note>
