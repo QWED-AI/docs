@@ -6,7 +6,7 @@ icon: "shield-check"
 ---
 
 <Note>
-**QWED v7.2.0 is live** — you get fail-closed security hardening across expression parsing, auth, sandbox, and event loop, plus a new float-precision advisory. No breaking wire changes. [See what's new →](/releases)
+**QWED v9.1.0 is the current release.** `CodeVerifier` now admits Python code only when the modules, builtins and special attributes it uses are listed, and each LLM provider runs the model you configure. Some code that earlier releases admitted is now refused, so read the [9.1.0](/changelog#v9-1-0-—-allowlist-admission-for-python-code) and [9.0.0](/changelog#v9-0-0-—-eleven-advisories-and-models-you-configure) upgrade steps before you upgrade.
 </Note>
 
 ## What is QWED?
@@ -74,22 +74,19 @@ flowchart LR
 
 ## Quick start (5 minutes)
 
-<CodeGroup>
-
-```bash pip
-pip install qwed==8.0.0
+```bash
+pip install qwed==9.1.0
 ```
 
-```bash docker
-docker pull qwedai/qwed-verification:7.2.0
-```
-
-</CodeGroup>
+The examples below use the `qwed` CLI that this installs. The `qwedai/qwed-verification:9.1.0` Docker image runs the API server instead; see [Self-hosting](/advanced/self-hosting#docker).
 
 ```bash
-# Verify a simple claim
-qwed verify "Is 2+2=5?"
-# -> CORRECTED: The answer is 4
+# Run every engine on known cases (no LLM needed)
+qwed test
+# Math:
+#   [ok] 2+2=4                  -> VERIFIED | ADMIT
+#   [ok] 2+2=5                  -> VERIFIED (false) | DENY
+#   ...
 
 # Verify logic constraints
 qwed verify-logic "(AND (GT x 5) (LT y 10))"
@@ -135,14 +132,14 @@ qwed verify-logic "(AND (GT x 5) (LT y 10))"
   Explore core, analysis, and specialized engines.
 </Card>
 
-## What's new in v7.2.0
+## What's new in v9
 
 <AccordionGroup>
-  <Accordion title="Security hardening batch" icon="shield-check" defaultOpen>
-    v7.2.0 hardens expression parsing, auth, sandbox containment, and event-loop safety against RCE, auth DoS, and resource exhaustion — with no breaking wire changes. [Learn more →](/releases)
+  <Accordion title="Allowlist admission for Python code" icon="shield-check" defaultOpen>
+    From v9.1.0, `CodeVerifier` admits Python code only when every module, module name, builtin and special attribute it uses is on a list, and the code reads no attribute's value by a name made at run time (`hasattr` is admitted: it only answers whether an attribute exists, although the lookup can run a property). Each refusal names the module, builtin or attribute. A caller can name modules its own runtime confines with `trusted_modules`, as the code-execution sandbox does for `numpy` and `pandas`; the module checks then skip those modules, so they need that confinement. [Read the 9.1.0 notes →](/changelog#v9-1-0-—-allowlist-admission-for-python-code)
   </Accordion>
-  <Accordion title="Precision advisory" icon="microchip">
-    When you verify expressions with binary floating-point constants, you will see a `precision.float-constants` advisory in `developer_fields.advisory_checks`. It never affects your verdict.
+  <Accordion title="Before you upgrade" icon="triangle-exclamation">
+    From v9.0.0, QWED names no model of its own: set your provider's model variable, such as `OPENAI_MODEL` or `ANTHROPIC_MODEL`, and pass `model=` to `QWEDLocal`, `verify()` and `qwed_sdk.integrations.langchain.QWEDTool`. `/verify/math` runs in worker processes with a time limit, the CSV exports change their columns, and the Go module path moves to `/v9`. Upgrade every server process together. [Read the upgrade steps →](/changelog#v9-0-0-—-eleven-advisories-and-models-you-configure)
   </Accordion>
 </AccordionGroup>
 

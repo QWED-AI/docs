@@ -574,7 +574,7 @@ Statically analyzes code for security risks using AST parsing (Python) or regex 
 - Credential hunting (`grep` for passwords/tokens)
 - Privilege escalation (`sudo`)
 
-`CodeGuard` is a blocklist pre-filter, not a verification. A pass returns `verified: True` with `advisory: True`, which means only that no listed pattern was found. Use `CodeGuard` to refuse code early, never to admit it. To admit code, use [`QWEDClient.verify_code`](/sdks/python#verify-code-code-language), which calls the server's `CodeVerifier`.
+`CodeGuard` is a blocklist pre-filter, not a verification. A pass returns `verified: True` with `advisory: True`, which means only that no listed pattern was found. Use `CodeGuard` to refuse code early, never to admit it. To admit code, use [`QWEDClient.verify_code`](/sdks/python#verify_code-code-language), which calls the server's `CodeVerifier`.
 
 ```python
 from qwed_new.guards.code_guard import CodeGuard
@@ -612,7 +612,7 @@ Validates SQL syntax using `sqlglot` and enforces read-only mutation policies. `
 - Calls to dangerous file, extension, network, and command functions, such as `load_extension()`, `pg_read_file()`, and `xp_cmdshell()` (`DANGEROUS_FUNCTION_BLOCKED`)
 - Invalid SQL syntax
 
-`SQLGuard` expands MySQL and MariaDB executable comments (`/*! ... */`) before it checks the query. With `allow_mutation=False` (the default), a pass means one read-only statement with no blocked function. It is a pre-filter, and the server's `SQLVerifier` decides admission. [`QWEDClient.verify_sql`](/sdks/python#verify-sql-query-schema-ddl-dialect) always calls the server.
+`SQLGuard` expands MySQL and MariaDB executable comments (`/*! ... */`) before it checks the query. With `allow_mutation=False` (the default), a pass means one read-only statement with no blocked function. It is a pre-filter, and the server's `SQLVerifier` decides admission. [`QWEDClient.verify_sql`](/sdks/python#verify_sql-query-schema_ddl-dialect) always calls the server.
 
 <ParamField path="allow_mutation" type="bool" default="false">
   When `false` (default), only `SELECT` and other read-only queries are permitted. Set to `true` only in trusted contexts.
