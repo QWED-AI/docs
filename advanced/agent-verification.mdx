@@ -287,15 +287,23 @@ print(budget)
 
 ## Activity logging
 
+Set `QWED_AGENT_ID` and `QWED_AGENT_TOKEN` to the `agent_id` and `agent_token` that registration returned before you run this example.
+
 ```python
+import os
+
 import requests
 
-# An agent reads its own activity with its token
+# An agent reads its own activity with its own ID and token, as returned at
+# registration: agent["agent_id"] and agent["agent_token"]
+agent_id = os.environ["QWED_AGENT_ID"]
+agent_token = os.environ["QWED_AGENT_TOKEN"]
 response = requests.get(
-    "http://localhost:8000/agents/42/activity",
+    f"http://localhost:8000/agents/{agent_id}/activity",
     params={"limit": 10},
     headers={"X-Agent-Token": agent_token},
 )
+response.raise_for_status()
 for entry in response.json()["activities"]:
     print(f"{entry['timestamp']}: {entry['type']} -> {entry['status']}")
 ```
