@@ -505,7 +505,7 @@ print(result["risk_level"]) # "none"
 </ParamField>
 
 <ParamField path="trusted_domains" type="set[str] | None" default="None">
-  Additional source URL domains to trust, merged with the built-in trusted list (`github.com`, `gitlab.com`, `bitbucket.org`, `pypi.org`, `npmjs.com`, `qwedai.com`).
+  Additional source URL domains to trust, merged with the built-in trusted list (`github.com`, `gitlab.com`, `bitbucket.org`, `pypi.org`, `npmjs.com`). qwed-mcp 0.2.3 removed `qwedai.com` from the built-in list ([QWED-AI/qwed-mcp#72](https://github.com/QWED-AI/qwed-mcp/pull/72)). QWED no longer uses that domain, and it lapses on 9 December 2026. qwed-mcp 0.2.2 and earlier still trust it, so upgrade to 0.2.3 or later. To trust any other domain, pass it in `trusted_domains`.
 </ParamField>
 
 <ParamField path="require_digest" type="bool" default="True">

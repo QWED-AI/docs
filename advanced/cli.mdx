@@ -162,7 +162,7 @@ Before bootstrapping an API key, `qwed init` proves that the server answering on
 The handshake runs on both paths: when `qwed init` reuses an already-running server, and when it spawns a fresh one.
 
 1. `qwed init` generates a fresh random nonce for each run (24 random bytes, URL-safe Base64).
-2. It calls [`GET /health/identity`](/api/endpoints#get-health-identity) with that nonce.
+2. It calls [`GET /health/identity`](/api/endpoints#get-%2Fhealth%2Fidentity) with that nonce.
 3. The server returns HMAC-SHA256 proofs over the nonce under `QWED_JWT_SECRET_KEY`, `QWED_API_KEY_LOOKUP_SECRET`, and `QWED_AUDIT_SECRET_KEY` (`audit_hmac`). A server on a different audit key would write audit rows this project's server can't verify after a restart.
 4. `qwed init` computes the expected proofs from its local secrets and compares them in constant time.
 
@@ -573,7 +573,7 @@ qwed context resolve --jwks-file jwks.json document.json
 
 #### `qwed context from-diagnostic`
 
-Create a Verification Context document from a [`DiagnosticResult`](/advanced/diagnostics) JSON file and print it. The command runs locally and has no signing key, so it prints an unsigned v1.0 document. Validate it with `--no-require-attestation`. For a signed document, use the server's [`POST /verification-context/from-diagnostic`](/api/endpoints#post-verification-context-from-diagnostic).
+Create a Verification Context document from a [`DiagnosticResult`](/advanced/diagnostics) JSON file and print it. The command runs locally and has no signing key, so it prints an unsigned v1.0 document. Validate it with `--no-require-attestation`. For a signed document, use the server's [`POST /verification-context/from-diagnostic`](/api/endpoints#post-%2Fverification-context%2Ffrom-diagnostic).
 
 ```bash
 qwed context from-diagnostic \

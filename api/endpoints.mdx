@@ -154,7 +154,7 @@ The endpoint returns the [`DiagnosticResult`](/advanced/diagnostics) verdict tha
 
 Admission is always `BLOCKED` because the LLM translation itself is unverified, so QWED never admits the result as an answer to your question. The verdict itself is unchanged. The audit log row's `is_verified` follows admission, so it is always `false`. QWED returns `BLOCKED` as the verdict when the control plane returns a malformed diagnostic or when the output sanitizer rejects the translated expression.
 
-For a deterministic, admissible result, send the expression to [`POST /verify/math`](#post-verify-math) directly.
+For a deterministic, admissible result, send the expression to [`POST /verify/math`](#post-%2Fverify%2Fmath) directly.
 
 The control plane also builds a `trust_boundary` record that describes what the pipeline proved. The control-plane response carries the enforced verdict as `diagnostic` together with `admission`.
 
@@ -1207,13 +1207,13 @@ Register a new AI agent with QWED for verified agentic workflows.
 }
 ```
 
-<Warning>Store the `agent_token` immediately. QWED stores only a keyed digest of the token, so it can't be retrieved again. If you lose it, re-issue it with [`POST /agents/{agent_id}/token/reissue`](#post-agents-agent-id-token-reissue).</Warning>
+<Warning>Store the `agent_token` immediately. QWED stores only a keyed digest of the token, so it can't be retrieved again. If you lose it, re-issue it with [`POST /agents/{agent_id}/token/reissue`](#post-%2Fagents%2F%2Ftoken%2Freissue).</Warning>
 
 ---
 
 ### GET /agents
 
-List the agents of your organization, oldest first. Use it to find an agent's ID, check its status, or see when it last authenticated, for example before reading its [activity](#get-agents-agent-id-activity).
+List the agents of your organization, oldest first. Use it to find an agent's ID, check its status, or see when it last authenticated, for example before reading its [activity](#get-%2Fagents%2F%2Factivity).
 
 Owners and admins can call this endpoint with an API key or a signed-in session. When you send both, QWED uses the API key.
 
@@ -1256,17 +1256,17 @@ curl --fail-with-body http://localhost:8000/agents \
 |-------|------|-------------|
 | `id` | integer | Agent ID |
 | `name` | string | Agent display name |
-| `type` | string | `autonomous`, `semi_autonomous`, or `assistant` |
+| `type` | string | The type given at registration (default `autonomous`) |
 | `status` | string | `active`, `suspended`, or `deactivated`. QWED lists agents in every status. |
 | `created_at` | string | When the agent was registered, in ISO 8601 with its UTC offset |
 | `last_active` | string \| null | When the agent last authenticated with its token, in ISO 8601 with its UTC offset. `null` until the agent first authenticates. |
 
-The response never includes the agent token or its digest. QWED shows the token only once, at registration or [re-issue](#post-agents-agent-id-token-reissue).
+The response never includes the agent token or its digest. QWED shows the token only once, at registration or [re-issue](#post-%2Fagents%2F%2Ftoken%2Freissue).
 
 | Status | Description |
 |--------|-------------|
-| 401 | No API key or bearer token, or an invalid one |
-| 403 | The caller is a `member` or `viewer`, or the user, organization, or key is inactive |
+| 401 | No API key or bearer token, or an invalid or expired bearer token |
+| 403 | An invalid, revoked, or expired API key; the caller is a `member` or `viewer`; or the user, organization, or key is inactive |
 
 ---
 
@@ -1421,7 +1421,7 @@ Submit an agent tool call for risk evaluation before execution. Unknown tools (n
 
 ### GET /agents/{agent_id}/activity
 
-Retrieve the activity log for a specific agent, newest first. Entries with the same timestamp are ordered by ID, newest first. Activity entries are not signed or hash-chained. The signed record of each agent verification is its row in the organization's audit log (see [`GET /audit/logs`](/api/authentication#get-audit-logs)).
+Retrieve the activity log for a specific agent, newest first. Entries with the same timestamp are ordered by ID, newest first. Activity entries are not signed or hash-chained. The signed record of each agent verification is its row in the organization's audit log (see [`GET /audit/logs`](/api/authentication#get-%2Faudit%2Flogs)).
 
 An agent can read its own activity with its token. An owner or admin can read the activity of any agent in their organization with an API key or a signed-in session.
 
@@ -1471,8 +1471,8 @@ Each `timestamp` is ISO 8601 with its UTC offset.
 
 | Status | Description |
 |--------|-------------|
-| 401 | `X-Agent-Token` is invalid or belongs to another agent, or no credential was sent |
-| 403 | Without an agent token: the caller is a `member` or `viewer`, or the user, organization, or key is inactive |
+| 401 | `X-Agent-Token` is invalid or belongs to another agent; no credential was sent; or, without an agent token, an invalid or expired bearer token |
+| 403 | Without an agent token: an invalid, revoked, or expired API key; the caller is a `member` or `viewer`; or the user, organization, or key is inactive |
 | 404 | Without an agent token: no agent with this ID exists in your organization, including an agent in another organization or an ID out of range |
 | 422 | `limit` is outside `1` to `200` |
 
@@ -1623,7 +1623,7 @@ Before this change, every admin endpoint returned `401 Unauthorized`, even for v
 
 Export your organization's audit trail as a CSV file (`text/csv`).
 
-The `Chain Status` column reports `Chained` when a row carries a hash and `Legacy` when it was written before the API used the hash chain. `Chained` doesn't mean the row was verified. Use [`GET /admin/compliance/verify/{log_id}`](#get-admin-compliance-verify-log-id) to verify it.
+The `Chain Status` column reports `Chained` when a row carries a hash and `Legacy` when it was written before the API used the hash chain. `Chained` doesn't mean the row was verified. Use [`GET /admin/compliance/verify/{log_id}`](#get-%2Fadmin%2Fcompliance%2Fverify%2F) to verify it.
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
