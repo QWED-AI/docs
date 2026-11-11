@@ -305,7 +305,7 @@ print(budget)
 
 ## Activity logging
 
-`AgentService` logs every `verify_action` decision in memory. Read an agent's entries with `get_agent_activity`:
+`AgentService` keeps an in-memory log of the decisions that reach its permission and risk checks: `APPROVED`, `PENDING`, and policy `DENIED`. It returns the other denials without logging them: an unregistered or suspended agent, a context or loop check (such as the replay above), an unknown action type, and a budget limit. Don't treat this log as a complete audit trail. Read an agent's entries with `get_agent_activity`:
 
 ```python
 for entry in client.get_agent_activity(agent_id, limit=10):
@@ -321,12 +321,12 @@ import requests
 
 # An agent reads its own activity with the ID and token that
 # POST /agents/register returned
-agent_id = os.environ["QWED_AGENT_ID"]
-agent_token = os.environ["QWED_AGENT_TOKEN"]
+server_agent_id = os.environ["QWED_AGENT_ID"]
+server_agent_token = os.environ["QWED_AGENT_TOKEN"]
 response = requests.get(
-    f"http://localhost:8000/agents/{agent_id}/activity",
+    f"http://localhost:8000/agents/{server_agent_id}/activity",
     params={"limit": 10},
-    headers={"X-Agent-Token": agent_token},
+    headers={"X-Agent-Token": server_agent_token},
 )
 response.raise_for_status()
 for entry in response.json()["activities"]:
