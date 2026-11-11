@@ -131,6 +131,7 @@ Otherwise the verdict is `UNVERIFIABLE` with `admission: DENY` and an empty `pro
 - No file scanned at all: every pattern matched nothing (`files_scanned` is `0`).
 - A matched file that can't be read.
 - A Python file that doesn't parse.
+- From v9.0.0, for `scan-code`, a Python file whose coding declaration isn't UTF-8 or whose bytes aren't valid UTF-8. Python decodes a file by its declaration, so a scan that read it as UTF-8 could check different code from what runs.
 - An absolute pattern, a pattern using `..`, or a match that resolves outside the workspace, including a symlink to a file elsewhere. The action names the offending file in the error.
 
 Matches that aren't regular files, such as a symlinked directory, are ignored, and so are files outside the mode's type: `scan-code` keeps only `.py` files and `verify-shell` only `.sh` files. A file reached through more than one pattern or link is scanned once.
