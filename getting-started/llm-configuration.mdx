@@ -44,7 +44,7 @@ QWED uses LLMs as **untrusted translators**, not as answer generators:
 | **OpenAI** | `OPENAI_API_KEY` | `OPENAI_MODEL` | Yes |
 | **Anthropic** | `ANTHROPIC_API_KEY` | `ANTHROPIC_MODEL` | Yes |
 | **Google Gemini** | `GOOGLE_API_KEY` / `GEMINI_API_KEY` | `GEMINI_MODEL` | Yes |
-| **Ollama (local)** | `OLLAMA_BASE_URL` | `OLLAMA_MODEL` | Yes |
+| **Ollama (local)** | `OLLAMA_BASE_URL` | `OLLAMA_MODEL` | Manual |
 | **OpenAI-compatible** | `CUSTOM_BASE_URL` + `CUSTOM_API_KEY` | `CUSTOM_MODEL` | Yes |
 | **Azure OpenAI** | `AZURE_OPENAI_ENDPOINT` + `AZURE_OPENAI_API_KEY` | `AZURE_OPENAI_DEPLOYMENT` | Manual |
 | **Claude Opus** | `CLAUDE_OPUS_API_KEY` | `CLAUDE_OPUS_DEPLOYMENT` | Manual |
@@ -133,7 +133,7 @@ OPENAI_MODEL=gpt-4o-mini
 
 # OR Google Gemini
 # GOOGLE_API_KEY=your-google-api-key
-# GEMINI_MODEL=gemini-1.5-pro
+# GEMINI_MODEL=your-gemini-model
 
 # OR OpenAI-compatible endpoint (Groq, Together, LM Studio, etc.)
 # CUSTOM_BASE_URL=https://inference.do-ai.run/v1
@@ -170,10 +170,14 @@ Key format: `sk-...` or `sk-proj-...` — get yours at [platform.openai.com/api-
 ```bash
 export ACTIVE_PROVIDER=anthropic
 export ANTHROPIC_API_KEY=sk-ant-your-key-here
-export ANTHROPIC_MODEL=claude-sonnet-4-20250514
+export ANTHROPIC_MODEL=your-claude-model
 ```
 
 Key format: `sk-ant-...` — get yours at [console.anthropic.com/settings/keys](https://console.anthropic.com/settings/keys).
+
+The server's Anthropic provider is an Azure AI Foundry client: set `ANTHROPIC_ENDPOINT` to your Foundry endpoint in the server's environment. On the server, `ANTHROPIC_ENDPOINT` and `ANTHROPIC_API_KEY` are both required, or the provider stops with `Missing Anthropic environment variables`. The `qwed` CLI calls the Anthropic API directly instead: it reads `ANTHROPIC_API_KEY` and `ANTHROPIC_MODEL`, and stops if `ANTHROPIC_ENDPOINT` is set.
+
+The Anthropic provider doesn't send `temperature`, `top_p`, or `top_k`. The anthropic SDK has had no sampling parameters since 1.0, and Anthropic API version `2026-10-21`, which the 2.x SDK sends, refuses them. Claude samples with the model's defaults, and no QWED setting overrides them. Sampling can vary the translations Claude returns and the verdicts `verify_fact` and `verify_image` return. QWED's fact and image verifiers record those verdicts only as advisory checks, never as `VERIFIED`.
 
 ### Local LLMs (Ollama)
 
@@ -203,7 +207,7 @@ export CUSTOM_API_KEY=your-api-key
 export CUSTOM_MODEL=gpt-4o-mini
 ```
 
-Only `CUSTOM_BASE_URL` is required. If your endpoint does not require authentication (for example, a local vLLM or LM Studio server), you can omit `CUSTOM_API_KEY` entirely. QWED supplies a placeholder token so the underlying client initializes correctly.
+`CUSTOM_BASE_URL` and `CUSTOM_MODEL` are required. If your endpoint does not require authentication (for example, a local vLLM or LM Studio server), you can omit `CUSTOM_API_KEY` entirely. QWED supplies a placeholder token so the underlying client initializes correctly.
 
 ### Google Gemini
 
@@ -218,7 +222,7 @@ Then configure your environment:
 ```bash
 export ACTIVE_PROVIDER=gemini
 export GOOGLE_API_KEY=your-google-api-key
-export GEMINI_MODEL=gemini-1.5-pro
+export GEMINI_MODEL=your-gemini-model
 ```
 
 You can also use `GEMINI_API_KEY` instead of `GOOGLE_API_KEY`. Get yours at [aistudio.google.com/app/apikey](https://aistudio.google.com/app/apikey).
@@ -239,9 +243,12 @@ export AZURE_OPENAI_API_VERSION=2024-02-15-preview
 
 ```bash
 export ACTIVE_PROVIDER=claude_opus
+export CLAUDE_OPUS_ENDPOINT=https://your-foundry-endpoint
 export CLAUDE_OPUS_API_KEY=sk-ant-your-key
 export CLAUDE_OPUS_DEPLOYMENT=claude-opus-4-5
 ```
+
+Like the Anthropic provider, the Claude Opus provider doesn't send `temperature` and samples with the model's defaults. Sampling can vary translations and the verdicts `verify_fact` and `verify_image` return. QWED records those verdicts only as advisory checks, never as `VERIFIED`.
 
 ---
 
@@ -268,7 +275,7 @@ providers:
 |-------|----------|---------|-------------|
 | `base_url` | Yes | — | The provider's API base URL |
 | `api_key_env` | Yes | — | Environment variable name containing the API key |
-| `default_model` | No | — | Model to use. QWED supplies none: without it, the provider has no model |
+| `default_model` | No | — | Model to use. QWED supplies none: without it, set `CUSTOM_MODEL` |
 | `models_endpoint` | No | `/models` | Endpoint for listing available models |
 | `auth_header` | No | `Authorization` | HTTP header name for authentication |
 | `auth_prefix` | No | `Bearer` | Prefix for the auth header value |
@@ -396,15 +403,13 @@ Understanding the two phases:
 
 ### Which LLM is best for QWED translation?
 
-For translation accuracy, use one of the following (in order of preference):
-1. GPT-4o (best)
-2. Claude 3 Opus
-3. Gemini Pro
-4. GPT-3.5-turbo (good for simple queries)
+QWED is model-agnostic and recommends no model. Use any model your provider serves: the deterministic engines check every translation it produces.
 
 ### Is the LLM translation deterministic?
 
-We set `temperature=0` for reproducibility, but LLMs are inherently probabilistic. That's why **QWED verification is essential** — it provides the determinism guarantee.
+No. LLMs are inherently probabilistic. The Anthropic and Claude Opus providers don't send `temperature`, so Claude samples with the model's defaults. Sampling can vary translations and the verdicts `verify_fact` and `verify_image` return. QWED's fact and image verifiers record those verdicts only as advisory checks, never as `VERIFIED`. The OpenAI, Azure OpenAI, OpenAI-compatible, Gemini, and Ollama providers send `temperature=0.0`, which reduces variation but doesn't remove it.
+
+That's why **QWED verification is essential**. The deterministic engines give the same verdict for the same translation. They check the expression the model produced, not whether it matches your question, so two different translations of one question can get different verdicts.
 
 ---
 

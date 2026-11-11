@@ -254,7 +254,7 @@ print(result.evidence['pii_masked'])
 ```python
 client = QWEDLocal(
     provider="anthropic",
-    model="claude-sonnet-4-20250514",
+    model="your-claude-model",
     api_key="sk-ant-...",
     mask_pii=True,
     pii_entities=["EMAIL_ADDRESS", "PERSON", "PHONE_NUMBER"]  # Custom list
@@ -494,7 +494,7 @@ client = QWEDLocal(
 # Card, bank and customer contact data
 client = QWEDLocal(
     provider="anthropic",
-    model="claude-sonnet-4-20250514",
+    model="your-claude-model",
     mask_pii=True,
     pii_entities=[
         "CREDIT_CARD",  # Card numbers
