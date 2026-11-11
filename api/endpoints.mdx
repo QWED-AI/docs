@@ -241,7 +241,7 @@ Every response from this endpoint includes `admission`. Gate on `admission`, not
 | Undefined part | `log(0)**0 = 2` | `UNVERIFIABLE` | `false` | `BLOCKED` |
 | Parse error | `d/dx(x^2) = 2x`, unparseable text | `BLOCKED` | `false` | `BLOCKED` |
 
-The expression can use `diff(f, x)` or `Derivative(f, x)`, for example `diff(x**2, x) == 2*x`. `==` reads as `=`. See [Derivatives in `/verify/math` identities](/engines/math#derivatives-in-verify-math-identities).
+The expression can use `diff(f, x)` or `Derivative(f, x)`, for example `diff(x**2, x) == 2*x`. `==` reads as `=`. See [Derivatives in `/verify/math` identities](/engines/math#derivatives-in-%2Fverify%2Fmath-identities).
 
 **Response (proven false):**
 

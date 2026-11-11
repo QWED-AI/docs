@@ -251,7 +251,7 @@ See [Startup environment integrity](/advanced/security-hardening#llm05-supply-ch
 - **Batch math equality items carry the route's fields.** Items with `=` include `left_side`, `right_side`, `simplified_difference`, `result`, and the route's messages (`Identity is true`, `Identity is false`), and keep `query`, `type`, and `diff`.
 - **Undefined parts are not disproven.** A claim with a side that has an undefined part (one that evaluates to `zoo` or `nan`) that SymPy evaluated away, such as `log(0)**0 = 2`, is `UNVERIFIABLE` with `math.undefined_part` on both routes. `log(0)**0 = 1`, where the sides agree, is `UNVERIFIABLE` with `math.domain_restricted_identity`. `/verify/math` gave it a signed disproof before.
 
-See [Derivatives in `/verify/math` identities](/engines/math#derivatives-in-verify-math-identities), [`POST /verify/math`](/api/endpoints#post-%2Fverify%2Fmath), and [Math items](/api/endpoints#math-items-proof-vs-simplification).
+See [Derivatives in `/verify/math` identities](/engines/math#derivatives-in-%2Fverify%2Fmath-identities), [`POST /verify/math`](/api/endpoints#post-%2Fverify%2Fmath), and [Math items](/api/endpoints#math-items-proof-vs-simplification).
 
 ---
 
