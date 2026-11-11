@@ -20,14 +20,18 @@ QWED Agent Verification provides:
 
 ## Registering an agent
 
-```python
-from qwed_sdk import QWEDClient
+<Note>
+These examples use `AgentService` from the `qwed` package. It runs in your own process and keeps agents, budgets, and conversation state in memory. The Python SDK's `QWEDClient` has no agent methods. A QWED server registers agents with [`POST /agents/register`](/api/endpoints#post-%2Fagents%2Fregister) and verifies their requests with [`POST /agents/{agent_id}/verify`](/api/endpoints#post-%2Fagents%2F%2Fverify).
+</Note>
 
-client = QWEDClient(api_key="qwed_...")
+```python
+from qwed_new.core.agent_service import ActionContext, AgentAction, AgentService
+
+client = AgentService()
 
 agent = client.register_agent(
     name="DataAnalyst",
-    type="supervised",  # supervised, autonomous, trusted
+    agent_type="supervised",  # supervised, autonomous, trusted
     principal_id="user_123",
     permissions={
         "allowed_engines": ["math", "logic", "sql"],
@@ -39,12 +43,12 @@ agent = client.register_agent(
     }
 )
 
-print(agent["agent_id"])     # agent_abc123
+print(agent["agent_id"])     # agent_1a2b3c4d5e6f
 print(agent["agent_token"])  # qwed_agent_xyz...
 ```
 
 <Warning>
-The `agent_token` is shown only once. QWED stores an HMAC-SHA256 digest of it, keyed with `QWED_API_KEY_LOOKUP_SECRET`, so it can't be retrieved later. To replace a lost or exposed token, call [`POST /agents/{agent_id}/token/reissue`](/api/endpoints#post-%2Fagents%2F%2Ftoken%2Freissue). The old token stops working.
+With a QWED server, the `agent_token` that `POST /agents/register` returns is shown only once. QWED stores an HMAC-SHA256 digest of it, keyed with `QWED_API_KEY_LOOKUP_SECRET`, so it can't be retrieved later. To replace a lost or exposed token, call [`POST /agents/{agent_id}/token/reissue`](/api/endpoints#post-%2Fagents%2F%2Ftoken%2Freissue). The old token stops working.
 </Warning>
 
 ## Verifying actions
@@ -54,15 +58,15 @@ Before an agent executes an action, you must provide an `ActionContext` with a `
 ```python
 decision = client.verify_action(
     agent_id="agent_abc123",
-    action={
-        "type": "execute_sql",
-        "query": "SELECT * FROM users"
-    },
-    context={
-        "conversation_id": "conv_xyz",
-        "step_number": 1,
-        "user_intent": "Get user list"
-    }
+    action=AgentAction(
+        action_type="execute_sql",
+        query="SELECT * FROM users",
+    ),
+    context=ActionContext(
+        conversation_id="conv_xyz",
+        step_number=1,
+        user_intent="Get user list",
+    )
 )
 
 if decision["decision"] == "APPROVED":
@@ -98,22 +102,22 @@ The `step_number` must be strictly greater than any previously committed step wi
 # Step 1: approved
 client.verify_action(
     agent_id="agent_abc123",
-    action={"type": "calculate", "query": "2+2"},
-    context={"conversation_id": "conv_1", "step_number": 1}
+    action=AgentAction(action_type="calculate", query="2+2"),
+    context=ActionContext(conversation_id="conv_1", step_number=1)
 )
 
 # Step 2: same action, still approved (first repeat)
 client.verify_action(
     agent_id="agent_abc123",
-    action={"type": "calculate", "query": "2+2"},
-    context={"conversation_id": "conv_1", "step_number": 2}
+    action=AgentAction(action_type="calculate", query="2+2"),
+    context=ActionContext(conversation_id="conv_1", step_number=2)
 )
 
 # Step 3: same action again — denied as repetitive loop
 result = client.verify_action(
     agent_id="agent_abc123",
-    action={"type": "calculate", "query": "2+2"},
-    context={"conversation_id": "conv_1", "step_number": 3}
+    action=AgentAction(action_type="calculate", query="2+2"),
+    context=ActionContext(conversation_id="conv_1", step_number=3)
 )
 # result["decision"] == "DENIED"
 # result["error"]["code"] == "QWED-AGENT-LOOP-003"
@@ -121,8 +125,8 @@ result = client.verify_action(
 # Step 3 retry: a different action succeeds on the same step number
 client.verify_action(
     agent_id="agent_abc123",
-    action={"type": "verify_logic", "query": "x > 1"},
-    context={"conversation_id": "conv_1", "step_number": 3}
+    action=AgentAction(action_type="verify_logic", query="x > 1"),
+    context=ActionContext(conversation_id="conv_1", step_number=3)
 )
 ```
 
@@ -147,13 +151,13 @@ state_hash = hashlib.sha256(db_snapshot.encode()).hexdigest()
 
 decision = client.verify_action(
     agent_id="agent_abc123",
-    action={"type": "execute_sql", "query": "UPDATE orders SET status = 'shipped'"},
-    context={
-        "conversation_id": "conv_xyz",
-        "step_number": 4,
-        "pre_action_state_hash": state_hash,
-        "state_source": "db_snapshot",
-    }
+    action=AgentAction(action_type="execute_sql", query="UPDATE orders SET status = 'shipped'"),
+    context=ActionContext(
+        conversation_id="conv_xyz",
+        step_number=4,
+        pre_action_state_hash=state_hash,
+        state_source="db_snapshot",
+    )
 )
 ```
 
@@ -262,7 +266,7 @@ Register custom tools as safe operations when configuring your agent's permissio
 ```python
 agent = client.register_agent(
     name="DataAnalyst",
-    type="supervised",
+    agent_type="supervised",
     principal_id="user_123",
     permissions={
         "allowed_engines": ["math", "logic", "sql"],
@@ -281,7 +285,7 @@ budget = client.get_agent_budget("agent_abc123")
 print(budget)
 # {
 #   "cost": {"max_daily_usd": 100, "current_daily_usd": 45.50},
-#   "requests": {"max_per_hour": 500, "current_hour": 123}
+#   "requests": {"max_per_hour": 500, "current_hour": 123, "max_per_day": 10000, "current_day": 840}
 # }
 ```
 
@@ -346,13 +350,13 @@ The step number must increase with each action in a conversation. Attempts to re
 
 <Info>New in v5.1.1</Info>
 
-Every `verify_action` call must reference an `action_type` that QWED has registered semantics for. Action types must be either bound to a verification engine or registered as a governed tool with a known risk level. Engine examples: `verify_math` → `math`, `execute_sql` → `sql`. Tool examples: `read_database`, `send_email`. Action types outside those two registries are denied with `QWED-AGENT-ACTION-001` before any risk assessment runs.
+Every `verify_action` call must reference an `action_type` that QWED has registered semantics for. Action types must be either bound to a verification engine or registered as a governed tool with a known risk level. Engine examples: `calculate` → `math`, `execute_sql` → `sql`. Tool examples: `read_database`, `send_email`. Action types outside those two registries are denied with `QWED-AGENT-ACTION-001` before any risk assessment runs.
 
 ```python
 result = client.verify_action(
     agent_id="agent_abc123",
-    action={"type": "do_arbitrary_thing", "query": "..."},
-    context={"conversation_id": "conv_1", "step_number": 1},
+    action=AgentAction(action_type="do_arbitrary_thing", query="..."),
+    context=ActionContext(conversation_id="conv_1", step_number=1),
 )
 # {
 #   "decision": "DENIED",
@@ -386,12 +390,12 @@ Actions are fingerprinted deterministically using `action_type`, `query`, `code`
 
 ```python
 # Step 1: approved
-client.verify_action(agent_id, action={"type": "calculate", "query": "2+2"},
-    context={"conversation_id": "conv_1", "step_number": 1})
+client.verify_action(agent_id, action=AgentAction(action_type="calculate", query="2+2"),
+    context=ActionContext(conversation_id="conv_1", step_number=1))
 
 # Step 1 again: DENIED (replay)
-client.verify_action(agent_id, action={"type": "calculate", "query": "2+2"},
-    context={"conversation_id": "conv_1", "step_number": 1})
+client.verify_action(agent_id, action=AgentAction(action_type="calculate", query="2+2"),
+    context=ActionContext(conversation_id="conv_1", step_number=1))
 # -> {"decision": "DENIED", "error": {"code": "QWED-AGENT-LOOP-002"}}
 ```
 
@@ -402,13 +406,13 @@ QWED denies any `verify_action` call whose `action_type` has no registered engin
 ```python
 result = client.verify_action(
     agent_id,
-    action={"type": "transfer_funds_internal_v2", "query": "Move funds between ledgers"},
-    context={"conversation_id": "conv_42", "step_number": 1},
+    action=AgentAction(action_type="transfer_funds_internal_v2", query="Move funds between ledgers"),
+    context=ActionContext(conversation_id="conv_42", step_number=1),
 )
 # -> {"decision": "DENIED", "error": {"code": "QWED-AGENT-ACTION-001", "message": "..."}}
 ```
 
-A denial under `QWED-AGENT-ACTION-001` releases the in-flight step reservation, so the agent may retry the same step number with a registered action type. Registered action types include the entries in `ACTION_ENGINES` (such as `calculate`, `verify`, `prove`) and tools listed in `TOOL_RISK_LEVELS`.
+A denial under `QWED-AGENT-ACTION-001` releases the in-flight step reservation, so the agent may retry the same step number with a registered action type. Registered action types include the entries in `ACTION_ENGINES` (`execute_sql`, `execute_code`, `calculate`, `verify_logic`, and `verify_fact`) and tools listed in `TOOL_RISK_LEVELS`.
 
 ### In-flight reservation system
 
@@ -446,8 +450,8 @@ Anything else — including custom action names, typos, and forward-compatible n
 ```python
 result = client.verify_action(
     agent_id="agent_abc123",
-    action={"type": "transfer_funds_internal_v2", "query": "Move funds between ledgers"},
-    context={"conversation_id": "conv_1", "step_number": 1},
+    action=AgentAction(action_type="transfer_funds_internal_v2", query="Move funds between ledgers"),
+    context=ActionContext(conversation_id="conv_1", step_number=1),
 )
 
 # {
