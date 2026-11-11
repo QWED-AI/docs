@@ -1578,7 +1578,7 @@ Returns verification logs for the authenticated tenant, ordered by most recent f
 
 <Info>New in v4.0.0</Info>
 
-Admin endpoints authenticate your API key with the `X-API-Key` header, then authorize the request by the role of the user who owns the key. Every admin endpoint acts only on your own organization, which is the organization the API key belongs to.
+Admin endpoints authenticate your API key with the `X-API-Key` header, or a [signed-in session](#session-sign-in-for-admin-endpoints), then authorize the request by the role of the user who owns the key or holds the session. Every admin endpoint acts only on your own organization, which is the organization the API key belongs to.
 
 Before QWED checks the role, the request must meet all of these conditions. Otherwise QWED returns `403 Forbidden`:
 
@@ -1596,7 +1596,7 @@ Before QWED checks the role, the request must meet all of these conditions. Othe
 | `GET /admin/security/events` | `owner`, `admin` | Not applicable (own organization only) |
 | `POST /admin/keys/rotate` | `owner`, `admin`, `member` | `404 Not Found` |
 
-A caller whose role isn't allowed gets `403 Forbidden` with `"Insufficient permissions for this operation"`. A missing API key returns `401 Unauthorized`; an invalid, revoked, or expired one returns `403 Forbidden`.
+A caller whose role isn't allowed gets `403 Forbidden` with `"Insufficient permissions for this operation"`. A request with neither an API key nor a bearer token returns `401 Unauthorized`. An invalid, revoked, or expired API key returns `403 Forbidden`; for a bearer token, see [Session sign-in for admin endpoints](#session-sign-in-for-admin-endpoints).
 
 The JWT-authenticated `/auth/api-keys` and `/audit` routes use the same role ranking. See [Roles on API-key and audit routes](/api/authentication#roles-on-api-key-and-audit-routes).
 

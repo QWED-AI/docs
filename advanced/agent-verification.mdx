@@ -292,10 +292,12 @@ import os
 
 import requests
 
-# An agent reads its own activity with its token: agent["agent_token"] from registration
+# An agent reads its own activity with its own ID and token, as returned at
+# registration: agent["agent_id"] and agent["agent_token"]
+agent_id = os.environ["QWED_AGENT_ID"]
 agent_token = os.environ["QWED_AGENT_TOKEN"]
 response = requests.get(
-    "http://localhost:8000/agents/42/activity",
+    f"http://localhost:8000/agents/{agent_id}/activity",
     params={"limit": 10},
     headers={"X-Agent-Token": agent_token},
 )
