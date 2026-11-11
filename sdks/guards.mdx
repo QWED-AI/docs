@@ -349,6 +349,10 @@ if not result["verified"]:
   When `True`, scans file contents for malicious patterns like `exec(`, `eval(`, `base64`, network imports, and hex-encoded payloads. Allowlisted files are always scanned for tampering regardless of this flag (fail-closed design).
 </ParamField>
 
+<ParamField path="pinned_pth_digests" type="dict[str, str] | None" default="None">
+  From v9.0.0. Maps a `.pth` filename to the SHA-256 hex digest of its exact contents. A pinned file is allowed only while its digest matches, and is not pattern-scanned. A file whose contents differ is flagged and counted as `digest_mismatch`. A pin overrides the same name in `allowed_pth_files`.
+</ParamField>
+
 ### Methods
 
 **`verify_environment_integrity()`** — Scans all `site-packages` directories for unauthorized or tampered `.pth` files.
@@ -362,7 +366,7 @@ Returns a dict with:
 | `suspicious_hooks` | `list[str]` | Paths to suspicious `.pth` files |
 | `content_findings` | `list[str]` | Specific malicious patterns found |
 | `scan_errors` | `list[str]` | Directories that could not be scanned |
-| `counts` | `dict` | Per-category counts: `malicious`, `unreadable`, `unauthorized` |
+| `counts` | `dict` | Per-category counts: `malicious`, `unreadable`, `unauthorized`, `digest_mismatch` |
 | `message` | `str` | Human-readable summary |
 
 ### Detected patterns
@@ -387,6 +391,32 @@ guard = StartupHookGuard(
 )
 result = guard.verify_environment_integrity()
 ```
+
+### Digest pin example
+
+A legitimate hook that contains a flagged pattern, such as setuptools' `distutils-precedence.pth` (which uses `__import__(`), fails the scan even when its name is allowed. Pin it by digest instead:
+
+```python
+guard = StartupHookGuard(
+    pinned_pth_digests={
+        "distutils-precedence.pth": "<64-char sha256 hex of the file>",
+    }
+)
+result = guard.verify_environment_integrity()
+```
+
+To read the same comma-separated format as the server's `QWED_ALLOWED_STARTUP_PTH_FILES` variable, use `parse_startup_hook_allowlist`. It returns the plain names and the digest pins, and raises `ValueError` for an entry with a colon that isn't `NAME.pth:sha256:<64 hex>`:
+
+```python
+import os
+from qwed_sdk.guards import StartupHookGuard
+from qwed_sdk.guards.environment_guard import parse_startup_hook_allowlist
+
+names, pins = parse_startup_hook_allowlist(os.environ.get("QWED_ALLOWED_STARTUP_PTH_FILES", ""))
+guard = StartupHookGuard(allowed_pth_files=names, pinned_pth_digests=pins)
+```
+
+See [Startup environment integrity](/advanced/security-hardening#llm05-supply-chain-vulnerabilities) for how to take a file's digest.
 
 ---
 
@@ -574,7 +604,7 @@ Statically analyzes code for security risks using AST parsing (Python) or regex 
 - Credential hunting (`grep` for passwords/tokens)
 - Privilege escalation (`sudo`)
 
-`CodeGuard` is a blocklist pre-filter, not a verification. A pass returns `verified: True` with `advisory: True`, which means only that no listed pattern was found. Use `CodeGuard` to refuse code early, never to admit it. To admit code, use [`QWEDClient.verify_code`](/sdks/python#verify-code-code-language), which calls the server's `CodeVerifier`.
+`CodeGuard` is a blocklist pre-filter, not a verification. A pass returns `verified: True` with `advisory: True`, which means only that no listed pattern was found. Use `CodeGuard` to refuse code early, never to admit it. To admit code, use [`QWEDClient.verify_code`](/sdks/python#verify_code-code-language), which calls the server's `CodeVerifier`.
 
 ```python
 from qwed_new.guards.code_guard import CodeGuard
@@ -612,7 +642,7 @@ Validates SQL syntax using `sqlglot` and enforces read-only mutation policies. `
 - Calls to dangerous file, extension, network, and command functions, such as `load_extension()`, `pg_read_file()`, and `xp_cmdshell()` (`DANGEROUS_FUNCTION_BLOCKED`)
 - Invalid SQL syntax
 
-`SQLGuard` expands MySQL and MariaDB executable comments (`/*! ... */`) before it checks the query. With `allow_mutation=False` (the default), a pass means one read-only statement with no blocked function. It is a pre-filter, and the server's `SQLVerifier` decides admission. [`QWEDClient.verify_sql`](/sdks/python#verify-sql-query-schema-ddl-dialect) always calls the server.
+`SQLGuard` expands MySQL and MariaDB executable comments (`/*! ... */`) before it checks the query. With `allow_mutation=False` (the default), a pass means one read-only statement with no blocked function. It is a pre-filter, and the server's `SQLVerifier` decides admission. [`QWEDClient.verify_sql`](/sdks/python#verify_sql-query-schema_ddl-dialect) always calls the server.
 
 <ParamField path="allow_mutation" type="bool" default="false">
   When `false` (default), only `SELECT` and other read-only queries are permitted. Set to `true` only in trusted contexts.
