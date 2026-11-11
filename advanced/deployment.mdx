@@ -8,7 +8,7 @@ This guide provides instructions for deploying QWED in various environments.
 ## Table of contents
 1. [Docker deployment](#docker-deployment)
 2. [Kubernetes deployment](#kubernetes-deployment)
-3. [Manual / bare metal deployment](#manual--bare-metal-deployment)
+3. [Manual / bare metal deployment](#manual-%2F-bare-metal-deployment)
 4. [Environment variables reference](#environment-variables-reference)
 5. [Production checklist](#production-checklist)
 6. [Troubleshooting](#troubleshooting)
@@ -133,7 +133,7 @@ docker run -d -p 8000:8000 \
   -e QWED_API_KEY_LOOKUP_SECRET \
   -e QWED_AUDIT_SECRET_KEY \
   -e DATABASE_URL \
-  qwedai/qwed-verification:8.0.0
+  qwedai/qwed-verification:9.1.0
 ```
 
 Omit `DATABASE_URL` to use the SQLite database in the `qwed-data` volume.
@@ -155,7 +155,7 @@ docker run -p 8000:8000 \
   -e QWED_API_KEY_LOOKUP_SECRET \
   -e QWED_AUDIT_SECRET_KEY \
   -e QWED_CORS_ORIGINS="https://app.yourcompany.com" \
-  qwedai/qwed-verification:8.0.0
+  qwedai/qwed-verification:9.1.0
 ```
 
 Keep the key file out of version control. See [Signing keys](/advanced/attestations#signing-keys).
@@ -194,7 +194,7 @@ For production environments, QWED ships Kubernetes manifests in `deploy/kubernet
    </Tip>
 
 3. **Deploy Application**
-   `deploy/kubernetes/deployment.yaml` pins `docker.io/qwedai/qwed-verification:8.0.0`. That tag is the first release of the API server image. Don't point the Deployment at an earlier tag, because earlier tags ran the GitHub Action.
+   `deploy/kubernetes/deployment.yaml` pins `docker.io/qwedai/qwed-verification:9.1.0`. The first tag of the API server image is 8.0.0. Don't point the Deployment at an earlier tag, because earlier tags ran the GitHub Action.
    ```bash
    kubectl apply -f deploy/kubernetes/deployment.yaml
    kubectl apply -f deploy/kubernetes/service.yaml
@@ -294,6 +294,7 @@ Run one worker per database. Every verification request appends an audit row, an
 | `API_KEY_SECRET` | Secret key for signing JWTs | None (must be set) | **YES** |
 | `QWED_CORS_ORIGINS` | Comma-separated list of allowed CORS origins | None (must be set) | **YES** |
 | `QWED_SKIP_ENV_INTEGRITY_CHECK` | Set to `true` to bypass startup environment integrity check | `false` | No |
+| `QWED_ALLOWED_STARTUP_PTH_FILES` | Comma-separated `.pth` startup hooks to allow at startup. A plain name (`my_hook.pth`) is allowed but still scanned for suspicious patterns. A digest pin (`my_hook.pth:sha256:<64 hex>`) is allowed only while the file's SHA-256 matches, and isn't scanned. A malformed pin stops the server at startup. See [Startup environment integrity](/advanced/security-hardening#llm05-supply-chain-vulnerabilities) | Unset | No |
 | `QWED_API_KEY_LOOKUP_SECRET` | Secret for HMAC-SHA256 API-key lookup digests and agent token digests. Must differ from `QWED_JWT_SECRET_KEY`. Changing it invalidates existing API keys and agent tokens | None | **Yes** |
 | `QWED_JWT_SECRET_KEY` | Secret for signing JWTs. Keep it stable: changing it invalidates issued tokens | None | **Yes** |
 | `QWED_AUDIT_SECRET_KEY` | HMAC key that signs the per-organization audit hash chain. The server refuses to start without it. Rotating it invalidates the signatures on existing rows, so verify and archive the trail first. See [Audit trail setup](/advanced/compliance#3-audit-trail-setup) | None (must be set) | **Yes** |
