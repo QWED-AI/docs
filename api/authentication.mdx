@@ -115,7 +115,7 @@ On regex engines without lookaround support (for example, RE2), use an explicit 
 (?:^|[^A-Za-z0-9_-])(qwed_live_[A-Za-z0-9_-]{43})(?:[^A-Za-z0-9_-]|$)
 ```
 
-The registered pattern names are `QWED_LIVE_API_KEY` (v2) and `QWED_LIVE_API_KEY_V1` (v1). QWED receives signed leak reports for these patterns at [`POST /webhooks/secret-scanning`](/api/endpoints#post-webhooks-secret-scanning).
+The registered pattern names are `QWED_LIVE_API_KEY` (v2) and `QWED_LIVE_API_KEY_V1` (v1). QWED receives signed leak reports for these patterns at [`POST /webhooks/secret-scanning`](/api/endpoints#post-%2Fwebhooks%2Fsecret-scanning).
 
 ### Masking keys
 
@@ -143,7 +143,7 @@ As of v7.2, QWED stores API keys as HMAC-SHA256 lookup digests keyed by a dedica
 **Breaking change.** There is no legacy fallback: API keys issued before v7.2 no longer authenticate and return `401 Unauthorized`. Each key must be re-issued once. The old raw key is never required:
 
 - **Portal or API:** sign in with your email and password to get a JWT, then call `POST /auth/api-keys` to mint a new key. This path needs no API key.
-- **Rotation by key ID:** call [`POST /admin/keys/rotate`](/api/endpoints#post-admin-keys-rotate) with the key's ID, authenticated with an already-working key in the same organization. Members can rotate only their own keys. Owners and admins can also rotate other users' keys, unless the key owner holds a higher role. Revoked or inactive keys can't be rotated. Rotation is atomic: it mints at most one replacement key, even when several rotations of the same key run concurrently. Rotating a key that is already inactive mints nothing and returns `404 Not Found`.
+- **Rotation by key ID:** call [`POST /admin/keys/rotate`](/api/endpoints#post-%2Fadmin%2Fkeys%2Frotate) with the key's ID, authenticated with an already-working key in the same organization. Members can rotate only their own keys. Owners and admins can also rotate other users' keys, unless the key owner holds a higher role. Revoked or inactive keys can't be rotated. Rotation is atomic: it mints at most one replacement key, even when several rotations of the same key run concurrently. Rotating a key that is already inactive mints nothing and returns `404 Not Found`.
 
 ```bash
 # Before (pre-v7.2 key): now rejected
@@ -217,7 +217,7 @@ QWED stores each agent token as an HMAC-SHA256 digest keyed with `QWED_API_KEY_L
 
 Tokens issued before this change keep working. At startup, after its fail-closed checks, the server hashes any agent token still stored in plain text, in place. You don't need to re-register agents.
 
-To replace a token, for example one whose plain text might remain in a database backup, call [`POST /agents/{agent_id}/token/reissue`](/api/endpoints#post-agents-agent-id-token-reissue). QWED returns a new token and the old one stops working.
+To replace a token, for example one whose plain text might remain in a database backup, call [`POST /agents/{agent_id}/token/reissue`](/api/endpoints#post-%2Fagents%2F%2Ftoken%2Freissue). QWED returns a new token and the old one stops working.
 
 <Warning>
 Agent token digests depend on `QWED_API_KEY_LOOKUP_SECRET`. Changing the secret invalidates every agent token as well as every API key. Re-issue agent tokens after changing it.
@@ -322,14 +322,14 @@ curl --fail-with-body -H "Authorization: Bearer eyJhbG..." http://localhost:8000
     "email": "owner@example.com",
     "role": "owner",
     "is_active": true,
-    "created_at": "2026-03-20T12:00:00+00:00"
+    "created_at": "2026-03-20T12:00:00Z"
   },
   {
     "id": "7",
     "email": "former@example.com",
     "role": "member",
     "is_active": false,
-    "created_at": "2026-05-02T08:30:00+00:00"
+    "created_at": "2026-05-02T08:30:00Z"
   }
 ]
 ```
@@ -338,8 +338,8 @@ QWED returns only users of your own organization. Inactive users are included wi
 
 | Status | Meaning |
 |--------|---------|
-| 401 | No API key or bearer token |
-| 403 | Not an owner or admin, or an inactive user, organization, or key |
+| 401 | No API key or bearer token, or an invalid or expired bearer token |
+| 403 | An invalid, revoked, or expired API key; not an owner or admin; or an inactive user, organization, or key |
 
 ### Roles on API-key and audit routes
 
@@ -407,8 +407,8 @@ Each key also includes:
     "id": "12",
     "name": "Production Key",
     "key_preview": "qwed_live_ab...",
-    "created_at": "2026-03-20T12:00:00+00:00",
-    "last_used_at": "2026-10-28T09:14:03+00:00",
+    "created_at": "2026-03-20T12:00:00Z",
+    "last_used_at": "2026-10-28T09:14:03Z",
     "is_revoked": false,
     "expires_at": null,
     "rotation_required": false,
@@ -482,7 +482,7 @@ Each entry includes `verdict`, the verdict stored in the row's result, `admissio
 | `api_key_id` | ID (as a string) of the API key that authenticated the request. `null` for rows written from a signed-in user session, by `POST /audit/seed`, or by `POST /agents/{agent_id}/verify` (which authenticates with an agent token), and for rows written before QWED recorded it |
 | `verifier_version` | The QWED server version that wrote the row. `null` for rows written before QWED recorded it |
 
-The entry hash covers `admission`, `api_key_id`, and `verifier_version`. Changing or clearing any of them on a stored row fails [integrity verification](/api/endpoints#get-admin-compliance-verify-log-id).
+The entry hash covers `admission`, `api_key_id`, and `verifier_version`. Changing or clearing any of them on a stored row fails [integrity verification](/api/endpoints#get-%2Fadmin%2Fcompliance%2Fverify%2F).
 
 <Warning>
 `verdict` is not an admission decision. `VERIFIED` means the check ran to a proof, not that the claim holds. A disproven identity or code proven unsafe is `VERIFIED` with `status` `blocked`. Don't gate on `verdict` or `status`. Read `admission` for the decision the route made.
@@ -516,7 +516,7 @@ The response has the same `verdict`, `status`, `admission`, `api_key_id`, and `v
 | `previous_hash` | The hash of the previous row in your organization's chain. `null` for the first row of a chain segment |
 | `hmac_signature` | The row's HMAC-SHA256 signature under `QWED_AUDIT_SECRET_KEY` |
 
-These fields identify the chain entry. To check that it is intact, call [`GET /admin/compliance/verify/{log_id}`](/api/endpoints#get-admin-compliance-verify-log-id).
+These fields identify the chain entry. To check that it is intact, call [`GET /admin/compliance/verify/{log_id}`](/api/endpoints#get-%2Fadmin%2Fcompliance%2Fverify%2F).
 
 ### GET /audit/export
 

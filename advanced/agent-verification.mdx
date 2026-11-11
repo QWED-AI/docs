@@ -44,7 +44,7 @@ print(agent["agent_token"])  # qwed_agent_xyz...
 ```
 
 <Warning>
-The `agent_token` is shown only once. QWED stores an HMAC-SHA256 digest of it, keyed with `QWED_API_KEY_LOOKUP_SECRET`, so it can't be retrieved later. To replace a lost or exposed token, call [`POST /agents/{agent_id}/token/reissue`](/api/endpoints#post-agents-agent-id-token-reissue). The old token stops working.
+The `agent_token` is shown only once. QWED stores an HMAC-SHA256 digest of it, keyed with `QWED_API_KEY_LOOKUP_SECRET`, so it can't be retrieved later. To replace a lost or exposed token, call [`POST /agents/{agent_id}/token/reissue`](/api/endpoints#post-%2Fagents%2F%2Ftoken%2Freissue). The old token stops working.
 </Warning>
 
 ## Verifying actions
@@ -288,11 +288,35 @@ print(budget)
 ## Activity logging
 
 ```python
-# Get agent activity
-activity = client.get_agent_activity("agent_abc123", limit=10)
-for entry in activity:
-    print(f"{entry['timestamp']}: {entry['action_type']} -> {entry['decision']}")
+import os
+
+import requests
+
+# An agent reads its own activity with its token: agent["agent_token"] from registration
+agent_token = os.environ["QWED_AGENT_TOKEN"]
+response = requests.get(
+    "http://localhost:8000/agents/42/activity",
+    params={"limit": 10},
+    headers={"X-Agent-Token": agent_token},
+)
+response.raise_for_status()
+for entry in response.json()["activities"]:
+    print(f"{entry['timestamp']}: {entry['type']} -> {entry['status']}")
 ```
+
+An agent reads its own activity with its token. Organization owners and admins can also list every agent in their organization with [`GET /agents`](/api/endpoints#get-%2Fagents) and read any of those agents' activity with an API key or a signed-in session, without the agent's token:
+
+```bash
+# List your organization's agents (owner or admin)
+curl --fail-with-body http://localhost:8000/agents \
+  -H "X-API-Key: $QWED_API_KEY"
+
+# Read an agent's 50 newest activity entries
+curl --fail-with-body "http://localhost:8000/agents/42/activity?limit=50" \
+  -H "X-API-Key: $QWED_API_KEY"
+```
+
+`limit` accepts `1` to `200`. See [`GET /agents/{agent_id}/activity`](/api/endpoints#get-%2Fagents%2F%2Factivity) for the access rules and status codes.
 
 ## Runtime hardening
 
