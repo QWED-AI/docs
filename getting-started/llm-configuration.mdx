@@ -48,7 +48,7 @@ QWED uses LLMs as **untrusted translators**, not as answer generators:
 | **OpenAI-compatible** | `CUSTOM_BASE_URL` + `CUSTOM_API_KEY` | `CUSTOM_MODEL` | Yes |
 | **Azure OpenAI** | `AZURE_OPENAI_ENDPOINT` + `AZURE_OPENAI_API_KEY` | `AZURE_OPENAI_DEPLOYMENT` | Manual |
 | **Claude Opus** | `CLAUDE_OPUS_API_KEY` | `CLAUDE_OPUS_DEPLOYMENT` | Manual |
-| **Custom (YAML)** | Defined per provider | The YAML's `default_model` | Yes |
+| **Custom (YAML)** | Defined per provider | The YAML's `default_model` | Manual (choose Custom Provider and enter the endpoint and model) |
 
 <Warning>
 From v9.0.0, QWED names no default model. Set the model variable of the provider you use. QWED sends the value to the provider unchanged, so any model or deployment ID the provider serves works. When no model is set, the provider raises an error that names the variable to set. Nothing falls back to another model. On the server, `ANTHROPIC_DEPLOYMENT` still wins over `ANTHROPIC_MODEL` when it is set.

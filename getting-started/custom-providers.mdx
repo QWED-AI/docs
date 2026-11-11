@@ -5,7 +5,7 @@ description: "Add any OpenAI-compatible LLM provider to QWED using a portable YA
 
 QWED ships with built-in support for OpenAI, Anthropic, Google Gemini, and Ollama. Starting in v4.0, you can also register any OpenAI-compatible endpoint as a **custom provider** through a YAML configuration file. This is useful when you work with providers like Groq, Together AI, Fireworks, Perplexity, or self-hosted inference servers that expose an OpenAI-compatible API.
 
-Custom providers are stored in `~/.qwed/providers.yaml`. Once registered, they appear as options in the `qwed init` wizard and work with `qwed verify` just like built-in providers.
+Custom providers are stored in `~/.qwed/providers.yaml`. The `qwed init` wizard doesn't list them and doesn't use their `default_model`: to set one up with the wizard, choose **Custom Provider** and enter the endpoint and model yourself.
 
 ## How it works
 
@@ -13,7 +13,7 @@ Custom providers follow the same security model as built-in ones:
 
 - The YAML file stores the **name** of the environment variable that holds your API key, never the key itself.
 - The file is written with `0600` permissions (owner-read/write only on Unix).
-- When you select a custom provider in `qwed init`, it maps to the `openai_compat` inference engine internally, so no changes are needed to your verification workflow.
+- A custom provider runs on the `openai_compat` inference engine, so no changes are needed to your verification workflow.
 
 ## Define a custom provider
 
