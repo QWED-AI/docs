@@ -364,10 +364,10 @@ While QWED handles internal verification, you must implement the following "Huma
   export QWED_ALLOWED_STARTUP_PTH_FILES="my_custom_plugin.pth,internal_tool.pth"
   ```
 
-  Use a digest pin for a legitimate hook that contains a flagged pattern. In a Python 3.11 venv, setuptools' `distutils-precedence.pth` (which uses `__import__(`) and coverage's `a1_coverage.pth` (which uses `exec(`) both fail the pattern scan. Before digest pins, the only way past them was `QWED_SKIP_ENV_INTEGRITY_CHECK=true`. To take a file's digest, run:
+  Use a digest pin for a legitimate hook that contains a flagged pattern. In a Python 3.11 venv, setuptools' `distutils-precedence.pth` (which uses `__import__(`) and coverage's `a1_coverage.pth` (which uses `exec(`) both fail the pattern scan. Before digest pins, the only way past them was `QWED_SKIP_ENV_INTEGRITY_CHECK=true`. To take a file's digest, run the command below. `-I -S` keeps Python from processing the `.pth` files, including the one you hash, while it computes the digest (`sha256sum` gives the same hex digest):
 
   ```bash
-  python -c "import hashlib,os,sys; p=sys.argv[1]; print(os.path.basename(p) + ':sha256:' + hashlib.sha256(open(p,'rb').read()).hexdigest())" path/to/site-packages/distutils-precedence.pth
+  python -I -S -c "import hashlib,os,sys; p=sys.argv[1]; print(os.path.basename(p) + ':sha256:' + hashlib.sha256(open(p,'rb').read()).hexdigest())" path/to/site-packages/distutils-precedence.pth
   ```
 
   Put the printed `NAME.pth:sha256:<hex>` value in the variable:
@@ -375,6 +375,8 @@ While QWED handles internal verification, you must implement the following "Huma
   ```bash
   export QWED_ALLOWED_STARTUP_PTH_FILES="distutils-precedence.pth:sha256:<hex>,a1_coverage.pth:sha256:<hex>"
   ```
+
+  The check runs when the server starts, after Python has already processed the `.pth` files, so it detects a tampered or unexpected hook and refuses to start; it doesn't stop that hook from running in the process that checks it.
 
   QWED ships no built-in digests, because these files change between setuptools and coverage versions. When you upgrade the package that wrote a pinned file, take its digest again. A pinned file whose contents differ fails the check and is counted as `digest_mismatch`. An entry with a colon that isn't `NAME.pth:sha256:<64 hex>`, with `NAME` a file name and no directory, stops startup with a `ValueError` instead of being read as a name.
 
@@ -492,7 +494,7 @@ QWED_LEAK_FEEDBACK_URL=https://scanner.example.com/feedback
 Raw mode transmits live secrets back out of your deployment. Enable `QWED_LEAK_FEEDBACK_SEND_RAW` only when the receiving scanner requires plaintext tokens. In raw mode, QWED emits no feedback log lines, so delivery results are not logged.
 </Note>
 
-See the [`POST /webhooks/secret-scanning`](/api/endpoints#post-webhooks-secret-scanning) reference for the request/response contract and the full status-code table.
+See the [`POST /webhooks/secret-scanning`](/api/endpoints#post-%2Fwebhooks%2Fsecret-scanning) reference for the request/response contract and the full status-code table.
 
 ---
 

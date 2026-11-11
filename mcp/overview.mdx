@@ -113,6 +113,8 @@ All tool calls pass through the [`RiskBasedExecutionGateway`](/mcp/tools#riskbas
 pip install qwed-mcp
 ```
 
+qwed-mcp 0.2.3 and later require Python 3.10 or later and the MCP Python SDK `mcp>=1.30.0,<2`. MCP SDK 2.x removed the server API that qwed-mcp uses, so pip keeps the SDK on 1.x.
+
 ### From source
 
 ```bash
@@ -124,9 +126,12 @@ pip install -e .
 ### Verify installation
 
 ```bash
-qwed-mcp --version
-# qwed-mcp 0.2.0
+pip show qwed-mcp
+# Name: qwed-mcp
+# Version: 0.2.3
 ```
+
+The `qwed-mcp` command starts the server over stdio and has no `--version` flag.
 
 ---
 
