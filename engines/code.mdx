@@ -421,7 +421,7 @@ Before v9.0.0, the verifier matched these names anywhere in a line, so `cur.exec
 
 ### File and network access is never admitted
 
-`CodeVerifier` reports file system and network I/O as a `CRITICAL` issue with type `file_or_network_access`, so the snippet is unsafe (`is_valid: false`) and `POST /verify/code` returns `admission: BLOCKED`. The following are covered, including through aliased imports:
+`CodeVerifier` reports file system and network I/O that the code itself calls as a `CRITICAL` issue with type `file_or_network_access`, so the snippet is unsafe (`is_valid: false`) and `POST /verify/code` returns `admission: BLOCKED`. The following are covered, including through aliased imports:
 
 - The bare `open()` builtin and `io.open`
 - `shutil.*`, `pathlib.Path`, and file-mutating `os` calls such as `os.remove`, `os.rename`, `os.mkdir`, `os.chmod`, and `os.open`
@@ -440,7 +440,7 @@ print(result.developer_fields["is_valid"])     # False
 # [{"severity": "CRITICAL", "type": "file_or_network_access", ...}]
 ```
 
-If generated code needs to read files or call the network, route that I/O through a reviewed, sandboxed tool.
+These checks cover calls the code makes by name. They don't see the objects your executor puts in the code's namespace: see the note under [Only listed modules, builtins and attributes are admitted](#only-listed-modules-builtins-and-attributes-are-admitted). If generated code needs to read files or call the network, route that I/O through a reviewed, sandboxed tool.
 
 ### Only listed modules, builtins and attributes are admitted
 
