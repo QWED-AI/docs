@@ -143,6 +143,7 @@ result2 = client.verify("What is 2+2?")  # $0 cost!
 ```python
 client = QWEDLocal(
     provider="openai",
+    model="gpt-4o-mini",
     mask_pii=True,  # Auto-mask emails, SSNs, etc.
     pii_entities=["EMAIL_ADDRESS", "CREDIT_CARD", "US_SSN"]
 )
@@ -169,6 +170,7 @@ client = QWEDLocal(
 # Option 2: Cloud + PII masking (more accurate)
 client = QWEDLocal(
     provider="openai",
+    model="gpt-4o-mini",
     mask_pii=True,
     pii_entities=["PERSON", "US_SSN", "MEDICAL_LICENSE"]
 )
@@ -180,6 +182,7 @@ client = QWEDLocal(
 ```python
 client = QWEDLocal(
     provider="openai",
+    model="gpt-4o-mini",
     mask_pii=True,
     pii_entities=["CREDIT_CARD", "IBAN_CODE"]
 )
@@ -193,7 +196,7 @@ client = QWEDLocal(
 dev_client = QWEDLocal(base_url="http://localhost:11434/v1", model="llama3")
 
 # Production
-prod_client = QWEDLocal(provider="openai", mask_pii=True, cache=True)
+prod_client = QWEDLocal(provider="openai", model="gpt-4o-mini", mask_pii=True, cache=True)
 ```
 
 **Recommendation:** Hybrid approach
@@ -257,7 +260,7 @@ export OPENAI_API_KEY="sk-..."
 
 # Use with QWED
 python -c "from qwed_sdk import QWEDLocal; \
-  client = QWEDLocal(provider='openai', mask_pii=True, cache=True); \
+  client = QWEDLocal(provider='openai', model='gpt-4o-mini', mask_pii=True, cache=True); \
   print(client.verify('2+2'))"
 ```
 
