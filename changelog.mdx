@@ -199,7 +199,7 @@ See [Organization owner](/advanced/cli#organization-owner).
   - The row now stores the document exactly as returned. Its attestation matches the stored document, so the row verifies with `POST /verification-context/validate` until the attestation expires (`QWED_ATTESTATION_TTL_SECONDS`, 24 hours by default) and while the server keeps the signing key.
   - The row's `query` is still redacted.
   - The stored document keeps any personal data you put in the query or the diagnostic, including its `agent_message` and `developer_fields`. To keep personal data out of it, mask the data in the query of the original verification and send that query unchanged here: for a `VERIFIED` diagnostic the attestation covers the query, so masking it only at this call makes the document `BLOCKED`.
-  - Rows written before this change keep their redacted copy and still don't verify against their attestation.
+  - Rows written before this change keep their redacted copy, which may not verify against its attestation: it fails when the redaction changed a signed field.
 
 ---
 
