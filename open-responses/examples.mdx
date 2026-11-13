@@ -23,56 +23,62 @@ from qwed_open_responses.guards import MathGuard, SchemaGuard
 
 verifier = ResponseVerifier()
 
-# Schema for calculation results
-calc_schema = {
+# Schema for invoice calculations
+invoice_schema = {
     "type": "object",
-    "required": ["operation", "operands", "result"],
+    "required": ["subtotal", "tax", "total"],
     "properties": {
-        "operation": {"enum": ["add", "subtract", "multiply", "divide", "percentage"]},
-        "operands": {"type": "array", "items": {"type": "number"}},
-        "result": {"type": "number"}
+        "subtotal": {"type": "number", "minimum": 0},
+        "tax": {"type": "number", "minimum": 0},
+        "discount": {"type": "number", "minimum": 0},
+        "total": {"type": "number"}
     }
 }
 
 math_guard = MathGuard()
-schema_guard = SchemaGuard(schema=calc_schema)
+schema_guard = SchemaGuard(schema=invoice_schema)
 ```
+
+MathGuard checks `total = subtotal + tax + shipping - discount`, counting any missing part as zero. See [what it checks](/open-responses/guards#what-it-checks) for the other shapes.
 
 ### Verification
 
 ```python
-# Agent output: "25% of 200 is 50"
+# Agent output: $200 subtotal, $16 tax, $20 discount, $196 total
 agent_output = {
-    "operation": "percentage",
-    "operands": [25, 200],
-    "result": 50
+    "subtotal": 200,
+    "tax": 16,
+    "discount": 20,
+    "total": 196
 }
 
 result = verifier.verify_structured_output(
     output=agent_output,
     guards=[schema_guard, math_guard]
 )
-
-# ✅ VERIFIED: 25% of 200 = 50 is correct
+print(result.verified)
+# True
 ```
 
 ### Catching errors
 
 ```python
-# Agent makes mistake: "25% of 200 is 60"
+# Agent makes a mistake: forgets to subtract the discount
 bad_output = {
-    "operation": "percentage",
-    "operands": [25, 200],
-    "result": 60  # Wrong!
+    "subtotal": 200,
+    "tax": 16,
+    "discount": 20,
+    "total": 216  # Wrong!
 }
 
 result = verifier.verify_structured_output(
     output=bad_output,
     guards=[schema_guard, math_guard]
 )
-
-# ❌ FAILED: MathGuard
-# Error: 25% of 200 = 50, not 60
+print(result.verified, result.block_reason)
+# False Math verification failed: 1 error(s)
+print(result.guard_results[1].details["errors"])
+# ['total mismatch: expected 216.0, calculated 196.0']
 ```
 
 ---
@@ -86,11 +92,14 @@ Agent has access to shell commands. Need to prevent dangerous operations.
 ### Setup
 
 ```python
+from qwed_open_responses import ResponseVerifier
 from qwed_open_responses.guards import ToolGuard
 
-# Create blocklist
+verifier = ResponseVerifier()
+
+# Create blocklist (added to the default blocklist)
 tool_guard = ToolGuard(
-    blocklist=[
+    blocked_tools=[
         "execute_shell",
         "delete_file",
         "drop_table",
@@ -114,10 +123,17 @@ result = verifier.verify_tool_call(
     arguments={"command": "rm -rf /"},
     guards=[tool_guard]
 )
+print(result.verified, result.block_reason)
+# False BLOCKED: Tool 'execute_shell' is not allowed
 
-# ❌ BLOCKED
-# Reason: Tool 'execute_shell' is in blocklist
-# Pattern matched: 'rm -rf'
+# Agent passes a dangerous argument to a tool that is not blocked
+result = verifier.verify_tool_call(
+    tool_name="run_query",
+    arguments={"sql": "DELETE FROM users WHERE 1=1"},
+    guards=[tool_guard]
+)
+print(result.verified, result.block_reason)
+# False BLOCKED: Dangerous pattern detected in tool arguments
 ```
 
 ### Allowed calls
@@ -129,8 +145,8 @@ result = verifier.verify_tool_call(
     arguments={"path": "/data/report.txt"},
     guards=[tool_guard]
 )
-
-# ✅ VERIFIED: Tool not in blocklist
+print(result.verified)
+# True
 ```
 
 ---
@@ -144,16 +160,18 @@ Healthcare AI generating patient summaries. Must not leak PII.
 ### Setup
 
 ```python
+from qwed_open_responses import ResponseVerifier
 from qwed_open_responses.guards import SafetyGuard
 
 safety_guard = SafetyGuard(
-    block_pii=True,
-    pii_patterns=[
-        r"\b\d{3}-\d{2}-\d{4}\b",  # SSN
-        r"\b\d{16}\b",              # Credit card
-        r"\b[A-Z]{2}\d{6}\b",       # Passport
+    check_pii=True,  # SSN, credit card, phone, email, IP address
+    custom_patterns=[
+        r"\b[A-Z]{2}\d{6}\b",  # Passport
     ]
 )
+
+# PII findings are warnings. allow_warnings=False makes them block.
+verifier = ResponseVerifier(allow_warnings=False)
 ```
 
 ### PII blocked
@@ -167,23 +185,34 @@ Patient John Doe (SSN: 123-45-6789) presented with...
 result = verifier.verify({
     "content": summary
 }, guards=[safety_guard])
-
-# ❌ BLOCKED
-# Reason: PII detected (SSN pattern: 123-45-6789)
+print(result.verified, result.block_reason)
+# False Safety warnings: 1 warning(s)
+print(result.guard_results[0].details["issues"])
+# [{'type': 'pii', 'severity': 'warning', 'details': ['ssn']}]
 ```
 
-### Redacted output
+A match on a `custom_patterns` entry is an error rather than a warning, so it blocks with any verifier:
 
 ```python
-# SafetyGuard can also redact instead of block
-safety_guard = SafetyGuard(
-    block_pii=False,
-    redact_pii=True
-)
-
-result = verifier.verify({"content": summary}, guards=[safety_guard])
-# Output: "Patient John Doe (SSN: [REDACTED]) presented with..."
+result = ResponseVerifier().verify({
+    "content": "Passport AB123456 on file"
+}, guards=[safety_guard])
+print(result.verified, result.block_reason)
+# False Safety check failed: 1 critical issue(s)
 ```
+
+### Warn instead of block
+
+```python
+# With the default allow_warnings=True, PII passes as a warning you can log
+result = ResponseVerifier().verify({"content": summary}, guards=[safety_guard])
+print(result.verified)
+# True
+print([warning.message for warning in result.warnings])
+# ['Safety warnings: 1 warning(s)']
+```
+
+SafetyGuard detects PII but does not redact it. Redact in your own code before you return the text.
 
 ---
 
@@ -196,11 +225,14 @@ Order processing agent. States must follow valid transitions.
 ### Setup
 
 ```python
+from qwed_open_responses import ResponseVerifier
 from qwed_open_responses.guards import StateGuard
+
+verifier = ResponseVerifier()
 
 # Define valid transitions
 state_guard = StateGuard(
-    valid_transitions={
+    transitions={
         "pending": ["processing", "cancelled"],
         "processing": ["shipped", "failed"],
         "shipped": ["delivered", "returned"],
@@ -212,38 +244,39 @@ state_guard = StateGuard(
 )
 ```
 
+StateGuard reads the requested state from `new_state` in the output. It does not read tool-call arguments, so pass the transition as structured output. Take the current state from your own records and pass it as `context["current_state"]`. That value wins over any `state` field in the output, so the agent can't claim a different starting state to make a transition pass.
+
 ### Valid transition
 
 ```python
-result = verifier.verify_tool_call(
-    tool_name="update_order_status",
-    arguments={
+result = verifier.verify_structured_output(
+    output={
         "order_id": "ORD-123",
-        "from_state": "processing",
-        "to_state": "shipped"
+        "new_state": "shipped"
     },
-    guards=[state_guard]
+    guards=[state_guard],
+    context={"current_state": "processing"}  # From your order database
 )
-
-# ✅ VERIFIED: processing → shipped is valid
+print(result.verified)
+# True
 ```
 
 ### Invalid transition (blocked)
 
 ```python
-result = verifier.verify_tool_call(
-    tool_name="update_order_status",
-    arguments={
+result = verifier.verify_structured_output(
+    output={
         "order_id": "ORD-123",
-        "from_state": "delivered",
-        "to_state": "pending"  # Can't go back!
+        "state": "failed",  # Agent claims a state that could move to pending
+        "new_state": "pending"  # Can't go back!
     },
-    guards=[state_guard]
+    guards=[state_guard],
+    context={"current_state": "delivered"}  # From your order database
 )
-
-# ❌ BLOCKED
-# Reason: Invalid transition: delivered → pending
-# Valid transitions from 'delivered': ['completed']
+print(result.verified, result.block_reason)
+# False Invalid transition: 'delivered' -> 'pending'
+print(result.guard_results[0].details["valid_next_states"])
+# ['completed']
 ```
 
 ---
@@ -254,56 +287,47 @@ result = verifier.verify_tool_call(
 
 ```python
 from langchain_openai import ChatOpenAI
-from langchain.agents import create_tool_calling_agent, AgentExecutor
-from langchain.tools import StructuredTool
+from langchain.agents import create_agent
+from langchain.tools import tool
 from qwed_open_responses.middleware.langchain import QWEDCallbackHandler
-from qwed_open_responses.guards import ToolGuard, MathGuard, SafetyGuard
+from qwed_open_responses.guards import ToolGuard, SafetyGuard
 
 # Define tools
-def calculate(expression: str) -> str:
-    """Calculate a mathematical expression."""
-    return str(eval(expression))  # In production, use safe eval!
+@tool
+def multiply(a: float, b: float) -> str:
+    """Multiply two numbers."""
+    return str(a * b)
 
+@tool
 def send_email(to: str, subject: str, body: str) -> str:
     """Send an email."""
     return f"Email sent to {to}"
 
-tools = [
-    StructuredTool.from_function(calculate),
-    StructuredTool.from_function(send_email),
-]
-
 # Create verification callback
 callback = QWEDCallbackHandler(
     guards=[
-        ToolGuard(blocklist=["send_email"]),  # Block email for now
-        MathGuard(),
-        SafetyGuard(block_pii=True),
+        ToolGuard(blocked_tools=["send_email"]),  # Block email for now
+        SafetyGuard(),
     ],
     block_on_failure=True,
-    log_verifications=True
+    verbose=True
 )
 
 # Create agent
 llm = ChatOpenAI(model="gpt-4")
-agent = create_tool_calling_agent(llm, tools, prompt)
-executor = AgentExecutor(
-    agent=agent,
-    tools=tools,
-    callbacks=[callback],
-    verbose=True
+agent = create_agent(llm, tools=[multiply, send_email])
+
+# Run agent, passing the callback in config
+result = agent.invoke(
+    {"messages": [{"role": "user", "content": "Calculate 15% tip on $85.50"}]},
+    config={"callbacks": [callback]}
 )
 
-# Run agent
-result = executor.invoke({
-    "input": "Calculate 15% tip on $85.50"
-})
-
 # Output:
-# ToolGuard: ✅ 'calculate' not in blocklist
-# MathGuard: ✅ 0.15 × 85.50 = 12.825 verified
-# Result: "The 15% tip on $85.50 is $12.83"
+# [QWED] Tool start: multiply -> [OK] Verified (2 guards passed)
 ```
+
+MathGuard is not in this callback. It checks a response's `output`, not tool-call arguments, so it would block every tool call with "No verifiable math found in response". See the [LangChain integration](/open-responses/langchain) for how the callback sees each tool call.
 
 ---
 
@@ -316,38 +340,31 @@ Prevent runaway API costs from agent loops.
 ### Setup
 
 ```python
+from qwed_open_responses import ResponseVerifier
 from qwed_open_responses.guards import SafetyGuard
 
+verifier = ResponseVerifier()
+
 # Per-session budget
-safety_guard = SafetyGuard(
-    max_budget=10.0,  # $10 per session
-    cost_per_call={
-        "gpt-4": 0.03,
-        "gpt-3.5": 0.002,
-        "dall-e-3": 0.04,
-    }
-)
+safety_guard = SafetyGuard(max_cost=10.0)  # $10 per session
 ```
+
+SafetyGuard does not price calls. Keep your own running cost for the session and pass it as `context["total_cost"]` on each check. Any `usage.cost` the response reports is added to that total. With no cost figure at all, the budget check fails closed.
 
 ### Budget enforcement
 
 ```python
-# After many calls...
+# After many calls, your running total is $10.24
 result = verifier.verify_tool_call(
     tool_name="generate_image",
     arguments={"prompt": "A cat"},
-    guards=[safety_guard]
+    guards=[safety_guard],
+    context={"total_cost": 10.24}
 )
-
-# If budget exceeded:
-# ❌ BLOCKED
-# Reason: Budget exceeded ($10.24 > $10.00 limit)
-# Session cost breakdown:
-#   - 200 × gpt-3.5: $0.40
-#   - 50 × gpt-4: $1.50
-#   - 200 × dall-e-3: $8.00
-#   - This call: $0.04
-#   - Total: $10.24
+print(result.verified, result.block_reason)
+# False Safety check failed: 1 critical issue(s)
+print(result.guard_results[0].details["issues"][0]["details"])
+# ['Cost exceeds limit: $10.24 > $10.0']
 ```
 
 ---
@@ -361,16 +378,19 @@ Ensure tool arguments match expected types.
 ### Setup
 
 ```python
+from qwed_open_responses import ResponseVerifier
 from qwed_open_responses.guards import ArgumentGuard
 
-# Define expected argument types
+verifier = ResponseVerifier()
+
+# Define expected argument types per tool
 arg_guard = ArgumentGuard(
-    tool_schemas={
+    tool_rules={
         "transfer_money": {
-            "from_account": {"type": "string", "pattern": r"^ACC-\d{8}$"},
-            "to_account": {"type": "string", "pattern": r"^ACC-\d{8}$"},
-            "amount": {"type": "number", "minimum": 0.01, "maximum": 10000},
-            "currency": {"type": "string", "enum": ["USD", "EUR", "GBP"]}
+            "from_account": {"type": "pattern", "pattern": r"^ACC-\d{8}$", "required": True},
+            "to_account": {"type": "pattern", "pattern": r"^ACC-\d{8}$", "required": True},
+            "amount": {"type": "number", "min": 0.01, "max": 10000, "required": True},
+            "currency": {"type": "enum", "values": ["USD", "EUR", "GBP"]}
         }
     }
 )
@@ -390,9 +410,10 @@ result = verifier.verify_tool_call(
     },
     guards=[arg_guard]
 )
-
-# ❌ BLOCKED
-# Reason: Argument 'amount' must be number, got string
+print(result.verified, result.block_reason)
+# False Argument validation failed: 1 error(s)
+print(result.guard_results[0].details["errors"])
+# ['amount: expected number, got str']
 ```
 
 ---
@@ -402,43 +423,75 @@ result = verifier.verify_tool_call(
 ### 1. Layer multiple guards
 
 ```python
-# Defense in depth
-verifier = ResponseVerifier(guards=[
-    SchemaGuard(schema),      # Structure valid?
-    ToolGuard(blocklist),     # Tool allowed?
-    ArgumentGuard(schemas),   # Args valid?
-    MathGuard(),              # Math correct?
-    SafetyGuard(block_pii=True),  # Safe content?
+from qwed_open_responses import (
+    ResponseVerifier,
+    ArgumentGuard,
+    MathGuard,
+    SafetyGuard,
+    SchemaGuard,
+    ToolGuard,
+)
+
+# Layered checks for tool calls
+tool_verifier = ResponseVerifier(default_guards=[
+    ToolGuard(allowed_tools=["search", "get_weather"]),  # Tool allowed?
+    ArgumentGuard(tool_rules={                           # Args valid?
+        "get_weather": {"city": {"type": "string", "required": True}},
+    }),
+    SafetyGuard(),                                       # Safe content?
+])
+
+# Layered checks for structured outputs
+output_verifier = ResponseVerifier(default_guards=[
+    SchemaGuard(schema=invoice_schema),  # Structure valid? (schema from Example 1)
+    MathGuard(),                         # Math correct?
 ])
 ```
+
+Keep `SchemaGuard` and `MathGuard` in a separate stack from tool-call checks. A tool call does not match your output schema and carries no math, so both would fail it.
 
 ### 2. Fail fast, log everything
 
 ```python
+import logging
+from qwed_open_responses import SafetyGuard, ToolGuard
+from qwed_open_responses.middleware.langchain import QWEDCallbackHandler, ToolCallBlocked
+
+logger = logging.getLogger(__name__)
+
 callback = QWEDCallbackHandler(
+    guards=[ToolGuard(), SafetyGuard()],
     block_on_failure=True,
-    log_verifications=True,
-    on_block=lambda r: logger.error(f"Blocked: {r.block_reason}")
+    verbose=True
 )
+
+try:
+    agent.invoke(inputs, config={"callbacks": [callback]})
+except ToolCallBlocked as e:
+    logger.error("Blocked: %s", e.result.block_reason)
+    raise
 ```
 
 ### 3. Environment-specific guards
 
 ```python
+import os
+from qwed_open_responses import SafetyGuard, ToolGuard
+
 if os.getenv("ENV") == "production":
-    guards = [ToolGuard(blocklist=PROD_BLOCKLIST), SafetyGuard(strict=True)]
+    guards = [ToolGuard(allowed_tools=PROD_TOOLS), SafetyGuard()]
 else:
-    guards = [ToolGuard(allow_unknown=True)]  # More lenient in dev
+    guards = [ToolGuard()]  # Default blocklist only, more lenient in dev
 ```
 
 ### 4. Test your guards
 
 ```python
-import pytest
+from qwed_open_responses import ToolGuard
 
 def test_tool_guard_blocks_dangerous():
-    guard = ToolGuard(blocklist=["delete_all"])
-    result = guard.verify(tool_name="delete_all", arguments={})
-    assert not result.verified
-    assert "blocklist" in result.block_reason
+    guard = ToolGuard(blocked_tools=["delete_all"])
+    result = guard.check({"type": "tool_call", "tool_name": "delete_all", "arguments": {}})
+    assert not result.passed
+    assert "not allowed" in result.message
 ```
