@@ -150,26 +150,31 @@ const guard = new SchemaGuard(schema, { allowAdditionalProperties: true });
 
 ---
 
-### "ToolGuard: Tool in blocklist"
+### "ToolGuard: Tool '...' is not allowed"
 
 **Cause:** Agent tried to call a blocked tool
 
 **Debug:**
 ```python
-print(f"Blocked tool: {result.tool_name}")
-print(f"Blocklist: {tool_guard.blocklist}")
+from qwed_open_responses import ToolGuard
+
+tool_guard = ToolGuard()
+result = tool_guard.check({"type": "tool_call", "tool_name": "execute_shell", "arguments": {}})
+print(result.message)
+# BLOCKED: Tool 'execute_shell' is not allowed
+print(result.details)
+# {'blocked_tool': 'execute_shell'}
 ```
 
 **Options:**
 1. Remove tool from blocklist if safe
-2. Use whitelist instead
+2. Use an allowlist instead
 3. Create exception for specific cases
 
 ```python
-# Whitelist mode
+# Allowlist mode: block every tool that is not on the list
 tool_guard = ToolGuard(
-    whitelist=["calculator", "search", "read_file"],
-    allow_unknown=False
+    allowed_tools=["calculator", "search", "read_file"],
 )
 ```
 
@@ -216,11 +221,17 @@ text_verifier = ResponseVerifier(default_guards=[SafetyGuard()])
 
 **Debug:**
 ```python
-result = math_guard.verify(output)
-if not result.verified:
-    print(f"Operation: {result.operation}")
-    print(f"Expected: {result.expected}")
-    print(f"Got: {result.actual}")
+from qwed_open_responses import MathGuard
+
+math_guard = MathGuard()
+output = {"subtotal": 100, "tax": 8, "total": 110}
+
+result = math_guard.check({"output": output})
+if not result.passed:
+    print(result.message)
+    print(result.details["errors"])
+# Math verification failed: 1 error(s)
+# ['total mismatch: expected 110.0, calculated 108.0']
 ```
 
 **This is working as intended!** The guard caught an LLM hallucination.
@@ -243,18 +254,29 @@ if not result.verified:
 - Phone: Various formats
 
 **Options:**
-1. **Block** (default): Return error
-2. **Redact**: Replace with `[REDACTED]`
-3. **Custom patterns**: Add your own
+1. **Warn** (default): PII passes the guard with `severity="warning"` and shows in `result.warnings`
+2. **Block**: Create the verifier with `allow_warnings=False`
+3. **Allow a type**: Skip PII types you expect, such as `email`, with `pii_allow_list`
+4. **Custom patterns**: Add your own. A match is an error, so it blocks
+
+SafetyGuard does not redact. Remove or mask PII in your own code.
 
 ```python
+from qwed_open_responses import ResponseVerifier, SafetyGuard
+
 safety_guard = SafetyGuard(
-    block_pii=False,
-    redact_pii=True,
+    pii_allow_list={"email"},  # Emails are expected in this output
     custom_patterns=[
         r"EMPLOYEE-\d{6}",  # Internal ID
     ]
 )
+
+# Block on PII warnings too
+verifier = ResponseVerifier(default_guards=[safety_guard], allow_warnings=False)
+
+result = verifier.verify({"content": "Contact jane@example.com about EMPLOYEE-123456"})
+print(result.verified, result.block_reason)
+# False Safety check failed: 1 critical issue(s)
 ```
 
 ---
@@ -265,9 +287,15 @@ safety_guard = SafetyGuard(
 
 **Debug:**
 ```python
-print(f"From: {from_state}")
-print(f"To: {to_state}")
-print(f"Valid transitions: {state_guard.valid_transitions[from_state]}")
+from qwed_open_responses import StateGuard
+
+state_guard = StateGuard(transitions={"pending": ["processing"], "processing": ["completed"]})
+
+result = state_guard.check({"state": "pending", "new_state": "completed"})
+print(result.message)
+# Invalid transition: 'pending' -> 'completed'
+print(f"Valid transitions: {result.details['valid_next_states']}")
+# Valid transitions: ['processing']
 ```
 
 **Fix:** Review your state machine definition.
@@ -280,22 +308,23 @@ print(f"Valid transitions: {state_guard.valid_transitions[from_state]}")
 
 **Check callback is added:**
 ```python
-# Wrong
-executor = AgentExecutor(agent=agent, tools=tools)
+# Wrong - no callback, so tool calls are not checked
+agent = create_agent(llm, tools=tools)
+result = agent.invoke({"messages": [{"role": "user", "content": "..."}]})
 
-# Right
-executor = AgentExecutor(
-    agent=agent,
-    tools=tools,
-    callbacks=[QWEDCallbackHandler(...)]  # Must include!
+# Right - LangChain 1.x create_agent has no callbacks argument,
+# so pass the callback in config on each call
+result = agent.invoke(
+    {"messages": [{"role": "user", "content": "..."}]},
+    config={"callbacks": [QWEDCallbackHandler(guards=[ToolGuard()])]},  # Must include!
 )
 ```
 
 **Check tool is being called:**
 ```python
 callback = QWEDCallbackHandler(
-    log_verifications=True,  # Enable logging
-    guards=[...]
+    verbose=True,  # Print each verification
+    guards=[ToolGuard(), SafetyGuard()]
 )
 ```
 
@@ -352,20 +381,20 @@ Also confirm the request's `Content-Type` matches the parser you registered. A b
 **Check guard order:**
 ```python
 # Guards run in order
-verifier = ResponseVerifier(guards=[
+verifier = ResponseVerifier(default_guards=[
     SchemaGuard(schema),  # First
-    ToolGuard(blocklist), # Second
+    ToolGuard(),          # Second
     SafetyGuard(),        # Last
 ])
 ```
 
 **Check guard is configured:**
 ```python
-# Empty blocklist won't block anything
-tool_guard = ToolGuard(blocklist=[])  # Does nothing!
+# With the default blocklist off and no blocked_tools, no tool is blocked by name
+tool_guard = ToolGuard(use_default_blocklist=False)  # Only pattern checks run
 
 # Fix
-tool_guard = ToolGuard(blocklist=["dangerous_tool"])
+tool_guard = ToolGuard(blocked_tools=["dangerous_tool"])  # Added to the default blocklist
 ```
 
 ---
@@ -377,8 +406,8 @@ tool_guard = ToolGuard(blocklist=["dangerous_tool"])
 **Reduce guards:**
 ```python
 # Only essential guards
-verifier = ResponseVerifier(guards=[
-    ToolGuard(blocklist),  # Fast
+verifier = ResponseVerifier(default_guards=[
+    ToolGuard(),  # Fast
     # Skip MathGuard for non-math outputs
 ])
 ```
@@ -397,12 +426,11 @@ def get_schema_guard(schema_name):
 
 ### Too many false positives
 
-**Tune PII patterns:**
+**Skip PII types that match your normal data:**
 ```python
+# Order numbers like 555-123-4567 read as phone numbers
 safety_guard = SafetyGuard(
-    pii_patterns=[
-        r"\b\d{3}-\d{2}-\d{4}\b",  # Only SSN, not dates
-    ]
+    pii_allow_list={"phone"},
 )
 ```
 
@@ -426,7 +454,7 @@ math_guard = MathGuard(tolerance=0.01)  # Allow 1 cent difference
 | "JSON response exceeds the nesting depth limit" | Verifier | JSON over 100 levels deep | Reduce nesting |
 | "JSON response could not be parsed within safe limits" | Verifier | Oversized integer | Shorten the digit run (split the value or send it as a string) |
 | 422 `QWED_REQUEST_BLOCKED` | Express middleware | Declared body was not parsed | Register a body parser first |
-| "Tool in blocklist" | Tool | Dangerous tool called | Review blocklist |
+| "Tool '...' is not allowed" | Tool | Dangerous tool called | Review blocklist |
 | "Unrecognized format" | Tool | Tool-like content in unknown shape | Use a recognized envelope |
 | "Malformed tool-call entry" | Tool | Non-object entry or hybrid envelope | Fix response structure |
 | "Calculation mismatch" | Math | LLM math wrong | This is intentional! |
