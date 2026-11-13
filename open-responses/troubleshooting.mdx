@@ -382,11 +382,13 @@ Also confirm the request's `Content-Type` matches the parser you registered. A b
 ```python
 # Guards run in order
 verifier = ResponseVerifier(default_guards=[
-    SchemaGuard(schema),  # First
-    ToolGuard(),          # Second
-    SafetyGuard(),        # Last
+    ToolGuard(),                                         # First
+    ArgumentGuard(rules={"query": {"type": "string"}}),  # Second
+    SafetyGuard(),                                       # Last
 ])
 ```
+
+Every guard runs and reports, even after one fails. Keep `SchemaGuard` and `MathGuard` in a separate verifier for structured outputs: a tool call does not match your output schema, so a shared verifier blocks safe tool calls.
 
 **Check guard is configured:**
 ```python

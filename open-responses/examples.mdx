@@ -244,7 +244,7 @@ state_guard = StateGuard(
 )
 ```
 
-StateGuard reads the current state from `state` and the requested state from `new_state` in the output. It does not read tool-call arguments, so pass the transition as structured output.
+StateGuard reads the requested state from `new_state` in the output. It does not read tool-call arguments, so pass the transition as structured output. Take the current state from your own records and pass it as `context["current_state"]`. That value wins over any `state` field in the output, so the agent can't claim a different starting state to make a transition pass.
 
 ### Valid transition
 
@@ -252,10 +252,10 @@ StateGuard reads the current state from `state` and the requested state from `ne
 result = verifier.verify_structured_output(
     output={
         "order_id": "ORD-123",
-        "state": "processing",
         "new_state": "shipped"
     },
-    guards=[state_guard]
+    guards=[state_guard],
+    context={"current_state": "processing"}  # From your order database
 )
 print(result.verified)
 # True
@@ -267,10 +267,11 @@ print(result.verified)
 result = verifier.verify_structured_output(
     output={
         "order_id": "ORD-123",
-        "state": "delivered",
+        "state": "failed",  # Agent claims a state that could move to pending
         "new_state": "pending"  # Can't go back!
     },
-    guards=[state_guard]
+    guards=[state_guard],
+    context={"current_state": "delivered"}  # From your order database
 )
 print(result.verified, result.block_reason)
 # False Invalid transition: 'delivered' -> 'pending'
@@ -433,14 +434,16 @@ from qwed_open_responses import (
 
 # Layered checks for tool calls
 tool_verifier = ResponseVerifier(default_guards=[
-    ToolGuard(allowed_tools=["search", "transfer_money"]),  # Tool allowed?
-    ArgumentGuard(tool_rules=tool_rules),                   # Args valid?
-    SafetyGuard(),                                          # Safe content?
+    ToolGuard(allowed_tools=["search", "get_weather"]),  # Tool allowed?
+    ArgumentGuard(tool_rules={                           # Args valid?
+        "get_weather": {"city": {"type": "string", "required": True}},
+    }),
+    SafetyGuard(),                                       # Safe content?
 ])
 
 # Layered checks for structured outputs
 output_verifier = ResponseVerifier(default_guards=[
-    SchemaGuard(schema=invoice_schema),  # Structure valid?
+    SchemaGuard(schema=invoice_schema),  # Structure valid? (schema from Example 1)
     MathGuard(),                         # Math correct?
 ])
 ```
