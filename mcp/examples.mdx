@@ -2,7 +2,7 @@
 sidebar_position: 3
 title: "QWED MCP examples for verified tool execution"
 sidebarTitle: "Examples and tutorials"
-description: "QWED MCP examples for verified tool execution covering financial calculations, legal reasoning, code review, SQL safety, and math validation workflows."
+description: "QWED MCP examples for checked tool execution covering financial calculations, propositional logic, refused code, background jobs and a Python client."
 ---
 
 ---
@@ -60,7 +60,7 @@ Execution completed successfully.
 
 ### Scenario
 
-An AI legal assistant needs to verify that conclusions follow from legal premises.
+An AI legal assistant needs to check that a conclusion follows from legal premises.
 
 ### Conversation
 
@@ -68,45 +68,12 @@ An AI legal assistant needs to verify that conclusions follow from legal premise
 
 **Claude's process:**
 
-1. Formalize the logic
-2. Call `execute_python_code` with a Z3 solver script:
+1. Formalize the argument as propositions
+2. Call `execute_python_code` with a script that looks for a truth assignment where the premises hold and the conclusion does not:
 
 ```json
 {
-  "code": "from qwed_new.engines.logic_engine import verify_logic_statement\n\nresult = verify_logic_statement(\n    premises=[\n        'if agreed and consideration then contract',\n        'Alice agreed',\n        'consideration exchanged'\n    ],\n    conclusion='contract formed'\n)\nprint(f'Verified: {result.get(\"verified\")}')\nprint(f'Message: {result.get(\"message\", \"\")}')"
-}
-```
-
-**Result:** Verified — the conclusion logically follows.
-
----
-
-## Example 3: secure code review
-
-### Scenario
-
-A developer asks AI to review their code for security issues.
-
-### Conversation
-
-**User:** Review this login function:
-
-```python
-def login(username, password):
-    query = f"SELECT * FROM users WHERE name='{username}'"
-    user = db.execute(query)
-    if eval(f"'{password}' == '{user.password}'"):
-        return True
-    return False
-```
-
-**Claude's process:**
-
-1. Call `execute_python_code` with a CodeGuard analysis:
-
-```json
-{
-  "code": "from qwed_new.guards.code_guard import CodeGuard\n\ncode = '''def login(username, password):\n    query = f\"SELECT * FROM users WHERE name='{username}'\"\n    user = db.execute(query)\n    if eval(f\"'{password}' == '{user.password}'\"):\n        return True\n    return False'''\n\nguard = CodeGuard()\nresult = guard.verify_safety(code)\nprint(f'Verified: {result[\"verified\"]}')\nif result.get('violations'):\n    for v in result['violations']:\n        print(f'  - {v}')"
+  "code": "from itertools import product\n\ndef implies(a, b):\n    return (not a) or b\n\ncounterexamples = [\n    (agreed, consideration, contract)\n    for agreed, consideration, contract in product([False, True], repeat=3)\n    if implies(agreed and consideration, contract) and agreed and consideration\n    and not contract\n]\nprint('valid:', not counterexamples)"
 }
 ```
 
@@ -114,71 +81,55 @@ def login(username, password):
 
 ```text
 STDOUT:
-Verified: False
-  - Dangerous function call: eval()
-  - Warning: String concatenation in SQL query detected
+valid: True
 
 Execution completed successfully.
 ```
 
-**Claude's response:**
+The check covers the formalized argument only. Whether the propositions capture the legal question is up to the person who reviews the script.
 
-Security issues found:
+---
 
-1. **SQL injection** — direct string formatting in SQL query
-2. **Code injection** — using `eval()` for password comparison
+## Example 3: code that is refused
 
-**Recommended fix:**
+### Scenario
+
+A script tries to reach the file system. The server refuses it before it runs.
+
+### Conversation
+
+**User:** Run this with `execute_python_code`:
 
 ```python
-def login(username, password):
-    query = "SELECT * FROM users WHERE name = ?"
-    user = db.execute(query, (username,))
-    return password == user.password
+import os
+print(os.listdir("."))
 ```
+
+**Result:**
+
+```text
+BLOCKED: QWED blocked python execution: Module 'os' is not admitted (line 1) (verification_id=...)
+```
+
+From v0.3.0, code that imports a module outside the allowlist, calls a refused builtin such as `open`, `eval` or `getattr`, or reads a private attribute is refused the same way, with the reason. Imports of QWED SDK packages, such as `qwed_new` or `qwed_legal`, and of other third-party packages are refused too. See [What code is admitted](/mcp/tools#what-code-is-admitted).
 
 ---
 
-## Example 4: research paper validation
+## Example 4: loan EMI
 
 ### Scenario
 
-Verifying statistical claims in AI-assisted research paper review.
+A car dealer quotes a monthly instalment, and you want the assistant to check it.
 
 ### Conversation
 
-**User:** The paper claims: "If the p-value \< 0.05, we reject the null hypothesis. Our p-value was 0.03. Therefore, we reject the null hypothesis."
+**User:** A dealer claims: "₹10,00,000 loan at 9% annual interest for 5 years = EMI of ₹20,758". Check it.
 
 **Claude's process:**
 
 ```json
 {
-  "code": "from qwed_new.engines.logic_engine import verify_logic_statement\n\nresult = verify_logic_statement(\n    premises=[\n        'if p_value less than 0.05 then reject_null',\n        'p_value less than 0.05'\n    ],\n    conclusion='reject_null'\n)\nprint(f'Verified: {result.get(\"verified\")}')"
-}
-```
-
-**Result:** Verified.
-
----
-
-## Example 5: SQL query validation
-
-### Scenario
-
-An AI data analyst generates SQL queries. You need to ensure they're safe before execution.
-
-### Conversation
-
-**User:** Get all orders for user input "admin' OR '1'='1"
-
-**Claude's process:**
-
-1. Generate query
-2. Call `execute_python_code` with a SQLGuard check before responding:
-
-```json
-{
-  "code": "from qwed_new.guards.sql_guard import SQLGuard\n\nguard = SQLGuard()\nresult = guard.verify_query(\"SELECT * FROM orders WHERE user_id = 'admin'' OR ''1''=''1'\")\nprint(f'Verified: {result[\"verified\"]}')\nprint(f'Message: {result.get(\"message\", \"\")}')"
+  "code": "from decimal import Decimal, ROUND_HALF_UP\n\nP = Decimal('1000000')\nr = Decimal('0.09') / 12\nn = 60\nemi = P * r * (1 + r) ** n / ((1 + r) ** n - 1)\nemi = emi.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)\nprint(f'EMI: {emi}')"
 }
 ```
 
@@ -186,32 +137,24 @@ An AI data analyst generates SQL queries. You need to ensure they're safe before
 
 ```text
 STDOUT:
-Verified: False
-Message: Potential SQL injection detected
+EMI: 20758.36
 
 Execution completed successfully.
 ```
 
-**Claude's response:**
-
-The input appears to be a SQL injection attempt. Use parameterized queries:
-
-```sql
-SELECT * FROM orders WHERE user_id = ?
--- Pass user_id as parameter
-```
+**Claude's response:** The claim holds to the rupee: the EMI is ₹20,758.36.
 
 ---
 
-## Example 6: background verification
+## Example 5: background job
 
 ### Scenario
 
-You need to run a complex, multi-guard verification that may exceed the default 30-second timeout. Use `background=true` to dispatch the job asynchronously, then poll for results with `verification_status`.
+You need to run a script that may exceed the 30-second synchronous timeout. Use `background=true` to dispatch the job asynchronously, then poll for results with `verification_status`.
 
 ### Conversation
 
-**User:** Run a full legal contract review including deadline, liability, and provenance checks on this 50-page NDA.
+**User:** Sum 1/k² for k from 1 to 2,000,000 and compare it with π²/6.
 
 **Claude's process:**
 
@@ -219,7 +162,7 @@ You need to run a complex, multi-guard verification that may exceed the default 
 
 ```json
 {
-  "code": "from qwed_legal import LegalGuard\nimport hashlib\n\nguard = LegalGuard(provenance_config={'require_disclosure': True})\n\n# Deadline check\nd = guard.verify_deadline('2026-01-15', '90 business days', '2026-05-01')\nprint(f'Deadline verified: {d.verified}')\n\n# Liability check\nl = guard.verify_liability_cap(5000000, 200, 10000000)\nprint(f'Liability verified: {l.verified}')\n\n# Provenance check\ncontent = 'This AI-generated contract review...'\nh = hashlib.sha256(content.encode()).hexdigest()\np = guard.verify_provenance(content, {'content_hash': h, 'model_id': 'gpt-4', 'generation_timestamp': '2026-03-25T10:00:00+00:00'})\nprint(f'Provenance verified: {p[\"verified\"]}')",
+  "code": "import math\n\ntotal = math.fsum(1 / (k * k) for k in range(1, 2_000_001))\nprint(f'sum = {total}')\nprint(f'pi^2/6 = {math.pi ** 2 / 6}')",
   "background": true
 }
 ```
@@ -248,55 +191,93 @@ Status: success
 
 Result:
 STDOUT:
-Deadline verified: True
-Liability verified: True
-Provenance verified: True
+sum = 1.6449335668483513
+pi^2/6 = 1.6449340668482264
 
 Execution completed successfully.
 ```
 
 <Note>
-  Background jobs are ideal for multi-guard verification pipelines, large document analysis, or any script that may exceed the 30-second synchronous timeout.
+  Background jobs suit any script that may exceed the 30-second synchronous timeout. They are bounded by `QWED_MCP_BACKGROUND_TIMEOUT` (default 120 seconds, at most 600). See [Execution limits](/mcp/tools#execution-limits).
 </Note>
 
 ---
 
-## Example 7: integration with LangChain
+## Example 6: Python MCP client
 
 ### Python code
 
+Start the server over stdio and call both tools from your own code with the MCP Python SDK. This example sets `QWED_MCP_TRUSTED_CODE_EXECUTION` for the server it starts.
+
 ```python
-from langchain_anthropic import ChatAnthropic
-from langchain.agents import create_tool_calling_agent, AgentExecutor
-from langchain.tools import StructuredTool
-import subprocess
-import json
+import asyncio
 
-# Create a tool that calls execute_python_code via MCP CLI
-def run_verification(code: str) -> str:
-    """Execute Python verification code via QWED-MCP."""
-    result = subprocess.run(
-        ["qwed-mcp-cli", "execute_python_code",
-         "--code", code],
-        capture_output=True, text=True
+from mcp import ClientSession, StdioServerParameters
+from mcp.client.stdio import stdio_client
+
+SCRIPT = """
+from decimal import Decimal, ROUND_HALF_UP
+
+principal = Decimal("10000")
+rate = Decimal("0.075")
+n, years = 4, 5
+amount = principal * (1 + rate / n) ** (n * years)
+print("amount:", amount.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP))
+"""
+
+
+def text(result) -> str:
+    return "\n".join(part.text for part in result.content if hasattr(part, "text"))
+
+
+async def main():
+    server_params = StdioServerParameters(
+        command="python",
+        args=["-m", "qwed_mcp.server"],
+        env={"QWED_MCP_TRUSTED_CODE_EXECUTION": "true"},
     )
-    return result.stdout
 
-verify_tool = StructuredTool.from_function(
-    func=run_verification,
-    name="execute_python_code",
-    description="Execute Python code to verify calculations using QWED SDKs."
-)
+    async with stdio_client(server_params) as (read, write):
+        async with ClientSession(read, write) as session:
+            await session.initialize()
 
-# Create agent with verification
-llm = ChatAnthropic(model="claude-3-sonnet")
-agent = create_tool_calling_agent(llm, [verify_tool], prompt)
-executor = AgentExecutor(agent=agent, tools=[verify_tool])
+            # Run a script and wait for its output
+            result = await session.call_tool(
+                "execute_python_code", arguments={"code": SCRIPT}
+            )
+            print(text(result))
 
-# Use it
-result = executor.invoke({
-    "input": "What's the integral of 2x? Write a script to verify your answer."
-})
+            # Run the same script as a background job
+            result = await session.call_tool(
+                "execute_python_code",
+                arguments={"code": SCRIPT, "background": True},
+            )
+            job_id = text(result).split("request ", 1)[1].split(".", 1)[0]
+            for _ in range(20):
+                await asyncio.sleep(0.5)
+                status = text(await session.call_tool(
+                    "verification_status", arguments={"job_id": job_id}
+                ))
+                # "Status: queued..." and "Status: running..." are not final
+                if not status.endswith("..."):
+                    break
+            print(status)
+
+
+asyncio.run(main())
+```
+
+The `qwed-mcp` repository ships a fuller version of this client in its `examples` directory.
+
+### Math, logic and SQL engines
+
+The math, logic and SQL engines in `qwed_mcp.engines` are a Python library API, not MCP tools, and `execute_python_code` scripts can't import them. Call them from your own code, for example:
+
+```python
+from qwed_mcp.engines.sql_engine import verify_sql_query
+
+result = verify_sql_query("SELECT * FROM users WHERE id = '1' OR '1'='1'")
+print(result["verified"])  # False: the condition does not depend on the row
 ```
 
 ---
@@ -315,16 +296,18 @@ User asks → AI calculates → AI writes verification script → AI responds
 
 Set `background=true` when running scripts that may take longer than 30 seconds. Poll results using `verification_status` with the returned `job_id`.
 
-### 3. Use appropriate SDK imports
+### 3. Use admitted modules
 
-| Task | SDK import |
+| Task | Admitted modules |
 | --- | --- |
-| Math/calculations | `from sympy import ...` |
-| Logic/reasoning | `from qwed_new.engines.logic_engine import verify_logic_statement` |
-| Code review | `from qwed_new.guards.code_guard import CodeGuard` |
-| SQL queries | `from qwed_new.guards.sql_guard import SQLGuard` |
-| Legal deadlines | `from qwed_legal import DeadlineGuard` |
-| AI provenance | `from qwed_legal import ProvenanceGuard` |
+| Money and exact decimals | `decimal` |
+| Exact fractions | `fractions` |
+| Math functions | `math`, `cmath` |
+| Statistics | `statistics` |
+| Propositional logic over truth assignments | `itertools` (`product`) |
+| Dates | `datetime`, `calendar` |
+
+See [What code is admitted](/mcp/tools#what-code-is-admitted) for the full rules.
 
 ### 4. Handle verification failures
 

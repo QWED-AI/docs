@@ -40,20 +40,6 @@ Common issues and solutions when using QWED-MCP.
 
 ---
 
-### "ModuleNotFoundError: No module named 'sympy'"
-
-**Cause:** QWED SDK dependencies not installed
-
-**Solution:**
-
-```bash
-pip install qwed-mcp[all]
-# or manually:
-pip install sympy z3-solver qwed-legal qwed-finance qwed-ucp
-```
-
----
-
 ## Claude Desktop issues
 
 ### Server not appearing in Claude
@@ -146,7 +132,7 @@ BLOCKED: Unknown MCP tool 'verify_math' is blocked by default. (verification_id=
 
 **Solution:** Tell Claude: *"The verify\_\* tools have been removed. Use execute\_python\_code to write and run a Python verification script."*
 
-See the [migration guide](/mcp/tools#migrating-from-v0-1-x) for the full tool mapping and [governance error codes](/mcp/tools#governance-error-codes) for the complete list of `QWED-MCP-RISK-*` codes.
+See the [migration guide](/mcp/tools#migrating-from-v0-1-x) and [governance error codes](/mcp/tools#governance-error-codes) for the complete list of `QWED-MCP-RISK-*` codes.
 
 ---
 
@@ -166,25 +152,18 @@ See the [migration guide](/mcp/tools#migrating-from-v0-1-x) for the full tool ma
 
 ---
 
-### ModuleNotFoundError in script output
+### "BLOCKED: QWED blocked python execution: Module '...' is not admitted"
 
-**Cause:** The QWED SDK package used in the script is not installed.
+**Cause:** From v0.3.0, `execute_python_code` admits code only when every module, builtin and attribute it uses is on the allowlist. Third-party packages are refused, including SymPy and QWED SDK packages such as `qwed_new`, `qwed_legal`, `qwed_finance` and `qwed_ucp`. Installing the package doesn't change this. The message lists every reason with its line number, for example:
 
-**Solution:** Install the required package:
-
-```bash
-# For legal verification
-pip install qwed-legal
-
-# For finance verification
-pip install qwed-finance
-
-# For commerce verification
-pip install qwed-ucp
-
-# For core engines (math, logic, code, SQL)
-pip install qwed
+```text
+BLOCKED: QWED blocked python execution: Module 'qwed_legal' is not admitted (line 1) (verification_id=...)
 ```
+
+**Solutions:**
+
+1. Rewrite the script with [admitted modules](/mcp/tools#what-code-is-admitted), such as `decimal`, `fractions`, `math`, `statistics` or `itertools`.
+2. To run a QWED guard or engine, call its package from your own Python code instead of through `execute_python_code`.
 
 ---
 
@@ -197,19 +176,33 @@ pip install qwed
 **Solutions:**
 
 1. Start a new conversation
-2. Explicitly tell Claude: *"Use execute\_python\_code instead of verify\_math. Write a Python script that imports sympy to verify the calculation."*
+2. Explicitly tell Claude: *"Use execute\_python\_code instead of verify\_math. Write a Python script with the decimal or fractions module to check the calculation."*
 
-### Scripts fail with import errors
+---
 
-**Cause:** The QWED SDK packages are not installed alongside qwed-mcp.
+## Upgrade issues (v0.2.x to v0.3.0)
 
-**Solution:**
+### Scripts that ran on v0.2.x are refused
+
+**Cause:** v0.3.0 replaced the list of refused names with an allowlist. Code that imports a module outside it (`os`, `pathlib`, `requests`, QWED SDK packages and other third-party packages), calls `open`, `eval`, `getattr` or another refused builtin, or reads a private or special attribute is now refused. A coding declaration other than UTF-8 is refused too.
+
+**Solution:** Read the reasons in the `BLOCKED` message and rewrite the script with [admitted modules and builtins](/mcp/tools#what-code-is-admitted).
+
+### Your code can't import qwed-finance or qwed-ucp
+
+**Cause:** From v0.3.0, installing qwed-mcp no longer installs `qwed-finance` or `qwed-ucp`.
+
+**Solution:** If your own code imports them, install them in your project:
 
 ```bash
-pip install qwed-mcp[all]
+pip install qwed-finance qwed-ucp
 ```
 
-This installs all QWED SDK packages that your scripts can import.
+### The server refuses to start with a skill manifest
+
+**Cause:** From v0.3.0, when `QWED_SKILL_MANIFEST` is set, the startup check refuses a registry that is not one of the built-in trusted domains (`github.com`, `gitlab.com`, `bitbucket.org`, `pypi.org`, `npmjs.com`).
+
+**Solution:** Use a manifest from a trusted registry, or vet the skill in your own code with [`SkillProvenanceGuard`](/mcp/tools#skillprovenanceguard-security) and that registry in `trusted_registries`.
 
 ---
 

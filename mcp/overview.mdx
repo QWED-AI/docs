@@ -2,7 +2,7 @@
 sidebar_position: 1
 title: "QWED MCP: verification for Model Context Protocol"
 sidebarTitle: "MCP overview"
-description: "QWED-MCP is a Model Context Protocol server that runs assistant-written Python scripts using QWED SDK verification libraries with the server's privileges."
+description: "QWED-MCP is a Model Context Protocol server that admits assistant-written Python scripts by allowlist and runs them with the server's privileges."
 ---
 
 **Model Context Protocol (MCP) Server for QWED Verification**
@@ -11,12 +11,12 @@ description: "QWED-MCP is a Model Context Protocol server that runs assistant-wr
  ![Tests](https://github.com/QWED-AI/qwed-mcp/actions/workflows/publish.yml/badge.svg)
  ![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)
 
-QWED-MCP brings deterministic verification to Claude Desktop, VS Code, and any MCP-compatible AI assistant. Instead of trusting LLMs to compute correctly, QWED-MCP runs Python scripts written by the assistant, with access to the QWED SDK verification libraries. All verification runs locally.
+QWED-MCP brings deterministic computation to Claude Desktop, VS Code, and any MCP-compatible AI assistant. Instead of trusting LLMs to compute correctly, QWED-MCP runs Python scripts written by the assistant. From v0.3.0, a script runs only when every module, builtin and attribute it uses is on an allowlist of computation-only standard-library features. All execution is local.
 
-Use QWED-MCP when you want an MCP-compatible assistant to run deterministic checks (math, logic, SQL, code) instead of computing answers itself.
+Use QWED-MCP when you want an MCP-compatible assistant to check a calculation or an argument with a script instead of computing the answer itself.
 
 <Warning>
-  `execute_python_code` runs code in a subprocess **with the server's privileges**. It is not a sandbox. The subprocess gets a restricted set of environment variables, and calls pass through the `RiskBasedExecutionGateway`, but only enable code execution where you trust the inputs.
+  `execute_python_code` runs admitted code in a subprocess **with the server's privileges**. It is not a sandbox. The subprocess gets a restricted set of environment variables, and calls pass through the `RiskBasedExecutionGateway`, but only enable code execution where you trust the inputs.
 </Warning>
 
 ---
@@ -34,16 +34,15 @@ LLMs are unreliable for:
 
 ### The solution
 
-QWED-MCP exposes **deterministic verification** to AI assistants through a single `execute_python_code` tool. The LLM writes a Python script that imports the appropriate QWED SDK, and the MCP server runs it in a subprocess with restricted environment variables and the server's privileges.
+QWED-MCP gives AI assistants a single `execute_python_code` tool. The LLM writes a Python script, the server admits it only if it stays within the [allowlist](/mcp/tools#what-code-is-admitted), and then runs it in a subprocess with restricted environment variables and the server's privileges.
 
 | Without QWED-MCP | With QWED-MCP |
 | --- | --- |
-| LLM-only math → approximated by the model | Script calls the QWED math engine → result computed by SymPy |
-| LLM-only SQL → unchecked for injection | Script calls the QWED SQL analyzer → known injection patterns flagged |
-| LLM-only reasoning → unchecked | Script calls Z3 via the SDK → the formal statement is checked; the result can also be inconclusive |
-| LLM-only code → unchecked | Script runs an AST check → dangerous patterns flagged |
+| LLM-only math → approximated by the model | Script computes with `decimal` or `fractions` → exact arithmetic |
+| LLM-only reasoning → unchecked | Script checks a propositional argument over every truth assignment with `itertools.product` |
+| LLM-only statistics → approximated | Script computes with the `statistics` module |
 
-What a run checks depends entirely on which QWED SDK calls the script makes: executing a script is not itself verification. The formal statement is only as good as the script the assistant wrote, so review it. See [qwedai.tech/limits](https://qwedai.tech/limits).
+From v0.3.0, scripts can't import third-party packages, so SymPy, Z3 and the QWED SDK packages are not available to them. Executing a script is not itself verification: what a run checks depends entirely on the script the assistant wrote, so review it. See [qwedai.tech/limits](https://qwedai.tech/limits).
 
 ---
 
@@ -63,23 +62,21 @@ What a run checks depends entirely on which QWED SDK calls the script makes: exe
             │       (JSON-RPC over stdio)     │
             ▼                                 ▼
 ┌──────────────────────────────────────────────────────────────┐
-│                     QWED-MCP Server (v0.2.0)                 │
+│                     QWED-MCP Server (v0.3.0)                 │
 ├──────────────────────────────────────────────────────────────┤
 │                                                              │
 │  ┌────────────────────────────────────────────────────────┐  │
 │  │          RiskBasedExecutionGateway                     │  │
 │  │  └─► Policy lookup → Argument validation →            │  │
-│  │      Code safety (AST) → Admin policy enforcement     │  │
+│  │      Allowlist admission → Admin policy enforcement   │  │
 │  ├────────────────────────────────────────────────────────┤  │
 │  │              execute_python_code                       │  │
 │  │  ├─► Synchronous Execution (30s timeout)               │  │
 │  │  └─► Background Execution (background=true)            │  │
 │  │       └─► Async Job Queue (up to 5 concurrent)         │  │
-│  │           └─► Native QWED library execution            │  │
-│  │               ├── qwed_new (math, logic, code, SQL)    │  │
-│  │               ├── qwed_legal (deadlines, citations,..) │  │
-│  │               ├── qwed_finance (banking, ISO 20022)    │  │
-│  │               └── qwed_ucp (commerce verification)     │  │
+│  │           └─► python -I subprocess                     │  │
+│  │               └── admitted standard-library modules    │  │
+│  │                   (math, decimal, fractions, ...)      │  │
 │  ├────────────────────────────────────────────────────────┤  │
 │  │              verification_status                       │  │
 │  │  └─► Poll background job results by job_id             │  │
@@ -94,10 +91,10 @@ What a run checks depends entirely on which QWED SDK calls the script makes: exe
 
 | Tool | Description | Use case |
 | --- | --- | --- |
-| [`execute_python_code`](/mcp/tools#execute_python_code) | Subprocess execution | The primary entry point for all QWED capabilities. Executes dynamically generated Python code with access to all QWED SDK libraries. Supports optional `background=true` for async execution. |
+| [`execute_python_code`](/mcp/tools#execute_python_code) | Subprocess execution | Runs dynamically generated Python code after the [allowlist admission check](/mcp/tools#what-code-is-admitted). Supports optional `background=true` for async execution. |
 | [`verification_status`](/mcp/tools#verification_status) | Job status polling | Check the status and results of background verification jobs dispatched via `execute_python_code` with `background=true`. |
 
-All tool calls pass through the [`RiskBasedExecutionGateway`](/mcp/tools#riskbasedexecutiongateway-governance) before dispatch. The gateway validates arguments, runs code safety analysis, and enforces admin policy. The gateway blocks unknown tools by default.
+All tool calls pass through the [`RiskBasedExecutionGateway`](/mcp/tools#riskbasedexecutiongateway-governance) before dispatch. The gateway validates arguments, runs the allowlist admission check, and enforces admin policy. The gateway blocks unknown tools by default.
 
 <Info>
   In v0.1.x, QWED-MCP exposed individual tools like `verify_math`, `verify_logic`, `verify_code`, and `verify_sql`. These were consolidated into `execute_python_code` in v0.2.0 to solve context bloat (RFC-9728 compatibility). See [migration guide](/mcp/tools#migrating-from-v0-1-x).
@@ -115,6 +112,8 @@ pip install qwed-mcp
 
 qwed-mcp 0.2.3 and later require Python 3.10 or later and the MCP Python SDK `mcp>=1.30.0,<2`. MCP SDK 2.x removed the server API that qwed-mcp uses, so pip keeps the SDK on 1.x.
 
+From v0.3.0, qwed-mcp no longer installs `qwed-finance` or `qwed-ucp`, and no longer declares `httpx` directly (`mcp` still installs it). If your own code imports any of them, add them to your own project's dependencies.
+
 ### From source
 
 ```bash
@@ -128,7 +127,7 @@ pip install -e .
 ```bash
 pip show qwed-mcp
 # Name: qwed-mcp
-# Version: 0.2.3
+# Version: 0.3.0
 ```
 
 The `qwed-mcp` command starts the server over stdio and has no `--version` flag.
@@ -211,9 +210,8 @@ async def main():
                 "execute_python_code",
                 arguments={
                     "code": (
-                        "from sympy import symbols, diff\n"
-                        "x = symbols('x')\n"
-                        "print(f'd/dx(x^3) = {diff(x**3, x)}')"
+                        "from fractions import Fraction\n"
+                        "print(Fraction(1, 3) + Fraction(1, 6))"
                     )
                 }
             )
@@ -276,49 +274,29 @@ Claude: Let me verify this calculation.
 
 ### 2. Research validation
 
-Ensure scientific claims are logically valid:
+Check that a conclusion follows from its premises:
 
 ```text
 User: If all mammals are warm-blooded, and dolphins are mammals,
       are dolphins warm-blooded?
 
-Claude: [Calls execute_python_code with a Z3 solver script]
-        
-        STDOUT: The conclusion logically follows from the premises.
-        ✅ Verified via Z3 SMT solver.
+Claude: [Calls execute_python_code with a script that checks every
+         true/false assignment with itertools.product]
+
+        STDOUT: valid: True
 ```
 
-### 3. Secure coding
+### 3. Refused code
 
-Check AI-generated code for security issues:
-
-```text
-User: Write a function to execute user commands
-
-Claude: def run_command(cmd):
-            os.system(cmd)
-        
-        [Calls execute_python_code with a CodeGuard script]
-        
-        STDOUT: Verified: False
-          - Dangerous pattern: os.system
-        
-        ⚠️ Security issue detected. Here's a safer alternative...
-```
-
-### 4. SQL security
-
-Check generated queries for SQL injection patterns:
+Code that reaches outside the allowlist is refused before it runs:
 
 ```text
-User: Generate a query to find user "admin' OR '1'='1"
+User: Run this: import os; print(os.listdir("."))
 
-Claude: [Calls execute_python_code with a SQLGuard script]
-        
-        STDOUT: Verified: False
-          - SQL injection pattern detected
-        
-        ❌ Injection detected. Use parameterized queries instead.
+Claude: [Calls execute_python_code]
+
+        BLOCKED: QWED blocked python execution: Module 'os' is not
+        admitted (line 1) (verification_id=...)
 ```
 
 ---
