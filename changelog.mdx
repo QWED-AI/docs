@@ -11,14 +11,14 @@ Jump to: [Maths expressions without a claim](#qwed-verification-—-maths-expres
 
 ## QWED Verification — maths expressions without an equals sign are not verified
 
-**Unreleased** · [GitHub PR #603](https://github.com/QWED-AI/qwed-verification/pull/603) · [GitHub PR #612](https://github.com/QWED-AI/qwed-verification/pull/612)
+**Released in v10.0.0 (November 14, 2026)** · [GitHub PR #603](https://github.com/QWED-AI/qwed-verification/pull/603) · [GitHub PR #612](https://github.com/QWED-AI/qwed-verification/pull/612)
 
 An expression without `=` states no claim. `POST /verify/math` returned `VERIFIED · ADMIT` for it and stored the audit row as verified, although nothing was checked against a claim.
 
 ### What changed
 
 - **No claim, no verdict.** `POST /verify/math` with an expression without `=` (`2+2`, `x + x`) returns `UNVERIFIABLE` with admission `BLOCKED`, `is_valid: false` and `constraint_id: "math.no_claim"`. It has no `proof_ref` or attestation, and its audit row is not verified. The computed `value`, `exact_value` and `simplified` stay in the response as evidence. `2+2 = 4` is still `VERIFIED · ADMIT`.
-- **Route and batch agree.** A `/verify/batch` maths item without `=` gets the same verdict as the route. Division by zero, undefined and ambiguous input (`1/0`, `oo`, `6/2(1+2)`) is `BLOCKED` as a batch item too, where it was `UNVERIFIABLE`.
+- **Route and batch agree.** A `/verify/batch` maths item without `=` was already `UNVERIFIABLE` in v9.1.0, so only the route's verdict changes. What changes for batch items is that division by zero, undefined and ambiguous input without `=` (`1/0`, `oo`, `6/2(1+2)`) is now `BLOCKED`, as on the route, where it was `UNVERIFIABLE`.
 - **Large values.** A value past the float range, such as `1e400`, no longer makes `/verify/math` answer 500. The response leaves out `value` and carries the number as a string in `exact_value`.
 - **Names ending in a digit.** `x2(3)` without `=` is refused as an unknown function, as it already was with `=`. It was read as `x2*3`. `atan2(1, 1)` without `=` now parses.
 - **Out of memory while parsing.** A maths job that runs out of memory while the parser runs, under `QWED_MATH_WORKER_MEMORY_MB` (Linux only), is `BLOCKED` with `math.out_of_memory` on `/verify/math` and as a batch item. It was `math.parse_error`, and the worker kept taking jobs. That worker process now ends, so the next job goes to a new worker. Input the parser refuses is still `math.parse_error`. [GitHub PR #612](https://github.com/QWED-AI/qwed-verification/pull/612)

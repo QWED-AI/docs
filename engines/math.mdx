@@ -59,6 +59,8 @@ result = client.verify_math("15% of 200 = 30")
 
 #### Expressions without a claim
 
+<Info>Changed in v10.0.0</Info>
+
 An expression without `=` states no claim, so there is nothing to verify. `POST /verify/math` and batch math items return `UNVERIFIABLE` with admission `BLOCKED`, `is_valid: false` and `constraint_id: "math.no_claim"`. The value SymPy computed stays in the response as evidence: `value` and `exact_value` for a number, `simplified` for a symbolic result. To have the value checked, send `expression = value`.
 
 | Input | Verdict | Evidence |
@@ -161,7 +163,7 @@ The same refusal covers a name starting with `d` that SymPy splits into letters,
 
 <Info>Changed in v9.0.0</Info>
 
-Input the parser refuses is `BLOCKED` with `constraint_id: "math.parse_error"` and the message `Expression could not be parsed`, as SQL and schema parse errors are. Leibniz notation gets the `diff(f, x)` message instead. The parser's own error text is not returned. Before v9.0.0, such input returned `BLOCKED` with `api.math.execution_error` and `Internal verification error`. A `/verify/batch` math item the parser refuses gets the same `BLOCKED` result instead of a failed item. A job that runs out of memory while the parser runs, under the worker memory limit (`QWED_MATH_WORKER_MEMORY_MB`, Linux only), is `BLOCKED` with `math.out_of_memory`, not `math.parse_error`, and that worker process ends.
+Input the parser refuses is `BLOCKED` with `constraint_id: "math.parse_error"` and the message `Expression could not be parsed`, as SQL and schema parse errors are. Leibniz notation gets the `diff(f, x)` message instead. The parser's own error text is not returned. Before v9.0.0, such input returned `BLOCKED` with `api.math.execution_error` and `Internal verification error`. A `/verify/batch` math item the parser refuses gets the same `BLOCKED` result instead of a failed item. From v10.0.0, a job that runs out of memory while the parser runs, under the worker memory limit (`QWED_MATH_WORKER_MEMORY_MB`, Linux only), is `BLOCKED` with `math.out_of_memory`, not `math.parse_error`, and that worker process ends.
 
 ### 4. Integrals
 
