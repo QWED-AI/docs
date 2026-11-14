@@ -10,7 +10,7 @@ description: "QWED Infra applies formal verification to infrastructure as code â
 ![Verified by QWED](https://img.shields.io/badge/Verified_by-QWED-00C853?style=flat&logo=checkmarx)
 ![PyPI](https://img.shields.io/pypi/v/qwed-infra?color=blue)
 
-`qwed-infra` is a Python library (v0.3.0) that mathematically proves the security and compliance of infrastructure definitions (Terraform, AWS IAM, Kubernetes). It uses **formal methods (Z3 solver)**, **graph theory**, and **deterministic arithmetic** to do so without ML, heuristics, or confidence scores.
+`qwed-infra` is a Python library (v0.4.0) that mathematically proves the security and compliance of infrastructure definitions (Terraform, AWS IAM, Kubernetes). It uses **formal methods (Z3 solver)**, **graph theory**, and **deterministic arithmetic** to do so without ML, heuristics, or confidence scores.
 
 It prevents AI agents (like Devin or Copilot Workspace) from deploying insecure, non-compliant, or expensive infrastructure by verifying configuration *before* deployment.
 
@@ -44,7 +44,7 @@ graph TD
 Verifies AWS IAM policies using the **Z3 theorem prover**. Converts policies into first-order logic formulas to prove or disprove access, wildcard expansion, condition evaluation, and deny precedence.
 
 ### NetworkGuard
-Verifies network reachability using **graph theory** (NetworkX). Validates paths like `Internet -> Internet Gateway (IGW) -> Route -> Security Group -> Instance`. Fail-closed on NAT gateways, VPC peering, NACLs, and Transit Gateway.
+Verifies network reachability using **graph theory** (NetworkX). Validates paths like `Internet -> Internet Gateway (IGW) -> Route -> Security Group -> Instance`. From v0.4.0 it models an explicit set of keys and route targets and returns `UNVERIFIABLE` for anything else, including NAT gateways, VPC peering, NACLs and Transit Gateway.
 
 ### CostGuard
 Deterministic cloud cost estimation using **Decimal arithmetic** (no floating-point rounding errors). Enforce budgets and detect expensive instance types before deployment.
@@ -73,7 +73,7 @@ The document is fail-closed by construction. `ADMIT` requires a `VERIFIED` resul
 Install with a minimum version:
 
 ```bash
-pip install "qwed-infra>=0.3.0"
+pip install "qwed-infra>=0.4.0"
 ```
 
-v0.3.0 adds runtime dependencies `pyjwt` and `cryptography` for attestation signing and validation.
+v0.3.0 added runtime dependencies `pyjwt` and `cryptography` for attestation signing and validation. v0.4.0 refuses more input as unmodelled and replaces `CostGuard.PRICING_CATALOG`; see the [v0.4.0 upgrade notes](/changelog#qwed-infra-v0-4-0-â€”-fail-closed-iam-network-cost-and-release-checks) before you upgrade.

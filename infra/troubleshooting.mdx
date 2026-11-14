@@ -13,19 +13,19 @@ description: "Fix common QWED Infra issues: Z3 solver errors, Terraform parsing 
 
 ### 2. Terraform parsing failures
 
-**Error:** `ParseError` **Cause:** Syntax error in `.tf` files or unsupported HCL features (e.g., complex modules or dynamic blocks not yet supported). **Fix:** Validate your terraform code with `terraform validate`. The parser fails closed — it raises `ParseError` with a full error list rather than silently skipping problematic blocks.
+**Error:** `ParseError` **Cause:** Syntax error in `.tf` files, a directory with no `.tf` files, or input the parser refuses: `.tf.json` files, Terraform override files, module calls, an unmodelled resource that may grant access, or template directives in a policy document. See [TerraformParser and unmodelled declarations](/infra/guards#terraformparser-and-unmodelled-declarations). **Fix:** Validate your terraform code with `terraform validate`. The parser fails closed — it raises `ParseError` with a full error list rather than silently skipping problematic blocks.
 
 ### 3. Missing pricing data
 
-**Error:** `CostEstimate.has_unknown_types=True` or `CostEstimate.within_budget=False` with unknown types. **Cause:** Instance or volume type not in the embedded static catalog. **Fix:** Update `qwed-infra` or check `CostGuard.PRICING_CATALOG` to verify coverage. Unknown types always produce a `BLOCKED` diagnostic — never a silent zero-cost estimate.
+**Error:** `CostEstimate.has_unknown_types=True` or `CostEstimate.within_budget=False` with unknown types. **Cause:** An instance or volume type not in the embedded static catalog, provisioned IOPS or throughput the catalog can't price, an invalid `count` or `size_gb`, or an entry in the model's `unmodelled` list (for example an `aws_instance` without `root_block_device`). The `reason` names each one. **Fix:** Update `qwed-infra` or check `CostGuard.INSTANCE_PRICING` and `CostGuard.VOLUME_PRICING` (which replace `CostGuard.PRICING_CATALOG` from v0.4.0) to verify coverage. Declare `root_block_device` with a size and type so the root volume can be priced. Unknown types and unmodelled declarations always produce a `BLOCKED` diagnostic — never a silent zero-cost estimate.
 
 ### 4. NetworkGuard unsupported topology
 
-**Error:** `ComputedPath.unsupported_topology=True` **Cause:** The topology contains NAT Gateways, VPC Peering, NACLs, or Transit Gateway — constructs the guard cannot model deterministically. **Fix:** Restructure the network to avoid these constructs, or implement a manual review gate for those topologies. The guard returns `UNVERIFIABLE` (not a silent pass).
+**Error:** `ComputedPath.unsupported_topology=True` **Cause:** The topology uses a key, route target or rule field outside the [modelled topology](/infra/guards#modelled-topology), such as NAT Gateways, VPC Peering, NACLs, Transit Gateway or protocol-scoped rules, or an input the guard refuses, such as a duplicate subnet id or an invalid port. `reason` names what was refused. **Fix:** Restructure the network to avoid these constructs, or implement a manual review gate for those topologies. The guard returns `UNVERIFIABLE` (not a silent pass).
 
 ### 5. ArtifactBoundaryGuard blocks with unknown boundary
 
-**Error:** `ArtifactBoundaryFinding.finding_type="unknown_boundary"` **Cause:** Missing or invalid `[tool.hatch.build.targets.wheel]` in `pyproject.toml`, or no TOML parser available. **Fix:** Add an explicit wheel packages configuration to your `pyproject.toml`. Install `tomli` for Python &lt;3.11.
+**Error:** `ArtifactBoundaryFinding.finding_type="unknown_boundary"` **Cause:** Missing or invalid `[tool.hatch.build.targets.wheel]` in `pyproject.toml`, a hatchling input the guard doesn't model (see [Hatchling inputs](/infra/guards#hatchling-inputs)), or no TOML parser available. **Fix:** Add an explicit wheel packages configuration to your `pyproject.toml`, and remove the unmodelled input named in the finding's `reason`. Install `tomli` for Python &lt;3.11.
 
 ### 6. Diagnostic serialization errors
 
