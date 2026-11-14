@@ -27,7 +27,7 @@ print(result.attestation)  # the signed JWT
 print(result.admission)    # "ADMIT" or "BLOCKED", on routes that decide one
 ```
 
-The maths, code, SQL, and natural-language routes, the agent route, and their batch items decide an admission, and their tokens sign it as `qwed.admission`. Routes that decide none (logic, fact, stats, image, RAG, process, consensus) sign none.
+The maths, code, SQL, natural-language, and logic routes, the agent route, and their batch items decide an admission, and their tokens sign it as `qwed.admission`. Routes that decide none (fact, stats, image, RAG, process, consensus) sign none.
 
 A [Verification Context](/specs/verification-context#version-1-1-and-the-issuer-attestation) document carries its own attestation, of type `qwed-context+jwt`, which signs every other field of the document. Verify it with `verify_document_attestation()`, described on the [Python SDK](/sdks/python#verification-context) page.
 
@@ -63,7 +63,7 @@ Treat a missing attestation, or one that doesn't verify, as a refusal. Never act
 - The issuer, and that the token has not expired (nor is used before any `nbf`).
 - That it attests a `VERIFIED` result.
 - That its `qwed.proof_hash` is the answer's `proof_ref`, so it's this answer's token.
-- When you pass `query`, that its `qwed.query_hash` is the SHA-256 of that statement. For a natural-language answer, pass the translated expression the answer reports (`translated_expression` in its developer fields), not your question: the verdict covers that expression.
+- When you pass `query`, that its `qwed.query_hash` is the SHA-256 of that statement. For a natural-language or logic answer, pass the translated expression the answer reports (`translated_expression` in its developer fields), not your question: the verdict covers that expression. For a logic answer, that's the DSL after a `(VAR name Sort)` for each variable.
 - On a route that decides an admission, that the token signs the answer's `admission`.
 
 If no cached key verifies the token, the client fetches the keys once more, at most once every 30 seconds, to pick up a rotated key. If it can't fetch them, it raises `KeysUnavailableError`, a subclass of `AttestationError`. `KeyMismatchError` means no key in the JWKS verifies the token.

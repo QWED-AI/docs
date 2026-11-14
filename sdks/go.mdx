@@ -92,7 +92,7 @@ Use `IsAdmitted()` to decide whether to act on a result. Don't gate on `Status` 
 - `Status` is `StatusVerified`
 - `ProofRef` is non-empty
 
-A missing or unknown admission is never admitted. Endpoints that make no admission decision (`/verify/logic`, `/verify/fact`, `/verify/rag`, `/verify/process`, and batch logic and fact items) are therefore never admitted. The top-level `verified` that `/verify/rag` and `/verify/process` send is their guard's own result. It stays in `Extra["verified"]` and `DeveloperFields["verified"]`.
+A missing or unknown admission is never admitted. Endpoints that make no admission decision (`/verify/fact`, `/verify/rag`, `/verify/process`, and batch fact items) are therefore never admitted. `/verify/logic` and batch logic items return admission `BLOCKED` while the translation of the query is unverified, so they are not admitted either. The top-level `verified` that `/verify/rag` and `/verify/process` send is their guard's own result. It stays in `Extra["verified"]` and `DeveloperFields["verified"]`.
 
 ```go
 result, err := client.VerifyCode(ctx, code, "python")
@@ -144,7 +144,8 @@ result, err := client.VerifyLogic(ctx, "(AND (GT x 5) (LT y 10))")
 if err != nil {
     log.Fatal(err)
 }
-// /verify/logic makes no admission decision: Admission is "" and IsAdmitted() is false.
+// /verify/logic returns Admission "BLOCKED" while the translation is unverified,
+// so IsAdmitted() is false even when Status is VERIFIED.
 fmt.Println(result.Status, result.Extra["model"])
 ```
 

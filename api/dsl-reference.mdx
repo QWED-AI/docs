@@ -154,7 +154,7 @@ False
 
 ### Variable sorts
 
-Variables are `Int`, `Real`, or `Bool`. An undeclared variable is an `Int`. Declare other sorts in the `variables` argument of `DSLLogicVerifier.verify_from_dsl()`, for example `variables=[{"name": "flag", "type": "Bool"}]`. On `POST /verify/logic` the query is natural language, and the translator declares the variables it emits. A `(VAR flag Bool)` form inside a larger expression does not compile, even though the compiler's error message suggests it.
+Variables are `Int`, `Real`, or `Bool`. An undeclared variable is an `Int`. Declare other sorts in the `variables` argument of `DSLLogicVerifier.verify_from_dsl()`, for example `variables=[{"name": "flag", "type": "Bool"}]`. On `POST /verify/logic` the query is natural language, and the translator declares the variables it emits. A `(VAR flag Bool)` form inside a larger expression does not compile, even though the compiler's error message suggests it. A program that only declares variables states no constraint: `verify_from_dsl()` returns `BLOCKED` with `dsl_logic_verifier.no_constraint`, not `SAT`.
 
 ```python
 from qwed_new.core.dsl_logic_verifier import DSLLogicVerifier
@@ -287,7 +287,7 @@ else:
     raise RuntimeError(f"Logic verification failed ({result.status}): {result.error}")
 ```
 
-The table above is the DSL verdict, which `DSLLogicVerifier.verify_from_dsl()` returns as is. `POST /verify/logic`, and so `client.verify_logic()`, maps it: `SAT` is `VERIFIED` with the model as evidence, `UNSAT` is `UNVERIFIABLE`, and anything else is `BLOCKED`. The route makes no admission decision, so the Python SDK's `is_verified` stays `False`; read `status` and the model.
+The table above is the DSL verdict, which `DSLLogicVerifier.verify_from_dsl()` returns as is. `POST /verify/logic`, and so `client.verify_logic()`, maps it: `SAT` is `VERIFIED` with the model as evidence, `UNSAT` is `UNVERIFIABLE`, and anything else is `BLOCKED`. The route's admission is `BLOCKED`, because an LLM wrote the constraints and nothing checks that they mean your question, so the Python SDK's `is_verified` stays `False`. A `VERIFIED` status means the translated constraints are satisfiable, not that your question is answered. See [Admission on the logic route](/engines/logic#admission-on-the-logic-route).
 
 ---
 
