@@ -40,8 +40,11 @@ from qwed_sdk.langchain import QWEDTool
 
 tool = QWEDTool(api_key="qwed_...")
 print(tool.run("2+2=4"))
-# ✅ VERIFIED: The statement is correct
+# ⚠️ HOLDS, NOT ADMITTED: the claim holds for the translated expression ..., but it was
+# translated from your query by an LLM, and that translation is not verified.
 ```
+
+From v10.0.0, `QWEDTool` reports this way. It sends the query to `/verify/natural_language`, which doesn't admit a result while the LLM translation of the query is unverified. So the tool reports what holds or fails for the translated expression instead of `✅ VERIFIED`. A false claim is `❌ INCORRECT` with the calculated value when the server sends one.
 
 ### Specialized tools
 
@@ -55,6 +58,8 @@ tools = [
 ]
 ```
 
+From v10.0.0, the tools call a result incorrect or unsafe only when QWED decided it. An `UNVERIFIABLE` or `BLOCKED` result, such as input that doesn't parse, a timeout or a server the client could not reach, returns its status and the server's message, for example `⚠️ UNVERIFIABLE: ...` or `⛔ BLOCKED: ...`. `QWEDCodeTool` lists the issues the server reports for unsafe code (`- CRITICAL: ...`). A tool answer starts with `✅` only when the server admitted the result.
+
 ### QWEDVerificationCallback
 
 Auto-verify all LLM outputs:
@@ -66,7 +71,10 @@ from qwed_sdk.langchain import QWEDVerificationCallback
 callback = QWEDVerificationCallback(
     verify_math=True,
     verify_code=True,
+    verify_sql=True,
     log_results=True,
+    sql_schema_ddl="CREATE TABLE users (id INT, name TEXT)",
+    sql_dialect="sqlite",
 )
 
 chain = LLMChain(
@@ -78,6 +86,19 @@ chain = LLMChain(
 result = chain.run("Calculate 15% of 200")
 # [QWED] ✅ MATH: verified=True
 ```
+
+<Info>
+New in v10.0.0: `sql_schema_ddl`, `sql_dialect` and the checks below. In 9.x, the callback takes no SQL schema.
+</Info>
+
+The callback checks what it recognises in each output:
+
+- **Fenced blocks.** Every fenced block is checked. A block tagged `sql` or a SQL dialect (`postgresql`, `postgres`, `pgsql`, `mysql`, `sqlite`, `tsql`, `plsql`) is checked as SQL, in `sql_dialect`. A block with another tag is checked as code in that language. An untagged block that starts with a SQL statement gets both checks, and a check that can't parse it doesn't count when the other check parsed it. Any other untagged block is checked as Python.
+- **SQL needs a schema.** `/verify/sql` checks a query against the tables it runs on. Pass their `CREATE TABLE` statements as `sql_schema_ddl`; `sql_dialect` defaults to `sqlite`. Without a schema, the callback sends no SQL and records each SQL check as `UNVERIFIABLE`.
+- **SQL outside a fenced block** that the callback recognises as a statement is recorded as `UNVERIFIABLE` when `verify_sql=True`, because the callback can't tell where it starts and ends. So is SQL in a code block when `verify_code=False`.
+- **A check that raises,** for example when the server can't be reached, is recorded as `UNVERIFIABLE` with the exception type. It doesn't interrupt the LangChain run.
+
+Each SQL or code record has `verified` and the route's `status`. A code record's `vulnerabilities` is the number of `issues` the route sent. `get_summary()` counts an output as verified only when at least one check ran on it and every check verified it. Claims in prose that the callback doesn't recognise aren't checked, so a verified output is one whose checks all passed, not one checked in full.
 
 ### QWEDVerifiedChain
 
