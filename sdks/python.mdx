@@ -191,11 +191,12 @@ result = client.verify_consensus(
     mode="high",
     min_confidence=0.8
 )
-print(result.is_verified)                 # True
-print(result.result["meets_requirement"])  # True
+print(result.status)                      # "BLOCKED": only SymPy verified the answer
+print(result.is_verified)                 # False
+print(result.result["meets_requirement"])  # False
 ```
 
-`verify_consensus` takes `status` from the server's response. `is_verified` is `True` only when the server returns `meets_requirement` exactly `True`, which it sets only for a `VERIFIED` result that meets `min_confidence`. A truthy value that is not `True` admits nothing.
+`verify_consensus` takes `status` from the server's response. `is_verified` is `True` only when the server returns `meets_requirement` exactly `True`. A truthy value that is not `True` admits nothing. From v10.0.0, the server sets `meets_requirement` only for a result that is `VERIFIED` with `is_valid` true, not reached on a model's translation of the query, and that meets `min_confidence`. A consensus is reached on the model's translation of the query and has no `is_valid`, so `is_verified` is `False` for every consensus. An answer that only one engine verified, as in `single` mode, is `BLOCKED`. See [Consensus engine](/engines/consensus).
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|

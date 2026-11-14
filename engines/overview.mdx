@@ -104,7 +104,7 @@ Advisory engines run **structured heuristic analysis** on inputs where a formal 
 | [Graph](/engines/graph) | Full-support triple match → `VERIFIED` | NLI fallback → `advisory_checks` |
 | [Image](/engines/image) | Pixel/metadata evidence → `VERIFIED` with `proof_ref` | VLM cross-check → `UNVERIFIABLE` with advisory checks |
 | [Reasoning](/engines/reasoning) | — | LLM providers and heuristics are advisory; no provider → `UNVERIFIABLE` |
-| [Consensus](/engines/consensus) | Preserves engine-level `BLOCKED` / `UNVERIFIABLE` / `VERIFIED` | Non-unanimous agreement stays advisory |
+| [Consensus](/engines/consensus) | Preserves engine-level `BLOCKED` / `UNVERIFIABLE` / `VERIFIED`; `VERIFIED` needs two distinct engines that verified the answer | Non-unanimous agreement stays advisory; one engine's verdict alone is `BLOCKED` (from v10.0.0) |
 
 Some engines in this tier are **hybrid**: a deterministic sub-path (for example, an Image pixel check or a Graph full-triple match) can still emit `VERIFIED` with a `proof_ref` or `BLOCKED` on a refutation. Only the heuristic or model fallback path is strictly advisory. The Fact engine is the exception: its deterministic path is heuristic TF-IDF analysis, so even a `SUPPORTED` verdict is capped at `UNVERIFIABLE`. Consensus is a status-preserving aggregator: it never invents a `VERIFIED` from disagreement, and math-translation failures fail closed.
 

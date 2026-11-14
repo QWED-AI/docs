@@ -484,6 +484,8 @@ Each entry includes `verdict`, the verdict stored in the row's result, `admissio
 | `verifier_version` | The QWED server version that wrote the row. `null` for rows written before QWED recorded it |
 | `latency_ms` | Whole milliseconds from the start of the HTTP request to when QWED began writing the audit row, before it waits for the append lock. It includes the verifier, any LLM call, and everything else before that point. QWED measures it itself and never reads it from the verifier's or caller's result. `null` for rows written outside an HTTP request and for rows written before QWED recorded it |
 
+From v10.0.0, `/verify/stats`, `/verify/fact`, `/verify/code`, `/verify/math`, `/verify/sql`, `/verify/image`, `/verify/rag`, `/verify/process`, `/verify/consensus`, and fact, SQL, maths and code items of `/verify/batch` set `is_verified` by one rule: the result is `VERIFIED`, its `is_valid` is `true`, and it wasn't reached on a model's translation of the question. Batch items also need a `proof_ref`. Natural-language and logic results, the agent route and their batch items set it from the admission. In v9.1.0 and earlier, several of these routes stored any `VERIFIED` result as verified, including SQL proven unsafe.
+
 The entry hash covers `admission`, `api_key_id`, `verifier_version`, and `latency_ms`. Changing or clearing any of them on a stored row fails [integrity verification](/api/endpoints#get-%2Fadmin%2Fcompliance%2Fverify%2F).
 
 <Warning>

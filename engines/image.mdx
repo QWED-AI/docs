@@ -9,7 +9,7 @@ The Image Engine verifies claims about images using **deterministic methods firs
 ## Features
 
 - **Metadata extraction** — dimensions and format (PNG, JPEG, GIF, WebP)
-- **Size verification** — exact dimension comparison from metadata
+- **Size verification** — exact comparison of a plain size claim with the dimensions in the metadata
 - **Claim classification** — routes claims to the appropriate verifier
 - **Advisory VLM cross-check** — optional model fallback for semantic claims
 
@@ -31,11 +31,23 @@ print(result.is_verified) # True
 print(result.result["developer_fields"]["analysis"]["metadata"])  # {"width": 800, "height": 600, "format": "png"}
 ```
 
+## Size claims
+
+<Info>Changed in v10.0.0</Info>
+
+The engine decides a size claim only when the whole claim is a plain statement of the width, the height or both. For example, `800x600`, `The image is 800x600 pixels`, `the width is 800`, `the image has a height of 600 pixels` and `The image is 800 pixels wide and 600 pixels tall` are all read. A unit (`px`, `pixels`) is optional. The engine checks every dimension the claim names:
+
+- Every named dimension matches: `VERIFIED`, with a `proof_ref` that binds the claim and the image's SHA-256.
+- A named dimension doesn't match: `BLOCKED`.
+- Anything else is `UNVERIFIABLE`: a negation (`The resolution is not HD`), a comparison (`at least 1920x1080`), a claim that says more than the dimensions (`This 800x600 image shows the signed contract`), or an image whose dimensions can't be read.
+
+`HD` is a convention, not a measurement, so the engine doesn't check it. In v9.1.0 and earlier, the engine took the first dimension it found anywhere in a claim, so a negation, a claim with a right width and a wrong height, or a claim that named the dimensions among other statements could be `VERIFIED`.
+
 ## Claim types
 
 | Claim Type      | Method           | Deterministic? |
 | --------------- | ---------------- | -------------- |
-| Size/Dimensions | Metadata parsing | ✅ 100%         |
+| Size/Dimensions | Metadata parsing | ✅ Plain statements of width, height or both |
 | Format          | Header detection | ✅ 100%         |
 | Color           | Pixel sampling   | ⚠️ Partial     |
 | Text            | OCR required     | ❌ VLM          |

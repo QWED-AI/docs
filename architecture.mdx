@@ -62,7 +62,7 @@ Verification engines are grouped into three tiers with distinct output guarantee
 | Schema / Stats / Taint | Structural and data-flow proofs |
 | Graph / Image | Hybrid — deterministic paths can emit `VERIFIED` with a `proof_ref`; LLM/VLM fallbacks are advisory |
 | Fact / Reasoning | Advisory analysis (never `VERIFIED`) |
-| Consensus | Status-preserving aggregator — `VERIFIED` only on unanimous engine outcomes |
+| Consensus | Status-preserving aggregator — `VERIFIED` only when two distinct engines verify the same answer; one engine's verdict alone is `BLOCKED` (from v10.0.0) |
 
 ### 4) Agent security guards
 
