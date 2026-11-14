@@ -183,6 +183,7 @@ Argument scanning additionally decodes bounded base64 tokens (7 or more alphabet
 | Tool call list | `{"tool_calls": [...]}`, including OpenAI `{"function": {"name", "arguments"}}` wrappers |
 | Chat Completions | `{"choices": [{"message": {"tool_calls": [...]}}]}` |
 | Anthropic content blocks | `{"content": [{"type": "tool_use", "name": ..., "input": ...}]}` |
+| Responses API object (v0.6.2 and later) | `{"object": "response", "output": [{"type": "function_call", ...}, ...]}`. Each call item in `output[]` is checked on its own |
 
 The `type` match is case-insensitive, so a `Tool_Use` block is treated as a tool call. JSON-encoded argument strings are parsed before blocklist and dangerous-pattern checks run, so a call cannot hide arguments inside a string.
 
@@ -203,7 +204,7 @@ Since v0.6.1, `ToolGuard` treats Responses API items that ask your client to run
 
 `ToolGuard` also joins `local_shell` argv lists into a single command line before pattern scanning. This normalization applies to direct items, `output[]` members of a response object, `tool_calls[]` entries, and the streaming middleware, in both the Python and TypeScript packages.
 
-Provider-hosted items (`web_search_call`, `file_search_call`, `code_interpreter_call`, `image_generation_call`, and `mcp_call`) run on the provider side before the response returns. `ToolGuard` keeps their existing behavior.
+Provider-hosted items (`web_search_call`, `file_search_call`, `code_interpreter_call`, `image_generation_call`, and `mcp_call`) run on the provider side before the response returns. `ToolGuard` doesn't check them as calls, so `allowed_tools` and `blocked_tools` can't stop them. Any name and arguments they carry are still inspected: an `mcp_call` with a `name` and `arguments` fails closed as tool-like content.
 
 <Warning>
 **Breaking change in v0.6.1.** The default blocklist now includes `local_shell`, `apply_patch`, and `computer_use`. `shell` was already on it. A `ToolGuard` with default settings blocks every `local_shell_call`, `shell_call`, `apply_patch_call`, and `computer_call` item.
@@ -255,6 +256,10 @@ const guard = new ToolGuard({
 - **Conflicting tool identities.** A call entry that names its tool in more than one place is blocked. This covers root fields (`tool_name`, `name`, `arguments`) combined with a nested `tool_call` or `function_call` object, more than one nested call object, or either of those combined with a `function: {name, arguments}` wrapper. `ToolGuard` can't tell which identity the runtime will execute, so it rejects the entry.
 - **Unknown action items.** Any other `*_call` or `*_request` item in a protocol position is blocked as unrecognized. Protocol positions are streamed items, `output_item` events, and `output[]` members of a response object. Ordinary data that uses such type labels elsewhere, such as `pull_request`, is unaffected.
 - **Ambiguous action items.** An action item that also carries a `tool_call`, `function_call`, `function`, or `tool_calls` envelope is blocked. A named item whose `tool_name` or `toolName` disagrees with its `name` is also blocked.
+- **Calls in more than one place (v0.6.2 and later).** Once `ToolGuard` has taken the calls from one envelope (`tool_calls`, `choices[].message.tool_calls`, `tool_use` content blocks, a direct call, or a response object's `output[]`), it scans the rest of the response for any other call. Finding one blocks the response, even when `object` is missing or isn't `"response"`. This covers `output[]` items beside a `tool_calls`, `choices`, or `content` collection, a call `type` at the root, and a stream event's `item` beside another call.
+- **Ambiguous response objects (v0.6.2 and later).** A response object whose `output[]` holds a call item is blocked if it also has a direct call `type`, or carries `tool_call`, `toolCall`, `function_call`, `functionCall`, `function`, `tool_use`, `tool_calls`, `toolCalls`, `choices`, or `content` at the top level. So is an `output[]` call item that carries one of these keys.
+- **Malformed `output` (v0.6.2 and later).** A response object's `output` must be a list of plain objects. Any other value, and any member that isn't an object, blocks the response. Pass `ToolGuard.check()` the result of `response.model_dump()`, not the SDK object or `dict(response)`. `ResponseVerifier` and `VerifiedOpenAI` convert SDK objects for you.
+- **Disagreeing name fields (v0.6.2 and later).** A call whose `name`, `tool_name`, and `toolName` fields name different tools is blocked with "Tool call name fields disagree". Fields that match, ignoring case and surrounding spaces, are accepted.
 - **Truncated nested scans.** `ToolGuard` scans wrapper objects and arrays up to 12 levels deep for hidden tool calls. If the scan reaches that limit, the response is blocked instead of reported as "No tool calls".
 
 Configured ToolGuards also inspect `structured_output` responses, including those produced by `verify_structured_output`. A structured output that carries a tool-shaped payload, such as `name` plus `arguments`, goes through the same blocklist and pattern checks as a direct tool call.
@@ -375,6 +380,8 @@ print(result.passed, result.message)
 | `uuid` | UUID format |
 | `enum` | In allowed values |
 | `pattern` | Regex match |
+
+From v0.6.2, in the Python package, `number` rules reject NaN and infinite values, and `rules` and `tool_rules` apply to the arguments of each call item in a response's `output[]` list, a stream `item`, or a `response` wrapper. Before v0.6.2, a response object's `output` list was read as one argument set, so no rule was checked against its calls.
 
 ---
 

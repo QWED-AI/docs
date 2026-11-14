@@ -198,6 +198,22 @@ tool_guard = ToolGuard(
 
 ---
 
+### "ToolGuard: A response object's output must be a list of objects"
+
+**Cause:** From v0.6.2, a Responses object (`"object": "response"`) whose `output` isn't a list, or holds a member that isn't a plain object, is blocked. This usually means an OpenAI SDK `Response` object, or `dict(response)`, was passed to `ToolGuard.check()` directly.
+
+**Fix:** Pass `response.model_dump()`. `ResponseVerifier` and `VerifiedOpenAI` convert SDK objects for you.
+
+---
+
+### "ToolGuard: Tool call name fields disagree"
+
+**Cause:** From v0.6.2, a call whose `name`, `tool_name`, and `toolName` fields name different tools is blocked, because a consumer could dispatch on a field `ToolGuard` didn't screen.
+
+**Fix:** Name the tool once, or make every name field match. Fields that differ only in case or surrounding spaces are accepted.
+
+---
+
 ### "MathGuard: No verifiable math found in response"
 
 **Cause:** The response contains no verifiable math shape. Prose, plain strings, and objects without recognized total, percentage, or inline-calculation fields no longer pass MathGuard vacuously. The guard fails with a warning-severity result, which blocks in strict mode.
@@ -459,6 +475,8 @@ math_guard = MathGuard(tolerance=0.01)  # Allow 1 cent difference
 | "Tool '...' is not allowed" | Tool | Dangerous tool called | Review blocklist |
 | "Unrecognized format" | Tool | Tool-like content in unknown shape | Use a recognized envelope |
 | "Malformed tool-call entry" | Tool | Non-object entry or hybrid envelope | Fix response structure |
+| "output must be a list of objects" | Tool | SDK object passed to `ToolGuard.check()` | Pass `response.model_dump()` |
+| "Tool call name fields disagree" | Tool | `name`, `tool_name`, `toolName` differ | Name the tool once |
 | "Calculation mismatch" | Math | LLM math wrong | This is intentional! |
 | "No verifiable math found" | Math | Response has no math shape | Scope MathGuard to math responses |
 | "PII detected" | Safety | SSN/email in output | Redact or edit prompt |
