@@ -67,6 +67,10 @@ agent = Agent(
 )
 ```
 
+<Info>
+New in v10.0.0: the SQL schema settings and the tool answers below. In 9.x, `QWEDSQLTool` takes no schema.
+</Info>
+
 `/verify/sql` checks a query against the tables it runs on, so `QWEDSQLTool` takes their `CREATE TABLE` statements as `schema_ddl`, and `dialect` (default `sqlite`). Without a schema, or with one that is only whitespace, the tool sends no request and answers `⚠️ UNVERIFIABLE: no schema was given, so QWED cannot verify the query. ...`.
 
 The tools call a result incorrect or unsafe only when QWED decided it. An `UNVERIFIABLE` or `BLOCKED` result, such as input that doesn't parse, a timeout or a server the client could not reach, returns its status and the server's message, for example `⛔ BLOCKED: ...`. `QWEDCodeTool` lists up to three issues the server reports for unsafe code, and `QWEDSQLTool` gives the server's reason for an unsafe query. `QWEDVerificationTool` sends the query to `/verify/natural_language`, which doesn't admit a result while the LLM translation is unverified, so it reports what holds or fails for the translated expression. A tool answer starts with `✅` only when the server admitted the result.
