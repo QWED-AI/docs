@@ -14,12 +14,12 @@ resources = parser.parse_directory("./terraform/prod")
 
 # Returns normalized resources:
 # {
-#   "policies": [...],
 #   "instances": [...],
+#   "policies": [...],
 #   "subnets": [...],
-#   "route_tables": [...],
-#   "security_groups": {...},
-#   ...
+#   "security_groups": [...],
+#   "volumes": [...],
+#   "unmodelled": [...],  # declarations the parser does not model (v0.4.0)
 # }
 ```
 
@@ -66,7 +66,7 @@ resources = {
 result = cost.verify_budget(resources, budget_monthly=500.0)
 
 print(f"Within Budget? {result.within_budget}")  # False
-print(f"Total: ${result.total_monthly_cost}")     # ~23905.36
+print(f"Total: ${result.total_monthly_cost}")     # 23937.29
 print(f"Reason: {result.reason}")
 ```
 

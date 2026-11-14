@@ -9,17 +9,54 @@ description: "Reference for IamGuard, NetworkGuard, CostGuard, and ArtifactBound
 
 ## 1. IamGuard
 
-**Engine:** Z3 Theorem Prover
+**Engine:** Python matching on the concrete request, combined with the Z3 theorem prover
 
-IamGuard converts AWS IAM Policies into first-order logic formulas to prove or disprove access. This is superior to regex-based policy checks because it reasons about logic (AND, OR, NOT, Conditions) using an SMT solver.
+IamGuard decides whether an AWS IAM policy allows a concrete request. From v0.4.0 it decides every action, resource and condition match in Python on the request values, following the AWS policy language, and Z3 combines those outcomes under Deny precedence. Anything the guard does not model makes the result `UNVERIFIABLE`, never allowed or denied.
 
 ### Capabilities
 
-- **Wildcard Logic:** Correctly handles `s3:*`, `bucket/*` expansion using Z3 regex (`InRe`).
-- **Conditions:** Supports context keys like `aws:SourceIp` (CIDR blocks), `aws:CurrentTime` (Date comparisons), `StringEquals`, and `StringLike`.
-- **Deny Overrides:** Mathematically proves that an explicit `Deny` always overrides an `Allow`, regardless of statement order.
-- **Least Privilege Analysis:** `verify_least_privilege(policy)` proves whether a policy allows full admin access (`*` on `*`).
-- **Unknown Operator Fail-Closed:** An unrecognized condition operator causes a `BLOCKED` result — never a silent pass.
+- **Deny overrides:** An explicit `Deny` overrides an `Allow`, regardless of statement order.
+- **Matching:** Actions match case-insensitively. `?` matches exactly one character and `*` any run of characters. In a resource ARN with colons, both stay within one colon-separated segment, except a `*` that ends the last segment. Condition key names match case-insensitively. Case folding is ASCII only.
+- **Condition operators:** The `String*`, `Arn*`, `Numeric*` and `Date*` families, `IpAddress`, `NotIpAddress`, `Bool`, `Null` and the `...IfExists` forms, with AWS multi-value semantics.
+- **Absent keys:** A condition on a key the request doesn't carry is false, except for a negated operator (`StringNotEquals`, `NotIpAddress` and the other `...Not...` forms) or an `...IfExists` operator, where it is true. `Null` tests whether the key is present.
+- **Policy variables:** `${aws:username}` and the `${*}`, `${?}` and `${$}` escapes are substituted in resources and condition values when the policy `Version` is `2012-10-17`. With any other version, or none, they are literal text, as in AWS.
+- **Least privilege:** `verify_least_privilege(policy)` returns `allowed=True` when the policy grants full access. It judges this from the patterns, not by matching a literal `*` request. An Allow counts, whatever its condition, when it has an `Action` pattern and a `Resource` pattern each made only of `*`, `?` and `:` with at least one `*` (such as `*:*` or `?*`, or `arn:*` for a resource). A Deny counts only when it has no condition and names every action and every resource with a pattern of `*` alone, so a conditional guard-rail such as "deny without MFA" doesn't make an admin policy compliant. An Allow whose coverage the guard can't tell, such as a wildcarded service prefix (`a*`) or a wildcarded partition or service in a resource ARN, makes the result `UNVERIFIABLE`.
+
+### What is UNVERIFIABLE
+
+Every condition has three outcomes: it matches, it doesn't match, or the guard can't evaluate it. When the decision depends on a statement the guard can't evaluate, the result is `UNVERIFIABLE`, for Allow and Deny statements alike. A Deny that applies still decides the request when another statement can't be evaluated. The guard can't evaluate:
+
+- An unsupported operator, including the `ForAnyValue:` and `ForAllValues:` set operators.
+- A malformed policy value, even when its key is absent from the request. Numbers must be decimal digits with an optional minus sign and fraction, dates W3C dates, W3C date-times with a zone or epoch seconds, and booleans `true` or `false`.
+- A multi-valued request key, a request value of `null` or an empty list, an unresolved policy variable, or operators or keys that differ only in case.
+- Non-ASCII text compared case-insensitively.
+- A resource match that needs a wildcard to cross a colon, a policy variable before the fifth colon of a resource ARN, or a wildcard in its service segment.
+- IP values that aren't addresses or CIDRs, including netmask forms, and IPv4-mapped or scoped IPv6 request addresses.
+
+The whole policy is `UNVERIFIABLE` when a statement uses `NotAction`, `NotResource` or `NotPrincipal`, a `Principal` other than `*` or `{"AWS": "*"}`, an element outside the policy language (such as a misspelt `Conditon`), an empty or missing `Action` or `Resource`, or an `Effect` other than `Allow` or `Deny`. So is a policy without `Statement`, with a top-level element other than `Version`, `Id` and `Statement`, or with a `Version` other than `2012-10-17` or `2008-10-17`. A single-object `Statement` is accepted. A Z3 `unknown` answer is also `UNVERIFIABLE`, not a proven denial.
+
+### Input bounds
+
+IamGuard refuses a policy or request over these bounds as `UNVERIFIABLE` before it evaluates anything:
+
+| Bound | Limit |
+| --- | --- |
+| Statements per policy | 1,000 |
+| Entries in one statement's `Action` or `Resource` | 1,000 |
+| `Action` and `Resource` entries per policy | 2,500 |
+| Characters in one `Action` or `Resource` entry or condition value | 2,048 |
+| Wildcards (`*` and `?` together) in one `Action` or `Resource` entry or condition value | 64 |
+| Condition entries per statement | 100 |
+| Condition entries per policy | 1,000 |
+| Condition values per policy (each value in a list counts) | 2,500 |
+| Characters of `Action`, `Resource` and condition value text per policy | 131,072 |
+| Characters in the request action, request resource, a context key or value, a condition operator or a condition key | 2,048 |
+| Request context entries | 100 |
+| Entries in one list, in a condition value or a context value | 100 |
+
+Policy variable substitution has two more bounds, checked while matching. A pattern longer than 8,192 characters after substitution, or substitution that adds more than 131,072 characters across one request, can't be evaluated. Like any other statement the guard can't evaluate, it makes the result `UNVERIFIABLE` when the decision depends on it.
+
+On an unexpected error, IamGuard records only the exception type in `error`, so no traceback or host path reaches diagnostics or Verification Context evidence.
 
 ### API
 
@@ -45,22 +82,40 @@ doc = guard.to_verification_context(
 | VerificationResult state | InfraDiagnosticStatus | proof_ref |
 |--------------------------|----------------------|-----------|
 | `verified=True, allowed=True/False` | `VERIFIED` | `sha256:...` |
-| `verified=False` | `UNVERIFIABLE` | `None` |
-| Unknown operator / exception | `BLOCKED` | `None` |
+| `verified=False` (unevaluable statement, unmodelled element, bound exceeded, Z3 `unknown`, exception) | `UNVERIFIABLE` | `None` |
+
+`to_verification_context()` admits only an allowed result. A proven denial is `BLOCKED`.
 
 ## 2. NetworkGuard
 
 **Engine:** NetworkX (Graph Theory)
 
-NetworkGuard builds a directed graph of your network topology (VPCs, Subnets, Route Tables, Security Groups, NACLs, Internet Gateways). It uses graph traversal algorithms to verify reachability.
+NetworkGuard builds a directed graph from a topology of subnets, route tables and security groups, and uses graph traversal to verify reachability. From v0.4.0 it models an explicit set of inputs and returns `UNVERIFIABLE` for anything else, instead of refusing only a list of known constructs.
 
 ### Capabilities
 
-- **Public Access Check:** Validates if a path exists from `Internet` to a specific `Instance`.
-  - Path: `Internet -> IGW -> Route Table -> Subnet -> Security Group -> Instance`.
-- **Port Verification:** Ensures critical management ports (22 SSH, 3389 RDP) are not exposed to `0.0.0.0/0`.
-- **Segmentation Verification:** Proves that sensitive subnets (e.g., Database) are isolated from public subnets.
-- **Fail-Closed Topologies:** Returns `UNVERIFIABLE` when the topology contains NAT Gateways, VPC Peering, NACLs, or Transit Gateway — constructs the guard cannot model deterministically.
+- **Public Access Check:** Validates if a path exists from `Internet` to a destination subnet.
+  - Path: `Internet -> IGW -> Route Table -> Subnet -> Security Group`.
+- **Port Verification:** Checks whether a port is open to the internet through the security group rules.
+- **Internet ranges:** Split ranges whose union covers `0.0.0.0/0` or `::/0` (for example `0.0.0.0/1` plus `128.0.0.0/1`) count as the internet, for security group rules and routes. An IPv4 route doesn't pair with an IPv6-only rule.
+
+### Modelled topology
+
+| Input | Modelled keys |
+| --- | --- |
+| Top level | `subnets`, `route_tables`, `security_groups` |
+| Subnet | `id`, `security_groups` (each `id` once) |
+| Route table | `subnet_id`, `routes` (one table per subnet). Route targets `igw...` (internet gateway) or `local`, with CIDR destinations |
+| Security group | `ingress`, `egress` (an inbound query reads only `ingress`) |
+| Ingress rule | `cidr`, and either `port` or both `from_port` and `to_port` |
+
+The result is `UNVERIFIABLE` with `unsupported_topology=True` for any other key or route target, so NAT gateways, VPC peering, NACLs, transit gateways, endpoints, protocol-scoped rules (`protocol`, `ip_protocol`), prefix lists (`prefix_list_id`) and security group references (`source_security_group_id`) are refused whatever they are called. The same applies to:
+
+- A rule without a valid `cidr`, a rule mixing `port` with a range, a reversed range, a one-sided `-1` port sentinel, or ports that aren't ASCII integers in range.
+- Duplicate subnet ids, more than one route table for a subnet, or a route table without a `subnet_id`.
+- A subnet that names an undeclared security group.
+- A queried port that isn't an integer in range.
+- A private IP address as the source. Only reachability from `"internet"` is graph-modelled.
 
 ### API
 
@@ -95,14 +150,28 @@ Malformed topology inputs (non-dict `resources`, subnets missing `id` keys, and 
 
 **Engine:** Deterministic Arithmetic & Pricing Catalog
 
-CostGuard estimates the monthly cost of your infrastructure definition *before* deployment using an embedded, static pricing catalog with **Decimal arithmetic** (no floating-point rounding errors).
+CostGuard estimates the monthly cost of your infrastructure definition *before* deployment using an embedded, static price catalogue with **Decimal arithmetic** (no floating-point rounding errors). An instance costs its hourly price times `count` times 730 hours. A volume costs its GB-month price times `size_gb` times `count`.
+
+### Price catalogue
+
+From v0.4.0, instance and volume prices are kept in separate tables, so a volume type used as an instance type is an unknown instance type:
+
+- `CostGuard.INSTANCE_PRICING`: EC2 and RDS instance types, in USD per instance-hour.
+- `CostGuard.VOLUME_PRICING`: EBS volume types, in USD per GB-month at us-east-1 list prices: `gp2` 0.10, `gp3` 0.08, `st1` 0.045 and `sc1` 0.015.
+
+The catalogue prices `us-east-1` only (`CostGuard.PRICING_REGION`). These replace `CostGuard.PRICING_CATALOG`.
 
 ### Capabilities
 
-- **Budget enforcement:** Blocks deployment if `estimated_cost > budget`.
-- **Anomaly detection:** Flags expensive instance types (e.g., `p4d.24xlarge` GPU instances) as suspected hallucinations.
-- **Granular breakdown:** Provides cost breakdown by resource type (Compute, Storage, Database).
-- **Fail-Closed Unknown Types:** Unknown instance or volume types produce a `BLOCKED` result — never a silent zero-cost estimate.
+- **Budget enforcement:** Compares the exact total with the exact budget, so an overrun of less than a cent is not within budget. The published `total_monthly_cost` is rounded up to the cent and `budget` down.
+- **Per-resource breakdown:** `breakdown` gives the monthly cost of each instance and volume.
+- **Fail-closed unknowns:** The estimate is incomplete (`has_unknown_types=True`), and the result `BLOCKED`, when any of these is present:
+  - An instance or volume type that isn't in the catalogue, or a missing type. `standard` (magnetic) volumes aren't priced, because their per-I/O-request charge can't be known before deployment. `io1` and `io2` aren't priced either.
+  - A `count` or `size_gb` that isn't a positive integer.
+  - Provisioned `iops` or `throughput` the catalogue can't price: above the `gp3` baseline of 3000 IOPS or 125 MiB/s, or on any other volume type.
+  - Any entry in the model's `unmodelled` list, which [`TerraformParser`](#terraformparser-and-unmodelled-declarations) fills with declarations it does not model. If you build the resource dictionary yourself, list anything you leave out in `unmodelled`.
+
+A `VERIFIED` diagnostic records the figures the decision was made on in its developer fields and proof evidence: `exact_total_monthly_cost`, `exact_budget`, `pricing_region` and `pricing_catalogue_sha256` (a content hash of the price tables). `to_diagnostic()` re-checks the decision on the exact figures and returns `BLOCKED` when they don't agree with `within_budget` or when the estimate was priced with a different catalogue.
 
 ### API
 
@@ -129,7 +198,7 @@ Malformed inputs (an undecimal budget, non-dict resources, non-dict resource ent
 | `within_budget=True, has_unknown_types=False` | `VERIFIED` | `sha256:...` |
 | `within_budget=False` | `BLOCKED` | `None` |
 | `has_unknown_types=True` | `BLOCKED` | `None` |
-| Cost parse error | `BLOCKED` | `None` |
+| Cost parse error, or figures that don't match the decision or catalogue | `BLOCKED` | `None` |
 
 ## 4. ArtifactBoundaryGuard
 
@@ -142,6 +211,7 @@ ArtifactBoundaryGuard is a release gate that verifies a Python package's source 
 - **Secret Detection:** Scans for `.pem`, `.key`, `.env`, credential files, and other sensitive patterns in the package surface.
 - **Debug Artifact Detection:** Flags test files (`test_*.py`), notebooks (`*.ipynb`), and debug directories (`__pycache__`, `.git`) included in the package.
 - **Build Config Validation:** Parses `[tool.hatch.build.targets.wheel]` to confirm the package boundary is explicit. Blocks if the config is missing, invalid, or doesn't reference the expected package name.
+- **Other hatchling inputs (v0.4.0):** Checks the other inputs known to change what hatchling ships in the wheel or to run project code at build time, and blocks what it doesn't model. See [Hatchling inputs](#hatchling-inputs).
 - **Disclosure Risk Detection:** Flags project-structure files (`.gitignore`, `.dockerignore`) that could leak internal conventions.
 - **Fail-Closed on Missing TOML Parser:** If neither `tomllib` nor `tomli` is available, every package is `BLOCKED`.
 
@@ -167,12 +237,53 @@ doc = guard.to_verification_context(
 
 The package identity is derived from the inspected `package_dir`, so a caller cannot scan one directory while checking the wheel configuration of another. Symlink escapes, symlink loops, non-string build backends, and wheel entries outside the scanned boundary map to a fail-closed `BLOCKED` document.
 
+### Hatchling inputs
+
+From v0.4.0, ArtifactBoundaryGuard blocks a package, as unmodelled, when its project has any of these:
+
+- A `hatch.toml` file, which hatchling merges over `[tool.hatch]`, or a `PKG-INFO` file in the project root.
+- `[project] dynamic` fields other than `version`.
+- `[build-system]` keys other than `requires` and `build-backend` (`backend-path` lets the project supply its own backend).
+- A build requirement other than `hatchling` with public PEP 440 version specifiers and an optional marker, in printable ASCII.
+- Root-level modules, namespace directories or programs named like standard library, build tool or interpreter names (such as `pip.py`, `argparse.py`, `org/` or `python.bat`).
+- Context formatting (`{env:...}`, `{root}`) in dependency strings.
+- `[tool.hatch.build]` options that apply to every target and add files or run code (such as `include`, `force-include`, `sources`, `packages` or `hooks`).
+- Sdist options that add or remap files (`force-include`, `sources`, `hooks`), because `python -m build` builds the wheel from the sdist.
+- Wheel options the guard doesn't model (such as `shared-data`, `extra-metadata`, `sources` or `hooks`), and wheel `force-include` even with `only-packages`.
+- A version source other than `regex`, a version `path` through a symlink, a hidden file or directory, or outside the project root, and `[tool.hatch.metadata]` hooks.
+- `[project]` readme files other than plain `README*` files in the project root, or license files other than plain `LICENSE*`, `LICENCE*`, `COPYING*`, `NOTICE*` or `AUTHORS*` files there. Symlinks and names that match a sensitive file pattern are refused.
+
+<Warning>
+These checks have limits. The root-level name check uses a list of known names, so the result assumes the build doesn't import from the project root: run `python -m build` with `PYTHONSAFEPATH=1` (or from outside the root) and an absolute interpreter path. File checks are by name: the content of README, LICENSE and version files is not inspected. The modelled behaviour is the wheel built by hatchling 1.27 and 1.28, and the sdist itself is not checked.
+</Warning>
+
 ### Diagnostic Mapping
 
 | ArtifactBoundaryResult state | InfraDiagnosticStatus | proof_ref |
 |------------------------------|----------------------|-----------|
 | `is_safe=True` | `VERIFIED` | `sha256:...` |
 | `is_safe=False` (with BLOCK-severity findings) | `BLOCKED` | `None` |
+
+## TerraformParser and unmodelled declarations
+
+`TerraformParser().parse_directory(path)` reads the `.tf` files in one directory into a model with `instances`, `policies`, `subnets`, `security_groups`, `volumes` and, from v0.4.0, `unmodelled`. It models `aws_instance`, `aws_iam_policy` and `aws_ebs_volume`, and it records or refuses every other declaration instead of dropping it.
+
+`unmodelled` is a list of `{"address", "reason"}` entries. The parser adds one for:
+
+- A resource type it does not model.
+- An instance or volume that uses `for_each` or `dynamic`.
+- An `aws_instance` without `root_block_device`, because its implicit root volume takes its size and type from the AMI.
+
+CostGuard is `BLOCKED` while `unmodelled` has any entry. An `aws_ebs_volume` without `size` keeps `size_gb` empty, so CostGuard refuses to price it. The parser also carries `count`, `iops` and `throughput` on volumes and models `root_block_device` and `ebs_block_device` on an instance as volumes.
+
+The parser raises `ParseError`, with the full list of errors, when:
+
+- The path is not a directory, or the directory has no `.tf` files.
+- The directory holds `.tf.json` files or Terraform override files (`override.tf`, `*_override.tf`).
+- The configuration calls a module.
+- A `.tf` file fails to parse. Files are read as UTF-8 on every platform.
+- An unmodelled resource may grant access: any `aws_iam_*` type, or a type, attribute or block whose name contains `polic`, `principal`, `permission`, `grant` or `authoriz`, or has `acl` or `roles` as an underscore-separated word. `tags` maps are not searched.
+- A policy document uses `NotAction`, `NotResource` or `NotPrincipal`, or holds HCL template directives (`%{...}`) or unresolved interpolation in its keys or values.
 
 ## Verification Context documents
 
