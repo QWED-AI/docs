@@ -136,6 +136,20 @@ Every outbound LLM provider call (translation and codegen for natural-language v
 
 Math expressions whose exact evaluation would be unboundedly expensive (huge integer literals, oversized exponents, power towers, large factorials) are rejected before evaluation. See [Math engine — compute-cost bounds](/engines/math#compute-cost-bounds).
 
+### Math time limit and worker pool
+
+From v9.0.0, `/verify/math` and the maths items of `/verify/batch` run in a fixed pool of worker processes. Unlike the limits above, the server operator sets these with the [maths limits settings](/advanced/deployment#maths-limits).
+
+| Outcome | Status | `constraint_id` |
+|---------|--------|-----------------|
+| The job runs past its time limit (default 10 seconds). Its worker is killed and replaced | `UNVERIFIABLE` | `math.timeout` |
+| Every worker is busy and the queue is full, or no worker frees up within the time limit | `BLOCKED` | `math.capacity` |
+| A batch job's maths budget (default 120 seconds) is used up before the item runs | `UNVERIFIABLE` | `batch.math_budget` |
+
+None of these results is admitted. On `math.capacity`, retry after a short delay.
+
+In a batch, a maths item's time limit is cut to what is left of the job's budget. If the budget runs out while the item waits for a worker, the item is `BLOCKED` (`math.capacity`); if it runs out during the run, the item is `UNVERIFIABLE` (`math.timeout`). Starting a new worker isn't counted against the item's own limit, which is set before the start, so that item can finish after the budget ran out and return its result. The start still uses the job's wall-clock budget, so later items can get `batch.math_budget`. Each batch item also has its own limit, `QWED_BATCH_ITEM_TIMEOUT` (default 60 seconds). The maths time limit applies to the wait and to the run separately, so with `QWED_MATH_TIMEOUT_SECONDS` above about 30 seconds a slow item can reach the item limit first: it is then `failed`, with an error and no result.
+
 ## Per-IP limits on authentication endpoints
 
 Anonymous `/auth/*` routes such as `POST /auth/signup` and `POST /auth/signin` carry no API key, so the per-key limiter cannot apply. As of v7.2, these routes are rate limited per client IP instead. This blocks password-guessing and prevents unauthenticated requests from saturating the service with expensive password hashing.

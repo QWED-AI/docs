@@ -119,6 +119,7 @@ from qwed_sdk import QWEDLocal
 # Enable PII masking
 client = QWEDLocal(
     provider="openai",
+    model="gpt-4o-mini",
     api_key="sk-...",
     mask_pii=True  # Enable masking
 )
@@ -193,6 +194,7 @@ from qwed_sdk import QWEDLocal
 # Client with PII masking enabled
 client = QWEDLocal(
     provider="openai",
+    model="gpt-4o-mini",
     api_key="sk-...",
     mask_pii=True  # Mask detected PII before the provider call
 )
@@ -252,6 +254,7 @@ print(result.evidence['pii_masked'])
 ```python
 client = QWEDLocal(
     provider="anthropic",
+    model="your-claude-model",
     api_key="sk-ant-...",
     mask_pii=True,
     pii_entities=["EMAIL_ADDRESS", "PERSON", "PHONE_NUMBER"]  # Custom list
@@ -336,6 +339,7 @@ Only detect specific PII types:
 ```python
 client = QWEDLocal(
     provider="openai",
+    model="gpt-4o-mini",
     api_key="sk-...",
     mask_pii=True,
     pii_entities=["EMAIL_ADDRESS", "CREDIT_CARD"]  # Only these
@@ -362,6 +366,7 @@ mask_pii = os.getenv("ENV") == "production"
 
 client = QWEDLocal(
     provider="openai",
+    model="gpt-4o-mini",
     mask_pii=mask_pii
 )
 ```
@@ -470,6 +475,7 @@ print(result.evidence['pii_masked'])
 # Protected Health Information (PHI) masking
 client = QWEDLocal(
     provider="openai",
+    model="gpt-4o-mini",
     mask_pii=True,
     pii_entities=[
         "PERSON",           # Patient names
@@ -488,6 +494,7 @@ client = QWEDLocal(
 # Card, bank and customer contact data
 client = QWEDLocal(
     provider="anthropic",
+    model="your-claude-model",
     mask_pii=True,
     pii_entities=[
         "CREDIT_CARD",  # Card numbers
@@ -504,6 +511,7 @@ client = QWEDLocal(
 # Personal data covered by GDPR / CCPA
 client = QWEDLocal(
     base_url="http://localhost:11434/v1",  # Local = zero data transfer
+    model="llama3",
     mask_pii=True,
     pii_entities=[
         "PERSON",        # Client names

@@ -20,7 +20,7 @@ pip install qwed-open-responses[langchain]
 ## Quick start
 
 ```python
-from langchain.agents import create_react_agent
+from langchain.agents import create_agent
 from qwed_open_responses.middleware.langchain import QWEDCallbackHandler
 from qwed_open_responses import ToolGuard, SafetyGuard
 
@@ -30,16 +30,18 @@ callback = QWEDCallbackHandler(
     block_on_failure=True,
 )
 
-# Add to agent
-agent = create_react_agent(
-    llm=llm,
-    tools=tools,
-    callbacks=[callback],
-)
+# Create the agent with your model and tools
+agent = create_agent(llm, tools=tools)
 
-# Agent actions are now verified!
-result = agent.invoke({"input": "Search for weather"})
+# Pass the callback when you run the agent
+result = agent.invoke(
+    {"messages": [{"role": "user", "content": "Search for weather"}]},
+    config={"callbacks": [callback]},
+)
+# A blocked tool call raises ToolCallBlocked before the tool runs
 ```
+
+LangChain 1.x `create_agent` has no `callbacks` argument, so pass the handler in `config` on each `invoke()` call. LangChain then reports every tool call to the handler before the tool runs. The handler checks it as `{"type": "tool_call", "tool_name": <tool name>, "arguments": {"input": <tool input string>}}`.
 
 ---
 
@@ -51,7 +53,7 @@ result = agent.invoke({"input": "Search for weather"})
 |--------|------|---------|-------------|
 | `guards` | list | `[]` | Guards to apply |
 | `block_on_failure` | bool | `True` | Raise exception on failure |
-| `on_block` | callable | `None` | Callback when blocked |
+| `on_block` | callable | `None` | Called with `(action, result)` when an agent action is blocked. LangChain 1.x `create_agent` does not send agent actions, so with that API catch `ToolCallBlocked` instead |
 | `verbose` | bool | `False` | Print verification results |
 
 ---
@@ -60,6 +62,7 @@ result = agent.invoke({"input": "Search for weather"})
 
 ```python
 from qwed_open_responses import ToolGuard
+from qwed_open_responses.middleware.langchain import QWEDCallbackHandler
 
 # Only allow safe tools
 callback = QWEDCallbackHandler(
@@ -72,7 +75,7 @@ callback = QWEDCallbackHandler(
 )
 
 # If agent tries to call execute_shell:
-# ToolCallBlocked: Tool call blocked: BLOCKED: Tool 'execute_shell' is not allowed
+# ToolCallBlocked: Tool blocked: BLOCKED: Tool 'execute_shell' is not allowed
 ```
 
 ---
@@ -81,19 +84,19 @@ callback = QWEDCallbackHandler(
 
 ```python
 from qwed_open_responses import SafetyGuard
+from qwed_open_responses.middleware.langchain import QWEDCallbackHandler
 
 callback = QWEDCallbackHandler(
     guards=[
         SafetyGuard(
             check_pii=True,
             check_injection=True,
-            max_cost=50.0,
         )
     ]
 )
 ```
 
-`QWEDCallbackHandler` forwards `verification_context` only when a callback emitter explicitly supplies that keyword. The standard LangChain agent path does not supply it, so this handler cannot apply trusted `total_cost` or `total_tokens` across an agent run. Do not rely on this callback for run-wide `max_cost` or `max_tokens` enforcement. The LlamaIndex handler reads `verification_context` from the event keyword arguments or the event payload.
+`QWEDCallbackHandler` forwards `verification_context` only when a callback emitter explicitly supplies that keyword. The standard LangChain agent path does not supply it, so this handler cannot apply trusted `total_cost` or `total_tokens` across an agent run. Do not rely on this callback for run-wide `max_cost` or `max_tokens` enforcement. Leave both unset here: with no cost or token figure, the budget check fails closed, so a `SafetyGuard` with `max_cost` or `max_tokens` in this callback blocks every tool call. The LlamaIndex handler reads `verification_context` from the event keyword arguments or the event payload.
 
 ---
 
@@ -103,12 +106,20 @@ callback = QWEDCallbackHandler(
 from qwed_open_responses.middleware.langchain import ToolCallBlocked
 
 try:
-    result = agent.invoke({"input": "Delete all files"})
+    result = agent.invoke(
+        {"messages": [{"role": "user", "content": "Delete all files"}]},
+        config={"callbacks": [callback]},
+    )
 except ToolCallBlocked as e:
     print(f"Action blocked: {e.result.block_reason}")
+    # If the agent called execute_shell:
+    # Action blocked: BLOCKED: Tool 'execute_shell' is not allowed
+
     # Log the attempted action
-    log_security_event(e.action, e.result)
+    log_security_event(e.result.to_dict())
 ```
+
+A tool call blocked on the `create_agent` path carries the verification result in `e.result`. `e.action` is `None` there, because LangChain 1.x sends the tool start rather than an agent action.
 
 ---
 
@@ -123,28 +134,36 @@ print(f"Failed: {summary['failed']}")
 print(f"Success rate: {summary['success_rate']:.1%}")
 ```
 
+<Note>
+The summary counts agent actions and agent finishes. LangChain 1.x `create_agent` reports tool calls only as tool starts, and in v0.6.1 tool-start checks are not added to the summary, so with `create_agent` it stays at zero. Use `verbose=True` or catch `ToolCallBlocked` to see each check.
+</Note>
+
 ---
 
 ## Full example
 
 ```python
 from langchain_openai import ChatOpenAI
-from langchain.agents import create_react_agent, AgentExecutor
-from langchain.tools import Tool
+from langchain.agents import create_agent
+from langchain.tools import tool
 from qwed_open_responses.middleware.langchain import QWEDCallbackHandler
-from qwed_open_responses import ToolGuard, MathGuard, SafetyGuard
+from qwed_open_responses import ToolGuard, SafetyGuard
 
 # Define tools
-tools = [
-    Tool(name="search", func=search_func, description="Search the web"),
-    Tool(name="calculator", func=calc_func, description="Do math"),
-]
+@tool
+def search(query: str) -> str:
+    """Search the web."""
+    return search_func(query)
+
+@tool
+def calculator(expression: str) -> str:
+    """Do math."""
+    return calc_func(expression)
 
 # Create verified callback
 callback = QWEDCallbackHandler(
     guards=[
         ToolGuard(allowed_tools=["search", "calculator"]),
-        MathGuard(),
         SafetyGuard(),
     ],
     verbose=True,
@@ -152,10 +171,14 @@ callback = QWEDCallbackHandler(
 
 # Create agent
 llm = ChatOpenAI(model="gpt-4")
-agent = create_react_agent(llm, tools, prompt)
-executor = AgentExecutor(agent=agent, tools=tools, callbacks=[callback])
+agent = create_agent(llm, tools=[search, calculator])
 
 # Run with verification
-result = executor.invoke({"input": "What is 15% of 200?"})
-# [QWED] Tool: calculator -> [OK] Verified (3 guards passed)
+result = agent.invoke(
+    {"messages": [{"role": "user", "content": "What is 15% of 200?"}]},
+    config={"callbacks": [callback]},
+)
+# [QWED] Tool start: calculator -> [OK] Verified (2 guards passed)
 ```
+
+Keep `MathGuard` out of this callback. It checks a response's `output`, not tool-call arguments, so it fails every tool call with "No verifiable math found in response". Check the agent's final answer with `MathGuard` separately if it carries a calculation.

@@ -21,7 +21,7 @@ The summary is not a SOC 2 report or an auditor's attestation. A SOC 2 report is
 
 **Prerequisites:**
 
-- An API key whose owner has the `owner` or `admin` role, or a signed-in session (`Authorization: Bearer <jwt_token>`) for an `owner` or `admin`. See [Session sign-in for compliance endpoints](/api/endpoints#session-sign-in-for-compliance-endpoints).
+- An API key whose owner has the `owner` or `admin` role, or a signed-in session (`Authorization: Bearer <jwt_token>`) for an `owner` or `admin`. See [Session sign-in for admin endpoints](/api/endpoints#session-sign-in-for-admin-endpoints).
 - `QWED_AUDIT_SECRET_KEY` set on the server. Without it, the audit trail check can't run and `audit_trail.status` is `NOT_VERIFIED`.
 
 **API endpoint:**
@@ -113,8 +113,9 @@ Every `/verify/*` endpoint, the Verification Context routes, `POST /agents/{agen
 - **`admission`**: the admission decision its route made (`ADMIT` or `BLOCKED`, or `ADMIT` or `DENY` for `POST /verification-context/from-diagnostic`). `null` for routes that decide no admission and for older rows.
 - **`api_key_id`**: the API key that authenticated the request. `null` for signed-in sessions, the audit seed, the agent route, and older rows.
 - **`verifier_version`**: the QWED server version that wrote the row.
+- **`latency_ms`**: whole milliseconds from the start of the HTTP request to when QWED began writing the audit row, before it waits for the append lock. `null` for rows written outside a request and for older rows.
 
-The entry hash covers all three fields, so changing or clearing them on a stored row fails verification. Rows written before these fields existed still verify.
+The entry hash covers all four fields, so changing or clearing them on a stored row fails verification. Rows written before these fields existed still verify.
 
 To export the whole trail as evidence, page through `GET /audit/logs` with the `before` cursor until `next_before` is `null`. See [Audit endpoints](/api/authentication#audit-endpoints).
 
@@ -154,7 +155,12 @@ GET /admin/compliance/verify/{log_id}
 GET /admin/compliance/verify-trail?start={start}&end={end}
 ```
 
-`start` and `end` are optional ISO 8601 datetimes. Omit both to check the whole chain. The response reports `status` (`VERIFIED`, `NO_ENTRIES`, or `NOT_VERIFIED`), the entry counts, and `first_failed_entry_id`, so you can see where the chain stops checking out. See [`GET /admin/compliance/verify-trail`](/api/endpoints#get-admin-compliance-verify-trail).
+`start` and `end` are optional ISO 8601 datetimes. Omit both to check the whole chain. The response's `scope` names what QWED checked:
+
+- With neither `start` nor `end`: `"Signature and hash-chain check of every audit entry recorded for the organisation. It does not show that every request was recorded."`
+- With `start`, `end`, or both: `"Signature and hash-chain check of the audit entries recorded in the period. It does not show that every request was recorded."`
+
+The response also reports `status` (`VERIFIED`, `NO_ENTRIES`, or `NOT_VERIFIED`), the entry counts, and `first_failed_entry_id`, so you can see where the chain stops checking out. See [`GET /admin/compliance/verify-trail`](/api/endpoints#get-%2Fadmin%2Fcompliance%2Fverify-trail).
 
 ```bash
 curl --fail-with-body -H "X-API-Key: qwed_live_your_admin_key" \
@@ -198,14 +204,30 @@ print(result["legacy_entries"])  # [] once the range starts after the upgrade
 </Note>
 
 ### Evidence collection
-Export all verification logs and security events as a CSV file to provide to your auditor.
+Export your organization's verification logs for an audit period as a CSV file to provide to your auditor.
 
 **API endpoint:**
 ```http
-GET /admin/compliance/export/csv?organization_id={org_id}
+GET /admin/compliance/export/csv?organization_id={org_id}&start={start}&end={end}
 ```
 
+`start` and `end` are ISO 8601 times. A time without a zone is UTC. Without `end`, the period ends now. Without `start`, it starts 30 days before `end`. A `start` after `end`, including a future `start` with no `end`, returns `400 Bad Request`.
+
+Each row carries the stored verdict and admission, so the file shows the decision QWED made for each request:
+
+```csv
+ID,Timestamp,User ID,API Key ID,Verifier Version,Domain,Query,Verdict,Admission,Is Verified (legacy),Result,Latency (ms),Entry Hash,HMAC Signature,Chain Status
+42,2026-10-21T12:00:00+00:00,3,7,9.0.0,MATH,x**2 + 2*x + 1 = (x+1)**2,VERIFIED,ADMIT,Yes,"{""status"": ""VERIFIED"", ...}",184,3b1f...a9c2,9d4e...07ab,Chained
+```
+
+- `Verdict` and `Admission` are the stored values, as `GET /audit/logs` returns them. A value QWED didn't record is an empty cell.
+- `Domain` names the verification engine. Natural-language requests use `NATURAL_LANGUAGE`. Rows written before that fix read `MATH`, because the domain is part of the signed entry.
+- Nothing is truncated. QWED prefixes an apostrophe to any cell that starts with `=`, `+`, `-`, `@`, a tab, a carriage return, or a line feed, so a spreadsheet doesn't run it as a formula.
+- The file holds at most the newest 1,000 rows of the period, newest first. When more rows matched, the response sets `X-Export-Truncated: true`, otherwise `false`. Split a long audit period into shorter `start`/`end` windows to collect every row.
+
 The `Chain Status` column shows `Chained` for rows that carry a hash and `Legacy` for rows written before the hash chain. `Chained` only means a hash is present. The export does not re-verify the chain. Use `GET /admin/compliance/verify/{log_id}` or `verify_audit_trail` to verify rows.
+
+See [`GET /admin/compliance/export/csv`](/api/endpoints#get-%2Fadmin%2Fcompliance%2Fexport%2Fcsv) for every column.
 
 ---
 
@@ -215,9 +237,9 @@ The `Chain Status` column shows `Chained` for rows that carry a hash and `Legacy
 QWED supports the Right of Access by allowing you to export all data associated with an organization or user.
 
 **API endpoint:**
-Use the CSV export endpoint to retrieve all verification data.
+Use the CSV export endpoint to retrieve verification data. Set `start` and `end` to cover the period you need, because the default is the last 30 days and each file holds at most 1,000 rows.
 ```http
-GET /admin/compliance/export/csv?organization_id={org_id}
+GET /admin/compliance/export/csv?organization_id={org_id}&start={start}&end={end}
 ```
 
 ### Data deletion (Article 17 - right to erasure)

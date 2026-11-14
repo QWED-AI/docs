@@ -21,6 +21,12 @@ The Stats Engine executes statistical queries on tabular data. All model-generat
 
 The Stats Engine requires a running Docker daemon. Without Docker, all statistical verification requests return HTTP 503. See the [deployment guide](/advanced/deployment) for setup instructions.
 
+The Stats Engine runs on Python 3.10 and later, including Python 3.14, which the server Docker image uses.
+
+<Note>
+Before v9.0.0, the Stats Engine could not load on Python 3.14, which removed `ast.Num` and `ast.Str`. Every `/verify/stats` request that passed the upload checks was `BLOCKED`, so nothing was admitted in error. Upgrade to v9.0.0 or later if you run the Python 3.14 image.
+</Note>
+
 ## The `DiagnosticResult` contract
 
 `verify_stats()` returns a `DiagnosticResult`. Execution success alone never produces `VERIFIED`:

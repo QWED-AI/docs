@@ -5,13 +5,13 @@ description: "Release notes for the QWED Protocol: version history, new guards, 
 
 All notable changes to the QWED platform, listed by release.
 
-Jump to: [RAG and process results are advisory](#qwed-verification-—-rag-and-process-results-are-advisory-only) · [QWED-MCP v0.2.3](#qwed-mcp-v0-2-3-—-qwedai-com-no-longer-trusted-and-mcp-sdk-pinned-below-2-0) · [v8.0.0](#v8-0-0-—-attested-verdicts-and-upgrade-guide) · [Batch and agent routes enforce attestations](#qwed-verification-—-batch-and-agent-verify-routes-return-enforced-attested-results) · [Audit paging and security events](#qwed-verification-—-audit-log-paging-caller-and-admission-fields-and-security-events) · [Clients fail closed](#qwed-verification-—-python-sdk-integrations-and-github-action-fail-closed) · [Pinned sandbox image](#qwed-verification-—-pinned-sandbox-image-and-hardened-container) · [CrossHair in the Docker sandbox](#qwed-verification-—-crosshair-runs-only-in-the-docker-sandbox) · [Signed audit chain for API rows](#qwed-verification-—-api-audit-rows-written-through-the-signed-hash-chain) · [Logic DSL fixes](#qwed-verification-—-logic-dsl-compiles-iff-and-quantifiers-and-rejects-boolean-coercion) · [Proven-false math claims](#qwed-verification-—-proven-false-math-claims-are-verified-with-admission-deny) · [GitHub Action scan paths](#qwed-verification-—-github-action-scans-use-mode-defaults-and-deny-empty-scans) · [Compliance session sign-in](#qwed-verification-—-session-sign-in-and-whole-chain-check-for-compliance-endpoints) · [Security activity summary](#qwed-verification-—-security-activity-summary-replaces-the-soc-2-report) · [Role checks and hashed agent tokens](#qwed-verification-—-role-checks-on-api-key-and-audit-routes-hashed-agent-tokens) · [Docker image runs the API server](#qwed-verification-—-docker-image-runs-the-api-server-and-the-compose-stack-builds) · [Go, TypeScript, and Rust SDK admission gating](#qwed-verification-—-go-typescript-and-rust-sdks-read-the-diagnosticresult-envelope) · [Signed Verification Context documents](#qwed-verification-—-signed-verification-context-documents-and-attestation-checks) · [Contacts moved to qwedai.tech](#qwed-verification-—-contacts-and-links-moved-to-qwedai-tech) · [v7.3.0](#v7-3-0-—-five-advisories-tenant-scoping-and-credential-hardening) · [Admin endpoint tenant scoping](#qwed-verification-—-tenant-scoped-admin-endpoints-and-working-rbac) · [`verify_fact` fails closed offline](#qwed-verification-—-verify_fact-fails-closed-offline-and-money-rejects-non-finite-amounts) · [Request caps and sandbox limits](#qwed-verification-—-request-body-caps-timeouts-and-sandbox-concurrency-limits) · [v7.2.3](#v7-2-3-—-code-secret-and-sql-verification-security-release) · [QWED-A2A runtime hardening](#qwed-a2a-—-request-size-limits-engine-budget-and-code-guard-hardening) · [QWED-Tax v0.2.1](#qwed-tax-v0-2-1-—-classification-claim-vocabulary-and-strict-facts) · [QWED-Legal v0.5.1](#qwed-legal-v0-5-1-—-deadlineguard-signing-anchor-allowlist) · [v7.2.2](#v7-2-2-—-verification-soundness-and-safety-hardening) · [Open Responses v0.6.1](#qwed-open-responses-v0-6-1-—-toolguard-verifies-client-action-items) · [QWED-Finance v3.0.1](#qwed-finance-v3-0-1-—-iso-20022-sanctions-and-queryguard-security-fixes) · [QWED-Legal date and input bounds](#qwed-legal-—-fail-closed-date-handling-and-input-bounds) · [Open Responses v0.6.0](#qwed-open-responses-v0-6-0-—-fail-closed-hardening) · [QWED-Legal fail-closed hardening](#qwed-legal-—-fail-closed-hardening-for-guards-diagnostics-and-github-action) · [`qwed init` server identity handshake](#qwed-verification-—-qwed-init-server-identity-handshake) · [Leaked key auto-revocation](#qwed-verification-—-leaked-api-key-auto-revocation-and-false-positive-feedback) · [API-key format spec](#qwed-verification-—-canonical-api-key-format-spec) · [Signed secret-scanning webhook](#qwed-verification-—-signed-secret-scanning-webhook-endpoint) · [v7.2.1](#v7-2-1-—-math-answer-comparison-security-patch) · [v7.2.0](#v7-2-0-—-precision-advisory-and-security-hardening-batch) · [v7.1.0](#v7-1-0-—-verification-context-v1-0-rollout) · [v7.0.0](#v7-0-0-—-full-diagnosticresult-engine-conformance)
+Jump to: [RAG and process results are advisory](#qwed-verification-—-rag-and-process-results-are-advisory-only) · [v9.1.0](#v9-1-0-—-allowlist-admission-for-python-code) · [v9.0.0](#v9-0-0-—-eleven-advisories-and-models-you-configure) · [List agents and owner activity access](#qwed-verification-—-list-agents-and-owners-read-agent-activity) · [Session admin auth, key list, and user list](#qwed-verification-—-session-sign-in-for-key-rotation-and-threats-richer-key-list-and-user-list) · [Audit CSV exports and natural-language domain](#qwed-verification-—-audit-csv-exports-carry-verdict-and-admission-natural-language-audit-domain) · [Owner sign-in from qwed init](#qwed-verification-—-qwed-init-can-create-an-owner-who-can-sign-in) · [Whole-chain trail scope and Verification Context audit rows](#qwed-verification-—-whole-chain-trail-scope-and-verifiable-verification-context-audit-rows) · [Startup hook digest pins](#qwed-verification-—-startup-hooks-can-be-allowed-by-content-digest) · [SQL and code verifier false positives](#qwed-verification-—-sql-and-code-verifier-false-positive-fixes-and-python-3-14) · [diff() and batch math verdicts](#qwed-verification-—-math-identities-read-diff-and-batch-math-matches-verify-math) · [Claude providers stop sending `temperature`](#qwed-verification-—-claude-providers-stop-sending-temperature) · [AgentStateGuard JSON numbers](#qwed-verification-—-agentstateguard-gives-one-verdict-on-a-json-number) · [QWED-MCP v0.2.3](#qwed-mcp-v0-2-3-—-qwedai-com-no-longer-trusted-and-mcp-sdk-pinned-below-2-0) · [v8.0.0](#v8-0-0-—-attested-verdicts-and-upgrade-guide) · [Batch and agent routes enforce attestations](#qwed-verification-—-batch-and-agent-verify-routes-return-enforced-attested-results) · [Audit paging and security events](#qwed-verification-—-audit-log-paging-caller-and-admission-fields-and-security-events) · [Clients fail closed](#qwed-verification-—-python-sdk-integrations-and-github-action-fail-closed) · [Pinned sandbox image](#qwed-verification-—-pinned-sandbox-image-and-hardened-container) · [CrossHair in the Docker sandbox](#qwed-verification-—-crosshair-runs-only-in-the-docker-sandbox) · [Signed audit chain for API rows](#qwed-verification-—-api-audit-rows-written-through-the-signed-hash-chain) · [Logic DSL fixes](#qwed-verification-—-logic-dsl-compiles-iff-and-quantifiers-and-rejects-boolean-coercion) · [Proven-false math claims](#qwed-verification-—-proven-false-math-claims-are-verified-with-admission-deny) · [GitHub Action scan paths](#qwed-verification-—-github-action-scans-use-mode-defaults-and-deny-empty-scans) · [Compliance session sign-in](#qwed-verification-—-session-sign-in-and-whole-chain-check-for-compliance-endpoints) · [Security activity summary](#qwed-verification-—-security-activity-summary-replaces-the-soc-2-report) · [Role checks and hashed agent tokens](#qwed-verification-—-role-checks-on-api-key-and-audit-routes-hashed-agent-tokens) · [Docker image runs the API server](#qwed-verification-—-docker-image-runs-the-api-server-and-the-compose-stack-builds) · [Go, TypeScript, and Rust SDK admission gating](#qwed-verification-—-go-typescript-and-rust-sdks-read-the-diagnosticresult-envelope) · [Signed Verification Context documents](#qwed-verification-—-signed-verification-context-documents-and-attestation-checks) · [Contacts moved to qwedai.tech](#qwed-verification-—-contacts-and-links-moved-to-qwedai-tech) · [v7.3.0](#v7-3-0-—-five-advisories-tenant-scoping-and-credential-hardening) · [Admin endpoint tenant scoping](#qwed-verification-—-tenant-scoped-admin-endpoints-and-working-rbac) · [`verify_fact` fails closed offline](#qwed-verification-—-verify_fact-fails-closed-offline-and-money-rejects-non-finite-amounts) · [Request caps and sandbox limits](#qwed-verification-—-request-body-caps-timeouts-and-sandbox-concurrency-limits) · [v7.2.3](#v7-2-3-—-code-secret-and-sql-verification-security-release) · [QWED-A2A runtime hardening](#qwed-a2a-—-request-size-limits-engine-budget-and-code-guard-hardening) · [QWED-Tax v0.2.1](#qwed-tax-v0-2-1-—-classification-claim-vocabulary-and-strict-facts) · [QWED-Legal v0.5.1](#qwed-legal-v0-5-1-—-deadlineguard-signing-anchor-allowlist) · [v7.2.2](#v7-2-2-—-verification-soundness-and-safety-hardening) · [Open Responses v0.6.1](#qwed-open-responses-v0-6-1-—-toolguard-verifies-client-action-items) · [QWED-Finance v3.0.1](#qwed-finance-v3-0-1-—-iso-20022-sanctions-and-queryguard-security-fixes) · [QWED-Legal date and input bounds](#qwed-legal-—-fail-closed-date-handling-and-input-bounds) · [Open Responses v0.6.0](#qwed-open-responses-v0-6-0-—-fail-closed-hardening) · [QWED-Legal fail-closed hardening](#qwed-legal-—-fail-closed-hardening-for-guards-diagnostics-and-github-action) · [`qwed init` server identity handshake](#qwed-verification-—-qwed-init-server-identity-handshake) · [Leaked key auto-revocation](#qwed-verification-—-leaked-api-key-auto-revocation-and-false-positive-feedback) · [API-key format spec](#qwed-verification-—-canonical-api-key-format-spec) · [Signed secret-scanning webhook](#qwed-verification-—-signed-secret-scanning-webhook-endpoint) · [v7.2.1](#v7-2-1-—-math-answer-comparison-security-patch) · [v7.2.0](#v7-2-0-—-precision-advisory-and-security-hardening-batch) · [v7.1.0](#v7-1-0-—-verification-context-v1-0-rollout) · [v7.0.0](#v7-0-0-—-full-diagnosticresult-engine-conformance)
 
 ---
 
 ## QWED Verification — RAG and process results are advisory only
 
-**Unreleased** · [GitHub PR #601](https://github.com/QWED-AI/qwed-verification/pull/601) · [GitHub PR #604](https://github.com/QWED-AI/qwed-verification/pull/604)
+**Released in v10.0.0 (November 14, 2026)** · [GitHub PR #601](https://github.com/QWED-AI/qwed-verification/pull/601) · [GitHub PR #604](https://github.com/QWED-AI/qwed-verification/pull/604)
 
 > **Verdict change.** `/verify/rag`, `/verify/process` and the GitHub Action's `verify-process` mode no longer report `VERIFIED`. Their guards compare data the request supplies (chunk labels, a target label and a threshold) or match keywords, so they can't show that the retrieval or the reasoning is right.
 
@@ -40,6 +40,281 @@ if not guard["verified"]:
 
 In GitHub workflows, stop gating on `verified`, `verdict` or `admission` after `verify-process`. Gate on the step itself, which fails when a step or milestone is missing.
 </Warning>
+
+---
+
+## v9.1.0 — Allowlist admission for Python code
+
+**Released: November 7, 2026** · [GitHub PR #596](https://github.com/QWED-AI/qwed-verification/pull/596) · [GitHub PR #594](https://github.com/QWED-AI/qwed-verification/pull/594) · [GitHub Release](https://github.com/QWED-AI/qwed-verification/releases/tag/v9.1.0)
+
+> **Minor release with one security fix.** `CodeVerifier` now admits Python code only when every module, module name, builtin and special attribute it uses is on a list. Code that 9.0.0 admitted may now be refused. The server also reads `.env` before any of its settings. Read the upgrade steps below before you upgrade.
+
+### Security fixes
+
+The advisory affects all versions up to 9.0.0. Upgrading is recommended.
+
+- **`CodeVerifier` admits only listed modules, builtins and special attributes** ([GHSA-9r7q-mx75-hcj7](https://github.com/QWED-AI/qwed-verification/security/advisories/GHSA-9r7q-mx75-hcj7), high). Reported by kta1kri. `/verify/code` returned `VERIFIED · ADMIT` for Python that read and wrote files with `io.FileIO`, sent data with `urllib3`, unpickled with `pickle.Unpickler`, started processes with `multiprocessing` and read `os.environ`. It refused code by lists of dangerous names and admitted anything those lists did not hold. Python code is now admitted only when:
+  - every module it imports, and every name it uses from one, is on the list of standard-library modules that compute without files, the network, processes, the environment or the import system. Third-party modules are not admitted.
+  - every builtin it reads is listed: the public exceptions, the builtins that compute, `print`, `input`, `exit` and `quit`.
+  - every special attribute (`__x__`) it uses is listed, and it reads no attribute's value by a name made at run time. `hasattr` is admitted: it only answers whether an attribute exists, although the lookup can run a property.
+  - no module is used as a value or written to, and no frame or traceback is read.
+
+  The code-execution sandbox passes the third-party modules its import guard confines (`numpy`, `pandas`, `scipy`, `sklearn`, `statsmodels`, `patsy`) as trusted, so the Statistics engine still runs that code. The GitHub Action's `scan-code` mode takes none of the new finding types, so repository scans don't change.
+
+### What changed
+
+- **`CodeVerifier(trusted_modules=...)`.** Names top-level modules that your own runtime confines, such as a sandbox with an import guard. The module checks skip a trusted module, so don't rely on them for one. The builtin, attribute and frame checks still apply.
+- **The server reads `.env` before any of its settings** ([#594](https://github.com/QWED-AI/qwed-verification/pull/594)). Before 9.1.0, the maths worker, database, rate limiter and auth settings were read before `.env` loaded, so a value written only in `.env` was ignored. For example, `DATABASE_URL` fell back to `sqlite:///./qwed.db`. The server now loads `.env` from the working directory, then `~/.qwed/.env`, before any other module. Values set in the process environment (the shell, Docker `-e`, Kubernetes `env`, Compose) still win over `.env`.
+
+<Warning>
+**Upgrading to 9.1.0.** These changes can make `/verify/code`, `QWEDLocal.verify_code` and the CLI refuse code that 9.0.0 admitted. Each refusal is a finding that names the module, builtin or attribute.
+
+1. **Imports.** Code that imports a third-party module (`numpy`, `pandas`, `requests`), or a standard-library module that is not listed (`asyncio`, `logging`, `warnings`, `subprocess`, `importlib`, `pathlib` and others), is refused even if it calls nothing from it. So are the `os.path` functions that read the file system, the working directory or the environment; `sys.stdin`, `sys.stdout` and `sys.stderr`; `contextlib.redirect_stdout`; `pprint.PrettyPrinter`; and star imports from `copy`, `dataclasses`, `enum`, `functools` and `time`.
+2. **Builtins.** A read of `open`, `vars`, `globals`, `locals`, `getattr`, `setattr`, `delattr`, `help`, `license`, `credits`, `copyright`, `breakpoint`, `memoryview` or `__build_class__` is refused, also where it is the name of your own variable or parameter. Rename it, for example to `help_text`.
+3. **Attributes.** Special attributes that are not listed (`__func__`, `__wrapped__`, `__get__`, `__reduce__` and others) are refused. `.format` and `.format_map` need a template written in the code with no attribute in a field. Use an f-string otherwise. `copy.copy`, `functools.update_wrapper`, `ast.iter_fields`, `types.MethodType` and `dataclasses.make_dataclass` are no longer listed. A class pattern with positional parts (`case Point(x, y)`) needs a class whose `__match_args__` is fixed: a builtin or listed class, or a class statement whose bases are such and whose decorators are listed.
+4. **SDK cache.** `QWEDLocal` doesn't serve code results it cached before 9.1.0 (its cache policy version is now `code_verifier-v3`).
+5. **`.env`.** Before upgrading, check `.env` in the working directory and `~/.qwed/.env` for settings the process environment doesn't set. The server now uses them: a `DATABASE_URL` there becomes the database the server opens, `QWED_AUTH_TRUSTED_PROXIES` there decides which proxies' `X-Forwarded-For` the server trusts for the client address, and a maths setting the server can't use stops the start.
+</Warning>
+
+---
+
+## v9.0.0 — Eleven advisories and models you configure
+
+**Released: November 6, 2026** · [GitHub PR #589](https://github.com/QWED-AI/qwed-verification/pull/589) · [GitHub PR #575](https://github.com/QWED-AI/qwed-verification/pull/575) · [GitHub Release](https://github.com/QWED-AI/qwed-verification/releases/tag/v9.0.0)
+
+> **Major release.** It fixes eleven advisories in code, maths, SQL and logic verification, the GitHub Action and sign-up. QWED no longer names models of its own: each provider runs the model you configure. The CSV exports change their columns, and the Go module path ends in `/v9`. Read the upgrade steps below before you upgrade.
+
+### Security fixes
+
+The advisories affect all versions up to 8.0.0. Upgrading is recommended.
+
+- **`CodeVerifier` refuses modules taken by name from the import system** ([GHSA-qrp4-p44j-m484](https://github.com/QWED-AI/qwed-verification/security/advisories/GHSA-qrp4-p44j-m484), high). Code that loaded a module by its name as a string, for example through `importlib.util.module_from_spec`, `pkgutil.resolve_name`, `pydoc.locate` or `sys.modules.get(...)`, was `VERIFIED · ADMIT`. These names are now refused wherever they appear, and any read of `sys.modules` is refused.
+- **`CodeVerifier` refuses eleven more modules that run strings as code, and more file readers** ([GHSA-jrxf-9jh4-86w7](https://github.com/QWED-AI/qwed-verification/security/advisories/GHSA-jrxf-9jh4-86w7), high). Importing `timeit`, `cProfile`, `profile`, `pdb`, `bdb`, `code`, `codeop`, `trace`, `doctest`, `logging.config` or `idlelib` is refused. Archive, compressed-file, `tempfile`, `sqlite3`, `shelve`, `glob` and other file readers join the file-access checks.
+- **`CodeVerifier` refuses code hidden in strings that typing evaluates** ([GHSA-p75q-7rg5-ff46](https://github.com/QWED-AI/qwed-verification/security/advisories/GHSA-p75q-7rg5-ff46), high). Strings that typing may compile, such as string annotations and `ForwardRef` arguments, are now parsed and refused when they hold a call, lambda, comprehension or assignment expression.
+- **`CodeVerifier` refuses a source encoding other than UTF-8** ([GHSA-pr6c-cqg8-6w5r](https://github.com/QWED-AI/qwed-verification/security/advisories/GHSA-pr6c-cqg8-6w5r), high). Under a `utf-7` or `unicode_escape` coding declaration, text checked as a comment could decode to statements at run time. Such a declaration is now refused.
+- **The Action's `scan-code` mode resolves from-imports, aliases, importlib and `getattr`** ([GHSA-hg73-j3qv-w4vh](https://github.com/QWED-AI/qwed-verification/security/advisories/GHSA-hg73-j3qv-w4vh), medium). It also runs `CodeVerifier` on each file. Attribute access by a computed name is reported as a warning in the new `warnings_count` output and doesn't fail the scan. A pass means no known dangerous pattern was found, not that the code is safe.
+- **The maths parser refuses unknown functions and gives `n` no hidden domain** ([GHSA-5h3v-3463-78hf](https://github.com/QWED-AI/qwed-verification/security/advisories/GHSA-5h3v-3463-78hf), medium). `sinc(0) = 0` and `Abs(n) = n` were `VERIFIED · ADMIT`. A name of two or more letters in call position must now be a supported function, a multi-letter name is one symbol, and `n` is a plain variable.
+- **`/verify/math` and batch maths run in worker processes with a time limit** ([GHSA-qgjc-92m3-fcr6](https://github.com/QWED-AI/qwed-verification/security/advisories/GHSA-qgjc-92m3-fcr6), medium). A job past `QWED_MATH_TIMEOUT_SECONDS` (default 10) is `UNVERIFIABLE` (`math.timeout`) and its worker is killed. A request that finds the pool full is `BLOCKED` (`math.capacity`).
+- **`verify_math` no longer accepts wrong small values or wrong 7th digits** ([GHSA-8hp7-jqjc-hrhf](https://github.com/QWED-AI/qwed-verification/security/advisories/GHSA-8hp7-jqjc-hrhf), medium). `1/1000000000 = 0` was `VERIFIED`. The comparison is now unrounded, `tolerance=0` is exact, and the result's new `match` field says how a claim matched.
+- **SQL tautologies written with `IN`, `IS`, `LIKE`, `BETWEEN` and other operators are refused** ([GHSA-jvhg-jw63-gr5g](https://github.com/QWED-AI/qwed-verification/security/advisories/GHSA-jvhg-jw63-gr5g), medium). A filter predicate that reads no data and still can't be evaluated is not admitted (`sql_verifier.unevaluated_predicate`).
+- **Logic verification keeps numbers exact** ([GHSA-w73j-4jjq-q53j](https://github.com/QWED-AI/qwed-verification/security/advisories/GHSA-w73j-4jjq-q53j), medium). Number-only sub-expressions such as `1/3` or `0.1 + 0.2` were computed as floats before Z3 saw them, so `prove_theorem` proved false statements. Decimal literals and divisions of two numbers are now exact or refused.
+- **Sign-up no longer prints the new user's password hash** ([GHSA-mr5j-gm4f-6c27](https://github.com/QWED-AI/qwed-verification/security/advisories/GHSA-mr5j-gm4f-6c27), low). Debug prints in `POST /auth/signup` wrote the user record, password hash included, to standard output. Treat hashes that earlier logs may have collected as exposed.
+
+### What changed
+
+- **Each provider runs the model you configure** ([#575](https://github.com/QWED-AI/qwed-verification/pull/575)). QWED no longer falls back to model names of its own. Each provider takes its model from the argument you pass or from its variable, and raises an error naming the variable when neither is set.
+- **Audit rows store real latency.** `/audit/logs` returns the measured `latency_ms` of each row, and both CSV exports have a `Latency (ms)` column. Rows written before 9.0.0 return `null`.
+- **Other changes since 8.0.0.** 9.0.0 also ships the API key list fields (`expires_at`, `rotation_required`, `owner`), `GET /auth/users`, `GET /agents` and owner access to agent activity, `qwed init --owner-email`, `org_name` on sign-in and `/auth/me`, the shared CSV export columns, the `NATURAL_LANGUAGE` audit domain, default sampling for the Anthropic and Claude Opus providers, and one verdict for JSON numbers in `AgentStateGuard`. It also ships key rotation and the threat summary for a signed-in session, statistics verification and `verify_python_deep` on Python 3.14, `diff()` in `/verify/math` (and refusal of `d/dx`), SQL queries with a parenthesised subquery or a `;` inside a string or comment, `exec`, `eval` and `compile` read as names instead of substrings, an audit row for a signed Verification Context document that verifies, and startup hooks allowed by the digest of their contents.
+
+<Warning>
+**Upgrading to 9.0.0.** These changes can break existing deployments and callers.
+
+1. **Set a model.** Set the model variable of the provider you use: `OPENAI_MODEL`, `AZURE_OPENAI_DEPLOYMENT`, `ANTHROPIC_MODEL`, `CLAUDE_OPUS_DEPLOYMENT`, `GEMINI_MODEL`, `OLLAMA_MODEL` or `CUSTOM_MODEL`. With none set, `qwed verify` and `qwed interactive` stop with an error naming the variable unless you pass `--model`. On the server, `ANTHROPIC_DEPLOYMENT` still wins over `ANTHROPIC_MODEL` when it is set. With an explicit `--base-url`, `qwed verify` reads no model variable, not even `CUSTOM_MODEL`, and needs `--model`. For Anthropic the CLI reads only `ANTHROPIC_MODEL` or `--model`. The server still starts, because it builds a provider on first use; logic, statistics and fact requests that need the provider then fail with that error, and the natural-language routes answer `UNVERIFIABLE`. `ACTIVE_PROVIDER`, and any provider a request names, must be one of `openai`, `openai_direct`, `openai_compat`, `azure_openai`, `anthropic`, `claude_opus`, `gemini`, `ollama` or `auto`.
+2. **Pass `model=` in Python.** `QWEDLocal`, `verify()` and `qwed_sdk.integrations.langchain.QWEDTool` raise `ValueError` without it. The `qwed_sdk.langchain.QWEDTool` that calls a QWED server takes no model. If `qwed verify` ran the saved provider with the key in `QWED_API_KEY`, set that provider's key variable or pass `--api-key`.
+3. **Update CSV export readers.** `GET /admin/compliance/export/csv` and `GET /audit/export` write a new, shared set of columns and at most the newest 1,000 rows. `X-Export-Truncated: true` is set when more rows matched.
+4. **Write `*` between names you multiply.** `xy` is now one name, and `n` is a plain variable. A single letter before a bracket is still a product (`f(0)` is `f*0`). With no tolerance, `verify_math` needs a claim to match to 9 significant digits, or to be correctly rounded with at least 6, within 1e-6. `VerificationEngine.verify_math`'s `tolerance` defaults to `None`.
+5. **Size the maths worker pool.** `/verify/math` and batch maths run in worker processes set by `QWED_MATH_WORKERS` (default 2), `QWED_MATH_TIMEOUT_SECONDS` (10), `QWED_MATH_MAX_WAITING` (32), `QWED_MATH_WORKER_MEMORY_MB` (2048, Linux only, `0` turns it off) and `QWED_BATCH_MATH_BUDGET_SECONDS` (120). A value these settings can't use stops the server at startup with an error naming the setting. In 9.0.0, a server started with `uvicorn qwed_new.api.main:app` reads the four `QWED_MATH_*` settings before `.env` loads: a value written only in `.env` is ignored and the default runs, and a value there that the server can't use makes every maths job `BLOCKED` (`math.worker_error`) instead of stopping the start. Set them in the process environment, or upgrade to 9.1.0.
+6. **Expect more code refusals.** `CodeVerifier` refuses the modules, names and attributes in the advisories above, and a coding declaration other than UTF-8.
+7. **Check Action gates.** `scan-code` also reports `CodeVerifier`'s code- and process-execution findings, refuses a Python file whose coding declaration isn't UTF-8 or whose bytes aren't valid UTF-8, and adds the `warnings_count` output.
+8. **Upgrade every server process together.** Each audit row's `latency_ms` is now covered by its entry hash, so an 8.x process can't verify rows that 9.0.0 writes. An existing database gets the column at startup. Natural-language rows are stored with the domain `NATURAL_LANGUAGE`, not `MATH`; rows already written keep `MATH`. The audit row of a signed Verification Context document stores the document as returned, with any personal data in it; its `query` column is still redacted.
+9. **Update callers of changed results.**
+   - A batch maths item proven false is `VERIFIED` with `is_valid` false and admission `BLOCKED`, as on `/verify/math`.
+   - Input the maths parser refuses is `BLOCKED` with `math.parse_error`, and Python that doesn't parse is `BLOCKED` with `code_verifier.parse_error`.
+   - `/auth/me` answers `403` for an inactive user or organisation or an unknown role, and sign-in refuses a user of an inactive organisation.
+   - A password over 72 bytes is `400` at sign-up and `401` at sign-in, not `500`.
+10. **Move to `z3-solver==5.3.2.0`.** `qwed` now requires it (it required 5.1.0.0). The server image moves to sqlglot 30.25.0, anthropic 2.3.0, FastAPI 0.162.0, openai 3.41.0 and python-dateutil 3.0.0.
+11. **Update the Go module path.** Change imports from `github.com/QWED-AI/qwed-verification/sdk-go/v8` to `github.com/QWED-AI/qwed-verification/sdk-go/v9`, then run `go get github.com/QWED-AI/qwed-verification/sdk-go/v9@v9.0.0`. The Go, TypeScript and Rust SDKs have no API changes in this release.
+</Warning>
+
+---
+
+## QWED Verification — list agents, and owners read agent activity
+
+**v9.0.0** · [GitHub PR #544](https://github.com/QWED-AI/qwed-verification/pull/544) · Closes [issue #527](https://github.com/QWED-AI/qwed-verification/issues/527)
+
+> Owners and admins can now list their organization's agents and read any of those agents' activity without the agent's token. The activity route's `limit` is now capped at 200.
+
+### What changed
+
+- **New `GET /agents`.** Returns every agent in your organization, oldest first, with `id`, `name`, `type`, `status`, `created_at`, and `last_active`. Suspended and deactivated agents are included. `last_active` is `null` until the agent first authenticates. The response never includes the agent token or its digest. Owners and admins can call it with an API key or a signed-in session. Members and viewers get `403 Forbidden`, and a request with no credential gets `401 Unauthorized`.
+- **Owner access to `GET /agents/{agent_id}/activity`.** The route also accepts an owner's or admin's API key or session for an agent in their organization. An agent in another organization, a missing agent, or an out-of-range ID returns `404 Not Found`. When you send `X-Agent-Token`, the token alone decides access, as before. A wrong token returns `401 Unauthorized`, even beside an owner's session.
+- **Bounded `limit`.** The activity route's `limit` now accepts `1` to `200` (default `20`). It was unbounded. A value out of range returns `422 Unprocessable Entity`.
+- **Ordering and timestamps.** Activity comes newest first, with ties broken by ID. Timestamps on both routes carry their UTC offset.
+
+```bash
+curl --fail-with-body http://localhost:8000/agents \
+  -H "Authorization: Bearer $QWED_SESSION_TOKEN"
+```
+
+See [`GET /agents`](/api/endpoints#get-%2Fagents) and [`GET /agents/{agent_id}/activity`](/api/endpoints#get-%2Fagents%2F%2Factivity).
+
+---
+
+## QWED Verification — session sign-in for key rotation and threats, richer key list, and user list
+
+**v9.0.0** · [GitHub PR #531](https://github.com/QWED-AI/qwed-verification/pull/531) · [#540](https://github.com/QWED-AI/qwed-verification/pull/540) · [#541](https://github.com/QWED-AI/qwed-verification/pull/541) · [#549](https://github.com/QWED-AI/qwed-verification/pull/549)
+
+> A dashboard signed in with a session can now rotate keys, read the threat summary, and list the organization's users without an API key. The key list and the user object return more of what QWED already stores.
+
+### Added
+
+- **Session sign-in for key rotation and the threat summary.** `POST /admin/keys/rotate` and `GET /admin/security/threats/{org_id}` accept `Authorization: Bearer <jwt>` with the same session checks as the compliance endpoints. QWED uses the API key when you send both, and returns `401` when you send neither. The role and organization rules are unchanged. `POST /agents/{agent_id}/token/reissue` still requires an API key.
+- **Key list fields.** Each key from `GET /auth/api-keys` adds `expires_at` (`null` when the key doesn't expire), `rotation_required`, and `owner` (`{id, email}`). `owner` is `null` for a key with no user, or whose user isn't in the key's organization. `expires_at`, `created_at`, and `last_used_at` always carry their UTC offset. Who sees which keys is unchanged.
+- **`org_name` on the user object.** Sign-up, sign-in, and `GET /auth/me` return `org_name`, the organization's display name, or `null` if QWED can't read it.
+- **`GET /auth/users`.** Owners and admins list the users of their organization, oldest first, with an API key or a signed-in session. Each user has `id`, `email`, `role`, `is_active`, and `created_at`. Inactive users are included. Members and viewers get `403`.
+
+### Fixed
+
+- **Threat summary.** `GET /admin/security/threats/{org_id}` no longer fails on every call with the pinned SQLModel release. Its `generated_at` is now UTC with a `+00:00` offset.
+- **Inactive accounts on `/auth/me`.** `GET /auth/me` now applies the user-session checks. An inactive user or organization, or an unknown role, returns `403` instead of an answer from a still-valid token. Sign-in refuses a user whose organization is inactive with `403` `"Organization is not active"`.
+- **Passwords over 72 bytes.** `POST /auth/signup` and `POST /auth/signin` no longer return `500` for a password over 72 bytes in UTF-8. Sign-up refuses it with `400` `"Password must be at most 72 bytes"`, before checking the email. Sign-in answers `401` `"Invalid email or password"`. An account whose password was set over 72 bytes under bcrypt 4, which used only the first 72 bytes, can't sign in with that password.
+
+See [Session sign-in for admin endpoints](/api/endpoints#session-sign-in-for-admin-endpoints), [`GET /auth/users`](/api/authentication#get-%2Fauth%2Fusers), and [`GET /auth/api-keys`](/api/authentication#get-%2Fauth%2Fapi-keys).
+
+---
+
+## QWED Verification — audit CSV exports carry verdict and admission; natural-language audit domain
+
+**v9.0.0** · [GitHub PR #542](https://github.com/QWED-AI/qwed-verification/pull/542) · [GitHub PR #543](https://github.com/QWED-AI/qwed-verification/pull/543) · [GitHub PR #546](https://github.com/QWED-AI/qwed-verification/pull/546)
+
+> Both CSV exports now write the same columns, including the stored verdict, admission, and latency, and take a period. Natural-language audit rows get their own domain, and every audit row stores its real latency.
+
+### What changed
+
+- **Shared CSV columns.** [`GET /admin/compliance/export/csv`](/api/endpoints#get-%2Fadmin%2Fcompliance%2Fexport%2Fcsv) and [`GET /audit/export`](/api/authentication#get-%2Faudit%2Fexport) write `ID`, `Timestamp`, `User ID`, `API Key ID`, `Verifier Version`, `Domain`, `Query`, `Verdict`, `Admission`, `Is Verified (legacy)`, `Result`, `Latency (ms)`, `Entry Hash`, `HMAC Signature`, and `Chain Status`. `Verdict` and `Admission` are the stored values, as `GET /audit/logs` returns them. A value QWED didn't record is an empty cell. No cell is truncated.
+- **Formula guard.** A cell that starts with `=`, `+`, `-`, `@`, a tab, a carriage return, or a line feed gets a leading apostrophe, so spreadsheet software doesn't run it as a formula.
+- **Export period.** Both exports take `start` and `end`. A time without a zone is UTC, and `start` after `end` returns `400`. Rows are newest first. The compliance export defaults to the 30 days before `end`, and `end` defaults to now. It checks the period after those defaults, so a future `start` with no `end` returns `400`.
+- **Row cap.** Both exports hold at most the newest 1,000 rows and set `X-Export-Truncated: true` when more matched, otherwise `false`. CORS exposes the header. The compliance export had no cap before.
+- **`NATURAL_LANGUAGE` audit domain.** `/verify/natural_language`, `/agents/{agent_id}/verify`, and natural-language `/verify/batch` items now write domain `NATURAL_LANGUAGE` (`engine_used` on `/audit/logs`, `Domain` in the CSV exports) instead of `MATH`. `/verify/math` and batch math items still write `MATH`. Rows already written keep `MATH`, because the domain is part of each signed, chained entry.
+- **Real latency in the audit log.** `GET /audit/logs` and `GET /audit/logs/{log_id}` returned `latency_ms` as a fixed `0`. QWED now stores each row's latency: whole milliseconds from the start of the HTTP request to when QWED began writing the audit row, before it waits for the append lock, including the verifier and any LLM call. Rows written outside a request, and rows written before this change, return `null`. Both CSV exports carry it in a `Latency (ms)` column after `Result`, empty when `null`. The entry hash covers `latency_ms`, so changing or clearing it fails integrity verification. Rows hashed before this change still verify. QWED adds the `latency_ms` column to an existing database at startup. Upgrade every server process together: an 8.x process can't verify rows that 9.0.0 writes.
+
+<Warning>
+**Breaking for CSV consumers.** Update any client that reads the export columns by name or position.
+
+- **Before:** `GET /admin/compliance/export/csv` covered only the last 30 days, cut the query to 100 characters and the signature to 16, and had no verdict, admission, or result. `GET /audit/export` wrote `is_verified` as `verified` or `blocked` under `Status`, with no admission or caller.
+- **After:** Both write the 15 shared columns above in full. Read `Admission` for the decision. `Is Verified (legacy)` is the old flag as `Yes` or `No`.
+- **Audit domain:** Reports that group by `engine_used` or `Domain` now see `NATURAL_LANGUAGE` for new natural-language rows. `MATH` rows written before the upgrade can include natural-language requests.
+</Warning>
+
+---
+
+## QWED Verification — `qwed init` can create an owner who can sign in
+
+**v9.0.0** · [GitHub PR #547](https://github.com/QWED-AI/qwed-verification/pull/547) · Fixes [issue #524](https://github.com/QWED-AI/qwed-verification/issues/524)
+
+> `qwed init` used to sign up with a generated email and password that it never showed or saved. Nobody could sign in to the organization it created, and its records could not be read in qwed-dashboard. You can now name the owner.
+
+### What changed
+
+- **`--owner-email`.** Names the organization owner. `QWED_OWNER_EMAIL` is read only when the flag is not given. An explicit empty or blank flag is refused, not replaced by the environment variable. Without either, interactive `qwed init` asks for the email after the organization name.
+- **Hidden password prompt.** `qwed init` asks for the owner password with hidden input and a confirmation. The password is never a flag, and `qwed init` never prints or saves it.
+- **Non-interactive mode.** With an owner email, the password comes from `QWED_OWNER_PASSWORD`. If it is missing, `qwed init` stops before the server starts. The local server `qwed init` starts does not inherit `QWED_OWNER_PASSWORD`.
+- **No owner email.** `qwed init` keeps the generated owner and warns that nobody can sign in to the organization. Running `qwed init` again with `--owner-email` creates a new organization and does not recover the earlier one's records.
+- **Checks.** The email needs a name before exactly one `@`, a domain with a dot inside it, and no whitespace. The password must be 1 to 72 UTF-8 bytes. An email that is already registered fails with `Email already registered` and tells you how to continue.
+- **Output.** On success, `qwed init` prints `[ok] Owner: <email> (sign in with the password you set)`.
+
+```bash
+export QWED_OWNER_PASSWORD="$CI_QWED_OWNER_PASSWORD"
+qwed init --non-interactive --provider openai --api-key "$OPENAI_API_KEY" --model "$OPENAI_MODEL" --owner-email owner@example.com
+```
+
+See [Organization owner](/advanced/cli#organization-owner).
+
+---
+
+## QWED Verification — whole-chain trail scope and verifiable Verification Context audit rows
+
+**v9.0.0** · [GitHub PR #551](https://github.com/QWED-AI/qwed-verification/pull/551) · [GitHub PR #550](https://github.com/QWED-AI/qwed-verification/pull/550)
+
+### Fixed
+
+- **The whole-chain check names the whole trail.** [`GET /admin/compliance/verify-trail`](/api/endpoints#get-%2Fadmin%2Fcompliance%2Fverify-trail) with no `start` or `end` checks every entry of the organization, but its `scope` said "audit entries recorded in the period". With neither bound, `scope` now reads "Signature and hash-chain check of every audit entry recorded for the organisation. It does not show that every request was recorded." With `start`, `end`, or both, it still names the period. The security activity summary always has a period, so its `audit_trail.scope` is unchanged. Only the text changed. The status, counts, and `proof_ref` are as before.
+- **The audit row of a signed Verification Context document verifies.** [`POST /verification-context/from-diagnostic`](/api/endpoints#post-%2Fverification-context%2Ffrom-diagnostic) signs the document it returns, but its audit row stored a copy with personal data redacted after signing. That copy no longer matched its attestation, so a consumer reading it from `GET /audit/logs` couldn't verify it.
+  - The row now stores the document exactly as returned. Its attestation matches the stored document, so the row verifies with `POST /verification-context/validate` until the attestation expires (`QWED_ATTESTATION_TTL_SECONDS`, 24 hours by default) and while the server keeps the signing key.
+  - The row's `query` is still redacted.
+  - The stored document keeps any personal data you put in the query or the diagnostic, including its `agent_message` and `developer_fields`. To keep personal data out of it, mask the data in the query of the original verification and send that query unchanged here: for a `VERIFIED` diagnostic the attestation covers the query, so masking it only at this call makes the document `BLOCKED`.
+  - Rows written before this change keep their redacted copy, which may not verify against its attestation: it fails when the redaction changed a signed field.
+
+---
+
+## QWED Verification — startup hooks can be allowed by content digest
+
+**v9.0.0** · [GitHub PR #553](https://github.com/QWED-AI/qwed-verification/pull/553) · Fixes [issue #491](https://github.com/QWED-AI/qwed-verification/issues/491)
+
+> In a Python 3.11 venv, setuptools' `distutils-precedence.pth` (which uses `__import__(`) and coverage's `a1_coverage.pth` (which uses `exec(`) stopped the server at startup. Allowing them by name didn't help, because an allowed name is still scanned for those patterns. The only way through was `QWED_SKIP_ENV_INTEGRITY_CHECK=true`.
+
+### What changed
+
+- **Digest pins.** `QWED_ALLOWED_STARTUP_PTH_FILES` now also accepts `NAME.pth:sha256:<64 hex>`. QWED allows such a file only while its exact contents hash to that digest, and then doesn't pattern-scan it. A pin overrides a plain name for the same file.
+- **Mismatches fail closed.** A pinned file whose contents differ fails the check and is counted as `digest_mismatch` in the guard's `counts`. A pin that isn't `NAME.pth:sha256:<64 hex>` stops startup with a `ValueError` instead of being read as a name.
+- **Plain names unchanged.** A plain name works as before, and the suspicious patterns are unchanged. QWED ships no built-in digests, because these files change between setuptools and coverage versions.
+- **Python SDK.** `StartupHookGuard` takes `pinned_pth_digests`, and `parse_startup_hook_allowlist` parses the variable's value.
+
+See [Startup environment integrity](/advanced/security-hardening#llm05-supply-chain-vulnerabilities) for how to take a file's digest, and [StartupHookGuard](/sdks/guards#startuphookguard).
+
+---
+
+## QWED Verification — SQL and code verifier false-positive fixes, and Python 3.14
+
+**v9.0.0** · [GitHub PR #554](https://github.com/QWED-AI/qwed-verification/pull/554) · [GitHub PR #555](https://github.com/QWED-AI/qwed-verification/pull/555) · [GitHub PR #560](https://github.com/QWED-AI/qwed-verification/pull/560) · [GitHub PR #569](https://github.com/QWED-AI/qwed-verification/pull/569)
+
+> The SQL and code verifiers no longer refuse common safe queries and snippets, and statistics verification works on Python 3.14.
+
+### What changed
+
+- **SQL subqueries are checked, not blocked ([#554](https://github.com/QWED-AI/qwed-verification/pull/554)).** A query with an `IN (SELECT ...)`, a scalar subquery, or a subquery in `FROM` was `BLOCKED` with `sql_verifier.execution_error`. It is now checked like any other query. Nesting past `max_subquery_depth` (`3`) is `BLOCKED` with `sql_verifier.complexity_limit_exceeded`. `complexity.subquery_depth` now reports `0` for a `UNION` of two plain `SELECT` statements. See [Subqueries and complexity limits](/engines/sql#subqueries-and-complexity-limits).
+- **A `;` in a string or comment is not a stacked query ([#555](https://github.com/QWED-AI/qwed-verification/pull/555)).** A `;` inside a string literal, a dollar-quoted string, or a comment no longer marks the query as `stacked_queries`. Two real statements still do. A query with a backslash, a `--` not followed by ASCII whitespace, a nested `/*`, a lone carriage return, or a parse failure still counts every `;`. See [Stacked queries](/engines/sql#stacked-queries).
+- **`exec`, `eval`, and `compile` are matched as names ([#560](https://github.com/QWED-AI/qwed-verification/pull/560)).** `CodeVerifier` matches `eval`, `exec`, `compile`, `__import__`, `getattr`, and `setattr` on the AST, not as substrings. `cur.execute(...)`, `model.evaluate(x, y)`, and `re.compile(...)` in a snippet that imports `re` are no longer `dangerous_function`. Any line containing `__import__` is still reported as `dangerous_attribute`. The names stay refused as values, keywords, function or parameter names, imports, attributes, and in strings, including strings built from literals. Python that does not parse is now `BLOCKED` with `code_verifier.parse_error`. See [`eval`, `exec`, and `compile` are matched as names](/engines/code#eval-exec-and-compile-are-matched-as-names).
+- **Statistics verification on Python 3.14 ([#569](https://github.com/QWED-AI/qwed-verification/pull/569)).** Python 3.14 removed `ast.Num` and `ast.Str`. On the server image, which runs 3.14, every `/verify/stats` request that passed the upload checks was `BLOCKED`, and `verify_python_deep` blocked code with a sink argument such as `os.system(request.args)`. Both failed closed and now work. Python 3.10 to 3.13 behave as before. See [Stats engine](/engines/stats#prerequisites).
+
+---
+
+## QWED Verification — math identities read diff(), and batch math matches /verify/math
+
+**v9.0.0** · [GitHub PR #558](https://github.com/QWED-AI/qwed-verification/pull/558) · [GitHub PR #557](https://github.com/QWED-AI/qwed-verification/pull/557)
+
+> **Behavior change.** `/verify/batch` math items with `=` now return the same verdict as `POST /verify/math`. A batch math claim proven false is `VERIFIED` with `is_valid: false`, a `proof_ref`, an `attestation`, and admission `BLOCKED`. It was `UNVERIFIABLE`.
+
+### What changed
+
+- **`diff()` in identities.** The expression parser evaluates `diff` and `Derivative`, so `diff(x**2, x) == 2*x` is `VERIFIED`. It was `BLOCKED` as an internal error. The total derivative order in one expression is at most 3, nested calls included. A derivative cannot appear inside a power, `factorial`, or `binomial`.
+- **`==` reads as `=`** in an identity.
+- **Leibniz notation is refused.** `d/dx(x^2) = 2x` was read as symbols `d` and `dx` and came back proven false. Now `d/dx`, `dy/dx`, `d(x^2)/dx`, `d^2y/dx^2`, and `d`-prefixed names that SymPy splits into letters (`dx`, `dtheta`, `data`) return `BLOCKED` with the message to write `diff(f, x)`. To use such a name as a symbol, pass it in `extra_symbols`. `extra_symbols` is an argument of `safe_parse_expr()` in the Python package only; `/verify/math` and batch items don't take it, so there rename the variable.
+- **Parse errors are input errors.** Input the parser refuses is `BLOCKED` with `constraint_id: "math.parse_error"` and `Expression could not be parsed`, not `api.math.execution_error`. The parser's text is not returned. A batch math item the parser refuses gets the same result instead of a `failed` item.
+- **Domain check covers derivatives.** `diff(sqrt(x), x)*2*sqrt(x) = 1` holds only for `x` other than 0, so it is `UNVERIFIABLE` with `math.domain_restricted_identity`. A non-zero numeric multiplier in a denominator no longer counts as a singular factor, so `2/(2*sqrt(x)) = 1/sqrt(x)` is `VERIFIED`.
+- **Batch math equality items carry the route's fields.** Items with `=` include `left_side`, `right_side`, `simplified_difference`, `result`, and the route's messages (`Identity is true`, `Identity is false`), and keep `query`, `type`, and `diff`.
+- **Undefined parts are not disproven.** A claim with a side that has an undefined part (one that evaluates to `zoo` or `nan`) that SymPy evaluated away, such as `log(0)**0 = 2`, is `UNVERIFIABLE` with `math.undefined_part` on both routes. `log(0)**0 = 1`, where the sides agree, is `UNVERIFIABLE` with `math.domain_restricted_identity`. `/verify/math` gave it a signed disproof before.
+
+See [Derivatives in `/verify/math` identities](/engines/math#derivatives-in-%2Fverify%2Fmath-identities), [`POST /verify/math`](/api/endpoints#post-%2Fverify%2Fmath), and [Math items](/api/endpoints#math-items-proof-vs-simplification).
+
+---
+
+## QWED Verification — Claude providers stop sending `temperature`
+
+**v9.0.0** · [GitHub PR #573](https://github.com/QWED-AI/qwed-verification/pull/573)
+
+> **Bug fix.** Every Claude call on the server image raised `TypeError` before QWED sent the request. Claude translations were refused, and `verify_image` returned `ERROR`.
+
+### What changed
+
+- **No sampling parameters.** The Anthropic and Claude Opus providers no longer pass `temperature=0.0` to `messages.create`. The anthropic SDK has had no sampling parameters since 1.0, and Anthropic API version `2026-10-21`, which the 2.x SDK sends, refuses `temperature`, `top_p`, and `top_k`.
+- **Default sampling.** Claude now samples with the model's defaults. No other setting replaces `temperature`. Sampling can vary translations and the verdicts `verify_fact` and `verify_image` return. QWED's fact and image verifiers record those verdicts only as advisory checks, never as `VERIFIED`. See [LLM configuration](/getting-started/llm-configuration#anthropic-claude).
+
+---
+
+## QWED Verification — AgentStateGuard gives one verdict on a JSON number
+
+**v9.0.0** · [GitHub PR #571](https://github.com/QWED-AI/qwed-verification/pull/571)
+
+> `AgentStateGuard` now checks a JSON number's text before converting it to `Decimal`, so it returns the same verdict on any Python build.
+
+### What changed
+
+- **Range and digit checks.** A number whose exponent is outside the C `decimal` module's range, or whose coefficient or exponent has more than `sys.get_int_max_str_digits()` digits (4300 by default), is rejected with `QWED-AGENT-STATE-102`. Leading zeros count toward the limit; a sign does not.
+- **Same result with either decimal module.** On a Python built without the C `_decimal` module, a `number` field holding `1e9999999999999999999999` was previously `VERIFIED`. It is now blocked, with the same message as on the C module.
+- **C module builds.** The server image builds `_decimal`. There, the only change is that a decimal with more than 4300 digits is now refused, as a JSON integer of that length already was.
+
+See [AgentStateGuard](/advanced/agent-state-guard#security-considerations).
 
 ---
 
@@ -142,7 +417,7 @@ if response["admission"] == "ADMIT":
 - **Batch math signing failure is `BLOCKED`.** It was `UNVERIFIABLE`. The attestation's engine is `math` (was `batch_math`).
 - **`POST /agents/{agent_id}/verify`** returns the enforced result with its `admission`, not the control plane's raw response, which could still say `VERIFIED` after enforcement blocked it. The agent activity log records the same response.
 
-See [`POST /verify/batch`](/api/endpoints#post-verify-batch), [`POST /agents/{agent_id}/verify`](/api/endpoints#post-agents-agent-id-verify), and [Attestation enforcement](/api/endpoints#attestation-enforcement).
+See [`POST /verify/batch`](/api/endpoints#post-%2Fverify%2Fbatch), [`POST /agents/{agent_id}/verify`](/api/endpoints#post-%2Fagents%2F%2Fverify), and [Attestation enforcement](/api/endpoints#attestation-enforcement).
 
 ---
 
@@ -166,7 +441,7 @@ The entry hash covers `admission`, `api_key_id`, and `verifier_version`. QWED ad
 **Don't roll back past this release.** Upgrade every QWED process together. An older release can't verify rows written with the new fields. When such a row is an organization's chain head, the older release refuses every further append for that organization and its verify routes return `500` (fail closed).
 </Warning>
 
-See [Audit endpoints](/api/authentication#audit-endpoints), [`GET /admin/security/events`](/api/endpoints#get-admin-security-events), and [Audit trail verification](/advanced/compliance#audit-trail-verification).
+See [Audit endpoints](/api/authentication#audit-endpoints), [`GET /admin/security/events`](/api/endpoints#get-%2Fadmin%2Fsecurity%2Fevents), and [Audit trail verification](/advanced/compliance#audit-trail-verification).
 
 ---
 
@@ -189,7 +464,7 @@ See [Audit endpoints](/api/authentication#audit-endpoints), [`GET /admin/securit
 - **The LlamaIndex, CrewAI, and LangChain integrations fail closed** ([GHSA-83v6-6h23-pvp4](https://github.com/QWED-AI/qwed-verification/security/advisories/GHSA-83v6-6h23-pvp4), high). They read `is_verified`. A response no engine checked is `UNVERIFIABLE`, and an error is unverified.
 - **The GitHub Action's outputs can't be injected** ([GHSA-j788-44pc-8hp3](https://github.com/QWED-AI/qwed-verification/security/advisories/GHSA-j788-44pc-8hp3), low). Outputs are written with a random heredoc delimiter, and the Action stops workflow commands for the rest of its step. Verify mode gates on `is_verified` and reports the server's verdict, for example `VERIFIED · DENY`.
 
-See [Python SDK](/sdks/python#how-is-verified-is-decided), [Guards](/sdks/guards#codeguard), [SQL engine](/engines/sql#dangerous-functions), [QWEDLocal](/advanced/qwed-local#3-code-security-codeverifier), [LlamaIndex](/integrations/llamaindex), [CrewAI](/integrations/crewai), [LangChain](/integrations/langchain), and [GitHub Action](/advanced/github-action#how-verify-mode-decides).
+See [Python SDK](/sdks/python#how-is_verified-is-decided), [Guards](/sdks/guards#codeguard), [SQL engine](/engines/sql#dangerous-functions), [QWEDLocal](/advanced/qwed-local#3-code-security-codeverifier), [LlamaIndex](/integrations/llamaindex), [CrewAI](/integrations/crewai), [LangChain](/integrations/langchain), and [GitHub Action](/advanced/github-action#how-verify-mode-decides).
 
 ---
 
@@ -334,7 +609,7 @@ if response["admission"] != "ADMIT":
 - **`POST /verify/natural_language` returns the enforced verdict.** The response carries the control-plane verdict with `admission`, `translated_expression`, `verification_scope: translated_expression_only`, and `query_semantics_verified: false`. Admission is always `DENY` because the LLM translation is unverified.
 - **`qwed init` and `qwed test` print the verdict with its admission.** For example, `2+2=5 -> VERIFIED (false) | DENY`. A failed self-check prints `FAILED`, and the closing line reads `All engines ready.`
 
-See [Math engine — Verdicts and admission](/engines/math#verdicts-and-admission), [`POST /verify/math`](/api/endpoints#post-verify-math), and [CLI reference](/advanced/cli).
+See [Math engine — Verdicts and admission](/engines/math#verdicts-and-admission), [`POST /verify/math`](/api/endpoints#post-%2Fverify%2Fmath), and [CLI reference](/advanced/cli).
 
 ---
 
@@ -378,7 +653,7 @@ curl --fail-with-body -H "Authorization: Bearer $QWED_SESSION_TOKEN" \
   "http://localhost:8000/admin/compliance/verify-trail"
 ```
 
-See [Session sign-in for compliance endpoints](/api/endpoints#session-sign-in-for-compliance-endpoints) and [`GET /admin/compliance/verify-trail`](/api/endpoints#get-admin-compliance-verify-trail).
+See [Session sign-in for admin endpoints](/api/endpoints#session-sign-in-for-admin-endpoints) and [`GET /admin/compliance/verify-trail`](/api/endpoints#get-%2Fadmin%2Fcompliance%2Fverify-trail).
 
 ---
 
@@ -431,7 +706,7 @@ See [Security activity summary](/advanced/compliance#1-security-activity-summary
 - **Role checks on `/auth/api-keys` and `/audit` (#483).** These routes previously required only a signed-in user, so any role could create keys, list and revoke every key in the organization, and export the audit log. Now creating a key needs `member` or higher. Members and viewers list and revoke only their own keys. Admins can revoke keys of users who don't rank higher, and owners can revoke any key in the organization. Every role can read audit logs. `GET /audit/export` and `POST /audit/seed` need `admin` or `owner`. See [Roles on API-key and audit routes](/api/authentication#roles-on-api-key-and-audit-routes).
 - **Fail-closed user checks (#483).** An inactive user, an inactive or missing organization, or an unknown role gets `403 Forbidden`. A member or viewer gets `404 Not Found` for another user's key. An invalid key ID returns `404 Not Found` instead of a server error.
 - **Agent tokens stored as keyed digests (#487).** QWED stores agent tokens as HMAC-SHA256 digests keyed with `QWED_API_KEY_LOOKUP_SECRET`, instead of plain text. A token is shown only once, at registration or re-issue. At startup, the server hashes existing plaintext tokens in place, so they keep working. Changing `QWED_API_KEY_LOOKUP_SECRET` now invalidates agent tokens as well as API keys. See [Agent token storage](/api/authentication#agent-token-storage).
-- **New `POST /agents/{agent_id}/token/reissue` (#487).** Members and above can issue a new token for an agent in their own organization. The old token stops working. Another organization's agent returns `404 Not Found`. See [`POST /agents/{agent_id}/token/reissue`](/api/endpoints#post-agents-agent-id-token-reissue).
+- **New `POST /agents/{agent_id}/token/reissue` (#487).** Members and above can issue a new token for an agent in their own organization. The old token stops working. Another organization's agent returns `404 Not Found`. See [`POST /agents/{agent_id}/token/reissue`](/api/endpoints#post-%2Fagents%2F%2Ftoken%2Freissue).
 
 ---
 
@@ -526,14 +801,14 @@ See the [Rust SDK](/sdks/rust#reading-a-result), [Go SDK](/sdks/go#reading-a-res
 
 ## QWED Verification — signed Verification Context documents and attestation checks
 
-**Unreleased** · [GitHub PR #517](https://github.com/QWED-AI/qwed-verification/pull/517) · [GitHub PR #523](https://github.com/QWED-AI/qwed-verification/pull/523) · Part of [issue #319](https://github.com/QWED-AI/qwed-verification/issues/319)
+**v8.0.0** · [GitHub PR #517](https://github.com/QWED-AI/qwed-verification/pull/517) · [GitHub PR #523](https://github.com/QWED-AI/qwed-verification/pull/523) · Part of [issue #319](https://github.com/QWED-AI/qwed-verification/issues/319)
 
 > **Security fix.** A document's `proof_ref` is a commitment anyone can compute, so anyone could build a document, an `ADMIT` one included, whose `proof_ref` resolves. The server now signs every document it issues, and `validate` and `resolve` check that signature by default.
 
 ### What changed
 
 - **Spec v1.1.** A [v1.1 document](/specs/verification-context#version-1-1-and-the-issuer-attestation) carries `attestation`: an ES256 JWT of type `qwed-context+jwt` that signs the hash of every other field, with the verdict, admission, and `proof_ref`.
-- **Signed documents.** [`POST /verification-context/from-diagnostic`](/api/endpoints#post-verification-context-from-diagnostic) returns v1.1 documents. A failure to sign is a `500`, not an unsigned document. A document the canonical encoding refuses is a `422`.
+- **Signed documents.** [`POST /verification-context/from-diagnostic`](/api/endpoints#post-%2Fverification-context%2Ffrom-diagnostic) returns v1.1 documents. A failure to sign is a `500`, not an unsigned document. A document the canonical encoding refuses is a `422`.
 - **API checks.** `POST /verification-context/validate` and `/resolve` take `require_attestation` (default `true`) and check the attestation with the server's key. A document with none returns `attestation_required`; one that doesn't verify or isn't this document's returns `attestation_invalid`.
 - **Python SDK.** `validate_verification_context()` and `resolve_verification_context()` verify the attestation against the server's JWKS first, and raise `KeysUnavailableError` if they can't fetch the keys. `verify_document_attestation()` returns the claims. See [Python SDK](/sdks/python#verification-context).
 - **CLI.** `qwed context validate` and `resolve` verify the attestation with `--server` or `--jwks-file`. See [CLI reference](/advanced/cli#qwed-context-verification-context-utilities).
@@ -548,7 +823,7 @@ See the [Rust SDK](/sdks/rust#reading-a-result), [Go SDK](/sdks/go#reading-a-res
 
 ## QWED Verification — contacts and links moved to `qwedai.tech`
 
-**Unreleased** · [GitHub PR #473](https://github.com/QWED-AI/qwed-verification/pull/473)
+**v8.0.0** · [GitHub PR #473](https://github.com/QWED-AI/qwed-verification/pull/473)
 
 > `qwedai.tech` is now the only QWED domain. Contact addresses, docs links, and the Verification Context schema `$id` all use it.
 
@@ -598,7 +873,7 @@ See [Verification Context specification](/specs/verification-context), [Go SDK](
 
 - **Request bodies are capped and blocking work runs off the event loop** (#447). See [Request limits](/api/endpoints#request-limits).
 - **Concurrent sandbox containers are bounded** (#448). See [Availability limits](/advanced/self-hosting#availability-limits).
-- **API-key rotation is atomic** (#453). QWED revokes the old key and mints the replacement in one transaction, so concurrent rotations of the same key mint exactly one replacement. Rotating a key that is already inactive or revoked mints nothing and returns `404 Not Found`. See [`POST /admin/keys/rotate`](/api/endpoints#post-admin-keys-rotate).
+- **API-key rotation is atomic** (#453). QWED revokes the old key and mints the replacement in one transaction, so concurrent rotations of the same key mint exactly one replacement. Rotating a key that is already inactive or revoked mints nothing and returns `404 Not Found`. See [`POST /admin/keys/rotate`](/api/endpoints#post-%2Fadmin%2Fkeys%2Frotate).
 
 ### Credential handling
 
@@ -654,7 +929,7 @@ if result.status == "UNVERIFIABLE":
 
 ### What changed
 
-- **`verify_fact` fails closed when the service is unreachable (#449).** On a connection failure or a connect or read timeout, the Python SDK returns `status="UNVERIFIABLE"` and `is_verified=False` with a message explaining that remote verification was unavailable. Previously, a connection failure returned `VERIFIED` after only the local PII scan, and a timeout raised an exception. See [`verify_fact`](/sdks/python#verify-fact-claim-context).
+- **`verify_fact` fails closed when the service is unreachable (#449).** On a connection failure or a connect or read timeout, the Python SDK returns `status="UNVERIFIABLE"` and `is_verified=False` with a message explaining that remote verification was unavailable. Previously, a connection failure returned `VERIFIED` after only the local PII scan, and a timeout raised an exception. See [`verify_fact`](/sdks/python#verify_fact-claim-context).
 - **`Money` rejects non-finite amounts (#451).** `Money("NaN")`, `Money("Infinity")`, and `Money(float("inf"))` raise `ValueError`.
 - **`verify_invoice_total` never raises on invalid input (#451).** Invalid amounts, a negative or non-finite `tolerance`, or a non-`Decimal` `tolerance` return `(False, reason)` instead of raising. Currency mismatches still return `(False, "Currency mismatch: ...")`.
 
@@ -1066,12 +1341,12 @@ See [LiabilityGuard](/legal/guards#fail-closed-behavior-on-non-finite-and-out-of
 
 ### What changed
 
-- **New `GET /health/identity` endpoint.** Takes a caller-supplied `nonce` (1–128 characters) and returns HMAC-SHA256 proofs over it under `QWED_JWT_SECRET_KEY` and `QWED_API_KEY_LOOKUP_SECRET`. Returns `400` for a missing or oversized nonce and `503` when server secrets aren't configured. The secrets never leave the server. See [`GET /health/identity`](/api/endpoints#get-health-identity).
+- **New `GET /health/identity` endpoint.** Takes a caller-supplied `nonce` (1–128 characters) and returns HMAC-SHA256 proofs over it under `QWED_JWT_SECRET_KEY` and `QWED_API_KEY_LOOKUP_SECRET`. Returns `400` for a missing or oversized nonce and `503` when server secrets aren't configured. The secrets never leave the server. See [`GET /health/identity`](/api/endpoints#get-%2Fhealth%2Fidentity).
 - **Nonce-bound, replay-safe handshake.** `qwed init` generates a fresh nonce on every run and compares the proofs against locally computed values in constant time. A captured response is useless for any later handshake.
 - **Runs on reused and freshly spawned servers.** A reused server can be foreign or stale even when secrets were retained. A fresh spawn can lose a port race after the health poll.
 - **Fails closed.** A mismatch, a `404` from an older server, any other non-`200` status, a malformed response, an unreachable server, or missing local secrets stops `qwed init` with exit status `1` before any key is issued. Each message tells you to restart the local server or re-run `qwed init`.
 
-See [`qwed init`](/advanced/cli#qwed-init-onboarding-and-bootstrap) and [troubleshooting](/troubleshooting#qwed-init-fails-with-server-identity-check-failed).
+See [`qwed init`](/advanced/cli#qwed-init-onboarding-and-bootstrap) and [troubleshooting](/troubleshooting#qwed-init-fails-with-%E2%80%9Cserver-identity-check-failed%E2%80%9D).
 
 ---
 
@@ -1119,7 +1394,7 @@ See [API key format](/api/authentication#api-key-format) for patterns, checksum 
 
 ### What changed
 
-- **New public endpoint.** `POST /webhooks/secret-scanning` accepts a JSON array of leaked-token matches, verifies the `Github-Public-Key-Identifier` and `Github-Public-Key-Signature` headers against GitHub's published signing keys, and hands verified batches to the revocation sink in the background. See [`POST /webhooks/secret-scanning`](/api/endpoints#post-webhooks-secret-scanning) for the full request/response contract.
+- **New public endpoint.** `POST /webhooks/secret-scanning` accepts a JSON array of leaked-token matches, verifies the `Github-Public-Key-Identifier` and `Github-Public-Key-Signature` headers against GitHub's published signing keys, and hands verified batches to the revocation sink in the background. See [`POST /webhooks/secret-scanning`](/api/endpoints#post-%2Fwebhooks%2Fsecret-scanning) for the full request/response contract.
 - **Raw-body signature verification.** The signature is verified over the exact bytes received; the body is never re-serialized. Nothing in the payload is parsed or logged until the signature is proven genuine.
 - **P-256 pinning at key-load.** Signing keys are pinned to `secp256r1` when the PEM is loaded, so a future keys-list entry on another curve is dropped at load rather than silently trusted at verify time.
 - **6-hour key cache with rotation retry.** Signing keys are cached in-process for 6 hours with an `ETag`-conditional refetch. On an unknown `key_identifier`, QWED refetches the list exactly once (throttled to one forced refetch per 60 s after a success, 10 s after a failure) and retries. A dead or throttled key service fails closed to `503`.
