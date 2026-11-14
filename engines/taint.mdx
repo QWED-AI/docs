@@ -10,7 +10,22 @@ The **Taint Analysis Engine** creates a security firewall by tracking "tainted" 
 
 1. **Source Identification:** Marks all variables derived from user input as `tainted`.
 2. **Flow Propagation:** Tracks these variables through assignments, function calls, and string operations.
-3. **Sink Validation:** If a `tainted` variable reaches a critical function (e.g., `subprocess.call` or `db.execute`) without passing through a sanitizer, it blocks execution.
+3. **Sink Validation:** If a `tainted` variable reaches a critical function (e.g., `subprocess.call` or `db.execute`) without passing through a sanitiser for that kind of sink, it blocks execution.
+
+### Sources, sinks and sanitisers
+
+- **Taint inside expressions.** Taint is followed into f-strings, concatenation, `%` and `str.format` templates, nested calls, tuple and starred unpacking, and augmented assignment. A variable assigned in more than one branch carries the taint of every assignment.
+- **Sources.** `input()`, `sys.stdin`, `sys.argv`, `os.environ` (including subscripts such as `os.environ["X"]`), `os.getenv`, and every read of a `request` attribute, including subscripts such as `request.form["name"]` and `request.method`. Sources are also found through the code's own imports, such as `from os import environ`. A `.get()` call on an arbitrary object, such as a dictionary, is not a source.
+- **Sinks.** Code execution (`eval`, `exec`, `compile`, `__import__`), shell commands (`os.system`, `os.popen`, `subprocess`), deserialisation (`pickle`, `yaml.load`, `marshal.loads`), SQL `execute`, file paths, network URLs, `mark_safe` (HTML) and `render_template_string` (templates). Values passed as bound SQL parameters, such as `cursor.execute(query, params)`, are not reported; taint in the query text still is.
+- **Sanitisers only clear the sinks they protect.**
+
+| Sanitiser | Clears |
+|-----------|--------|
+| `int()`, `float()`, `bool()` | Every sink |
+| `html.escape`, `markupsafe.escape`, `django.utils.html.escape` | HTML sinks only, where the value lands in text content (not inside a tag, comment, script or style). `html.escape(s, quote=False)` clears nothing |
+| `werkzeug.utils.secure_filename` | File-path sinks only |
+
+There is no shell sanitiser: `shlex.quote` protects one word, but the command around it decides what the word does, so it does not clear a shell sink. HTML escaping does not clear `render_template_string`. A sanitiser clears taint only when the code imports it from its own module, never rebinds or patches it, uses no reflection, and passes its result to the sink unchanged. A sanitised value that is then transformed, such as `str(int(x))` or `"".join([html.escape(x)])`, is tainted again.
 
 ## Usage
 
