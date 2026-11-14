@@ -47,7 +47,6 @@ QWED uses LLMs as **untrusted translators**, not as answer generators:
 | **Ollama (local)** | `OLLAMA_BASE_URL` | `OLLAMA_MODEL` | Manual |
 | **OpenAI-compatible** | `CUSTOM_BASE_URL` + `CUSTOM_API_KEY` | `CUSTOM_MODEL` | Yes |
 | **Azure OpenAI** | `AZURE_OPENAI_ENDPOINT` + `AZURE_OPENAI_API_KEY` | `AZURE_OPENAI_DEPLOYMENT` | Manual |
-| **Claude Opus** | `CLAUDE_OPUS_API_KEY` | `CLAUDE_OPUS_DEPLOYMENT` | Manual |
 | **Custom (YAML)** | Defined per provider | `CUSTOM_MODEL` | Manual (choose Custom Provider and enter the endpoint and model) |
 
 <Warning>
@@ -114,7 +113,7 @@ For self-hosted deployments, run `qwed init` or manually create a `.env` file:
 # WARNING: Contains secrets. NEVER commit this file.
 
 # Active provider (openai, openai_direct, openai_compat, azure_openai,
-# anthropic, claude_opus, gemini, ollama, auto)
+# anthropic, gemini, ollama, auto)
 ACTIVE_PROVIDER=openai
 
 # Set the model variable for your provider. QWED names no default model.
@@ -179,6 +178,10 @@ The server's Anthropic provider is an Azure AI Foundry client: set `ANTHROPIC_EN
 
 The Anthropic provider doesn't send `temperature`, `top_p`, or `top_k`. The anthropic SDK has had no sampling parameters since 1.0, and Anthropic API version `2026-10-21`, which the 2.x SDK sends, refuses them. Claude samples with the model's defaults, and no QWED setting overrides them. Sampling can vary the translations Claude returns and the verdicts `verify_fact` and `verify_image` return. QWED's fact and image verifiers record those verdicts only as advisory checks, never as `VERIFIED`.
 
+<Note>
+`claude_opus` is no longer a provider ([#617](https://github.com/QWED-AI/qwed-verification/issues/617)): it was this provider under one model's name. `ACTIVE_PROVIDER=claude_opus` is refused like any other value QWED does not know, with an error that says what to set. To move, set `ACTIVE_PROVIDER=anthropic`, move `CLAUDE_OPUS_ENDPOINT`, `CLAUDE_OPUS_API_KEY`, and `CLAUDE_OPUS_DEPLOYMENT` to `ANTHROPIC_ENDPOINT`, `ANTHROPIC_API_KEY`, and `ANTHROPIC_MODEL`, and unset `ANTHROPIC_DEPLOYMENT`, which wins over `ANTHROPIC_MODEL`.
+</Note>
+
 ### Local LLMs (Ollama)
 
 No API key needed. Install Ollama, pull a model, and configure QWED:
@@ -238,17 +241,6 @@ export AZURE_OPENAI_API_KEY=your-azure-key
 export AZURE_OPENAI_DEPLOYMENT=your-deployment-name
 export AZURE_OPENAI_API_VERSION=2024-02-15-preview
 ```
-
-### Claude Opus
-
-```bash
-export ACTIVE_PROVIDER=claude_opus
-export CLAUDE_OPUS_ENDPOINT=https://your-foundry-endpoint
-export CLAUDE_OPUS_API_KEY=sk-ant-your-key
-export CLAUDE_OPUS_DEPLOYMENT=claude-opus-4-5
-```
-
-Like the Anthropic provider, the Claude Opus provider doesn't send `temperature` and samples with the model's defaults. Sampling can vary translations and the verdicts `verify_fact` and `verify_image` return. QWED records those verdicts only as advisory checks, never as `VERIFIED`.
 
 ---
 
@@ -407,7 +399,7 @@ QWED is model-agnostic and recommends no model. Use any model your provider serv
 
 ### Is the LLM translation deterministic?
 
-No. LLMs are inherently probabilistic. The Anthropic and Claude Opus providers don't send `temperature`, so Claude samples with the model's defaults. Sampling can vary translations and the verdicts `verify_fact` and `verify_image` return. QWED's fact and image verifiers record those verdicts only as advisory checks, never as `VERIFIED`. The OpenAI, Azure OpenAI, OpenAI-compatible, Gemini, and Ollama providers send `temperature=0.0`, which reduces variation but doesn't remove it.
+No. LLMs are inherently probabilistic. The Anthropic provider doesn't send `temperature`, so Claude samples with the model's defaults. Sampling can vary translations and the verdicts `verify_fact` and `verify_image` return. QWED's fact and image verifiers record those verdicts only as advisory checks, never as `VERIFIED`. The OpenAI, Azure OpenAI, OpenAI-compatible, Gemini, and Ollama providers send `temperature=0.0`, which reduces variation but doesn't remove it.
 
 That's why **QWED verification is essential**. The deterministic engines give the same verdict for the same translation. They check the expression the model produced, not whether it matches your question, so two different translations of one question can get different verdicts.
 
