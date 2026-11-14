@@ -47,7 +47,6 @@ QWED uses LLMs as **untrusted translators**, not as answer generators:
 | **Ollama (local)** | `OLLAMA_BASE_URL` | `OLLAMA_MODEL` | Manual |
 | **OpenAI-compatible** | `CUSTOM_BASE_URL` + `CUSTOM_API_KEY` | `CUSTOM_MODEL` | Yes |
 | **Azure OpenAI** | `AZURE_OPENAI_ENDPOINT` + `AZURE_OPENAI_API_KEY` | `AZURE_OPENAI_DEPLOYMENT` | Manual |
-| **Claude Opus** | `CLAUDE_OPUS_API_KEY` | `CLAUDE_OPUS_DEPLOYMENT` | Manual |
 | **Custom (YAML)** | Defined per provider | `CUSTOM_MODEL` | Manual (choose Custom Provider and enter the endpoint and model) |
 
 <Warning>
@@ -114,7 +113,7 @@ For self-hosted deployments, run `qwed init` or manually create a `.env` file:
 # WARNING: Contains secrets. NEVER commit this file.
 
 # Active provider (openai, openai_direct, openai_compat, azure_openai,
-# anthropic, claude_opus, gemini, ollama, auto)
+# anthropic, gemini, ollama, auto)
 ACTIVE_PROVIDER=openai
 
 # Set the model variable for your provider. QWED names no default model.
@@ -239,16 +238,26 @@ export AZURE_OPENAI_DEPLOYMENT=your-deployment-name
 export AZURE_OPENAI_API_VERSION=2024-02-15-preview
 ```
 
-### Claude Opus
+### Claude Opus (removed in v10.0.0)
+
+v10.0.0 removes the `claude_opus` provider. It was a copy of the Anthropic provider under one model's name. `ACTIVE_PROVIDER=claude_opus` is now refused, and the error says what to set instead. A request that names `claude_opus` is refused as an unknown provider.
+
+To keep running Claude Opus, use the [Anthropic provider](#anthropic-claude):
 
 ```bash
+# Before (v9.x)
 export ACTIVE_PROVIDER=claude_opus
 export CLAUDE_OPUS_ENDPOINT=https://your-foundry-endpoint
 export CLAUDE_OPUS_API_KEY=sk-ant-your-key
-export CLAUDE_OPUS_DEPLOYMENT=claude-opus-4-5
-```
+export CLAUDE_OPUS_DEPLOYMENT=your-claude-opus-model
 
-Like the Anthropic provider, the Claude Opus provider doesn't send `temperature` and samples with the model's defaults. Sampling can vary translations and the verdicts `verify_fact` and `verify_image` return. QWED records those verdicts only as advisory checks, never as `VERIFIED`.
+# After (v10.0.0)
+export ACTIVE_PROVIDER=anthropic
+export ANTHROPIC_ENDPOINT=https://your-foundry-endpoint
+export ANTHROPIC_API_KEY=sk-ant-your-key
+export ANTHROPIC_MODEL=your-claude-opus-model
+unset ANTHROPIC_DEPLOYMENT  # it wins over ANTHROPIC_MODEL when set
+```
 
 ---
 
@@ -407,7 +416,7 @@ QWED is model-agnostic and recommends no model. Use any model your provider serv
 
 ### Is the LLM translation deterministic?
 
-No. LLMs are inherently probabilistic. The Anthropic and Claude Opus providers don't send `temperature`, so Claude samples with the model's defaults. Sampling can vary translations and the verdicts `verify_fact` and `verify_image` return. QWED's fact and image verifiers record those verdicts only as advisory checks, never as `VERIFIED`. The OpenAI, Azure OpenAI, OpenAI-compatible, Gemini, and Ollama providers send `temperature=0.0`, which reduces variation but doesn't remove it.
+No. LLMs are inherently probabilistic. The Anthropic provider doesn't send `temperature`, so Claude samples with the model's defaults. Sampling can vary translations and the verdicts `verify_fact` and `verify_image` return. QWED's fact and image verifiers record those verdicts only as advisory checks, never as `VERIFIED`. The OpenAI, Azure OpenAI, OpenAI-compatible, Gemini, and Ollama providers send `temperature=0.0`, which reduces variation but doesn't remove it.
 
 That's why **QWED verification is essential**. The deterministic engines give the same verdict for the same translation. They check the expression the model produced, not whether it matches your question, so two different translations of one question can get different verdicts.
 
