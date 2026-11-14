@@ -283,24 +283,24 @@ Leibniz notation (`d/dx`, `dy/dx`, `d^2y/dx^2`) gets the same `BLOCKED` result w
 
 The audit log row's `is_verified` follows `is_valid`, so a proven-false identity is logged as not verified.
 
-**Response (expression):**
+**Response (expression without `=`):** An expression without `=` states no claim. It returns `UNVERIFIABLE` with `constraint_id: "math.no_claim"`, no `proof_ref` and no attestation, and the audit row is not verified. The computed value stays in the response as evidence. To have it checked, send `expression = value`, such as `2 + 2 = 4`.
 
 ```json
 {
-  "status": "VERIFIED",
-  "is_valid": true,
+  "status": "UNVERIFIABLE",
+  "is_valid": false,
+  "constraint_id": "math.no_claim",
   "value": 4.0,
   "exact_value": "4",
   "simplified": "4",
   "original": "2 + 2",
-  "agent_message": "Expression evaluated",
-  "proof_ref": "sha256:...",
-  "attestation": "eyJ...",
-  "admission": "ADMIT"
+  "agent_message": "Expression evaluated, but no equality or proof claim was provided",
+  "proof_ref": null,
+  "admission": "BLOCKED"
 }
 ```
 
-Symbolic expressions that cannot be evaluated to a numeric value include `is_symbolic: true`. Expressions involving complex numbers include `is_complex: true`.
+A symbolic result (`x + x`) carries `simplified` and `is_symbolic: true` instead of `value`. A value past the float range, such as `1e400`, has no `value` field; `exact_value` carries it as a string. A batch math item without `=` gets the same verdict as this route.
 
 **Ambiguous expressions:** Expressions with implicit multiplication after division (e.g., `1/2(3+1)`) are rejected with `is_valid: false`, `result: false`, `status: "BLOCKED"`, and `admission: "BLOCKED"`. The response includes `warning: "ambiguous"` and an `agent_message` explaining why. Rewrite the expression with explicit parentheses or a `*` operator to remove the ambiguity.
 
@@ -318,7 +318,7 @@ Symbolic expressions that cannot be evaluated to a numeric value include `is_sym
 
 **Error cases:** Division by zero, `log(0)`, and square root of negative numbers in the real domain return `status: "BLOCKED"`, `is_valid: false`, and `admission: "BLOCKED"`, with a descriptive `error` and `agent_message`.
 
-**Tolerance bounding:** This endpoint takes no `tolerance`. The bound applies to the engine method `VerificationEngine.verify_math(expression, expected, tolerance)`, which returns an engine dictionary without `admission`. When it verifies an expression against an expected value with a `tolerance` parameter, the engine enforces a deterministic upper bound on the tolerance. The maximum allowed tolerance is `max(0.01, abs(calculated_value) * 0.01)`. If the requested tolerance exceeds this bound, the request returns a `BLOCKED` status. Invalid tolerance values (negative, `NaN`, `Infinity`, or non-numeric) are also rejected with `BLOCKED`.
+**Tolerance bounding:** This endpoint takes no `tolerance`. The bound applies to the engine method `VerificationEngine.verify_math(expression, expected, tolerance)`, which returns an engine dictionary without `admission`. When it verifies an expression against an expected value with a `tolerance` parameter, the engine enforces a deterministic upper bound on the tolerance. The maximum allowed tolerance is `max(min(0.01, abs(calculated_value)), abs(calculated_value) * 0.01)`: 1% of the value, with a floor of `0.01`, but never more than the value itself. With no `tolerance`, the claim must match to 9 significant digits, or be correctly rounded with at least 6, and lie within `1e-6`. See [Tolerance settings](/engines/math#tolerance-settings). If the requested tolerance exceeds this bound, the request returns a `BLOCKED` status. Invalid tolerance values (negative, `NaN`, `Infinity`, or non-numeric) are also rejected with `BLOCKED`.
 
 **Engine dictionary (tolerance exceeded):**
 
