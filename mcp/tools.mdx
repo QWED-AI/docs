@@ -6,10 +6,10 @@ description: "Complete QWED-MCP tools reference covering execute_python_code (th
 
 ## execute\_python\_code
 
-Execute Python code in a subprocess with access to all QWED SDK libraries.
+Execute Python code in a subprocess after an allowlist admission check.
 
 <Warning>
-  The subprocess runs **with the server's privileges**. It is not a sandbox: it only gets a restricted set of environment variables. Enable code execution only where you trust the inputs.
+  Admitted code runs **with the server's privileges**. The subprocess is not a sandbox: it only gets a restricted set of environment variables. Code execution is off until the server admin sets `QWED_MCP_TRUSTED_CODE_EXECUTION=true`. Enable it only where you trust the inputs.
 </Warning>
 
 <Info>
@@ -18,9 +18,24 @@ Execute Python code in a subprocess with access to all QWED SDK libraries.
 
 ### Description
 
-The `execute_python_code` tool runs arbitrary Python code in a subprocess with restricted environment variables. The subprocess has access to all installed QWED SDK packages (`qwed_new`, `qwed_legal`, `qwed_finance`, `qwed_ucp`, etc.), so LLMs can write verification scripts that import and call any QWED engine directly.
+The `execute_python_code` tool parses the code and runs it in a subprocess only when it passes the [allowlist admission check](#what-code-is-admitted). Admitted code can use computation-only standard-library modules, such as `decimal`, `fractions`, `math`, `statistics` and `itertools`. From v0.3.0, it can't import third-party packages, including SymPy and the QWED SDK packages (`qwed_new`, `qwed_legal`, `qwed_finance`, `qwed_ucp`).
 
 The tool captures `stdout` and `stderr` from the subprocess and returns them as text.
+
+### What code is admitted
+
+<Info>Changed in v0.3.0. Earlier versions refused a list of dangerous names and ran everything else.</Info>
+
+Before any code runs, the server parses it and admits it only when every module, builtin and attribute it uses is on an allowlist:
+
+- **Modules:** computation-only standard-library modules, such as `math`, `cmath`, `decimal`, `fractions`, `statistics`, `itertools`, `functools`, `collections`, `json`, `re`, `datetime`, `hashlib` and `random`, and in each only the listed names. Modules that reach files, the network, processes, the environment or the import system (`os`, `sys`, `subprocess`, `socket`, `pathlib`, `importlib`, `ctypes` and others) are refused. So is every third-party package, QWED SDK packages included. A module can be used only as `module.name` with a listed name, never as a value.
+- **Builtins:** only builtins that compute. `open`, `eval`, `exec`, `compile`, `__import__`, `getattr`, `vars`, `globals`, `type`, `input`, `breakpoint` and the other builtins that aren't listed are refused wherever they appear, so they can't be rebound or passed on.
+- **Attributes:** no special or private attribute (`__x__`, `_x`) apart from reading `__init__` and `__name__`, no frame or traceback attribute, and `str.format` only on a string literal whose fields read no attribute.
+- **Source encoding:** a coding declaration other than UTF-8 is refused. The server writes the script as UTF-8, so the code that runs is the code that was checked.
+
+Refused code never runs. The response lists each reason with its line number, for example `Module 'os' is not admitted (line 1)`.
+
+Admission is a static check of what the code can reach. It is not a proof that the code is correct, and it does not limit resource use: the [execution timeouts](#execution-limits) limit run time, and nothing limits memory. The output of admitted code comes from that code, so treat it as untrusted data.
 
 ### Parameters
 
@@ -31,13 +46,15 @@ The tool captures `stdout` and `stderr` from the subprocess and returns them as 
 
 ### Risk gateway pre-validation
 
-All tool calls pass through the [`RiskBasedExecutionGateway`](#riskbasedexecutiongateway-governance) before dispatch. The gateway normalizes arguments, verifies code safety, and enforces server policy. If the gateway blocks a request, the tool returns a structured `BLOCKED` response with a `verification_id` and error code instead of executing the code. See [governance error codes](#governance-error-codes) for the full list.
+All tool calls pass through the [`RiskBasedExecutionGateway`](#riskbasedexecutiongateway-governance) before dispatch. The gateway normalizes arguments, runs the allowlist admission check, and enforces server policy. If the gateway blocks a request, the tool returns a structured `BLOCKED` response with a `verification_id` and error code instead of executing the code. See [governance error codes](#governance-error-codes) for the full list.
 
 ### Environment
 
 The subprocess runs with a restricted environment. Only `PATH`, `PYTHONPATH`, and `SYSTEMROOT` (Windows) are forwarded. Secrets, API keys, and other environment variables are stripped.
 
-The server admin must set `QWED_MCP_TRUSTED_CODE_EXECUTION=true` to enable this tool. When disabled, the tool returns a `BLOCKED_ADMIN_POLICY` response even if the code passes safety verification.
+From v0.3.0, the server starts the subprocess in Python's isolated mode (`python -I`). The script's directory, a shared temporary directory, is not on the import path, so a file placed there can't stand in for an admitted module. Isolated mode also ignores `PYTHON*` variables, so the forwarded `PYTHONPATH` has no effect.
+
+The server admin must set `QWED_MCP_TRUSTED_CODE_EXECUTION=true` to enable this tool. When disabled, the tool returns a `BLOCKED_ADMIN_POLICY` response even if the code passes the admission check. The admission check runs first, so refused code is reported as refused whether or not execution is enabled.
 
 ### Execution limits
 
@@ -60,9 +77,11 @@ The server admin must set `QWED_MCP_TRUSTED_CODE_EXECUTION=true` to enable this 
 
 #### Verify a math calculation
 
+Check that `x = 3` and `x = -5` solve `x² + 2x - 15 = 0` with exact fractions:
+
 ```json
 {
-  "code": "from sympy import symbols, diff\nx = symbols('x')\nresult = diff(x**3, x)\nprint(f'derivative of x^3 = {result}')\nassert str(result) == '3*x**2', 'Mismatch!'\nprint('VERIFIED')"
+  "code": "from fractions import Fraction\n\ndef f(x):\n    return x**2 + 2*x - 15\n\nfor root in (Fraction(3), Fraction(-5)):\n    print(f'f({root}) = {f(root)}')\nassert all(f(r) == 0 for r in (Fraction(3), Fraction(-5))), 'Mismatch!'\nprint('Both roots check out')"
 }
 ```
 
@@ -70,8 +89,9 @@ The server admin must set `QWED_MCP_TRUSTED_CODE_EXECUTION=true` to enable this 
 
 ```text
 STDOUT:
-derivative of x^3 = 3*x**2
-VERIFIED
+f(3) = 0
+f(-5) = 0
+Both roots check out
 
 Execution completed successfully.
 ```
@@ -80,7 +100,7 @@ Execution completed successfully.
 
 ```json
 {
-  "code": "from decimal import Decimal, ROUND_HALF_UP\n\nP = Decimal('10000')\nr = Decimal('0.075')\nn = Decimal('4')\nt = Decimal('5')\n\nA = P * (1 + r/n) ** (n*t)\nA = A.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)\nprint(f'Future value: ${A}')\nassert A == Decimal('14490.97'), f'Expected 14490.97, got {A}'"
+  "code": "from decimal import Decimal, ROUND_HALF_UP\n\nP = Decimal('10000')\nr = Decimal('0.075')\nn = Decimal('4')\nt = Decimal('5')\n\nA = P * (1 + r/n) ** (n*t)\nA = A.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)\nprint(f'Future value: ${A}')\nassert A == Decimal('14499.48'), f'Expected 14499.48, got {A}'"
 }
 ```
 
@@ -88,58 +108,34 @@ Execution completed successfully.
 
 ```text
 STDOUT:
-Future value: $14490.97
+Future value: $14499.48
 
 Execution completed successfully.
 ```
 
-#### Check code for security vulnerabilities
+#### Code that is refused
+
+Code outside the allowlist is refused before it runs:
 
 ```json
 {
-  "code": "from qwed_new.guards.code_guard import CodeGuard\n\nguard = CodeGuard()\nresult = guard.verify_safety(\"import os; os.system('rm -rf /')\")\nprint(f'Verified: {result[\"verified\"]}')\nif result.get('violations'):\n    for v in result['violations']:\n        print(f'  - {v}')"
+  "code": "import os\nprint(os.listdir('.'))"
 }
 ```
 
 **Response:**
 
 ```text
-STDOUT:
-Verified: False
-  - Dangerous pattern: os.system
-
-Execution completed successfully.
+BLOCKED: QWED blocked python execution: Module 'os' is not admitted (line 1) (verification_id=...)
 ```
 
-#### Verify SQL safety
-
-```json
-{
-  "code": "from qwed_new.guards.sql_guard import SQLGuard\n\nguard = SQLGuard()\nresult = guard.verify_query(\"SELECT * FROM users WHERE id = '1' OR '1'='1'\")\nprint(f'Verified: {result[\"verified\"]}')\nprint(f'Message: {result.get(\"message\", \"\")}')"
-}
-```
-
-#### Verify a legal deadline
-
-```json
-{
-  "code": "from qwed_legal import DeadlineGuard\n\nguard = DeadlineGuard(country='US')\nresult = guard.verify('2026-01-15', '30 business days', '2026-02-14')\nprint(f'Verified: {result.verified}')\nprint(f'Computed deadline: {result.computed_deadline}')"
-}
-```
-
-#### Verify AI content provenance
-
-```json
-{
-  "code": "import hashlib\nfrom qwed_legal import ProvenanceGuard\n\ncontent = 'This AI-generated memo reviews the indemnification terms.'\ncontent_hash = hashlib.sha256(content.encode()).hexdigest()\n\nguard = ProvenanceGuard(require_disclosure=True)\nresult = guard.verify_provenance(content, {\n    'content_hash': content_hash,\n    'model_id': 'claude-4.5-sonnet',\n    'generation_timestamp': '2026-03-24T12:00:00+00:00',\n})\nprint(f'Verified: {result[\"verified\"]}')\nprint(f'Checks passed: {result[\"checks_passed\"]}')"
-}
-```
+Imports of QWED SDK packages are refused the same way, for example `Module 'qwed_legal' is not admitted (line 1)`. To run a QWED guard, call it from your own Python code instead of through `execute_python_code`.
 
 #### Run a heavy verification in the background
 
 ```json
 {
-  "code": "from qwed_legal import LegalGuard\n\nguard = LegalGuard()\n# ... long-running multi-guard verification\nprint('All checks passed')",
+  "code": "import math\n\ntotal = math.fsum(1 / (k * k) for k in range(1, 2_000_001))\nprint(f'sum = {total}')\nprint(f'pi^2/6 = {math.pi ** 2 / 6}')",
   "background": true
 }
 ```
@@ -167,8 +163,8 @@ Then poll for results:
 | --- | --- |
 | Missing or empty `code` | `BLOCKED: Missing required non-empty 'code' argument. (verification_id=...)` — error code `QWED-MCP-RISK-003` |
 | Invalid `background` type | `BLOCKED: 'background' must be a boolean when provided. (verification_id=...)` — error code `QWED-MCP-RISK-004` |
-| Code fails safety check | `BLOCKED: QWED blocked python execution: <issues> (verification_id=...)` — error code `QWED-MCP-RISK-005` |
-| Tool disabled (admin policy) | `BLOCKED_ADMIN_POLICY: Python execution was verified, but server policy keeps code execution disabled until QWED_MCP_TRUSTED_CODE_EXECUTION=true. (verification_id=...)` — error code `QWED-MCP-RISK-006` |
+| Code not admitted | `BLOCKED: QWED blocked python execution: <reasons> (verification_id=...)` — error code `QWED-MCP-RISK-005`. Reasons are separated by `; ` |
+| Tool disabled (admin policy) | `BLOCKED_ADMIN_POLICY: Python code passed the allowlist admission check, but server policy keeps code execution disabled until QWED_MCP_TRUSTED_CODE_EXECUTION=true. (verification_id=...)` — error code `QWED-MCP-RISK-006` |
 | Script raises exception | `STDERR` contains the traceback; return code is non-zero |
 | Timeout exceeded (synchronous) | `Execution timed out after 30.0 seconds.` |
 | Timeout exceeded (background) | Job transitions to `timed_out` status with result `Background verification timed out after <N> seconds. Process terminated to prevent resource exhaustion.` |
@@ -229,7 +225,8 @@ Status: success
 
 Result:
 STDOUT:
-All checks passed
+sum = 1.6449335668483513
+pi^2/6 = 1.6449340668482264
 
 Execution completed successfully.
 ```
@@ -262,30 +259,12 @@ Claude: Calls verify_math tool with expression="x^3", claimed_result="3*x^2", op
 
 ```text
 User: "Write a script to verify the derivative of x³ using execute_python_code"
-Claude: Calls execute_python_code with a Python script that imports sympy and checks the result
+Claude: Calls execute_python_code with a Python script that checks the result
 ```
 
-### Tool mapping
+### Replacing the removed tools
 
-Use these QWED SDK imports in your `execute_python_code` scripts to replicate the previous tool behavior:
-
-| Deprecated tool | Replacement SDK import |
-| --- | --- |
-| `verify_math` | `from sympy import ...` or `from qwed_new.engines.math_engine import verify_math_expression` |
-| `verify_logic` | `from qwed_new.engines.logic_engine import verify_logic_statement` |
-| `verify_code` | `from qwed_new.guards.code_guard import CodeGuard` |
-| `verify_sql` | `from qwed_new.guards.sql_guard import SQLGuard` |
-| `verify_banking_compliance` | `from qwed_finance import FinanceVerifier` |
-| `verify_iso_20022` | `from qwed_finance import ISOGuard` |
-| `verify_commerce_transaction` | `from qwed_ucp import UCPVerifier` |
-| `verify_legal_deadline` | `from qwed_legal import DeadlineGuard` |
-| `verify_legal_citation` | `from qwed_legal import CitationGuard` |
-| `verify_legal_liability` | `from qwed_legal import LiabilityGuard` |
-| `verify_legal_jurisdiction` | `from qwed_legal import JurisdictionGuard` |
-| `verify_legal_statute` | `from qwed_legal import StatuteOfLimitationsGuard` |
-| `verify_system_command` | `from qwed_sdk.guards.system_guard import SystemGuard` |
-| `verify_file_path` | `from qwed_sdk.guards.system_guard import SystemGuard` |
-| `verify_config_secrets` | `from qwed_sdk.guards.config_guard import ConfigGuard` |
+In v0.2.x, a script could import a QWED SDK package to replace a removed tool, for example `from qwed_legal import DeadlineGuard`. From v0.3.0, `execute_python_code` refuses every third-party import, QWED SDK packages and SymPy included (see [What code is admitted](#what-code-is-admitted)). Scripts can still compute a check with the admitted standard-library modules, such as `decimal` for money, `fractions` for exact arithmetic and `itertools.product` for checking a propositional argument over every truth assignment. To run a QWED guard or engine, call its package from your own Python code.
 
 <Warning>
   A `BLOCKED` response with error code `QWED-MCP-RISK-001` in Claude Desktop means the LLM is trying to call a tool that is not in the governance policy table. This typically happens with removed v0.1.x tools. Tell Claude: "The verify\_\* tools have been removed. Use execute\_python\_code to write and run a Python verification script."
@@ -295,7 +274,7 @@ Use these QWED SDK imports in your `execute_python_code` scripts to replicate th
 
 ## Deprecated tools (v0.1.x)
 
-The following tools were available in v0.1.x and have been removed in v0.2.0. They are listed here for reference. Use [execute\_python\_code](#execute_python_code) with the corresponding SDK imports instead.
+The following tools were available in v0.1.x and have been removed in v0.2.0. They are listed here for reference. Use [execute\_python\_code](#execute_python_code) instead. See [Replacing the removed tools](#replacing-the-removed-tools).
 
 ### verify\_math (deprecated)
 
@@ -469,13 +448,15 @@ print(bom["components"])
 
 ## SkillProvenanceGuard (security)
 
-Verify MCP skill manifests before allowing dynamic tool loading. Protects against skill marketplace poisoning attacks where malicious agents upload trojanized skills to registries and inflate download counts.
+Check MCP skill manifests before allowing dynamic tool loading, against skill marketplace poisoning where malicious agents upload trojanized skills to registries.
 
 ### Description
 
 `SkillProvenanceGuard` performs deterministic provenance verification on skill manifests. When the `QWED_SKILL_MANIFEST` environment variable points to a JSON manifest file, the MCP server validates it at startup and refuses to start if verification fails.
 
 You can also use `SkillProvenanceGuard` directly in your own code to vet skills before loading them.
+
+The registry, source URL and digest are claims the manifest makes about itself. The guard checks those claims against its lists, and the digest against the skill's bytes when you pass them. It does not establish where the manifest came from.
 
 ### Usage
 
@@ -484,24 +465,34 @@ from qwed_mcp.security import SkillProvenanceGuard
 
 guard = SkillProvenanceGuard()
 
-result = guard.verify_skill(manifest={
-    "name": "my-skill",
-    "version": "1.0.0",
-    "source_url": "https://github.com/org/skill",
-    "registry": "github.com",
-    "digest": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-    "download_count": 150,
-})
+skill_bytes = b""  # the skill's content, as loaded
 
-print(result["verified"])   # True
-print(result["status"])     # "TRUSTED"
-print(result["risk_level"]) # "none"
+result = guard.verify_skill(
+    manifest={
+        "name": "my-skill",
+        "version": "1.0.0",
+        "source_url": "https://github.com/org/skill",
+        "registry": "github.com",
+        "digest": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "download_count": 150,
+    },
+    content=skill_bytes,
+)
+
+print(result["verified"])         # True
+print(result["status"])           # "TRUSTED"
+print(result["digest_verified"])  # True
+print(result["risk_level"])       # "none"
 ```
+
+Pass the skill's bytes as `content` to check the digest against them. Without `content`, the digest is checked for form only, and a manifest that passes every other check gets `status` `"TRUSTED_DIGEST_UNVERIFIED"` with `digest_verified` `False`. The digest in this example is the SHA-256 of empty content.
+
+<Info>Changed in v0.3.0: `content`, `TRUSTED_DIGEST_UNVERIFIED`, `digest_verified` and `advisories` are new, and `TRUSTED` now means the digest matched the content.</Info>
 
 ### Constructor parameters
 
 <ParamField path="trusted_registries" type="set[str] | None" default="None">
-  Strict allowlist of registry domains. When set, only skills from these registries are accepted. When `None`, the default blocklist is used instead.
+  Allowlist of registry domains, matched exactly. When `None`, the allowlist is the built-in trusted domains (`github.com`, `gitlab.com`, `bitbucket.org`, `pypi.org`, `npmjs.com`), and a registry not on it is refused. Before v0.3.0, `None` meant a blocklist that let any unlisted registry through.
 </ParamField>
 
 <ParamField path="trusted_domains" type="set[str] | None" default="None">
@@ -509,7 +500,7 @@ print(result["risk_level"]) # "none"
 </ParamField>
 
 <ParamField path="require_digest" type="bool" default="True">
-  Whether to enforce cryptographic digest presence in the manifest.
+  Whether to require a digest in the manifest. With `False`, a manifest without a digest can pass, but `digest_verified` stays `False`.
 </ParamField>
 
 ### Manifest fields
@@ -521,31 +512,34 @@ print(result["risk_level"]) # "none"
 | `source_url` | `str` | Yes | Source repository URL (must be HTTPS and from a trusted domain) |
 | `registry` | `str` | Yes | Registry domain the skill was loaded from |
 | `digest` | `str` | Yes (configurable) | Cryptographic digest in `algorithm:hex_digest` format. Supported algorithms: `sha256`, `sha384`, `sha512` |
-| `download_count` | `int` | No | Number of downloads (used for anomaly detection) |
+| `download_count` | `int` | No | Number of downloads. Reported in `advisories` only; it never decides the result |
 
 ### Verification checks
 
-The guard runs five checks on every manifest:
+The guard runs these checks on every manifest:
 
 | Check | Description |
 | --- | --- |
 | **Required fields** | `name` and `version` must be present and non-empty |
-| **Registry validation** | Blocks known untrusted registries (`clawdhub.com`, `moltbot.io`, `skillhub.ai`, `agentstore.dev`, `llm-tools.net`). When `trusted_registries` is set, acts as an allowlist instead |
+| **Registry validation** | The registry must be on the `trusted_registries` allowlist. A registry not on it is refused. The known unvetted registries (`clawdhub.com`, `moltbot.io`, `skillhub.ai`, `agentstore.dev`, `llm-tools.net`) and their subdomains are named in the finding, matched by domain, not by substring. A registry you list in `trusted_registries` is trusted even if it is one of these |
 | **Source URL validation** | Domain must be in the trusted list; scheme must be HTTPS |
-| **Digest validation** | Must follow `algorithm:hex_digest` format with a supported algorithm and correct hex length |
-| **Download anomaly detection** | Flags counts below 10 (possibly planted) or counts divisible by 1000 (possible bot inflation) |
+| **Digest validation** | Must follow `algorithm:hex_digest` format with a supported algorithm and correct hex length. When you pass `content`, the digest must be the digest of those bytes; a mismatch blocks the skill |
 
-Additionally, manifest values (excluding metadata fields like `name`, `description`, `source_url`) are scanned for suspicious code patterns such as `eval()`, `exec()`, `os.system()`, and credential access attempts.
+Manifest values are also scanned for suspicious patterns. Every field, including `description` and `source_url`, is scanned for code-execution patterns such as `eval()`, `exec()` and `os.system()`. Fields other than the identity and free-text fields (`name`, `description`, `source_url`, `registry`, `author`, `license`, `version`, `digest`) are also scanned for secret-name keywords (`credentials`, `api_key`, `secret_key`).
+
+The download count comes from the registry being checked, so it is not a security signal. Notes about it (low, round, missing or malformed counts) go in `advisories` and never decide the result. Before v0.3.0, a count below 10 or divisible by 1,000 blocked the skill.
 
 ### Response format
 
 | Field | Type | Description |
 | --- | --- | --- |
-| `verified` | `bool` | `True` if all checks pass |
-| `status` | `str` | `"TRUSTED"` or `"BLOCKED"` |
+| `verified` | `bool` | `True` if no check failed |
+| `status` | `str` | `"TRUSTED"` (the digest matched `content`), `"TRUSTED_DIGEST_UNVERIFIED"` (no check failed, but the digest was not compared with content) or `"BLOCKED"` |
+| `digest_verified` | `bool` | `True` only when the digest was compared with `content` and matched |
 | `skill_name` | `str` | Name from the manifest |
 | `risk_level` | `str` | `"none"`, `"medium"`, or `"high"` |
 | `findings` | `list[str]` | All security findings |
+| `advisories` | `list[str]` | Notes that do not decide the result, such as download-count notes |
 | `message` | `str` | Human-readable summary |
 
 ### Server-level validation
@@ -556,10 +550,12 @@ When the `QWED_SKILL_MANIFEST` environment variable is set, the MCP server valid
 QWED_SKILL_MANIFEST=/path/to/skill-manifest.json qwed-mcp
 ```
 
-If validation fails, the server logs the error and exits immediately. This prevents poisoned skills from being loaded into the MCP pipeline.
+If validation fails, the server logs the error and exits immediately. Otherwise it logs the provenance status and any advisories.
+
+The startup check has the manifest only, not the skill's content, so a manifest that passes reports `TRUSTED_DIGEST_UNVERIFIED`: its digest was checked for form, not against the skill.
 
 <Warning>
-  Skills from registries like `clawdhub.com` and `moltbot.io` are blocked by default due to insufficient vetting. If you need to load skills from a custom registry, use the `trusted_registries` parameter to set an explicit allowlist.
+  The startup check builds the guard with its defaults, so from v0.3.0 a manifest whose registry is not one of the built-in trusted domains stops the server from starting. To vet skills from another registry, call `SkillProvenanceGuard` in your own code with that registry in `trusted_registries`.
 </Warning>
 
 ---
@@ -570,7 +566,7 @@ Verification-first governance gateway that validates all MCP tool calls before d
 
 ### Description
 
-`RiskBasedExecutionGateway` enforces deterministic policy checks on every tool invocation. It normalizes arguments, runs code safety analysis, enforces admin policy, and returns a structured governance decision. If the gateway blocks a request, the MCP server returns the decision directly without executing the tool.
+`RiskBasedExecutionGateway` enforces deterministic policy checks on every tool invocation. It normalizes arguments, runs the allowlist admission check on Python code, enforces admin policy, and returns a structured governance decision. If the gateway blocks a request, the MCP server returns the decision directly without executing the tool.
 
 The gateway is instantiated automatically when the MCP server starts — you do not need to configure it separately.
 
@@ -578,8 +574,8 @@ The gateway is instantiated automatically when the MCP server starts — you do 
 
 1. **Policy lookup** — The gateway checks the tool name against its internal policy table. Unknown tools are blocked immediately (`QWED-MCP-RISK-001`).
 2. **Argument validation** — Required arguments are checked for type and presence. For `execute_python_code`, the `code` parameter must be a non-empty string and `background` must be a boolean.
-3. **Code safety verification** — For `execute_python_code`, the gateway runs AST-based analysis to detect dangerous patterns (e.g., `eval`, `exec`, `compile`, `open`, `__import__`, `os.system`, `os.popen`, `subprocess`, `pickle.loads`, `marshal.loads`). The analyzer resolves import aliases and `from ... import` renames to catch obfuscated calls such as `import os as x; x.system(...)` or `from os import popen as op; op(...)`. Raw pattern-based checks are used as a fallback only when AST parsing fails.
-4. **Admin policy enforcement** — Even if code passes safety verification, the gateway checks `QWED_MCP_TRUSTED_CODE_EXECUTION`. If not enabled, the request is blocked with `BLOCKED_ADMIN_POLICY`.
+3. **Allowlist admission** — For `execute_python_code`, the gateway parses the code and admits it only when every module, builtin and attribute it uses is on the allowlist (see [What code is admitted](#what-code-is-admitted)). Code that doesn't parse, or that has no statements, is refused. Before v0.3.0, this step looked for a list of dangerous patterns instead.
+4. **Admin policy enforcement** — Even if code is admitted, the gateway checks `QWED_MCP_TRUSTED_CODE_EXECUTION`. If not enabled, the request is blocked with `BLOCKED_ADMIN_POLICY`.
 5. **UUID validation** — For `verification_status`, the `job_id` must be a valid canonical UUID.
 
 ### Usage
@@ -597,7 +593,7 @@ decision = gateway.evaluate_and_route("execute_python_code", {
 })
 
 print(decision["verified"])          # True or False
-print(decision["status"])            # "ALLOW_VERIFIED", "BLOCKED", or "BLOCKED_ADMIN_POLICY"
+print(decision["status"])            # "ALLOW_ADMITTED", "BLOCKED", or "BLOCKED_ADMIN_POLICY"
 print(decision["verification_id"])   # Context-bound SHA-256 fingerprint (unique per call)
 print(decision["normalized_arguments"])  # Cleaned arguments
 ```
@@ -607,7 +603,7 @@ print(decision["normalized_arguments"])  # Cleaned arguments
 | Field | Type | Description |
 | --- | --- | --- |
 | `verified` | `bool` | `True` if the request is approved for execution |
-| `status` | `str` | `ALLOW_VERIFIED`, `BLOCKED`, or `BLOCKED_ADMIN_POLICY` |
+| `status` | `str` | `ALLOW_ADMITTED` (admitted `execute_python_code` request), `ALLOW_VERIFIED` (valid `verification_status` lookup), `BLOCKED`, or `BLOCKED_ADMIN_POLICY`. Before v0.3.0, admitted code was reported as `ALLOW_VERIFIED`. Admission is a static check, not a proof that the code is correct |
 | `risk_level` | `str` | `high` or `low` depending on the tool |
 | `verification_id` | `str` | Context-bound SHA-256 fingerprint of the tool name, normalized arguments, a per-request nonce, wall-clock timestamp, and the gateway's per-process server instance ID. Unique for every call, even when inputs are identical. |
 | `normalized_arguments` | `dict` | Cleaned and validated arguments |
@@ -622,8 +618,8 @@ print(decision["normalized_arguments"])  # Cleaned arguments
 | `QWED-MCP-RISK-002` | Any | Tool exists in policy but has no governance handler |
 | `QWED-MCP-RISK-003` | `execute_python_code` | Missing or empty `code` argument |
 | `QWED-MCP-RISK-004` | `execute_python_code` | `background` is not a boolean |
-| `QWED-MCP-RISK-005` | `execute_python_code` | Code safety verification failed or raised an error |
-| `QWED-MCP-RISK-006` | `execute_python_code` | Code passed verification but `QWED_MCP_TRUSTED_CODE_EXECUTION` is not `true` |
+| `QWED-MCP-RISK-005` | `execute_python_code` | Code was not admitted, or the admission check raised an error |
+| `QWED-MCP-RISK-006` | `execute_python_code` | Code was admitted but `QWED_MCP_TRUSTED_CODE_EXECUTION` is not `true` |
 | `QWED-MCP-RISK-007` | `verification_status` | Missing or empty `job_id` argument |
 | `QWED-MCP-RISK-008` | `verification_status` | `job_id` is not a valid canonical UUID |
 
@@ -654,8 +650,7 @@ All tool responses include `stdout`, `stderr`, and a return code summary. A non-
 | --- | --- | --- |
 | `BLOCKED: Unknown MCP tool` | Tool name not in the governance policy table | Use `execute_python_code` or `verification_status` |
 | `BLOCKED: Missing required non-empty 'code' argument` | Empty or missing `code` parameter | Provide Python code in the `code` field |
-| `BLOCKED: QWED blocked python execution` | Code contains dangerous patterns | Remove `eval`, `exec`, `compile`, `open`, `__import__`, `os.system`, `os.popen`, `subprocess`, `pickle.loads`, `marshal.loads`, or similar calls. Aliased imports are also detected. |
+| `BLOCKED: QWED blocked python execution` | Code uses a module, name, builtin or attribute outside the allowlist | Read the reasons in the message and rewrite the script with [admitted modules and builtins](#what-code-is-admitted) |
 | `BLOCKED_ADMIN_POLICY` | `QWED_MCP_TRUSTED_CODE_EXECUTION` not set | Server admin sets env var to `true` |
 | `BLOCKED: Invalid job_id format` | `job_id` is not a canonical UUID | Use the UUID returned by the background job |
 | `Execution timed out after 30.0 seconds` | Script exceeded synchronous time limit | Optimize the script, break into smaller steps, or use `background=true` |
-| `ModuleNotFoundError` in stderr | Missing QWED SDK package | Install the required package (e.g., `pip install qwed-legal`) |

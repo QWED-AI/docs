@@ -274,7 +274,11 @@ provenance = {
 
 **Scenario:** A lawyer uses Claude Desktop to verify contract deadlines.
 
-When `qwed-mcp` is installed, Claude Desktop gains access to all QWED SDK libraries through the `execute_python_code` tool. Claude writes a Python script that imports the relevant guard and runs the verification.
+<Warning>
+  From qwed-mcp v0.3.0, `execute_python_code` admits only computation-only standard-library modules, so it refuses this script's `qwed_legal` import (`Module 'qwed_legal' is not admitted`). The example runs on qwed-mcp v0.2.x. On v0.3.0 and later, call `DeadlineGuard` from your own Python code. See [What code is admitted](/mcp/tools#what-code-is-admitted).
+</Warning>
+
+With qwed-mcp v0.2.x, Claude Desktop can import QWED SDK libraries through the `execute_python_code` tool. Claude writes a Python script that imports the relevant guard and runs the verification.
 
 **User:** "Verify: Contract signed Jan 15, 2026 with 30 business days deadline. Is Feb 14 correct?"
 
