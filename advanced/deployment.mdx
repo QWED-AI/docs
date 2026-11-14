@@ -359,7 +359,7 @@ From v9.1.0, `deploy/.env.example` and `deploy/kubernetes/configmap.yaml` list t
 ### AI providers
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `ACTIVE_PROVIDER` | Selected LLM provider: `openai`, `openai_direct`, `openai_compat`, `azure_openai`, `anthropic`, `claude_opus`, `gemini`, `ollama`, or `auto`. Any other value stops each request that needs a provider with an error naming `ACTIVE_PROVIDER` | `ollama` |
+| `ACTIVE_PROVIDER` | Selected LLM provider: `openai`, `openai_direct`, `openai_compat`, `azure_openai`, `anthropic`, `gemini`, `ollama`, or `auto`. Any other value stops each request that needs a provider with an error naming `ACTIVE_PROVIDER` | `ollama` |
 | `AZURE_OPENAI_API_KEY` | API key for Azure OpenAI | - |
 | `AZURE_OPENAI_ENDPOINT` | Endpoint URL | - |
 | `AZURE_OPENAI_DEPLOYMENT` | Azure OpenAI deployment to run. Required for Azure OpenAI | - |
@@ -368,7 +368,9 @@ From v9.1.0, `deploy/.env.example` and `deploy/kubernetes/configmap.yaml` list t
 | `GOOGLE_API_KEY` | API key for Google Gemini (or `GEMINI_API_KEY`) | - |
 | `GEMINI_MODEL` | Gemini model to run. Required for Gemini | - |
 
-From v9.0.0, QWED names no default model. Set the model variable of the provider you use (`OPENAI_MODEL`, `AZURE_OPENAI_DEPLOYMENT`, `ANTHROPIC_MODEL`, `CLAUDE_OPUS_DEPLOYMENT`, `GEMINI_MODEL`, `OLLAMA_MODEL`, or `CUSTOM_MODEL`). The server still starts without one, because it builds a provider on first use. Logic, statistics, and fact requests that need the provider then fail with an error that names the variable. The natural-language routes answer `UNVERIFIABLE`. See [LLM configuration](/getting-started/llm-configuration#supported-llm-providers).
+From v9.0.0, QWED names no default model. Set the model variable of the provider you use (`OPENAI_MODEL`, `AZURE_OPENAI_DEPLOYMENT`, `ANTHROPIC_MODEL`, `GEMINI_MODEL`, `OLLAMA_MODEL`, or `CUSTOM_MODEL`). The server still starts without one, because it builds a provider on first use. Logic, statistics, and fact requests that need the provider then fail with an error that names the variable. The natural-language routes answer `UNVERIFIABLE`. See [LLM configuration](/getting-started/llm-configuration#supported-llm-providers).
+
+`claude_opus` is no longer a provider. To move its settings to `anthropic`, see [Anthropic (Claude)](/getting-started/llm-configuration#anthropic-claude).
 
 ### Observability
 | Variable | Description | Default |
