@@ -10,6 +10,10 @@ The Consensus Engine orchestrates multiple verification engines for high-confide
 **Changed in v4.0.4:** Python code verification within consensus now runs exclusively through the secure Docker executor (`SecureCodeExecutor`). If the Docker sandbox is unavailable, consensus returns a `blocked_secure_execution` status and the API responds with HTTP 503.
 </Warning>
 
+<Warning>
+**Changed in v10.0.0:** one engine is not a consensus. An answer that only one engine verified is `BLOCKED`, with `agreement_status` `no_independent_verification` and `constraint_id` `consensus.no_independent_verification`, whatever the other engines returned and whatever `min_confidence` you ask for. In `single` mode, the default, SymPy is the only engine, so an answer it verifies is `BLOCKED`. A consensus is `VERIFIED` only when two distinct engines verify the same answer, which no two engines do today: Python and Stats are advisory and never verify. An answer that no engine verified is `UNVERIFIABLE`, or `BLOCKED` when every engine was blocked. In v9.1.0 and earlier, SymPy's verdict alone was a `VERIFIED` consensus in `single` mode, although SymPy compares the expression the model translated from your query with the answer the same model gave.
+</Warning>
+
 ## Features
 
 - **Async parallel execution** — Run engines concurrently
@@ -31,9 +35,8 @@ result = client.verify_with_consensus(
 )
 
 print(result.final_answer)     # 4
-print(result.confidence)       # 0.999
 print(result.engines_used)     # 3
-print(result.agreement_status) # "unanimous"
+print(result.agreement_status) # "no_independent_verification" when only SymPy verified 4
 ```
 
 ## Verification modes
@@ -203,6 +206,7 @@ Final confidence = weighted average of agreeing engines.
 | `majority` | More than half of the total weight agrees |
 | `split` | No clear majority among engines |
 | `no_results` | No engines returned a result |
+| `no_independent_verification` | Only one engine verified the answer, so the result is `BLOCKED` (from v10.0.0) |
 | `blocked_secure_execution` | The Docker sandbox is unavailable and a required engine cannot run (returns HTTP 503) |
 
 ## Status propagation
@@ -210,9 +214,10 @@ Final confidence = weighted average of agreeing engines.
 Consensus is a status-preserving aggregator, not a proof engine. Per the [3-tier engine classification](/engines/overview), consensus never invents a `VERIFIED` status from disagreement:
 
 - All engines return `BLOCKED` → the consensus result is `BLOCKED`.
-- Any single engine returns `BLOCKED` (but not all) → the consensus result is capped at `UNVERIFIABLE` (fail-closed — a partial block prevents `VERIFIED`).
-- Any engine returns `UNVERIFIABLE` → the consensus result is `UNVERIFIABLE`.
-- Only unanimous `VERIFIED` engine outcomes can produce a `VERIFIED` consensus.
+- Exactly one distinct engine returns `VERIFIED` → the consensus result is `BLOCKED` (`no_independent_verification`), whatever the other engines returned. QWED checks this before it counts the vote.
+- Otherwise, any engine returns `BLOCKED` (but not all) → the consensus result is capped at `UNVERIFIABLE` (fail-closed — a partial block prevents `VERIFIED`).
+- Otherwise, any engine returns `UNVERIFIABLE` → the consensus result is `UNVERIFIABLE`.
+- Only a unanimous answer that at least two distinct engines verified, with every engine `VERIFIED`, produces a `VERIFIED` consensus. Its evidence and `proof_ref` bind the query.
 - Math-query translation failures fail closed — the engine raises rather than fabricating a numeric answer from a regex or decimal guess.
 
 Individual engine outcomes are exposed via the `status` field on each `EngineResult` in the aggregated result.
@@ -236,14 +241,14 @@ Async and sync consensus verification both return a `ConsensusResult` dataclass 
 | ----- | ---- | ----------- |
 | `final_answer` | `Any` | Best-supported answer across engines |
 | `confidence` | `float` | Weighted confidence, `0.0`–`1.0` |
-| `agreement_status` | `str` | `unanimous`, `majority`, `split`, `no_results`, `all_failed`, or `blocked_secure_execution` |
+| `agreement_status` | `str` | `unanimous`, `majority`, `split`, `no_results`, `all_failed`, `no_independent_verification`, or `blocked_secure_execution` |
 | `engines_used` | `int` | Number of engines that returned a result |
 | `verification_chain` | `List[EngineResult]` | Per-engine outcomes, including each engine's `status` |
 | `total_latency_ms` | `float` | End-to-end latency for the aggregation |
 | `parallel_execution` | `bool` | True when engines ran concurrently |
 | `status` | `Optional[DiagnosticStatus]` | Trust-boundary status — `VERIFIED`, `UNVERIFIABLE`, or `BLOCKED` (enum, not a bare string) |
 | `proof_ref` | `Optional[str]` | Populated only on `VERIFIED` consensus — the sha256 hash of the canonical evidence |
-| `verified_evidence` | `Optional[Dict[str, Any]]` | Populated only on `VERIFIED` consensus — the exact evidence bound to `proof_ref` (agreement status, contributing engines, and the winning chain) |
+| `verified_evidence` | `Optional[Dict[str, Any]]` | Populated only on `VERIFIED` consensus — the exact evidence bound to `proof_ref` (agreement status, contributing engines, the winning chain and, from v10.0.0, the query) |
 
 <Info>
 `status` is now a [`DiagnosticStatus`](/advanced/diagnostics) enum rather than a bare string. Code that compared `result.status == "VERIFIED"` should use `result.status is DiagnosticStatus.VERIFIED` or check `result.status.value` for the string form.
@@ -263,4 +268,4 @@ dr.proof_ref            # sha256:... bound to result.verified_evidence
 dr.developer_fields     # {'agreement_status': 'unanimous', 'confidence': 0.99, 'engines_used': 2}
 ```
 
-The conversion is fail-closed: a `VERIFIED` `ConsensusResult` that is missing `verified_evidence` is downgraded to `UNVERIFIABLE` rather than emitting a weaker proof. This is why the `/verify/consensus` endpoint's `meets_requirement` flag is true only when consensus is `VERIFIED` at the trust boundary **and** confidence meets the requested threshold — confidence alone is never sufficient.
+The conversion is fail-closed: a `VERIFIED` `ConsensusResult` that is missing `verified_evidence` is downgraded to `UNVERIFIABLE` rather than emitting a weaker proof. The `/verify/consensus` endpoint's `meets_requirement` flag is true only when the result is verified as the attestation and the audit log decide it (`VERIFIED`, with `is_valid` true, and not reached on a model's translation of the query) **and** confidence meets the requested threshold. Confidence alone is never sufficient. A consensus is reached on the model's translation of the query and carries no `is_valid`, so from v10.0.0 `meets_requirement` is `false` for every consensus, including a `VERIFIED` one.

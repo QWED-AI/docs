@@ -565,7 +565,7 @@ Verify a factual claim against a provided context.
 
 ### POST /verify/consensus
 
-<Info>New in v4.0.0 · Updated in v5.0.0</Info>
+<Info>New in v4.0.0 · Changed in v10.0.0</Info>
 
 Multi-engine consensus verification. Runs the query through multiple verification engines and requires agreement above a confidence threshold. This endpoint is rate-limited per API key.
 
@@ -597,39 +597,57 @@ Mathematical expressions are parsed and compared using `Decimal` arithmetic inte
 | `high` | 2 | Higher confidence for important claims |
 | `maximum` | 3+ | Critical domains (medical, financial) |
 
-**Response:**
+<Warning>
+From v10.0.0, one engine is not a consensus. An answer that only one engine verified is `BLOCKED` with `constraint_id` `consensus.no_independent_verification`, whatever `min_confidence` is. That includes every answer in `single` mode, the default, where SymPy is the only engine. A consensus is `VERIFIED` only when two distinct engines verify the same answer, which no two engines do today, because Python and Stats are advisory. `meets_requirement` is `false` for every consensus. In v9.1.0 and earlier, SymPy's verdict alone was `VERIFIED` with `meets_requirement: true`.
+</Warning>
+
+**Response (SymPy verified the answer and Python is advisory):**
 
 ```json
 {
+  "status": "BLOCKED",
+  "agent_message": "Consensus verification: blocked, as one engine is not a consensus and no other engine verified the answer",
+  "proof_ref": null,
+  "constraint_id": "consensus.no_independent_verification",
   "final_answer": "12",
-  "confidence": 98.5,
+  "confidence": 0.0,
   "engines_used": 2,
-  "agreement_status": "UNANIMOUS",
+  "agreement_status": "no_independent_verification",
   "verification_chain": [
     {
-      "engine": "math",
-      "method": "symbolic",
+      "engine": "SymPy",
+      "method": "symbolic_math",
       "result": "12",
-      "confidence": 99.0,
+      "confidence": 1.0,
       "latency_ms": 12.5,
       "success": true,
       "status": "VERIFIED"
+    },
+    {
+      "engine": "Python",
+      "method": "code_execution",
+      "result": "12",
+      "confidence": 0.99,
+      "latency_ms": 30.1,
+      "success": true,
+      "status": "UNVERIFIABLE"
     }
   ],
   "total_latency_ms": 45.2,
-  "meets_requirement": true
+  "meets_requirement": false
 }
 ```
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `confidence` | float | Confidence as a percentage (0–100) |
+| `confidence` | float | Weighted confidence, 0–1. `0.0` when only one engine verified the answer |
 | `verification_chain` | array | Detailed results from each engine |
 | `verification_chain[].status` | string | Trust-boundary status from that engine — `VERIFIED`, `UNVERIFIABLE`, or `BLOCKED` |
-| `meets_requirement` | boolean | True only when consensus is `VERIFIED` at the trust boundary **and** `confidence` meets `min_confidence`. Confidence alone is never sufficient. |
+| `agreement_status` | string | `unanimous`, `majority`, `split`, `no_results`, `all_failed`, `blocked_secure_execution`, or, from v10.0.0, `no_independent_verification` |
+| `meets_requirement` | boolean | True only when the result is verified as the attestation and the audit log decide it (`VERIFIED`, with `is_valid` true, and not reached on a model's translation of the query) **and** `confidence` meets `min_confidence`. Confidence alone is never sufficient. A consensus is reached on the model's translation of the query and has no `is_valid`, so from v10.0.0 this is `false` for every consensus |
 
 <Note>
-Only unanimous `VERIFIED` engine outcomes can produce a `VERIFIED` consensus. Advisory-only sub-engines (statistical computation, code execution) always return `UNVERIFIABLE`, so a query answered solely by those paths never satisfies `meets_requirement`. See the [Consensus engine](/engines/consensus#sub-engine-status-contract) page for the full sub-engine contract.
+Only a unanimous answer that at least two distinct engines verified can produce a `VERIFIED` consensus, and its `proof_ref` binds the query. Advisory-only sub-engines (statistical computation, code execution) always return `UNVERIFIABLE`, so a query answered solely by those paths never satisfies `meets_requirement`. See the [Consensus engine](/engines/consensus#sub-engine-status-contract) page for the full sub-engine contract.
 </Note>
 
 | Status | Description |
@@ -660,23 +678,36 @@ curl -X POST http://localhost:8000/verify/image \
 | `image` | file | Yes | Image file (max 10 MB; PNG, JPEG, GIF, WebP) |
 | `claim` | string | Yes | The claim about the image to verify |
 
-**Response:**
+<Info>Changed in v10.0.0</Info>
+
+The route reads the image's dimensions from its metadata and decides a size claim only when the whole claim is a plain statement of the width, the height or both, such as `800x600`, `The image is 800x600 pixels`, `the width is 800` or `The image is 800 pixels wide and 600 pixels tall`. It checks every dimension the claim names.
+
+**Response (size claim that holds):**
 
 ```json
 {
-  "verdict": "SUPPORTED",
-  "confidence": 0.95,
-  "reasoning": "Image dimensions match the claimed resolution",
-  "methods_used": ["metadata_analysis", "pixel_inspection"]
+  "status": "VERIFIED",
+  "agent_message": "Image claim verified",
+  "proof_ref": "sha256:…",
+  "constraint_id": "image_verifier.deterministic",
+  "is_valid": true,
+  "methods_used": ["metadata_extraction", "size_verification"],
+  "analysis": {
+    "metadata": {"width": 800, "height": 600, "format": "png"},
+    "claim_type": "size"
+  }
 }
 ```
 
-| Verdict | Meaning |
-|---------|---------|
-| `SUPPORTED` | Claim is confirmed by image analysis |
-| `REFUTED` | Claim contradicts image analysis |
-| `INCONCLUSIVE` | Cannot determine from available methods |
-| `VLM_REQUIRED` | Visual Language Model needed for deeper analysis |
+| Outcome | `status` | `constraint_id` |
+|---------|----------|-----------------|
+| Every dimension the claim names matches | `VERIFIED` | `image_verifier.deterministic` |
+| A dimension the claim names doesn't match | `BLOCKED` | `image_verifier.deterministic_refuted` |
+| A claim about size that isn't a plain statement of the dimensions, such as a negation (`The resolution is not HD`), a comparison (`at least 1920x1080`) or a claim that says more than the dimensions, or an image whose dimensions can't be read | `UNVERIFIABLE` | `image_verifier.inconclusive` |
+| A claim that needs visual understanding, including `The image is HD`. `/verify/image` runs no VLM, so nothing checks it | `UNVERIFIABLE` | `image_verifier.vlm_advisory_only` |
+| An internal error | `BLOCKED` | `api.image.execution_error` |
+
+The example leaves out `developer_fields`, which repeats the fields after `proof_ref`. The `proof_ref` of a `VERIFIED` result binds the claim and the image's SHA-256, so it can't stand for another claim or image. In v9.1.0 and earlier, the route took the first dimension it found anywhere in a claim, so `The resolution is not HD`, a claim with a right width and a wrong height, and a claim that named the dimensions among other statements could be `VERIFIED`.
 
 ---
 

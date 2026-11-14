@@ -83,14 +83,14 @@ This preserves the guarantee from the [3-tier engine classification](/engines/ov
 
 ## Batch verification
 
-`BatchFactVerifier` summaries are counted by diagnostic status:
+`BatchFactVerifier` summaries count items by the same rule as the attestation's `verified` claim. From v10.0.0, an item counts as `verified` only when it is `VERIFIED` with `is_valid` true. A `VERIFIED` item whose claim was proven false counts as `blocked`, and a `VERIFIED` item with no `is_valid` counts as `unverifiable`:
 
 ```python
 from qwed_new.core.fact_verifier import BatchFactVerifier
 
 batch = BatchFactVerifier()
 summary = batch.verify_batch(claims, context=context)
-print(summary["summary"]["verified"])      # count of VERIFIED items
+print(summary["summary"]["verified"])      # count of items proven true
 print(summary["summary"]["unverifiable"])  # NEUTRAL / INSUFFICIENT / empty
 print(summary["summary"]["blocked"])       # REFUTED or pipeline errors
 ```

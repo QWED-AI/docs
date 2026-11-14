@@ -151,6 +151,8 @@ Tokens last `QWED_ATTESTATION_TTL_SECONDS` (24 hours by default, from 60 seconds
 
 `qwed.admission` is present only on routes that decide an admission. It is `ADMIT` or `BLOCKED`, and the server signs `ADMIT` only for a `VERIFIED` result that is verified and bound to its proof.
 
+`qwed.result.verified` is `true` only when the result is `VERIFIED`, its `is_valid` is `true`, and it wasn't reached on a model's translation of the question. The audit log's `is_verified` and a batch summary's `verified` count use the same rule. Code or SQL proven unsafe is `VERIFIED` with `is_valid` `false`, so it's signed `verified: false`. From v10.0.0, a `VERIFIED` result with no `is_valid`, such as a logic result or a consensus, and a natural-language verdict are also signed `verified: false`. In v9.1.0 and earlier, the token signed `verified: true` unless `is_valid` was `false`.
+
 ## Issuing attestations
 
 This section is for code that runs QWED's engines in-process and signs its own results.
