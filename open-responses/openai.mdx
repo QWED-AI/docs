@@ -21,12 +21,12 @@ pip install qwed-open-responses[openai]
 
 ```python
 from qwed_open_responses.middleware.openai_sdk import VerifiedOpenAI
-from qwed_open_responses import ToolGuard, SchemaGuard
+from qwed_open_responses import ToolGuard
 
 # Create verified client
 client = VerifiedOpenAI(
     api_key="sk-...",
-    guards=[ToolGuard(), SchemaGuard(schema=my_schema)],
+    guards=[ToolGuard()],
 )
 
 # Responses are automatically verified
@@ -37,6 +37,7 @@ response = client.chat.completions.create(
 
 # Check verification result
 print(response._qwed_verification.verified)
+# True
 ```
 
 <Warning>
@@ -57,7 +58,9 @@ See the [guards reference](/open-responses/guards#combining-guards) for details.
 ## Structured outputs
 
 ```python
-from qwed_open_responses import SchemaGuard
+import json
+from qwed_open_responses import ResponseVerifier, SafetyGuard, SchemaGuard
+from qwed_open_responses.middleware.openai_sdk import VerifiedOpenAI
 
 # Define expected schema
 order_schema = {
@@ -72,7 +75,7 @@ order_schema = {
 
 client = VerifiedOpenAI(
     api_key="sk-...",
-    guards=[SchemaGuard(schema=order_schema)],
+    guards=[SafetyGuard()],
 )
 
 response = client.chat.completions.create(
@@ -80,8 +83,20 @@ response = client.chat.completions.create(
     messages=[...],
     response_format={"type": "json_object"},
 )
-# If output doesn't match schema: ResponseBlocked exception
+
+# Check the model's JSON against the schema
+order = json.loads(response.choices[0].message.content)
+result = ResponseVerifier().verify_structured_output(
+    output=order,
+    guards=[SchemaGuard(schema=order_schema)],
+)
+
+# For {"product": "Widget", "quantity": 2, "price": 9.99}:
+print(result.verified)
+# True
 ```
+
+Keep `SchemaGuard` out of the client's guards. It validates the whole response object (`id`, `choices`, `usage` and so on) rather than the model's JSON, so every response fails with "Schema validation failed". Parse the model's JSON and check it as above.
 
 ---
 
@@ -183,16 +198,20 @@ You can also call `client.verify(response, context={...})` directly.
 ## Responses API (preview)
 
 ```python
-# For the new OpenAI Responses API (when available)
-client = VerifiedOpenAI(api_key="sk-...")
+from qwed_open_responses import SafetyGuard, ToolGuard
+from qwed_open_responses.middleware.openai_sdk import VerifiedOpenAI
+
+client = VerifiedOpenAI(api_key="sk-...", guards=[ToolGuard(), SafetyGuard()])
 
 response = client.responses.create(
     model="gpt-4",
     input="Search for weather in NYC",
     tools=[{"type": "web_search"}],
 )
-# Automatically verified
+# Verified before it is returned: a failed check raises ResponseBlocked
 ```
+
+`client.responses.create(...)` runs the same guards on Responses API objects. In v0.6.1, `ToolGuard` does not read `function_call` items inside a Responses object's `output[]`. It fails closed instead, so any response that contains a function call raises `ResponseBlocked`, even a safe one. Text responses and provider-hosted items such as `web_search_call` pass. For your own function tools, use `client.chat.completions.create(...)` until this changes.
 
 ---
 
@@ -200,14 +219,13 @@ response = client.responses.create(
 
 ```python
 from qwed_open_responses.middleware.openai_sdk import VerifiedOpenAI, ResponseBlocked
-from qwed_open_responses import ToolGuard, SchemaGuard, SafetyGuard
+from qwed_open_responses import ToolGuard, SafetyGuard
 
 # Create client with multiple guards
 client = VerifiedOpenAI(
     api_key="sk-...",
     guards=[
         ToolGuard(blocked_tools=["execute_shell"]),
-        SchemaGuard(schema=output_schema),
         SafetyGuard(check_pii=True),
     ],
 )
@@ -223,7 +241,11 @@ try:
     
     print("✅ Response verified!")
     print(f"Guards passed: {response._qwed_verification.guards_passed}")
-    
+    # ✅ Response verified!
+    # Guards passed: 2
+
 except ResponseBlocked as e:
     print(f"❌ Blocked: {e.result.block_reason}")
+    # If the model called execute_shell:
+    # ❌ Blocked: BLOCKED: Tool 'execute_shell' is not allowed
 ```
