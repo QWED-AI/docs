@@ -147,7 +147,7 @@ docker run -d -p 8000:8000 \
   -e QWED_API_KEY_LOOKUP_SECRET \
   -e QWED_AUDIT_SECRET_KEY \
   -e DATABASE_URL \
-  qwedai/qwed-verification:9.1.0
+  qwedai/qwed-verification:10.0.0
 ```
 
 Omit `DATABASE_URL` to use the SQLite database in the `qwed-data` volume. The server names no model. For requests that use a provider (natural-language, logic, statistics, and fact), also pass the provider's settings, for example `-e ACTIVE_PROVIDER -e OPENAI_API_KEY -e OPENAI_MODEL`. The container doesn't read the `qwed init` settings on your host. The same applies to the signing-key command below.
@@ -169,7 +169,7 @@ docker run -p 8000:8000 \
   -e QWED_API_KEY_LOOKUP_SECRET \
   -e QWED_AUDIT_SECRET_KEY \
   -e QWED_CORS_ORIGINS="https://app.yourcompany.com" \
-  qwedai/qwed-verification:9.1.0
+  qwedai/qwed-verification:10.0.0
 ```
 
 Keep the key file out of version control. See [Signing keys](/advanced/attestations#signing-keys).
@@ -208,7 +208,7 @@ For production environments, QWED ships Kubernetes manifests in `deploy/kubernet
    </Tip>
 
 3. **Deploy Application**
-   `deploy/kubernetes/deployment.yaml` pins `docker.io/qwedai/qwed-verification:9.1.0`. The first tag of the API server image is 8.0.0. Don't point the Deployment at an earlier tag, because earlier tags ran the GitHub Action.
+   `deploy/kubernetes/deployment.yaml` pins `docker.io/qwedai/qwed-verification:10.0.0`. The first tag of the API server image is 8.0.0. Don't point the Deployment at an earlier tag, because earlier tags ran the GitHub Action.
    ```bash
    kubectl apply -f deploy/kubernetes/deployment.yaml
    kubectl apply -f deploy/kubernetes/service.yaml
@@ -359,7 +359,7 @@ From v9.1.0, `deploy/.env.example` and `deploy/kubernetes/configmap.yaml` list t
 ### AI providers
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `ACTIVE_PROVIDER` | Selected LLM provider: `openai`, `openai_direct`, `openai_compat`, `azure_openai`, `anthropic`, `claude_opus`, `gemini`, `ollama`, or `auto`. Any other value stops each request that needs a provider with an error naming `ACTIVE_PROVIDER` | `ollama` |
+| `ACTIVE_PROVIDER` | Selected LLM provider: `openai`, `openai_direct`, `openai_compat`, `azure_openai`, `anthropic`, `gemini`, `ollama`, or `auto`. Any other value stops each request that needs a provider with an error naming `ACTIVE_PROVIDER`. From v10.0.0, `claude_opus` is refused, and the error says to use `anthropic` with the `ANTHROPIC_*` settings | `ollama` |
 | `AZURE_OPENAI_API_KEY` | API key for Azure OpenAI | - |
 | `AZURE_OPENAI_ENDPOINT` | Endpoint URL | - |
 | `AZURE_OPENAI_DEPLOYMENT` | Azure OpenAI deployment to run. Required for Azure OpenAI | - |
@@ -368,7 +368,7 @@ From v9.1.0, `deploy/.env.example` and `deploy/kubernetes/configmap.yaml` list t
 | `GOOGLE_API_KEY` | API key for Google Gemini (or `GEMINI_API_KEY`) | - |
 | `GEMINI_MODEL` | Gemini model to run. Required for Gemini | - |
 
-From v9.0.0, QWED names no default model. Set the model variable of the provider you use (`OPENAI_MODEL`, `AZURE_OPENAI_DEPLOYMENT`, `ANTHROPIC_MODEL`, `CLAUDE_OPUS_DEPLOYMENT`, `GEMINI_MODEL`, `OLLAMA_MODEL`, or `CUSTOM_MODEL`). The server still starts without one, because it builds a provider on first use. Logic, statistics, and fact requests that need the provider then fail with an error that names the variable. The natural-language routes answer `UNVERIFIABLE`. See [LLM configuration](/getting-started/llm-configuration#supported-llm-providers).
+From v9.0.0, QWED names no default model. Set the model variable of the provider you use (`OPENAI_MODEL`, `AZURE_OPENAI_DEPLOYMENT`, `ANTHROPIC_MODEL`, `GEMINI_MODEL`, `OLLAMA_MODEL`, or `CUSTOM_MODEL`). The server still starts without one, because it builds a provider on first use. Logic, statistics, and fact requests that need the provider then fail with an error that names the variable. The natural-language routes answer `UNVERIFIABLE`. See [LLM configuration](/getting-started/llm-configuration#supported-llm-providers).
 
 ### Observability
 | Variable | Description | Default |

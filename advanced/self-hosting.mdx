@@ -142,7 +142,7 @@ docker run -d -p 8000:8000 \
   -e QWED_JWT_SECRET_KEY \
   -e QWED_API_KEY_LOOKUP_SECRET \
   -e QWED_AUDIT_SECRET_KEY \
-  qwedai/qwed-verification:9.1.0
+  qwedai/qwed-verification:10.0.0
 ```
 
 The server refuses to start without any of `QWED_CORS_ORIGINS`, `API_KEY_SECRET`, `QWED_JWT_SECRET_KEY`, `QWED_API_KEY_LOOKUP_SECRET` and `QWED_AUDIT_SECRET_KEY`, and `QWED_API_KEY_LOOKUP_SECRET` must differ from `QWED_JWT_SECRET_KEY`. Also set `QWED_SIGNING_KEY` (an EC P-256 key), or attestations stop verifying after a restart or on another replica.
@@ -168,7 +168,7 @@ docker run -d -p 9000:9000 -e UVICORN_PORT=9000 \
   -e QWED_JWT_SECRET_KEY \
   -e QWED_API_KEY_LOOKUP_SECRET \
   -e QWED_AUDIT_SECRET_KEY \
-  qwedai/qwed-verification:9.1.0
+  qwedai/qwed-verification:10.0.0
 ```
 
 ### Build from source
@@ -181,7 +181,7 @@ docker build --target server -t qwed-api .
 
 ## Kubernetes
 
-The repository ships manifests in `deploy/kubernetes/`. The Deployment pins `docker.io/qwedai/qwed-verification:9.1.0`. Tags from 8.0.0 contain the API server. Fill in every value in `deploy/kubernetes/secret.yaml` before you apply it. See [Kubernetes deployment](/advanced/deployment#kubernetes-deployment).
+The repository ships manifests in `deploy/kubernetes/`. The Deployment pins `docker.io/qwedai/qwed-verification:10.0.0`. Tags from 8.0.0 contain the API server. Fill in every value in `deploy/kubernetes/secret.yaml` before you apply it. See [Kubernetes deployment](/advanced/deployment#kubernetes-deployment).
 
 ```yaml
 apiVersion: apps/v1
@@ -201,7 +201,7 @@ spec:
     spec:
       containers:
       - name: qwed-core
-        image: docker.io/qwedai/qwed-verification:9.1.0
+        image: docker.io/qwedai/qwed-verification:10.0.0
         ports:
         - containerPort: 8000
         envFrom:

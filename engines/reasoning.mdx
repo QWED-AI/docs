@@ -8,6 +8,8 @@ The Reasoning Engine validates LLM reasoning traces using chain-of-thought parsi
 
 Because reasoning validation depends on LLM providers, this engine is [advisory](/engines/overview#tier-3-advisory-engines): provider-backed and heuristic checks populate `advisory_checks`, and the engine does not emit `VERIFIED` on their basis alone. When no provider is available, the engine returns `UNVERIFIABLE` with `constraint_id: reasoning_verifier.no_provider` — passing `providers=[]` no longer silently defaults to `["anthropic"]`.
 
+From v10.0.0, a `providers` list that holds a name the verifier can't load, such as the removed `claude_opus` or a name QWED doesn't know, is `BLOCKED` with `constraint_id: reasoning_verifier.provider_config_error` and a message naming the setting to fix. No other provider in the list runs in its place. Before v10.0.0, the other providers ran.
+
 ## Features
 
 - **Chain-of-Thought Validation** - Parse and verify reasoning steps
