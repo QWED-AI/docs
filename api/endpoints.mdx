@@ -152,9 +152,9 @@ The endpoint returns the [`DiagnosticResult`](/advanced/diagnostics) verdict tha
 | `query_semantics_verified` | boolean | Always `false`. QWED cannot prove the translation means what you asked |
 | `admission` | string | Always `"BLOCKED"` (`DENY`) for this endpoint, even when the translated claim holds |
 
-Admission is always `BLOCKED` because the LLM translation itself is unverified, so QWED never admits the result as an answer to your question. The verdict itself is unchanged. The audit log row's `is_verified` follows admission, so it is always `false`. QWED returns `BLOCKED` as the verdict when the control plane returns a malformed diagnostic or when the output sanitizer rejects the translated expression.
+Admission is always `BLOCKED` because the LLM translation itself is unverified, so QWED never admits the result as an answer to your question. The verdict itself is unchanged. The audit log row's `is_verified` follows admission, so it is always `false`. The row's domain is `NATURAL_LANGUAGE`. Rows written before this fix store `MATH`, because the domain is part of each signed, chained entry and QWED doesn't rewrite it. QWED returns `BLOCKED` as the verdict when the control plane returns a malformed diagnostic or when the output sanitizer rejects the translated expression.
 
-For a deterministic, admissible result, send the expression to [`POST /verify/math`](#post-verify-math) directly.
+For a deterministic, admissible result, send the expression to [`POST /verify/math`](#post-%2Fverify%2Fmath) directly.
 
 The control plane also builds a `trust_boundary` record that describes what the pipeline proved. The control-plane response carries the enforced verdict as `diagnostic` together with `admission`.
 
@@ -238,6 +238,10 @@ Every response from this endpoint includes `admission`. Gate on `admission`, not
 | Proven false | `2 + 2 = 5` | `VERIFIED` | `false` | `BLOCKED` |
 | Undecided symbolic difference | SymPy can't decide the difference is zero or non-zero | `UNVERIFIABLE` | `false` | `BLOCKED` |
 | Domain-restricted identity | `x/x = 1`, `(x**2-1)/(x-1) = x+1` | `UNVERIFIABLE` | `false` | `BLOCKED` |
+| Undefined part | `log(0)**0 = 2` | `UNVERIFIABLE` | `false` | `BLOCKED` |
+| Parse error | `d/dx(x^2) = 2x`, unparseable text | `BLOCKED` | `false` | `BLOCKED` |
+
+The expression can use `diff(f, x)` or `Derivative(f, x)`, for example `diff(x**2, x) == 2*x`. `==` reads as `=`. See [Derivatives in `/verify/math` identities](/engines/math#derivatives-in-%2Fverify%2Fmath-identities).
 
 **Response (proven false):**
 
@@ -259,6 +263,23 @@ Every response from this endpoint includes `admission`. Gate on `admission`, not
 A proven-false identity is a decided verdict, so `status` is `VERIFIED` and `proof_ref` is set. Previous versions returned `UNVERIFIABLE` for it.
 
 **Response (domain-restricted identity):** An identity that holds only after SymPy cancels a removable singularity returns `UNVERIFIABLE` with `constraint_id: "math.domain_restricted_identity"`. For example, `x/x = 1` is false at `x = 0`. See [Domain-restricted identities](/engines/math#domain-restricted-identities).
+
+**Response (undefined part):** A claim with a side that SymPy evaluates away from an undefined value (`zoo` or `nan`) is not disproven. For example, SymPy reads `log(0)**0` as `1`. `log(0)**0 = 2` returns `UNVERIFIABLE` with `constraint_id: "math.undefined_part"`, `agent_message: "A side of the identity is undefined"`, and no attestation. Previous versions returned a signed disproof.
+
+**Response (parse error):** Input the parser refuses returns `BLOCKED` with `constraint_id: "math.parse_error"`. The parser's own error text is not returned. Previous versions returned `api.math.execution_error` with `Internal verification error`.
+
+```json
+{
+  "status": "BLOCKED",
+  "is_valid": false,
+  "agent_message": "Expression could not be parsed",
+  "constraint_id": "math.parse_error",
+  "proof_ref": null,
+  "admission": "BLOCKED"
+}
+```
+
+Leibniz notation (`d/dx`, `dy/dx`, `d^2y/dx^2`) gets the same `BLOCKED` result with the message `Expression uses d/dx notation, or a name read as d times a variable, which cannot be read unambiguously; write diff(f, x) for a derivative`.
 
 The audit log row's `is_verified` follows `is_valid`, so a proven-false identity is logged as not verified.
 
@@ -496,7 +517,7 @@ Validate SQL queries against a provided schema. Returns the unified [`Diagnostic
 }
 ```
 
-A proven-malicious query returns `status: "VERIFIED"` with `developer_fields.is_valid: false`, `developer_fields.malicious_classification: true`, and `admission: "BLOCKED"` — proving malice is a successful proof, so the truth verdict is preserved while admission is denied. `BLOCKED` status is reserved for verification failures: `sql_verifier.parse_error`, `sql_verifier.schema_parse_error`, `sql_verifier.complexity_limit_exceeded`, and `sql_verifier.execution_error`. See the [SQL engine](/engines/sql) page for the full contract.
+A proven-malicious query returns `status: "VERIFIED"` with `developer_fields.is_valid: false`, `developer_fields.malicious_classification: true`, and `admission: "BLOCKED"` — proving malice is a successful proof, so the truth verdict is preserved while admission is denied. `BLOCKED` status is reserved for verification failures: `sql_verifier.parse_error`, `sql_verifier.schema_parse_error`, `sql_verifier.complexity_limit_exceeded`, `sql_verifier.execution_error`, and, from v9.0.0, `sql_verifier.unevaluated_predicate` (a filter predicate that reads no data and can't be worked out). See the [SQL engine](/engines/sql) page for the full contract.
 
 ---
 
@@ -854,7 +875,7 @@ Math, logic, and natural-language items return the [`DiagnosticResult`](/advance
 - `result.agent_message`: short human-readable summary safe to surface to the caller.
 - `result.developer_fields`: engine detail (including the legacy `is_valid` flag for backward compatibility).
 - `result.proof_ref`: cryptographic hash of the retained proof artifact. Present only when `result.status == VERIFIED`; `null` otherwise. **This is the authority bit.** Downstream gates must reject any item whose `proof_ref` is `null`.
-- `result.admission`: `ADMIT` or `BLOCKED` on math, SQL, and code items, the same decision `POST /verify/math`, `POST /verify/sql`, and `POST /verify/code` return. Natural-language items always carry `BLOCKED`. Logic and fact items carry no admission. Admit an item only when `admission` is `ADMIT`, `status` is `VERIFIED`, and `proof_ref` is set. A proven-malicious query or proven-unsafe code is `VERIFIED` with admission `BLOCKED`. A math item whose sides differ is `UNVERIFIABLE` with admission `BLOCKED` (see the table below), unlike `POST /verify/math`, which returns a proven-false identity as `VERIFIED`.
+- `result.admission`: `ADMIT` or `BLOCKED` on math, SQL, and code items, the same decision `POST /verify/math`, `POST /verify/sql`, and `POST /verify/code` return. Natural-language items always carry `BLOCKED`. Logic and fact items carry no admission. Admit an item only when `admission` is `ADMIT`, `status` is `VERIFIED`, and `proof_ref` is set. A proven-malicious query, proven-unsafe code, or a math claim proven false is `VERIFIED` with admission `BLOCKED`.
 
 | Item type | `result` |
 |-----------|----------|
@@ -912,14 +933,27 @@ The full response for two math items:
       "status": "completed",
       "result": {
         "status": "VERIFIED",
-        "agent_message": "Identity verified",
+        "agent_message": "Identity is true",
+        "query": "x**2 + 2*x + 1 = (x+1)**2",
+        "type": "math",
+        "is_valid": true,
+        "result": true,
+        "left_side": "x**2 + 2*x + 1",
+        "right_side": "(x + 1)**2",
+        "simplified_difference": "0",
+        "diff": "0",
         "developer_fields": {
           "query": "x**2 + 2*x + 1 = (x+1)**2",
           "type": "math",
           "is_valid": true,
+          "result": true,
+          "left_side": "x**2 + 2*x + 1",
+          "right_side": "(x + 1)**2",
+          "simplified_difference": "0",
           "diff": "0"
         },
         "proof_ref": "sha256:9f2c…",
+        "attestation": "eyJ...",
         "admission": "ADMIT",
         "is_authoritative": true
       },
@@ -951,15 +985,22 @@ The full response for two math items:
 
 #### Math items: proof vs. simplification
 
-Math items take the same trust step as `POST /verify/math`: QWED signs a `VERIFIED` identity and enforces the attestation as mandatory. The attestation's engine is `math`. Four outcomes are possible:
+Math items build the identity verdict with the same function as `POST /verify/math`, so an equality claim gets the same verdict on both routes. They take the same trust step: QWED signs a `VERIFIED` identity, true or proven false, and enforces the attestation as mandatory. The attestation's engine is `math`.
 
-| Result | `status` | `proof_ref` | When |
-|--------|----------|-------------|------|
-| Verified identity | `VERIFIED` | `sha256:...` | Equality claim (e.g., `x**2 + 2*x + 1 = (x+1)**2`) simplifies to `0` **and** attestation signing succeeds. |
-| Not equal | `UNVERIFIABLE` | `null` | Equality claim where the two sides do not simplify to the same expression. `developer_fields.is_valid` is `false` and `developer_fields.diff` shows the non-zero difference. |
-| Simplification only | `UNVERIFIABLE` | `null` | Expression without an equality (e.g., `x + x`). `developer_fields.simplified` contains the simplified form. |
-| Domain-restricted identity | `UNVERIFIABLE` | `null` | Equality whose sides are undefined at different points, such as `x/x = 1`. `constraint_id` is `math.domain_restricted_identity`, as on `POST /verify/math`. |
-| Signing failed | `BLOCKED` | `null` | Verified identity whose attestation could not be issued. See below. |
+Each equality item carries the route's messages (`Identity is true`, `Identity is false`, and so on) and fields (`left_side`, `right_side`, `simplified_difference`, `result`), and keeps its own `query`, `type`, and `diff`.
+
+| Result | `status` | `is_valid` | `proof_ref` | `admission` | When |
+|--------|----------|------------|-------------|-------------|------|
+| Verified identity | `VERIFIED` | `true` | `sha256:...` | `ADMIT` | Equality claim (e.g., `x**2 + 2*x + 1 = (x+1)**2`) simplifies to `0` **and** attestation signing succeeds. |
+| Proven false | `VERIFIED` | `false` | `sha256:...` | `BLOCKED` | SymPy decides the difference is non-zero (e.g., `2 + 2 = 5`). The item carries `attestation`. `diff` shows the non-zero difference. |
+| Undecided | `UNVERIFIABLE` | `false` | `null` | `BLOCKED` | SymPy can't decide the difference, or the difference only holds float residue. |
+| Undefined part | `UNVERIFIABLE` | `false` | `null` | `BLOCKED` | A side has a part that evaluates to `zoo` or `nan`, such as `log(0)**0 = 2`. `constraint_id` is `math.undefined_part`, as on `POST /verify/math`. |
+| Simplification only | `UNVERIFIABLE` | `false` | `null` | `BLOCKED` | Expression without an equality (e.g., `x + x`). `developer_fields.simplified` contains the simplified form. |
+| Domain-restricted identity | `UNVERIFIABLE` | `false` | `null` | `BLOCKED` | Equality whose sides are undefined at different points, such as `x/x = 1`. `constraint_id` is `math.domain_restricted_identity`, as on `POST /verify/math`. |
+| Parse error | `BLOCKED` | `false` | `null` | `BLOCKED` | The parser refuses the expression, including Leibniz notation such as `d/dx`. `constraint_id` is `math.parse_error`, as on `POST /verify/math`. |
+| Signing failed | `BLOCKED` | n/a | `null` | `BLOCKED` | Verified identity whose attestation could not be issued. See below. |
+
+Previously, a batch math claim proven false was `UNVERIFIABLE` with no `proof_ref`, and an expression the parser refused was a `failed` item carrying the parser's error text.
 
 If attestation signing fails on an otherwise-verified identity, the item is `BLOCKED`, as on `POST /verify/math`. Previously it was downgraded to `UNVERIFIABLE`. A math result is never returned as `VERIFIED` without a signed proof.
 
@@ -990,12 +1031,12 @@ Bare expressions (no `=`) always return `UNVERIFIABLE`. A successful symbolic si
 </Warning>
 
 <Info>
-The pre-v6.0 top-level `is_valid` field is preserved inside `developer_fields.is_valid` for backward compatibility, but new code should gate on `result.status == "VERIFIED"` and the presence of `result.proof_ref`. The batch response does not include a pass/fail aggregate because a boolean cannot represent the three-status verdict — count `items[].result.status == "VERIFIED"` entries directly if you need a success ratio.
+The pre-v6.0 top-level `is_valid` field is preserved inside `developer_fields.is_valid` for backward compatibility, but new code should gate on `result.admission == "ADMIT"`, `result.status == "VERIFIED"`, and the presence of `result.proof_ref`. A math claim proven false is `VERIFIED` with a `proof_ref`, so `status` alone does not mean the claim holds. The batch response does not include a pass/fail aggregate because a boolean cannot represent the three-status verdict — count `items[].result.status == "VERIFIED"` entries directly if you need a success ratio.
 </Info>
 
 Each item runs under `QWED_BATCH_ITEM_TIMEOUT` (default 60 seconds). An item that times out is marked `failed` with its error recorded, and the rest of the job still completes.
 
-**Audit trail:** QWED appends one signed, hash-chained audit row per item, including failed items. Each row stores the item's query and a result with `batch_job_id`, `batch_item_id`, `batch_item_type`, `item_status`, and `details` (the item's `result` or `error`). The row's domain and `is_verified` follow the rule of the item type's own `/verify/*` route. If the audit append for an item fails, QWED marks that item `failed`, returns `"result": null` with `"error": "audit persistence failed"`, and counts it in `failed_items`. No item result is returned without its audit row.
+**Audit trail:** QWED appends one signed, hash-chained audit row per item, including failed items. Each row stores the item's query and a result with `batch_job_id`, `batch_item_id`, `batch_item_type`, `item_status`, and `details` (the item's `result` or `error`). The row's domain and `is_verified` follow the rule of the item type's own `/verify/*` route. For example, natural-language items store domain `NATURAL_LANGUAGE` and math items store `MATH`. If the audit append for an item fails, QWED marks that item `failed`, returns `"result": null` with `"error": "audit persistence failed"`, and counts it in `failed_items`. No item result is returned without its audit row.
 
 | Status | Description |
 |--------|-------------|
@@ -1068,6 +1109,12 @@ Convert a [`DiagnosticResult`](/advanced/diagnostics) into a schema-valid Verifi
 - A `VERIFIED` diagnostic without an `attestation_token` fails closed to `BLOCKED` (`trust_gate.mandatory_attestation_missing`). A supplied invalid token fails closed to `BLOCKED` (`trust_gate.invalid_attestation_token`). A valid token with mismatched claims uses the corresponding `trust_gate.claims_*` code. Attestation is enforced through the same trust boundary as `/verify/*`.
 - The server records the diagnostic but does not vouch for it. The caller's `agent_message` and `developer_fields` are kept under `developer_fields.caller_supplied` and decide nothing, `is_valid` included.
 - The admission is `DENY` unless `attestation_token` also signs `ADMIT` for this verdict (`qwed.admission`), as the token of an answer the server admitted does. An admitted document names the engine that signed the token, and this server's version, as its verifier. Your `verifier` and `verifier_version` are kept under `caller_supplied`.
+
+**Audit row:** Each successful call writes one audit row; a `422` or a signing failure writes none. The row stores the signed document exactly as returned, so its attestation matches the stored document: read back from `GET /audit/logs`, it verifies with [`POST /verification-context/validate`](#post-%2Fverification-context%2Fvalidate) until the attestation expires (24 hours by default) and while the server keeps the signing key. Only the row's `query` is redacted for personal data (emails, phone numbers, SSNs, IP addresses). The redaction matches patterns and misses some forms, such as a phone number written `(415) 555-1212` or an IPv6 address, so treat the `query` column as possibly holding personal data.
+
+<Warning>
+The stored document keeps any personal data you put in `query` or `diagnostic`, including the diagnostic's `agent_message` and `developer_fields`, which are stored as sent. To keep it out of the audit log, mask personal data in the query of the original verification and send that query unchanged to `from-diagnostic`. For a `VERIFIED` diagnostic the attestation covers the query, so masking it only here makes the document `BLOCKED`. Rows written before this change hold a redacted copy of the document, which may not verify against its attestation: it fails when the redaction changed a signed field.
+</Warning>
 
 | Status | Description |
 |--------|-------------|
@@ -1207,7 +1254,66 @@ Register a new AI agent with QWED for verified agentic workflows.
 }
 ```
 
-<Warning>Store the `agent_token` immediately. QWED stores only a keyed digest of the token, so it can't be retrieved again. If you lose it, re-issue it with [`POST /agents/{agent_id}/token/reissue`](#post-agents-agent-id-token-reissue).</Warning>
+<Warning>Store the `agent_token` immediately. QWED stores only a keyed digest of the token, so it can't be retrieved again. If you lose it, re-issue it with [`POST /agents/{agent_id}/token/reissue`](#post-%2Fagents%2F%2Ftoken%2Freissue).</Warning>
+
+---
+
+### GET /agents
+
+List the agents of your organization, oldest first. Use it to find an agent's ID, check its status, or see when it last authenticated, for example before reading its [activity](#get-%2Fagents%2F%2Factivity).
+
+Owners and admins can call this endpoint with an API key or a signed-in session. When you send both, QWED uses the API key.
+
+**Headers (one of):**
+
+```text
+X-API-Key: <api_key>
+Authorization: Bearer <jwt_token>
+```
+
+```bash
+curl --fail-with-body http://localhost:8000/agents \
+  -H "X-API-Key: $QWED_API_KEY"
+```
+
+**Response:**
+
+```json
+[
+  {
+    "id": 42,
+    "name": "FinanceBot",
+    "type": "semi_autonomous",
+    "status": "active",
+    "created_at": "2026-10-20T09:15:00Z",
+    "last_active": "2026-10-28T12:00:00Z"
+  },
+  {
+    "id": 43,
+    "name": "ReportBot",
+    "type": "assistant",
+    "status": "suspended",
+    "created_at": "2026-10-21T14:30:00Z",
+    "last_active": null
+  }
+]
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `id` | integer | Agent ID |
+| `name` | string | Agent display name |
+| `type` | string | The type given at registration (default `autonomous`) |
+| `status` | string | `active`, `suspended`, or `deactivated`. QWED lists agents in every status. |
+| `created_at` | string | When the agent was registered, in ISO 8601 with its UTC offset |
+| `last_active` | string \| null | When the agent last authenticated with its token, in ISO 8601 with its UTC offset. `null` until the agent first authenticates. |
+
+The response never includes the agent token or its digest. QWED shows the token only once, at registration or [re-issue](#post-%2Fagents%2F%2Ftoken%2Freissue).
+
+| Status | Description |
+|--------|-------------|
+| 401 | No API key or bearer token, or an invalid or expired bearer token |
+| 403 | An invalid, revoked, or expired API key; the caller is a `member` or `viewer`; or the user, organization, or key is inactive |
 
 ---
 
@@ -1331,7 +1437,7 @@ Gate on `admission`, not `status`. A natural-language verdict covers the express
 | 403 | Agent budget exceeded or request blocked by security checks |
 | 500 | Internal agent verification error, or `audit persistence failed` |
 
-**Audit trail:** Before QWED logs the agent activity and returns, it appends the same signed, hash-chained audit row that `POST /verify/natural_language` writes, plus the `agent_id`. If that append fails, the request returns `500` with `audit persistence failed` and no agent activity is logged.
+**Audit trail:** Before QWED logs the agent activity and returns, it appends the same signed, hash-chained audit row that `POST /verify/natural_language` writes, with domain `NATURAL_LANGUAGE`, plus the `agent_id`. If that append fails, the request returns `500` with `audit persistence failed` and no agent activity is logged.
 
 ---
 
@@ -1362,19 +1468,30 @@ Submit an agent tool call for risk evaluation before execution. Unknown tools (n
 
 ### GET /agents/{agent_id}/activity
 
-Retrieve the activity log for a specific agent. Activity entries are not signed or hash-chained. The signed record of each agent verification is its row in the organization's audit log (see [`GET /audit/logs`](/api/authentication#get-audit-logs)).
+Retrieve the activity log for a specific agent, newest first. Entries with the same timestamp are ordered by ID, newest first. Activity entries are not signed or hash-chained. The signed record of each agent verification is its row in the organization's audit log (see [`GET /audit/logs`](/api/authentication#get-%2Faudit%2Flogs)).
 
-**Headers:**
+An agent can read its own activity with its token. An owner or admin can read the activity of any agent in their organization with an API key or a signed-in session.
+
+**Headers (one of):**
 
 ```text
 X-Agent-Token: qwed_agent_...
+X-API-Key: <api_key>
+Authorization: Bearer <jwt_token>
+```
+
+When you send `X-Agent-Token`, the token alone decides access. It must be the active agent's own token, or QWED returns `401`, even if you also send an owner's API key or session. Without `X-Agent-Token`, QWED checks the API key or session for the `owner` or `admin` role.
+
+```bash
+curl --fail-with-body "http://localhost:8000/agents/42/activity?limit=50" \
+  -H "X-API-Key: $QWED_API_KEY"
 ```
 
 **Query params:**
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `limit` | integer | `20` | Maximum number of activity records to return |
+| `limit` | integer | `20` | Maximum number of activity records to return, from `1` to `200` |
 
 **Response:**
 
@@ -1391,15 +1508,20 @@ X-Agent-Token: qwed_agent_...
       "description": "Query: What is 15% of 200?",
       "status": "success",
       "cost": 0.01,
-      "timestamp": "2026-03-20T12:00:00Z"
+      "timestamp": "2026-03-20T12:00:00+00:00"
     }
   ]
 }
 ```
 
+Each `timestamp` is ISO 8601 with its UTC offset.
+
 | Status | Description |
 |--------|-------------|
-| 401 | Invalid agent token |
+| 401 | `X-Agent-Token` is invalid or belongs to another agent; no credential was sent; or, without an agent token, an invalid or expired bearer token |
+| 403 | Without an agent token: an invalid, revoked, or expired API key; the caller is a `member` or `viewer`; or the user, organization, or key is inactive |
+| 404 | Without an agent token: no agent with this ID exists in your organization, including an agent in another organization or an ID out of range |
+| 422 | `limit` is outside `1` to `200` |
 
 ---
 
@@ -1503,7 +1625,7 @@ Returns verification logs for the authenticated tenant, ordered by most recent f
 
 <Info>New in v4.0.0</Info>
 
-Admin endpoints authenticate your API key with the `X-API-Key` header, then authorize the request by the role of the user who owns the key. Every admin endpoint acts only on your own organization, which is the organization the API key belongs to.
+Admin endpoints authenticate your API key with the `X-API-Key` header, or a [signed-in session](#session-sign-in-for-admin-endpoints), then authorize the request by the role of the user who owns the key or holds the session. Every admin endpoint acts only on your own organization, which is the organization the API key belongs to.
 
 Before QWED checks the role, the request must meet all of these conditions. Otherwise QWED returns `403 Forbidden`:
 
@@ -1521,24 +1643,29 @@ Before QWED checks the role, the request must meet all of these conditions. Othe
 | `GET /admin/security/events` | `owner`, `admin` | Not applicable (own organization only) |
 | `POST /admin/keys/rotate` | `owner`, `admin`, `member` | `404 Not Found` |
 
-A caller whose role isn't allowed gets `403 Forbidden` with `"Insufficient permissions for this operation"`. A missing or invalid API key returns `401 Unauthorized`.
+A caller whose role isn't allowed gets `403 Forbidden` with `"Insufficient permissions for this operation"`. A request with neither an API key nor a bearer token returns `401 Unauthorized`. An invalid, revoked, or expired API key returns `403 Forbidden`; for a bearer token, see [Session sign-in for admin endpoints](#session-sign-in-for-admin-endpoints).
 
 The JWT-authenticated `/auth/api-keys` and `/audit` routes use the same role ranking. See [Roles on API-key and audit routes](/api/authentication#roles-on-api-key-and-audit-routes).
 
-### Session sign-in for compliance endpoints
+### Session sign-in for admin endpoints
 
-The four `/admin/compliance/*` endpoints also accept a signed-in session, so a dashboard user doesn't need to paste an API key into the browser. Send the `access_token` from [`POST /auth/signin`](/api/authentication) as a bearer token:
+The four `/admin/compliance/*` endpoints, `GET /admin/security/threats/{org_id}`, `GET /admin/security/events`, and `POST /admin/keys/rotate` also accept a signed-in session. A dashboard user doesn't need to paste an API key into the browser. Send the `access_token` from [`POST /auth/signin`](/api/authentication) as a bearer token:
 
 ```text
 Authorization: Bearer <jwt_token>
 ```
 
 - The token must be valid and its user must exist. Otherwise QWED returns `401 Unauthorized`.
-- The user must be active, belong to an active organization, and hold the `owner` or `admin` role. Otherwise QWED returns `403 Forbidden`.
-- If you send both `X-API-Key` and a bearer token, QWED uses the API key.
-- The session's organization is the signed-in user's organization. Organization scoping works the same as with an API key.
+- The user must be active, belong to an active organization, and hold a role the endpoint allows (see the table above). Otherwise QWED returns `403 Forbidden`.
+- If you send both `X-API-Key` and a bearer token, QWED uses the API key. If you send neither, QWED returns `401 Unauthorized`.
+- The session's organization is the signed-in user's organization. Organization scoping and role rules work the same as with an API key.
 
-Other admin endpoints (`/admin/security/threats/{org_id}` and `/admin/keys/rotate`) accept only an API key. A bearer token alone returns `401 Unauthorized`.
+```bash
+curl --fail-with-body -X POST -H "Authorization: Bearer eyJhbG..." \
+  "http://localhost:8000/admin/keys/rotate?key_id=42"
+```
+
+[`POST /agents/{agent_id}/token/reissue`](#post-%2Fagents%2F%2Ftoken%2Freissue) still accepts only an API key. A bearer token alone returns `401 Unauthorized`.
 
 <Note>
 Before this change, every admin endpoint returned `401 Unauthorized`, even for valid owner and admin keys. Admin endpoints now authorize by role and are scoped to the caller's organization.
@@ -1546,20 +1673,53 @@ Before this change, every admin endpoint returned `401 Unauthorized`, even for v
 
 ### GET /admin/compliance/export/csv
 
-Export your organization's audit trail as a CSV file (`text/csv`).
+Export your organization's audit trail for a period as a CSV file (`text/csv`). Use it to hand verification evidence to an auditor. [`GET /audit/export`](/api/authentication#get-%2Faudit%2Fexport) writes the same columns.
 
-The `Chain Status` column reports `Chained` when a row carries a hash and `Legacy` when it was written before the API used the hash chain. `Chained` doesn't mean the row was verified. Use [`GET /admin/compliance/verify/{log_id}`](#get-admin-compliance-verify-log-id) to verify it.
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `organization_id` | integer (query) | Required | Must be your own organization ID |
+| `start` | datetime (query) | 30 days before `end` | Export rows at or after this time |
+| `end` | datetime (query) | Now | Export rows at or before this time |
 
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `organization_id` | integer (query) | Must be your own organization ID |
+Pass `start` and `end` as ISO 8601 times. URL-encode a `+` in an offset as `%2B`; an unencoded `+` reads as a space and the time is refused. A time without a zone is read as UTC, and other offsets are converted. QWED applies the defaults first and then checks the period, so `start` after `end` returns `400 Bad Request` with `"start must not be after end"`. A `start` in the future with no `end` is also `400`, not an empty file.
 
 Passing another organization's ID returns `403 Forbidden` with `"Cannot access another organization's data"`.
 
 ```bash
-curl --fail-with-body -H "X-API-Key: qwed_live_your_admin_key" \
-  "http://localhost:8000/admin/compliance/export/csv?organization_id=12"
+curl --fail-with-body -D headers.txt -o audit.csv \
+  -H "X-API-Key: qwed_live_your_admin_key" \
+  "http://localhost:8000/admin/compliance/export/csv?organization_id=12&start=2026-10-01T00:00:00Z&end=2026-10-28T00:00:00Z"
 ```
+
+#### CSV columns
+
+QWED writes rows newest first, ordered by timestamp and then by ID. Both CSV exports write these columns:
+
+| Column | Description |
+|--------|-------------|
+| `ID` | The audit log ID |
+| `Timestamp` | When the row was written, in ISO 8601 UTC |
+| `User ID` | The user who wrote the row |
+| `API Key ID` | The API key that authenticated the request |
+| `Verifier Version` | The QWED server version that wrote the row |
+| `Domain` | The row's domain, the same value as `engine_used` on [`GET /audit/logs`](/api/authentication#get-%2Faudit%2Flogs), for example `MATH`, `NATURAL_LANGUAGE`, `LOGIC`, or `CODE` |
+| `Query` | The stored query, in full |
+| `Verdict` | The stored verdict (`VERIFIED`, `UNVERIFIABLE`, or `BLOCKED`), as `verdict` on `/audit/logs` |
+| `Admission` | The stored admission decision, as `admission` on `/audit/logs` |
+| `Is Verified (legacy)` | `Yes` or `No`, from the row's `is_verified` flag. Each route sets this flag by its own rule. It is neither the verdict nor the admission |
+| `Result` | The stored result, in full |
+| `Latency (ms)` | The stored latency, as `latency_ms` on `/audit/logs`: whole milliseconds from the start of the HTTP request to when QWED began writing the audit row, before it waits for the append lock. Empty for rows written outside a request or before QWED recorded latency |
+| `Entry Hash` | The row's hash in the signed audit chain |
+| `HMAC Signature` | The row's full HMAC-SHA256 signature |
+| `Chain Status` | `Chained` when the row carries a hash, `Legacy` when it was written before the API used the hash chain |
+
+A value that QWED didn't record is an empty cell. QWED doesn't truncate any cell. `Chained` doesn't mean the row was verified. Use [`GET /admin/compliance/verify/{log_id}`](#get-%2Fadmin%2Fcompliance%2Fverify%2F) or [`GET /admin/compliance/verify-trail`](#get-%2Fadmin%2Fcompliance%2Fverify-trail) to verify rows.
+
+The query and result are caller-controlled. To stop spreadsheet software from running a cell as a formula, QWED prefixes an apostrophe (`'`) to any cell that starts with `=`, `+`, `-`, `@`, a tab, a carriage return, or a line feed. Strip that apostrophe if you compare a cell with the stored value.
+
+#### Row cap
+
+Each export holds at most the newest 1,000 rows in the period. When more rows matched, the response sets `X-Export-Truncated: true`, otherwise `false`. CORS exposes this header, so a browser client on another allowed origin can read it. To export older rows, request again with `end` set to the oldest `Timestamp` in the file, and skip rows whose `ID` you already have.
 
 ### GET /admin/compliance/verify/{log_id}
 
@@ -1649,7 +1809,7 @@ Check the signature and hash chain of every audit entry in your organization ove
 | `start` | ISO 8601 datetime (query, optional) | Start of the period. Omit for no lower bound. |
 | `end` | ISO 8601 datetime (query, optional) | End of the period. Omit for no upper bound. |
 
-With neither parameter, QWED checks the whole chain. QWED reads a time without a zone as UTC and converts any other offset to UTC. A `start` later than `end` returns `400 Bad Request`.
+With neither parameter, QWED checks the whole chain, and `scope` reads `"Signature and hash-chain check of every audit entry recorded for the organisation. It does not show that every request was recorded."` With `start`, `end`, or both, `scope` names the period, as in the example below. Only the text differs. The status, counts, and `proof_ref` are computed the same way. QWED reads a time without a zone as UTC and converts any other offset to UTC. A `start` later than `end` returns `400 Bad Request`.
 
 ```bash
 curl --fail-with-body -H "Authorization: Bearer $QWED_SESSION_TOKEN" \
@@ -1683,6 +1843,13 @@ The fields after `end` match `audit_trail` in the [security activity summary](/a
 ### GET /admin/security/threats/{org_id}
 
 Returns a real-time threat summary for your organization, including blocked injection attempts and anomalous patterns. `org_id` must be your own organization ID. Another organization's ID returns `403 Forbidden`.
+
+Owners and admins can call this endpoint with an API key in the `X-API-Key` header or with a [signed-in session](#session-sign-in-for-admin-endpoints). The summary's `generated_at` is UTC with a `+00:00` offset.
+
+```bash
+curl --fail-with-body -H "Authorization: Bearer eyJhbG..." \
+  "http://localhost:8000/admin/security/threats/1"
+```
 
 ### GET /admin/security/events
 
@@ -1734,7 +1901,7 @@ Events come newest first, by timestamp and then ID, as on [`GET /audit/logs`](/a
 
 ### POST /admin/keys/rotate
 
-Rotate an API key and return the new secret once. Owners, admins, and members can call this endpoint, subject to these rules:
+Rotate an API key and return the new secret once. Owners, admins, and members can call this endpoint with an API key in the `X-API-Key` header or with a [signed-in session](#session-sign-in-for-admin-endpoints). The same rules apply either way:
 
 - **Your own key:** any allowed role can rotate a key it owns.
 - **Another user's key:** only an `owner` or `admin` can rotate it, and only when the key's owner doesn't hold a higher role. An admin can't rotate an owner's key. A member can't rotate anyone else's key. These cases return `403 Forbidden`.

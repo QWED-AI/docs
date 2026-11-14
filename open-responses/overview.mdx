@@ -137,22 +137,25 @@ verifier = ResponseVerifier()
 # Verify a tool call before execution
 result = verifier.verify_tool_call(
     tool_name="calculator",
-    arguments={
-        "operation": "multiply",
-        "x": 150,
-        "y": 10,
-        "result": 1500  # Correct!
-    },
-    guards=[ToolGuard(), MathGuard(), SafetyGuard()]
+    arguments={"operation": "multiply", "x": 150, "y": 10},
+    guards=[ToolGuard(), SafetyGuard()],
 )
 
 if result.verified:
     print("✅ Safe to execute")
-    execute_tool(result.tool_name, result.arguments)
 else:
     print(f"❌ Blocked: {result.block_reason}")
-    print(f"   Failed guard: {result.failed_guard}")
+# ✅ Safe to execute
+
+# Verify the math in the agent's answer
+result = verifier.verify({"output": "150 * 10 = 1600"}, guards=[MathGuard()])
+print(result.verified, result.block_reason)
+# False Math verification failed: 1 error(s)
+print(result.guard_results[0].details["errors"])
+# ['Calculation error: 150.0 * 10.0 = 1600.0 (should be 1500.0)']
 ```
+
+MathGuard checks the response's `output`, such as the agent's answer or a structured output. It does not read tool-call arguments, so a tool call on its own fails MathGuard with "No verifiable math found in response".
 
 ### Verify structured output
 
@@ -190,7 +193,8 @@ result = verifier.verify_structured_output(
 
 ```python
 from langchain_openai import ChatOpenAI
-from langchain.agents import create_tool_calling_agent, AgentExecutor
+from langchain.agents import create_agent
+from qwed_open_responses.guards import ToolGuard, SafetyGuard
 from qwed_open_responses.middleware.langchain import QWEDCallbackHandler
 
 # Create callback with guards
@@ -199,45 +203,42 @@ callback = QWEDCallbackHandler(
     block_on_failure=True,  # Stop execution if guard fails
 )
 
-# Add to agent
+# Create the agent, then pass the callback when you run it
 llm = ChatOpenAI(model="gpt-4")
-agent = create_tool_calling_agent(llm, tools, prompt)
-executor = AgentExecutor(
-    agent=agent,
-    tools=tools,
-    callbacks=[callback]
-)
+agent = create_agent(llm, tools=tools)  # your tools
 
-# Every tool call is now verified!
-result = executor.invoke({"input": "Calculate 25% of 500"})
+# Every tool call is now verified before the tool runs
+result = agent.invoke(
+    {"messages": [{"role": "user", "content": "Calculate 25% of 500"}]},
+    config={"callbacks": [callback]},
+)
 ```
 
 ### OpenAI SDK
 
 ```python
 from qwed_open_responses.middleware.openai_sdk import VerifiedOpenAI
-from qwed_open_responses.guards import SchemaGuard, SafetyGuard
+from qwed_open_responses.guards import ToolGuard, SafetyGuard
 
 # Create verified client
 client = VerifiedOpenAI(
     api_key="sk-...",
-    guards=[
-        SchemaGuard(schema=my_schema),
-        SafetyGuard(block_pii=True)
-    ]
+    guards=[ToolGuard(), SafetyGuard()],
 )
 
 # Use normally - verification is automatic
 response = client.chat.completions.create(
     model="gpt-4",
     messages=[{"role": "user", "content": "Generate an order"}],
-    tools=my_tools
+    tools=my_tools,
 )
 
 # Tool calls are verified before returning
-for tool_call in response.choices[0].message.tool_calls:
+for tool_call in response.choices[0].message.tool_calls or []:
     print(f"Verified tool call: {tool_call.function.name}")
 ```
+
+Keep `SchemaGuard` out of the client's guards. It validates the whole response object rather than the model's JSON, so every response fails. See [structured outputs](/open-responses/openai#structured-outputs) for checking the model's JSON instead.
 
 ---
 
@@ -360,23 +361,32 @@ The middleware copies the context and adds each item's reported `usage.cost` and
 ### Custom guard configuration
 
 ```python
+from qwed_open_responses import ResponseVerifier
 from qwed_open_responses.guards import ToolGuard, SafetyGuard
 
-# Custom tool blocklist
+# Custom tool blocklist, added to the default one
 tool_guard = ToolGuard(
-    blocklist=["execute_shell", "delete_database", "send_email"],
-    allow_unknown=False  # Block tools not in whitelist
+    blocked_tools=["execute_shell", "delete_database", "send_email"],
+    allowed_tools=["search", "calculator"],  # Block tools not on this list
 )
 
 # Custom safety settings
 safety_guard = SafetyGuard(
-    block_pii=True,
-    block_injection=True,
-    max_budget=50.0,  # $50 limit
-    harmful_patterns=["password", "secret", "token"]
+    check_pii=True,
+    check_injection=True,
+    max_cost=50.0,  # $50 limit, checked against context["total_cost"]
+    custom_patterns=[r"password", r"secret", r"token"],
 )
 
-verifier = ResponseVerifier(guards=[tool_guard, safety_guard])
+verifier = ResponseVerifier(default_guards=[tool_guard, safety_guard])
+
+result = verifier.verify_tool_call(
+    "search",
+    {"query": "weather"},
+    context={"total_cost": 4.20},  # your running cost for this session
+)
+print(result.verified)
+# True
 ```
 
 ---

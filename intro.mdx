@@ -6,7 +6,7 @@ icon: "shield-check"
 ---
 
 <Note>
-**QWED v8.0.0 is the current release.** Every `VERIFIED` answer now carries a signed attestation you can check against `/.well-known/jwks.json`. Some settings, response shapes, and SDK types change, so read the [upgrade steps](/changelog#v8-0-0-—-attested-verdicts-and-upgrade-guide) before you upgrade.
+**QWED v9.1.0 is the current release.** `CodeVerifier` now admits Python code only when the modules, builtins and special attributes it uses are listed, and each LLM provider runs the model you configure. Some code that earlier releases admitted is now refused, so read the [9.1.0](/changelog#v9-1-0-—-allowlist-admission-for-python-code) and [9.0.0](/changelog#v9-0-0-—-eleven-advisories-and-models-you-configure) upgrade steps before you upgrade.
 </Note>
 
 ## What is QWED?
@@ -75,10 +75,10 @@ flowchart LR
 ## Quick start (5 minutes)
 
 ```bash
-pip install qwed==8.0.0
+pip install qwed==9.1.0
 ```
 
-The examples below use the `qwed` CLI that this installs. The `qwedai/qwed-verification:8.0.0` Docker image runs the API server instead; see [Self-hosting](/advanced/self-hosting#docker).
+The examples below use the `qwed` CLI that this installs. The `qwedai/qwed-verification:9.1.0` Docker image runs the API server instead; see [Self-hosting](/advanced/self-hosting#docker).
 
 ```bash
 # Run every engine on known cases (no LLM needed)
@@ -132,14 +132,14 @@ qwed verify-logic "(AND (GT x 5) (LT y 10))"
   Explore core, analysis, and specialized engines.
 </Card>
 
-## What's new in v8.0.0
+## What's new in v9
 
 <AccordionGroup>
-  <Accordion title="Signed verdicts" icon="shield-check" defaultOpen>
-    The server signs the status, `proof_ref`, and statement hash of every `VERIFIED` answer with an ES256 attestation, and the admission on routes that decide one. Check it against the public keys at `/.well-known/jwks.json`. Set `QWED_SIGNING_KEY` or `QWED_SIGNING_KEY_FILE` so attestations keep verifying across restarts and replicas. [Read about attestations →](/advanced/attestations)
+  <Accordion title="Allowlist admission for Python code" icon="shield-check" defaultOpen>
+    From v9.1.0, `CodeVerifier` admits Python code only when every module, module name, builtin and special attribute it uses is on a list, and the code reads no attribute's value by a name made at run time (`hasattr` is admitted: it only answers whether an attribute exists, although the lookup can run a property). Each refusal names the module, builtin or attribute. A caller can name modules its own runtime confines with `trusted_modules`, as the code-execution sandbox does for `numpy` and `pandas`; the module checks then skip those modules, so they need that confinement. [Read the 9.1.0 notes →](/changelog#v9-1-0-—-allowlist-admission-for-python-code)
   </Accordion>
   <Accordion title="Before you upgrade" icon="triangle-exclamation">
-    The server now refuses to start without `QWED_AUDIT_SECRET_KEY`. The Docker image runs the API server instead of the GitHub Action, and the Go module path moves to `/v8`. A math claim proven false is now `VERIFIED`, not `UNVERIFIABLE`, with admission `BLOCKED` in API and SDK responses (`DENY` in Verification Context documents and CLI output). [Read the upgrade steps →](/changelog#v8-0-0-—-attested-verdicts-and-upgrade-guide)
+    From v9.0.0, QWED names no model of its own: set your provider's model variable, such as `OPENAI_MODEL` or `ANTHROPIC_MODEL`, and pass `model=` to `QWEDLocal`, `verify()` and `qwed_sdk.integrations.langchain.QWEDTool`. `/verify/math` runs in worker processes with a time limit, the CSV exports change their columns, and the Go module path moves to `/v9`. Upgrade every server process together. [Read the upgrade steps →](/changelog#v9-0-0-—-eleven-advisories-and-models-you-configure)
   </Accordion>
 </AccordionGroup>
 

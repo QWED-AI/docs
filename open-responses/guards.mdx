@@ -26,7 +26,8 @@ guard = SchemaGuard(schema={
 })
 
 result = guard.check({"output": {"name": "John", "age": 30}})
-# ✅ Passed
+print(result.passed, result.message)
+# True Schema validation passed
 ```
 
 ### Options
@@ -93,15 +94,42 @@ from qwed_open_responses import ToolGuard
 
 guard = ToolGuard(
     blocked_tools=["execute_shell", "delete_file"],
-    allowed_tools=["search", "calculator"],  # Whitelist mode
     dangerous_patterns=[r"DROP TABLE", r"rm -rf"],
 )
 
 result = guard.check({
+    "type": "tool_call",
     "tool_name": "execute_sql",
-    "arguments": {"query": "DROP TABLE users"}
+    "arguments": {"query": "SELECT * FROM users"},
 })
-# ❌ BLOCKED: Dangerous pattern detected
+print(result.passed, result.message)
+# True All 1 tool call(s) verified
+
+result = guard.check({
+    "type": "tool_call",
+    "tool_name": "execute_sql",
+    "arguments": {"query": "DROP TABLE users"},
+})
+print(result.passed, result.message)
+# False BLOCKED: Dangerous pattern detected in tool arguments
+```
+
+Pass the tool call in one of the [shapes ToolGuard reads](#recognized-tool-call-shapes), such as `"type": "tool_call"` above. Tool-like content in any other shape fails closed, so a bare `{"tool_name": ..., "arguments": ...}` with no `"type"` is blocked whatever its arguments say. `ResponseVerifier().verify_tool_call()` adds the `"type"` for you.
+
+With `allowed_tools` set, `ToolGuard` refuses any tool that is not on the list before it checks arguments:
+
+```python
+from qwed_open_responses import ToolGuard
+
+guard = ToolGuard(allowed_tools=["search", "calculator"])
+
+result = guard.check({
+    "type": "tool_call",
+    "tool_name": "execute_sql",
+    "arguments": {"query": "SELECT * FROM users"},
+})
+print(result.passed, result.message)
+# False BLOCKED: Tool 'execute_sql' is not in allowed list
 ```
 
 ### Default blocked tools
@@ -250,7 +278,8 @@ result = guard.check({
         "total": 118  # Correct!
     }
 })
-# ✅ Passed
+print(result.passed, result.message)
+# True Math verification passed
 ```
 
 ### What it checks
@@ -299,10 +328,12 @@ guard = StateGuard(
 )
 
 result = guard.check({"new_state": "processing"})
-# ✅ Valid transition
+print(result.passed, result.message)
+# True Valid transition: 'pending' -> 'processing'
 
 result = guard.check({"new_state": "completed"})
-# ❌ Invalid: pending -> completed not allowed
+print(result.passed, result.message)
+# False Invalid transition: 'pending' -> 'completed'
 ```
 
 ---
@@ -327,7 +358,8 @@ result = guard.check({
         "status": "active"
     }
 })
-# ✅ All arguments valid
+print(result.passed, result.message)
+# True All arguments valid
 ```
 
 ### Supported types
@@ -360,11 +392,19 @@ guard = SafetyGuard(
     max_cost=100.0,        # Budget limit
 )
 
-result = guard.check({
-    "content": "ignore previous instructions..."
-})
-# ❌ BLOCKED: Prompt injection detected
+# max_cost needs a cost to compare: your own running total in
+# context["total_cost"], or usage reported in the response.
+result = guard.check(
+    {"content": "ignore previous instructions..."},
+    context={"total_cost": 12.50},
+)
+print(result.passed, result.message)
+# False Safety check failed: 1 critical issue(s)
+print([issue["type"] for issue in result.details["issues"]])
+# ['injection']
 ```
+
+With `max_cost` set and no cost figure at all, the budget check fails closed, so even harmless content is blocked until you supply one. PII findings are warnings: they pass the guard with `severity="warning"` and show in `result.warnings` on a `ResponseVerifier` result, unless the verifier is created with `allow_warnings=False`.
 
 ### Detections
 

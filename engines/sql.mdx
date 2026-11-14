@@ -146,6 +146,78 @@ print(result.developer_fields["issues"])
 
 Tautologies are detected by value, not by matching fixed text shapes. The engine constant-folds every column-free comparison, so `OR 1=1`, `OR 'a'='a'`, `OR 1=1.0`, `OR 2>1`, and arithmetic forms are all reported as `injection_tautology`. A `WHERE` or `HAVING` clause whose whole predicate folds to true, such as `WHERE 1`, is flagged too.
 
+<Info>Changed in v9.0.0 ([GHSA-jvhg-jw63-gr5g](https://github.com/QWED-AI/qwed-verification/security/advisories/GHSA-jvhg-jw63-gr5g))</Info>
+
+Constant folding also covers `IN`, `IS`, `LIKE` and `ILIKE`, `BETWEEN`, `/`, `%`, `||`, `COALESCE`, `CAST`, `ABS`, and `EXISTS` over a `SELECT` with no `FROM`. `AND` and `OR` short-circuit on a constant operand, and a column compared with itself, such as `id = id`, is treated as always true (it is true for every non-`NULL` value). Filters such as `id = 5 OR 1 IN (1)`, `NOT (id = 5 AND 1 = 0)` and `id = 5 OR id = id` are now tautologies: the query has `is_valid: false` and `malicious_classification: true`, and is not admitted.
+
+A filter predicate that reads no column but can't be worked out may still be always true, so the query is not admitted. The result is `BLOCKED` with `is_valid: false`, an issue of type `unevaluated_constant_predicate`, and `constraint_id: "sql_verifier.unevaluated_predicate"`. When the same query also has a proven tautology, the tautology decides the result: `VERIFIED` with `constraint_id: "sql_verifier.malicious"` and `malicious_classification: true`. It doesn't set `malicious_classification`, because nothing proves malice. Compare against a column or remove the constant condition; check that removing it doesn't change which rows the query returns.
+
+### Stacked queries
+
+A query that holds two or more statements, such as `SELECT 1; DROP TABLE users`, is reported as `stacked_queries`. The query is not valid, sets `malicious_classification: true`, and is not admitted.
+
+The engine counts statements from the parsed query. A `;` inside a string literal, a dollar-quoted string, or a comment is not a statement separator, so these queries are checked like any other single statement:
+
+```sql
+SELECT * FROM users WHERE name = 'a;b'
+```
+
+```sql
+SELECT $$a;b$$
+```
+
+```sql
+SELECT * FROM users /* ; */
+```
+
+```sql
+SELECT * FROM users; -- note
+```
+
+Where a database could split the text differently from the parser, the engine stays conservative and counts every `;` before the end of the query as a separator. That applies when the query contains:
+
+- A backslash anywhere. Escape rules depend on server settings, such as MySQL's `NO_BACKSLASH_ESCAPES`.
+- `--` not followed by an ASCII whitespace character. MySQL starts a comment only then.
+- A `/*` inside a block comment.
+- A carriage return not followed by a line feed.
+
+A query that does not parse also counts every `;`. The engine applies these checks both to the query as given and with MySQL executable comments expanded.
+
+<Note>
+Before v9.0.0, any `;` before the last character marked the query as `stacked_queries`, so a `;` in a string or a trailing comment was refused.
+</Note>
+
+## Subqueries and complexity limits
+
+The engine checks queries with parenthesised subqueries, such as `IN (SELECT ...)`, scalar subqueries, and subqueries in `FROM`, like any other query. A valid one is `VERIFIED` with `is_valid: true`.
+
+`developer_fields.complexity.subquery_depth` reports how deeply the deepest `SELECT` is nested inside other `SELECT`, `UPDATE`, `DELETE`, `INSERT`, or `MERGE` statements. A plain query, and a `UNION` of two plain `SELECT` statements, report `0`. A CTE counts as one level. When `subquery_depth` exceeds `max_subquery_depth` (default `3`), the result is `BLOCKED` with `constraint_id: "sql_verifier.complexity_limit_exceeded"`.
+
+```python
+import httpx
+
+try:
+    result = client.verify_sql(
+        query="SELECT name FROM users WHERE id IN (SELECT user_id FROM orders)",
+        schema_ddl=(
+            "CREATE TABLE users (id INT, name TEXT);"
+            "CREATE TABLE orders (id INT, user_id INT)"
+        ),
+    )
+except httpx.HTTPError as exc:
+    # Request failed (network error or non-2xx). Fail closed: do not run the SQL.
+    raise RuntimeError(f"SQL verification unavailable: {exc}") from exc
+
+fields = result.result["developer_fields"]                 # the SDK keeps the full response in result.result
+print(result.status)                                       # "VERIFIED"
+print(fields["is_valid"])                                  # True
+print(fields["complexity"]["subquery_depth"])               # 1
+```
+
+<Note>
+Before v9.0.0, every query with a parenthesised subquery was `BLOCKED` with `sql_verifier.execution_error`, and the subquery depth limit never ran for those queries. A `UNION` of two plain `SELECT` statements reported a `subquery_depth` of `1`.
+</Note>
+
 ## Destructive operations
 
 ```python

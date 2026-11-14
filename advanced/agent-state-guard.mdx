@@ -22,7 +22,7 @@ Use AgentStateGuard when your AI agents maintain structured state (such as task 
 
 AgentStateGuard uses a three-phase approach:
 
-1. **Structural verification (Phase 1)** — Validates that a proposed JSON state payload conforms to a strict schema. Rejects duplicate keys, non-standard JSON constants (`NaN`, `Infinity`), and unexpected fields. Numbers are parsed as `Decimal` to preserve deterministic numeric semantics.
+1. **Structural verification (Phase 1)** — Validates that a proposed JSON state payload conforms to a strict schema. Rejects duplicate keys, non-standard JSON constants (`NaN`, `Infinity`), and unexpected fields. Numbers are parsed as `Decimal` to preserve deterministic numeric semantics. A number with a fraction or exponent whose exponent is outside the decimal range, or that has more digits than Python's integer string limit (4300 by default), is rejected; an integer is held to the same digit limit by Python's `int()`. See [Security considerations](#security-considerations).
 2. **Semantic transition verification (Phase 2)** — Verifies that a proposed state transition satisfies configured rules. Immutable paths cannot change, integer paths must increase monotonically, enum paths must advance forward, and keyed arrays must preserve order.
 3. **Governed atomic commit (Phase 3)** — After verification passes, writes the normalized state to disk atomically using `tempfile` + `os.replace`. The write target must be within configured allowed roots and must end in `.json`.
 
@@ -314,7 +314,7 @@ Existing items must preserve their order and cannot be removed. All non-boolean 
 | Code | Phase | Description |
 |------|-------|-------------|
 | `QWED-AGENT-STATE-101` | 1 | Input is not a non-empty JSON string |
-| `QWED-AGENT-STATE-102` | 1 | Invalid JSON (syntax error, duplicate keys, non-standard constants, or two keys that collide under Unicode NFC normalization) |
+| `QWED-AGENT-STATE-102` | 1 | Invalid JSON (syntax error, duplicate keys, non-standard constants, a number outside the decimal range or digit limit, or two keys that collide under Unicode NFC normalization) |
 | `QWED-AGENT-STATE-103` | 1 | Schema validation failed (missing keys, wrong types, unexpected fields) |
 | `QWED-AGENT-STATE-104` | 2 | Transition rules not configured or all rules are empty |
 | `QWED-AGENT-STATE-105` | 2 | Current state failed structural verification |
@@ -324,7 +324,13 @@ Existing items must preserve their order and cannot be removed. All non-boolean 
 
 ## Security considerations
 
-- **Strict JSON parsing**: Duplicate keys and non-standard constants (`NaN`, `Infinity`, `-Infinity`) are rejected. Numbers are parsed as `Decimal` to avoid floating-point non-determinism.
+- **Strict JSON parsing**: Duplicate keys and non-standard constants (`NaN`, `Infinity`, `-Infinity`) are rejected. Numbers are parsed as `Decimal` to avoid floating-point non-determinism. Before conversion, the guard checks the text of each number that has a fraction or an exponent and rejects it with `QWED-AGENT-STATE-102` if:
+  - Its exponent is outside the range of Python's C `decimal` module (for example, `1e9999999999999999999999`).
+  - Its coefficient or exponent has more digits than `sys.get_int_max_str_digits()` (4300 by default). Leading zeros count toward the limit; a sign does not. This digit check is off when the limit is `0`, and on Python older than 3.10.7.
+
+  An integer is read by Python's `int()`, which applies the same digit limit itself.
+
+  The verdict and message are the same whether Python has the C `_decimal` module or only the pure-Python `decimal` module.
 - **Unicode canonicalization**: All string keys and values are normalized to NFC before validation, so precomposed and decomposed spellings of the same text cannot smuggle divergent hashes past the guard. Objects containing two keys that collide under NFC are rejected rather than silently merged.
 - **Reproducible proof references**: `proof_ref` is a SHA-256 over the canonical evidence payload, so any consumer can independently recompute and verify it. For committed state, `proof_ref` is bound to the exact bytes on disk.
 - **Frozen configuration**: Schemas and transition rules are deeply frozen on construction using `MappingProxyType` and tuples. Callers cannot mutate the guard's configuration after initialization.

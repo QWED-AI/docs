@@ -15,7 +15,7 @@ The **Taint Analysis Engine** creates a security firewall by tracking "tainted" 
 ### Sources, sinks and sanitisers
 
 - **Taint inside expressions.** Taint is followed into f-strings, concatenation, `%` and `str.format` templates, nested calls, tuple and starred unpacking, and augmented assignment. A variable assigned in more than one branch carries the taint of every assignment.
-- **Sources.** `input()`, `sys.stdin`, `sys.argv`, `os.environ` (including subscripts such as `os.environ["X"]`), `os.getenv`, and every read of a `request` attribute, including subscripts such as `request.form["name"]`. Sources are also found through the code's own imports, such as `from os import environ`. A `.get()` call on an arbitrary object, such as a dictionary, is not a source.
+- **Sources.** `input()`, `sys.stdin`, `sys.argv`, `os.environ` (including subscripts such as `os.environ["X"]`), `os.getenv`, and every read of a `request` attribute, including subscripts such as `request.form["name"]` and `request.method`. Sources are also found through the code's own imports, such as `from os import environ`. A `.get()` call on an arbitrary object, such as a dictionary, is not a source.
 - **Sinks.** Code execution (`eval`, `exec`, `compile`, `__import__`), shell commands (`os.system`, `os.popen`, `subprocess`), deserialisation (`pickle`, `yaml.load`, `marshal.loads`), SQL `execute`, file paths, network URLs, `mark_safe` (HTML) and `render_template_string` (templates). Values passed as bound SQL parameters, such as `cursor.execute(query, params)`, are not reported; taint in the query text still is.
 - **Sanitisers only clear the sinks they protect.**
 
