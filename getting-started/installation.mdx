@@ -57,7 +57,7 @@ pnpm add @qwed-ai/sdk
 ## Go SDK
 
 ```bash
-go get github.com/QWED-AI/qwed-verification/sdk-go/v9@v9.1.0
+go get github.com/QWED-AI/qwed-verification/sdk-go/v10@v10.0.0
 ```
 
 ## Rust SDK
@@ -65,7 +65,7 @@ go get github.com/QWED-AI/qwed-verification/sdk-go/v9@v9.1.0
 ```toml
 # Cargo.toml
 [dependencies]
-qwed = "9.1.0"
+qwed = "10.0.0"
 ```
 
 ---
@@ -113,7 +113,7 @@ docker run -p 8000:8000 \
   -e QWED_JWT_SECRET_KEY \
   -e QWED_API_KEY_LOOKUP_SECRET \
   -e QWED_AUDIT_SECRET_KEY \
-  qwedai/qwed-verification:9.1.0
+  qwedai/qwed-verification:10.0.0
 ```
 
 The server names no model. For requests that use a provider (natural-language, logic, statistics, and fact), also pass the provider's settings, for example `-e ACTIVE_PROVIDER -e OPENAI_API_KEY -e OPENAI_MODEL`. The container doesn't read the `qwed init` settings on your host.
