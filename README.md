@@ -140,8 +140,10 @@ If you discover a security issue related to QWED documentation, examples, or ver
 
 [Apache License 2.0](LICENSE)
 
+Redistributions keep the attribution in [NOTICE](NOTICE), and [TRADEMARKS.md](TRADEMARKS.md) says how the QWED name and logo may be used.
+
 ```
-Copyright 2025 QWED-AI
+Copyright 2025-2026 Rahul Dass (QWED-AI)
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
