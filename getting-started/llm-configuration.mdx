@@ -182,8 +182,8 @@ The Anthropic provider doesn't send `temperature`, `top_p`, or `top_k`. The anth
 `claude_opus` is no longer a provider ([#617](https://github.com/QWED-AI/qwed-verification/issues/617)): it was this provider under one model's name. `ACTIVE_PROVIDER=claude_opus` is refused like any other value QWED does not know, with an error that says what to set, and a request that names `claude_opus` as its provider is refused as an unknown provider. To move:
 
 - set `ACTIVE_PROVIDER=anthropic`, and have requests that name a provider name `anthropic`;
-- on the server, move `CLAUDE_OPUS_ENDPOINT`, `CLAUDE_OPUS_API_KEY`, and `CLAUDE_OPUS_DEPLOYMENT` to `ANTHROPIC_ENDPOINT`, `ANTHROPIC_API_KEY`, and `ANTHROPIC_MODEL`, and unset `ANTHROPIC_DEPLOYMENT`, which wins over `ANTHROPIC_MODEL`;
-- keep `ANTHROPIC_ENDPOINT` out of the environment the `qwed` CLI runs in: the CLI calls the Anthropic API directly and stops if it is set.
+- on the server, move `CLAUDE_OPUS_ENDPOINT`, `CLAUDE_OPUS_API_KEY`, and `CLAUDE_OPUS_DEPLOYMENT` to `ANTHROPIC_ENDPOINT`, `ANTHROPIC_API_KEY`, and `ANTHROPIC_MODEL`, and remove `ANTHROPIC_DEPLOYMENT`, which wins over `ANTHROPIC_MODEL`, from the shell and from the `.env` files QWED reads (`.env` in the working directory and `~/.qwed/.env`), since QWED loads a value from those files when the shell has none;
+- keep `ANTHROPIC_ENDPOINT` out of the environment the `qwed` CLI runs in, the shell and the same `.env` files. The CLI calls the Anthropic API directly: with the saved provider (`ACTIVE_PROVIDER=anthropic`) it stops if `ANTHROPIC_ENDPOINT` is set, and with an explicit `--provider anthropic` it does not read it.
 </Note>
 
 ### Local LLMs (Ollama)
