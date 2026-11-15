@@ -442,7 +442,7 @@ Other `constraint_id`s used by the engine: `logic_verifier.invalid_constraint`, 
 **Status field**
 
 ```python
-# Before — LogicResult with a solver-level status string
+# Before: LogicResult with a solver-level status string
 result = verifier.verify_logic(variables, constraints)
 if result.status == "SAT":
     solution = result.model
@@ -451,7 +451,7 @@ elif result.status == "UNSAT":
 ```
 
 ```python
-# After — DiagnosticResult with method-scoped semantics
+# After: DiagnosticResult with method-scoped semantics
 result = verifier.verify_logic(variables, constraints)
 if result.is_verified:
     solution = result.developer_fields["model"]
@@ -462,7 +462,7 @@ elif result.developer_fields.get("deterministic_verdict") == "UNSAT":
 **Proving a theorem**
 
 ```python
-# Before — SAT meant "theorem is valid"
+# Before: SAT meant "theorem is valid"
 result = verifier.prove_theorem(variables, premises, conclusion)
 if result.status == "SAT":
     ...   # theorem valid
@@ -471,22 +471,24 @@ elif result.status == "UNSAT":
 ```
 
 ```python
-# After — VERIFIED means "theorem proved", BLOCKED means "counterexample found"
+# After: VERIFIED means "theorem proved", a counterexample is BLOCKED
 result = verifier.prove_theorem(variables, premises, conclusion)
 if result.is_verified:
     ...   # theorem proved by contradiction
-elif result.status.value == "BLOCKED":
+elif result.developer_fields.get("deterministic_verdict") == "counterexample_found":
     counterexample = result.developer_fields["model"]
 ```
+
+A counterexample is the only `prove_theorem` result with `deterministic_verdict: "counterexample_found"` and a `model`. The other `BLOCKED` results, such as `logic_verifier.explicit_declarations_required` or `logic_verifier.execution_error` for invalid input, carry no `model`.
 
 **Variable declarations are now mandatory**
 
 ```python
-# Before — the engine tried to infer types from constraint syntax
+# Before: the engine tried to infer types from constraint syntax
 result = verifier.verify_logic({}, ["x > 5", "P and Q"])
 # Types guessed: x -> Int, P/Q -> Bool
 
-# After — empty variables dict fails closed
+# After: empty variables dict fails closed
 result = verifier.verify_logic({}, ["x > 5", "P and Q"])
 result.status.value                              # "BLOCKED"
 result.developer_fields["constraint_id"]         # "logic_verifier.explicit_declarations_required"
@@ -495,10 +497,10 @@ result.developer_fields["constraint_id"]         # "logic_verifier.explicit_decl
 **Malformed `BitVec` declarations fail closed**
 
 ```python
-# Before — silently defaulted to 32-bit
+# Before: silently defaulted to 32-bit
 result = verifier.verify_bitvector({"x": "BitVec"}, ["x == 0"])
 
-# After — BLOCKED with a type-validation constraint ID
+# After: BLOCKED with a type-validation constraint ID
 result = verifier.verify_logic({"x": "BitVec"}, ["x == 0"])
 result.status.value                              # "BLOCKED"
 result.developer_fields["constraint_id"]         # "dsl_compiler.type_validation"

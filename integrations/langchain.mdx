@@ -76,7 +76,7 @@ The tools call a result wrong only when QWED decided it. A result QWED did not d
 
 ### QWEDVerificationCallback
 
-Checks what it recognises in each LLM, chain and agent output: the math it finds, each fenced block (as SQL or as code, by its tag), and SQL outside a block, which it records as `UNVERIFIABLE`. Anything else, such as a claim in prose, is not checked.
+Checks what it recognises in each LLM, chain and agent output: the math it finds, each fenced block (as SQL or as code, by its tag), and SQL outside a block, which it records as `UNVERIFIABLE`. Outside a block, it finds a statement by its keywords in capitals, such as `SELECT ... FROM` or `DELETE FROM`. Only a statement that creates, drops, alters or truncates a table is found in any case. Lowercase SQL such as `delete from users;` is not found, so it is not checked. Anything else, such as a claim in prose, is not checked.
 
 ```python
 from langchain.chains import LLMChain
@@ -97,10 +97,11 @@ chain = LLMChain(
 )
 
 result = chain.run("Calculate 15% of 200")
+# LLM output: "15% of 200 = 30"
 # [QWED] ❌ MATH: verified=False
 ```
 
-The math check sends the output to `/verify/natural_language`, which admits no result while the LLM's translation is unverified, so it logs `verified=False`. `verify_sql` is on by default: a SQL block is checked against `sql_schema_ddl` in `sql_dialect` (default `sqlite`). Without a schema, SQL is recorded as `UNVERIFIABLE` and nothing is sent. `get_summary()` counts an output as verified only when a check ran and every check verified it.
+The math check sends the output to `/verify/natural_language`, which admits no result while the LLM's translation is unverified, so it logs `verified=False`. `verify_sql` is on by default: a SQL block is checked against `sql_schema_ddl` in `sql_dialect` (default `sqlite`). Without a schema, SQL is recorded as `UNVERIFIABLE` and nothing is sent. `get_summary()` counts an output as verified only when a check ran and every check verified it. SQL the callback did not find is not a check, so an output with an admitted code block and `delete from users;` in its text counts as verified.
 
 ### QWEDVerifiedChain
 

@@ -73,7 +73,7 @@ The tools call a result wrong (`❌ INCORRECT`, `❌ UNSAFE`, `⚠️ SECURITY I
 
 ## QWEDVerifiedAgent
 
-Agent wrapper with automatic verification:
+Agent wrapper that creates a CrewAI agent with the QWED tools. It does not check the agent's output by itself: pass each output to `verify_output()`.
 
 ```python
 from qwed_sdk.crewai import QWEDVerifiedAgent, VerificationConfig
@@ -93,10 +93,12 @@ analyst = QWEDVerifiedAgent(
     )
 )
 
-# Check verification summary. verify_output() checks through
+# Check an output. verify_output() checks through
 # /verify/natural_language, which admits no result yet.
+analyst.verify_output("The compound interest is $6,288.95")
+
 print(analyst.verification_summary())
-# {"total_outputs": 5, "verified": 0, "failed": 5, "verification_rate": 0.0}
+# {"total_outputs": 1, "verified": 0, "failed": 1, "verification_rate": 0.0}
 ```
 
 `sql_schema_ddl` and `sql_dialect` go to the agent's `QWEDSQLTool`. Without a schema, its SQL checks are `UNVERIFIABLE`.

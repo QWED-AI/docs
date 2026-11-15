@@ -7,7 +7,7 @@ description: "QWED's Consensus Engine orchestrates multiple verification engines
 The Consensus Engine orchestrates multiple verification engines for high-confidence results with fault tolerance.
 
 <Warning>
-**Changed in v4.0.4:** Python code verification within consensus now runs exclusively through the secure Docker executor (`SecureCodeExecutor`). If the Docker sandbox is unavailable, consensus returns a `blocked_secure_execution` status and the API responds with HTTP 503.
+**Changed in v4.0.4:** Python code verification within consensus now runs exclusively through the secure Docker executor (`SecureCodeExecutor`). If the Docker sandbox is unavailable, consensus returns a `blocked_secure_execution` status and the API responds with HTTP 503. From v6.0.0, the API responds with HTTP 200 and `BLOCKED` instead.
 </Warning>
 
 ## Features
@@ -49,7 +49,7 @@ One engine is not a consensus. In the example, SymPy verifies the answer and the
 | `maximum` | 3+ (All applicable) | Slower | Maximum    | Yes             |
 
 <Note>
-The `high` and `maximum` modes include the Python engine, which requires the secure Docker sandbox. If Docker is unavailable, these modes return `blocked_secure_execution` instead of falling back to in-process execution. The `/verify/consensus` response is then `BLOCKED` with HTTP 200, not an HTTP error.
+The `high` and `maximum` modes include the Python engine, which requires the secure Docker sandbox. If Docker is unavailable, these modes return `blocked_secure_execution` instead of falling back to in-process execution. This status takes precedence over `no_independent_verification`, so it is returned even when SymPy verified the answer. The `/verify/consensus` response is then `BLOCKED` with HTTP 200, not an HTTP error.
 </Note>
 
 ## Async execution
@@ -204,14 +204,15 @@ Final confidence = weighted average of agreeing engines.
 | `split` | No clear majority among engines |
 | `no_results` | No engines returned a result |
 | `no_independent_verification` | Only one engine verified the answer. The result is `BLOCKED` with `confidence` `0.0` |
-| `blocked_secure_execution` | The Docker sandbox is unavailable and a required engine cannot run. The result is `BLOCKED` (HTTP 200) |
+| `blocked_secure_execution` | The Docker sandbox is unavailable and a required engine cannot run. The result is `BLOCKED` (HTTP 200). It takes precedence over every other status, `no_independent_verification` included |
 
 ## Status propagation
 
 Consensus is a status-preserving aggregator, not a proof engine. Per the [3-tier engine classification](/engines/overview), consensus never invents a `VERIFIED` status from disagreement:
 
+- The Python engine finds the Docker sandbox unavailable → the consensus result is `BLOCKED` with `agreement_status` `blocked_secure_execution`, whatever the other engines returned. This rule is checked first.
 - All engines return `BLOCKED` → the consensus result is `BLOCKED`.
-- Only one engine verifies the answer → the consensus result is `BLOCKED` with `constraint_id: "consensus.no_independent_verification"` and `confidence` `0.0`, whatever the other engines returned (advisory, blocked or absent). One engine is not a consensus.
+- Otherwise, only one engine verifies the answer → the consensus result is `BLOCKED` with `constraint_id: "consensus.no_independent_verification"` and `confidence` `0.0`, whatever the other engines returned (advisory, blocked or absent). One engine is not a consensus.
 - Otherwise, any single engine returns `BLOCKED` (but not all) → the consensus result is capped at `UNVERIFIABLE` (fail-closed: a partial block prevents `VERIFIED`).
 - Otherwise, any engine returns `UNVERIFIABLE` → the consensus result is `UNVERIFIABLE`.
 - Only unanimous `VERIFIED` engine outcomes from two distinct engines or more can produce a `VERIFIED` consensus. No two engines do so today.
