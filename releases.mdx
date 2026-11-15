@@ -6,8 +6,8 @@ description: "QWED Protocol release history with download links, installation in
 
 ## Current release
 
-<Card title="v10.0.0 — Verdicts that prove the claim, and claude_opus removed" icon="shield-check" href="https://github.com/QWED-AI/qwed-verification/releases/tag/v10.0.0">
-  Major release. Routes stop reporting `VERIFIED`, or admitting a result, on evidence that doesn't prove the claim, so some results that 9.1.0 verified are now `UNVERIFIABLE` or `BLOCKED`. The `claude_opus` provider is removed, three dependency advisories are fixed, and the Go module path moves to `/v10`. Read the [upgrade steps](/changelog#v10-0-0-—-verdicts-that-prove-the-claim-and-claude_opus-removed) before you upgrade.
+<Card title="v10.0.0: Evidence is not proof" icon="shield-check" href="https://github.com/QWED-AI/qwed-verification/releases/tag/v10.0.0">
+  Major release. Routes stop reporting `VERIFIED`, or admitting a result, on evidence that does not prove the claim, the `claude_opus` provider is removed, and the Go module path ends in `/v10`. Three dependency advisories are fixed. Read the [upgrade steps](/changelog#v10-0-0-evidence-is-not-proof) before upgrading.
 </Card>
 
 ### Install
@@ -43,7 +43,7 @@ go get github.com/QWED-AI/qwed-verification/sdk-go/v10@v10.0.0
 <AccordionGroup>
 
 <Accordion title="v9.1.0 — Allowlist admission for Python code (November 7, 2026)" icon="shield-check">
-  **Minor release with one security fix** (GHSA-9r7q-mx75-hcj7). `CodeVerifier` admits Python code only when the modules, builtins and special attributes it uses are listed, so code that 9.0.0 admitted may now be refused. The server reads `.env` before any of its settings.
+  Minor release with one security fix (GHSA-9r7q-mx75-hcj7). `CodeVerifier` admits Python code only when the modules, builtins and special attributes it uses are listed, so code that 9.0.0 admitted may now be refused. The server reads `.env` before any of its settings. Read the [upgrade steps](/changelog#v9-1-0-—-allowlist-admission-for-python-code) before you upgrade.
 
   [Full Release Notes →](/changelog#v9-1-0-—-allowlist-admission-for-python-code) · [GitHub Release ↗](https://github.com/QWED-AI/qwed-verification/releases/tag/v9.1.0)
 </Accordion>

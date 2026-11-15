@@ -174,9 +174,17 @@ export ANTHROPIC_MODEL=your-claude-model
 
 Key format: `sk-ant-...` — get yours at [console.anthropic.com/settings/keys](https://console.anthropic.com/settings/keys).
 
-The server's Anthropic provider is an Azure AI Foundry client: set `ANTHROPIC_ENDPOINT` to your Foundry endpoint in the server's environment. On the server, `ANTHROPIC_ENDPOINT` and `ANTHROPIC_API_KEY` are both required, or the provider stops with `Missing Anthropic environment variables`. The `qwed` CLI calls the Anthropic API directly instead: it reads `ANTHROPIC_API_KEY` and `ANTHROPIC_MODEL`, and stops if `ANTHROPIC_ENDPOINT` is set.
+The server's Anthropic provider is an Azure AI Foundry client: set `ANTHROPIC_ENDPOINT` to your Foundry endpoint in the server's environment. On the server, `ANTHROPIC_ENDPOINT` and `ANTHROPIC_API_KEY` are both required, or the provider stops with `Missing Anthropic environment variables`. The `qwed` CLI calls the Anthropic API directly instead: it reads `ANTHROPIC_API_KEY` and `ANTHROPIC_MODEL`. With the saved provider (`ACTIVE_PROVIDER=anthropic`) it stops if `ANTHROPIC_ENDPOINT` is set; an explicit `--provider anthropic` does not read it.
 
 The Anthropic provider doesn't send `temperature`, `top_p`, or `top_k`. The anthropic SDK has had no sampling parameters since 1.0, and Anthropic API version `2026-10-21`, which the 2.x SDK sends, refuses them. Claude samples with the model's defaults, and no QWED setting overrides them. Sampling can vary the translations Claude returns and the verdicts `verify_fact` and `verify_image` return. QWED's fact and image verifiers record those verdicts only as advisory checks, never as `VERIFIED`.
+
+<Note>
+`claude_opus` is no longer a provider ([#617](https://github.com/QWED-AI/qwed-verification/issues/617)): it was this provider under one model's name. `ACTIVE_PROVIDER=claude_opus` is refused like any other value QWED does not know, with an error that says what to set, and a request that names `claude_opus` as its provider is refused as an unknown provider. To move:
+
+- set `ACTIVE_PROVIDER=anthropic`, and have requests that name a provider name `anthropic`;
+- on the server, move `CLAUDE_OPUS_ENDPOINT`, `CLAUDE_OPUS_API_KEY`, and `CLAUDE_OPUS_DEPLOYMENT` to `ANTHROPIC_ENDPOINT`, `ANTHROPIC_API_KEY`, and `ANTHROPIC_MODEL`, and remove `ANTHROPIC_DEPLOYMENT`, which wins over `ANTHROPIC_MODEL`, from the shell and from the `.env` files QWED reads (`.env` in the working directory and `~/.qwed/.env`), since QWED loads a value from those files when the shell has none;
+- keep `ANTHROPIC_ENDPOINT` out of the environment the `qwed` CLI runs in, the shell and the same `.env` files. The CLI calls the Anthropic API directly: with the saved provider (`ACTIVE_PROVIDER=anthropic`) it stops if `ANTHROPIC_ENDPOINT` is set, and with an explicit `--provider anthropic` it does not read it.
+</Note>
 
 ### Local LLMs (Ollama)
 
@@ -236,27 +244,6 @@ export AZURE_OPENAI_ENDPOINT=https://your-resource.openai.azure.com/
 export AZURE_OPENAI_API_KEY=your-azure-key
 export AZURE_OPENAI_DEPLOYMENT=your-deployment-name
 export AZURE_OPENAI_API_VERSION=2024-02-15-preview
-```
-
-### Claude Opus (removed in v10.0.0)
-
-v10.0.0 removes the `claude_opus` provider. It was a copy of the Anthropic provider under one model's name. `ACTIVE_PROVIDER=claude_opus` is now refused, and the error says what to set instead. A request that names `claude_opus` is refused as an unknown provider.
-
-To keep running Claude Opus, use the [Anthropic provider](#anthropic-claude):
-
-```bash
-# Before (v9.x)
-export ACTIVE_PROVIDER=claude_opus
-export CLAUDE_OPUS_ENDPOINT=https://your-foundry-endpoint
-export CLAUDE_OPUS_API_KEY=sk-ant-your-key
-export CLAUDE_OPUS_DEPLOYMENT=your-claude-opus-model
-
-# After (v10.0.0)
-export ACTIVE_PROVIDER=anthropic
-export ANTHROPIC_ENDPOINT=https://your-foundry-endpoint
-export ANTHROPIC_API_KEY=sk-ant-your-key
-export ANTHROPIC_MODEL=your-claude-opus-model
-unset ANTHROPIC_DEPLOYMENT  # it wins over ANTHROPIC_MODEL when set
 ```
 
 ---
