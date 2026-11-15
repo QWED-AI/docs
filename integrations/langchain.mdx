@@ -40,8 +40,10 @@ from qwed_sdk.langchain import QWEDTool
 
 tool = QWEDTool(api_key="qwed_...")
 print(tool.run("2+2=4"))
-# ✅ VERIFIED: The statement is correct
+# ⚠️ HOLDS, NOT ADMITTED: the claim holds for the translated expression <expression>, but it was translated from your query by an LLM, and that translation is not verified.
 ```
+
+`QWEDTool` sends its input to `/verify/natural_language`, which admits no result while the LLM's translation of the query is unverified. So the tool says what holds for the translated expression and that it is not admitted. A claim proven false for that expression starts with `❌ INCORRECT for the translated expression`, and a result QWED did not decide is `⚠️ UNVERIFIABLE:` or `⛔ BLOCKED:` followed by the server's message.
 
 ### Specialized tools
 
@@ -55,9 +57,26 @@ tools = [
 ]
 ```
 
+<Info>Changed in v10.0.0</Info>
+
+The tools call a result wrong only when QWED decided it. A result QWED did not decide is reported with its status and the server's message.
+
+| Tool | Result | Answer |
+| --- | --- | --- |
+| `QWEDMathTool` | Admitted | `✅ VERIFIED: <expression> is correct` |
+| `QWEDMathTool` | `VERIFIED`, claim proven false | `❌ INCORRECT:` and the server's message |
+| `QWEDLogicTool` | `VERIFIED`, not admitted | `⚠️ SAT, NOT ADMITTED:` with the assignment, and why it is not admitted |
+| `QWEDLogicTool` | `UNVERIFIABLE`, unsatisfiable | `❌ UNSAT: no assignment satisfies the translated constraints.` |
+| `QWEDCodeTool` | Admitted | `✅ SAFE: No security issues detected` |
+| `QWEDCodeTool` | `VERIFIED`, proven unsafe | `⚠️ SECURITY ISSUES:` and up to five `severity: description` lines |
+| All three | `UNVERIFIABLE` | `⚠️ UNVERIFIABLE:` and the server's message |
+| All three | `BLOCKED` | `⛔ BLOCKED:` and the server's message |
+
+`/verify/logic` admits no result while the LLM's translation of the query is unverified, so `QWEDLogicTool` reports a satisfiable query as `SAT, NOT ADMITTED`, not `SAT`.
+
 ### QWEDVerificationCallback
 
-Auto-verify all LLM outputs:
+Checks what it recognises in each LLM, chain and agent output: the math it finds, each fenced block (as SQL or as code, by its tag), and SQL outside a block, which it records as `UNVERIFIABLE`. Anything else, such as a claim in prose, is not checked.
 
 ```python
 from langchain.chains import LLMChain
@@ -66,6 +85,8 @@ from qwed_sdk.langchain import QWEDVerificationCallback
 callback = QWEDVerificationCallback(
     verify_math=True,
     verify_code=True,
+    sql_schema_ddl="CREATE TABLE users (id INT, name TEXT)",
+    sql_dialect="sqlite",
     log_results=True,
 )
 
@@ -76,8 +97,10 @@ chain = LLMChain(
 )
 
 result = chain.run("Calculate 15% of 200")
-# [QWED] ✅ MATH: verified=True
+# [QWED] ❌ MATH: verified=False
 ```
+
+The math check sends the output to `/verify/natural_language`, which admits no result while the LLM's translation is unverified, so it logs `verified=False`. `verify_sql` is on by default: a SQL block is checked against `sql_schema_ddl` in `sql_dialect` (default `sqlite`). Without a schema, SQL is recorded as `UNVERIFIABLE` and nothing is sent. `get_summary()` counts an output as verified only when a check ran and every check verified it.
 
 ### QWEDVerifiedChain
 
@@ -91,10 +114,10 @@ verified_chain = QWEDVerifiedChain(base_chain, auto_correct=True)
 
 result = verified_chain.run("What is 2+2?")
 print(result.output)    # "4"
-print(result.verified)  # True
+print(result.verified)  # False
 ```
 
-The tools, callback, and `QWEDVerifiedChain` read the client's `is_verified`, which follows the server's admission. `result.verified` is `True` only when the server admitted the output. A `BLOCKED` or `UNVERIFIABLE` result is never verified.
+The callback and `QWEDVerifiedChain` read the client's `is_verified`, which follows the server's admission: `result.verified` is `True` only when the server admitted the output, and a `BLOCKED` or `UNVERIFIABLE` result is never verified. `QWEDVerifiedChain` checks the output with `client.verify()`, which calls `/verify/natural_language`, so `result.verified` is `False` while that route admits no result. The tools call a result wrong only when QWED decided it.
 
 <Warning>
 Before v8.0.0 ([GHSA-83v6-6h23-pvp4](https://github.com/QWED-AI/qwed-verification/security/advisories/GHSA-83v6-6h23-pvp4)), the integrations read a `verified` attribute that `QWEDClient` results don't have, so their checks raised. When you call `QWEDClient` directly, gate on `result.is_verified`.

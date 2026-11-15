@@ -161,9 +161,9 @@ query2 = "The Sun orbits the Earth"
 **Example:**
 ```python
 # User doesn't need to know about SymPy internals
-result = client.verify_math("What is 2+2?")
-print(result.verified)  # True
-print(result.value)  # 4
+result = client.verify_math("2+2=4")
+print(result.status)       # "VERIFIED"
+print(result.is_verified)  # True
 ```
 
 **Rationale:** You shouldn't need to learn SymPy, Z3, and AST separately. QWED provides a unified interface.

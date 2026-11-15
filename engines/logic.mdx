@@ -404,6 +404,12 @@ Z3's `sat`/`unsat` outcome has different meanings depending on the method. The e
 | `verify_optimization` | `VERIFIED` (optimal model) | `UNVERIFIABLE` | `UNVERIFIABLE` |
 | `check_vacuity` | `VERIFIED` (non-vacuous) | `UNVERIFIABLE` (vacuously true) | `UNVERIFIABLE` |
 
+<Info>Changed in v10.0.0</Info>
+
+Before `prove_theorem` and `check_implication` look for a proof, they check that the premises can all hold. Premises that contradict each other prove any conclusion, so the result is `UNVERIFIABLE` with `constraint_id: "logic_verifier.vacuous_premises"`, `deterministic_verdict: "VACUOUS_PREMISES"`, and the conflicting premises in `developer_fields.unsat_core`. Premises the solver cannot decide are `UNVERIFIABLE` with `logic_verifier.premises_undecided`.
+
+`verify_logic`, `verify_with_quantifiers`, `verify_bitvector` and `verify_array` are `BLOCKED` with `logic_verifier.no_constraint` when they assert no constraint, since every assignment satisfies an empty set. A constraint that is not a Boolean formula (`"None"`, `"[]"`, a tuple, a number) makes any logic check `BLOCKED`. `verify_logic` reports it with `logic_verifier.invalid_constraint`.
+
 <Tip>
 Always branch on `result.is_verified` (or `result.proof_ref is not None`) for control flow. Read `developer_fields["deterministic_verdict"]` for diagnostic context — never for authorization.
 </Tip>
@@ -429,7 +435,7 @@ Two fail-closed behaviors ship with the migration:
 | `logic_verifier.explicit_declarations_required` | The `variables` dict is empty. The previous `_infer_variables` heuristic has been removed — the engine now refuses to guess types from constraint syntax. |
 | `dsl_compiler.type_validation` | A variable is declared with a malformed type such as `"BitVec"` (missing width), `"BitVec[]"`, or `"BitVec[abc]"`. The engine no longer silently defaults to 32-bit; you must declare a valid `BitVec[N]` with `N ≥ 1`. |
 
-Other `constraint_id`s used by the engine: `logic_verifier.invalid_constraint`, `logic_verifier.unknown_quantifier`, and `logic_verifier.execution_error`.
+Other `constraint_id`s used by the engine: `logic_verifier.invalid_constraint`, `logic_verifier.no_constraint`, `logic_verifier.vacuous_premises`, `logic_verifier.premises_undecided`, `logic_verifier.unknown_quantifier`, and `logic_verifier.execution_error`.
 
 ### Migrating from `LogicResult`
 
