@@ -221,9 +221,9 @@ All API error paths now use a centralized `redact_pii()` function that masks ema
 
 All model-generated Python code — in both the Stats and Consensus engines — runs exclusively inside a Docker sandbox (`SecureCodeExecutor`). The in-process Wasm and restricted execution fallbacks that existed in earlier versions have been permanently disabled.
 
-If the Docker daemon is unreachable, the affected endpoints return HTTP 503 rather than degrading to an insecure execution mode. The executor performs a live health check (`docker.ping()`) on every request to detect runtime failures that would not be caught by a startup-time flag.
+If the Docker daemon is unreachable, the affected endpoints answer with a `BLOCKED` result (HTTP 200) rather than degrading to an insecure execution mode. The executor performs a live health check (`docker.ping()`) on every request to detect runtime failures that would not be caught by a startup-time flag.
 
-This design ensures that a Docker outage is surfaced as a visible service disruption rather than silently downgrading security.
+This design ensures that a Docker outage is surfaced as a visible `BLOCKED` result rather than silently downgrading security.
 
 #### Sandbox containment limits
 

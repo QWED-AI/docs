@@ -75,7 +75,7 @@ Use `is_admitted()` to decide whether to act on a result. Don't gate on `status`
 - `status` is `Verified`
 - `proof_ref` is set
 
-A missing or `Unknown` admission is never admitted. Endpoints that make no admission decision (`/verify/logic`, `/verify/fact`, `/verify/rag`, `/verify/process`, and batch logic and fact items) are therefore never admitted. The `verified` field that `/verify/rag` and `/verify/process` send is their guard's own result, not an admission. It stays in `extra["verified"]` and `developer_fields`.
+A missing or `Unknown` admission is never admitted. Endpoints that make no admission decision (`/verify/fact`, `/verify/rag`, `/verify/process`, and batch fact items) are therefore never admitted. `/verify/logic` and batch logic items decide one as `/verify/natural_language` does: their verdict covers the constraints an LLM translated the question into, so the admission is `Blocked` until QWED verifies the translation itself. `/verify/rag` and `/verify/process` return `Unverifiable`: what their guards check comes from the request itself, so the guard's result is advisory only, in `developer_fields.advisory_checks`. An older server also sent the guard's result as a `verified` field, which is not an admission; it is in `extra["verified"]` and `developer_fields`.
 
 ```rust
 let result = client.verify_math("2 + 2 = 5").await?;
@@ -111,8 +111,9 @@ println!("{:?}", result.extra.get("is_valid"));  // Some(Bool(true))
 
 ```rust
 let result = client.verify_logic("(AND (GT x 5) (LT y 10))").await?;
-// /verify/logic makes no admission decision, so is_admitted() is false.
-println!("{:?} {:?}", result.status, result.extra.get("model"));
+// The verdict covers the translated constraints only: admission is
+// Some(Blocked) and is_admitted() is false, whatever the status.
+println!("{:?} {:?} {:?}", result.status, result.admission, result.extra.get("model"));
 ```
 
 ### verify\_code
@@ -144,7 +145,7 @@ let result = client.verify_sql(query, schema, "postgresql").await?;
 
 ### verify\_batch
 
-`verify_batch` returns a `BatchResponse` that mirrors the server's batch job. Each item's verification answer is in `item.result`. Call `is_admitted()` on each `BatchResult` item. There is no aggregate `summary`. Math, code, and SQL items carry their route's admission, so a proven item can be admitted. Natural-language items always carry `BLOCKED`. Logic and fact items make no decision, so they're never admitted.
+`verify_batch` returns a `BatchResponse` that mirrors the server's batch job. Each item's verification answer is in `item.result`. Call `is_admitted()` on each `BatchResult` item. There is no aggregate `summary`. Math, code, and SQL items carry their route's admission, so a proven item can be admitted. Natural-language and logic items always carry `BLOCKED`. Fact items make no decision, so they're never admitted.
 
 ```rust
 use qwed::{BatchItem, VerificationType};

@@ -8,22 +8,32 @@ The **Taint Analysis Engine** creates a security firewall by tracking "tainted" 
 
 ## How it works
 
-1. **Source Identification:** Marks all variables derived from user input as `tainted`.
-2. **Flow Propagation:** Tracks these variables through assignments, function calls, and string operations.
-3. **Sink Validation:** If a `tainted` variable reaches a critical function (e.g., `subprocess.call` or `db.execute`) without passing through a sanitizer, it blocks execution.
+1. **Source Identification:** Marks values from untrusted input as `tainted`: `input()`, every `request.<attr>` read (such as `request.args.get(...)`, `request.form[...]`, `request.get_json()` and `request.method`), `os.environ` and `os.getenv`, `sys.argv`, and `read`, `readline` and `recv` calls. An arbitrary `obj.get()`, such as `dict.get`, is not a source.
+2. **Flow Propagation:** Tracks taint through assignments and inside expressions: concatenation, f-strings, `%` and `str.format`, nested calls, tuple and starred unpacking, augmented assignment and branches.
+3. **Sanitisers per Sink Class:** A sanitiser clears only the sink classes it protects, matched by exact name. `int()`, `float()` and `bool()` clear every class. `html.escape` and `markupsafe.escape` clear only HTML output, such as `mark_safe`, and only where the value lands in text content. `werkzeug.utils.secure_filename` clears only file paths. There is no shell sanitiser: `shlex.quote` does not clear a shell sink. A sanitiser counts only when the code imports it itself (the builtins need no import), uses no reflection, and its result reaches the sink directly.
+4. **Sink Validation:** If tainted data reaches a sink, such as `eval`, `os.system`, `subprocess.run`, `pickle.loads`, a SQL `execute`, `open`, `requests.get`, `mark_safe` or `render_template_string`, without a sanitiser for that sink's class, the engine reports a vulnerability. SQL bound parameters (`execute(query, params)`) are not reported; taint in the query still is. Taint does not follow a call's arguments into the parameters of the function, method or lambda it calls, so a flow through a parameter is not reported: `def deliver(payload): os.system(payload)` with `deliver(input())` is `SAFE`.
 
 ## Usage
 
+Run `TaintAnalyzer` from the `qwed` package. `CodeVerifier.verify_python_deep` also runs it, together with the pattern scan.
+
 ```python
-response = client.verify_taint(
-    code="""
-    user_input = get_query_param("id")
-    # Vulnerable!
-    query = "SELECT * FROM users WHERE id = " + user_input
-    db.execute(query)
-    """
-)
-# -> ❌ TAINT DETECTED: Untrusted input reaches SQL sink.
+from qwed_new.core.taint_analyzer import TaintAnalyzer
+
+code = '''
+from flask import request
+
+user_id = request.args.get("id")
+# Vulnerable!
+query = "SELECT * FROM users WHERE id = " + user_id
+db.execute(query)
+'''
+
+result = TaintAnalyzer().analyze(code)
+print(result["is_safe"])  # False
+print(result["status"])   # VULNERABLE
+print(result["vulnerabilities"][0]["description"])
+# Tainted data in db.execute: tainted data from request.args.get() reaches db.execute()
 ```
 
 ## When to use

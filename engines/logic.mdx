@@ -404,6 +404,12 @@ Z3's `sat`/`unsat` outcome has different meanings depending on the method. The e
 | `verify_optimization` | `VERIFIED` (optimal model) | `UNVERIFIABLE` | `UNVERIFIABLE` |
 | `check_vacuity` | `VERIFIED` (non-vacuous) | `UNVERIFIABLE` (vacuously true) | `UNVERIFIABLE` |
 
+<Info>Changed in v10.0.0</Info>
+
+Before `prove_theorem` and `check_implication` look for a proof, they check that the premises can all hold. Premises that contradict each other prove any conclusion, so the result is `UNVERIFIABLE` with `constraint_id: "logic_verifier.vacuous_premises"`, `deterministic_verdict: "VACUOUS_PREMISES"`, and the conflicting premises in `developer_fields.unsat_core`. Premises the solver cannot decide are `UNVERIFIABLE` with `logic_verifier.premises_undecided`.
+
+`verify_logic`, `verify_with_quantifiers`, `verify_bitvector` and `verify_array` are `BLOCKED` with `logic_verifier.no_constraint` when they assert no constraint, since every assignment satisfies an empty set. A constraint that is not a Boolean formula (`"None"`, `"[]"`, a tuple, a number) makes any logic check `BLOCKED`. `verify_logic` reports it with `logic_verifier.invalid_constraint`.
+
 <Tip>
 Always branch on `result.is_verified` (or `result.proof_ref is not None`) for control flow. Read `developer_fields["deterministic_verdict"]` for diagnostic context — never for authorization.
 </Tip>
@@ -429,14 +435,14 @@ Two fail-closed behaviors ship with the migration:
 | `logic_verifier.explicit_declarations_required` | The `variables` dict is empty. The previous `_infer_variables` heuristic has been removed — the engine now refuses to guess types from constraint syntax. |
 | `dsl_compiler.type_validation` | A variable is declared with a malformed type such as `"BitVec"` (missing width), `"BitVec[]"`, or `"BitVec[abc]"`. The engine no longer silently defaults to 32-bit; you must declare a valid `BitVec[N]` with `N ≥ 1`. |
 
-Other `constraint_id`s used by the engine: `logic_verifier.invalid_constraint`, `logic_verifier.unknown_quantifier`, and `logic_verifier.execution_error`.
+Other `constraint_id`s used by the engine: `logic_verifier.invalid_constraint`, `logic_verifier.no_constraint`, `logic_verifier.vacuous_premises`, `logic_verifier.premises_undecided`, `logic_verifier.unknown_quantifier`, and `logic_verifier.execution_error`.
 
 ### Migrating from `LogicResult`
 
 **Status field**
 
 ```python
-# Before — LogicResult with a solver-level status string
+# Before: LogicResult with a solver-level status string
 result = verifier.verify_logic(variables, constraints)
 if result.status == "SAT":
     solution = result.model
@@ -445,7 +451,7 @@ elif result.status == "UNSAT":
 ```
 
 ```python
-# After — DiagnosticResult with method-scoped semantics
+# After: DiagnosticResult with method-scoped semantics
 result = verifier.verify_logic(variables, constraints)
 if result.is_verified:
     solution = result.developer_fields["model"]
@@ -456,7 +462,7 @@ elif result.developer_fields.get("deterministic_verdict") == "UNSAT":
 **Proving a theorem**
 
 ```python
-# Before — SAT meant "theorem is valid"
+# Before: SAT meant "theorem is valid"
 result = verifier.prove_theorem(variables, premises, conclusion)
 if result.status == "SAT":
     ...   # theorem valid
@@ -465,22 +471,24 @@ elif result.status == "UNSAT":
 ```
 
 ```python
-# After — VERIFIED means "theorem proved", BLOCKED means "counterexample found"
+# After: VERIFIED means "theorem proved", a counterexample is BLOCKED
 result = verifier.prove_theorem(variables, premises, conclusion)
 if result.is_verified:
     ...   # theorem proved by contradiction
-elif result.status.value == "BLOCKED":
+elif result.developer_fields.get("deterministic_verdict") == "counterexample_found":
     counterexample = result.developer_fields["model"]
 ```
+
+A counterexample is the only `prove_theorem` result with `deterministic_verdict: "counterexample_found"` and a `model`. The other `BLOCKED` results, such as `logic_verifier.explicit_declarations_required` or `logic_verifier.execution_error` for invalid input, carry no `model`.
 
 **Variable declarations are now mandatory**
 
 ```python
-# Before — the engine tried to infer types from constraint syntax
+# Before: the engine tried to infer types from constraint syntax
 result = verifier.verify_logic({}, ["x > 5", "P and Q"])
 # Types guessed: x -> Int, P/Q -> Bool
 
-# After — empty variables dict fails closed
+# After: empty variables dict fails closed
 result = verifier.verify_logic({}, ["x > 5", "P and Q"])
 result.status.value                              # "BLOCKED"
 result.developer_fields["constraint_id"]         # "logic_verifier.explicit_declarations_required"
@@ -489,10 +497,10 @@ result.developer_fields["constraint_id"]         # "logic_verifier.explicit_decl
 **Malformed `BitVec` declarations fail closed**
 
 ```python
-# Before — silently defaulted to 32-bit
+# Before: silently defaulted to 32-bit
 result = verifier.verify_bitvector({"x": "BitVec"}, ["x == 0"])
 
-# After — BLOCKED with a type-validation constraint ID
+# After: BLOCKED with a type-validation constraint ID
 result = verifier.verify_logic({"x": "BitVec"}, ["x == 0"])
 result.status.value                              # "BLOCKED"
 result.developer_fields["constraint_id"]         # "dsl_compiler.type_validation"
