@@ -140,11 +140,11 @@ fmt.Println(result.Extra["is_valid"]) // true
 ### VerifyLogic
 
 ```go
-result, err := client.VerifyLogic(ctx, "(AND (GT x 5) (LT y 10))")
+result, err := client.VerifyLogic(ctx, "x is greater than 5. Is x greater than 10?")
 if err != nil {
     log.Fatal(err)
 }
-// The verdict covers the translated constraints only: Admission is
+// The verdict covers the translated constraints and claim only: Admission is
 // AdmissionBlocked and IsAdmitted() is false, whatever the status.
 fmt.Println(result.Status, result.Admission, result.Extra["model"])
 ```
