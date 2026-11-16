@@ -93,15 +93,15 @@ llm_answer = response.choices[0].message.content
 
 # QWED verification only (no LLM needed)
 qwed = QWEDClient(api_key="qwed_your_key")
-result = qwed.verify_math(
-    expression="847 * 23",
-    expected_result=llm_answer
-)
+# verify_math takes one expression: state the claim with "="
+result = qwed.verify_math(f"847 * 23 = {llm_answer}")
 
-if result.verified:
+if result.is_verified:              # admission ADMIT: the claim holds
     print(f"✅ LLM was correct: {llm_answer}")
+elif result.status == "VERIFIED":   # proven false, admission BLOCKED
+    print("❌ LLM was wrong")
 else:
-    print(f"❌ LLM was wrong. Correct: {result.corrected}")
+    print(f"Not decided: {result.status}")
 ```
 
 ### Option 3: Self-hosted with custom LLM

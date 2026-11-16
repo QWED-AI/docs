@@ -30,9 +30,9 @@ from qwed_sdk import QWEDClient
 client = QWEDClient(api_key="your_key")
 
 # Verify a math claim
-result = client.verify_math("15% of 200 is 30")
-print(result.verified)  # True
-print(result.status)    # "VERIFIED"
+result = client.verify_math("15/100 * 200 = 30")
+print(result.is_verified)  # True
+print(result.status)       # "VERIFIED"
 ```
 
 ---
@@ -711,12 +711,16 @@ To resolve this, rewrite the expression with explicit parentheses or a `*` opera
 
 ```python
 # Explicit grouping — no ambiguity
-result = client.verify_math("(1/2)*(3+1)")
-# ✓ Verified: 2.0
+result = client.verify_math("(1/2)*(3+1) = 2")
+# ✓ Verified
 
-result = client.verify_math("1/(2*(3+1))")
-# ✓ Verified: 0.125
+result = client.verify_math("1/(2*(3+1)) = 1/8")
+# ✓ Verified
 ```
+
+<Info>Changed in v10.0.0</Info>
+
+Send the value you expect with `=`. An expression without `=` states no claim, so `POST /verify/math` returns `UNVERIFIABLE` with `constraint_id: "math.no_claim"` and the computed value as evidence (`value`, `exact_value`), never `VERIFIED`. Division by zero, an undefined value and ambiguous input are still `BLOCKED`.
 
 ---
 

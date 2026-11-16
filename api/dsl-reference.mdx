@@ -272,6 +272,7 @@ else:
 | `SAT` | Satisfiable — solution exists | `{x: 6, y: 4}` |
 | `UNSAT` | Unsatisfiable — no solution | `null` |
 | `UNKNOWN` | Solver timeout or undecidable | `null` |
+| `BLOCKED` | The program declares variables but states no constraint (`constraint_id: "dsl_logic_verifier.no_constraint"`). Every assignment satisfies an empty set, so `SAT` would verify nothing. Changed in v10.0.0. | `null` |
 
 ### Reading results
 
@@ -287,7 +288,7 @@ else:
     raise RuntimeError(f"Logic verification failed ({result.status}): {result.error}")
 ```
 
-The table above is the DSL verdict, which `DSLLogicVerifier.verify_from_dsl()` returns as is. `POST /verify/logic`, and so `client.verify_logic()`, maps it: `SAT` is `VERIFIED` with the model as evidence, `UNSAT` is `UNVERIFIABLE`, and anything else is `BLOCKED`. The route makes no admission decision, so the Python SDK's `is_verified` stays `False`; read `status` and the model.
+The table above is the DSL verdict, which `DSLLogicVerifier.verify_from_dsl()` returns as is. `POST /verify/logic`, and so `client.verify_logic()`, maps it: `SAT` is `VERIFIED` with the model as evidence, `UNSAT` is `UNVERIFIABLE`, and anything else is `BLOCKED`. The response carries `admission`, and it is always `BLOCKED`: the DSL is an LLM's translation of your question, and nothing checks that it means what you asked. So the Python SDK's `is_verified` stays `False`; read `status` and the model.
 
 ---
 
