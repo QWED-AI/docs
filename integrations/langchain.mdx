@@ -101,7 +101,7 @@ result = chain.run("Calculate 15% of 200")
 # [QWED] ❌ MATH: verified=False
 ```
 
-The math check sends the output to `/verify/natural_language`, which admits no result while the LLM's translation is unverified, so it logs `verified=False`. `verify_sql` is on by default: a SQL block is checked against `sql_schema_ddl` in `sql_dialect` (default `sqlite`). Without a schema, SQL is recorded as `UNVERIFIABLE` and nothing is sent. `get_summary()` counts an output as verified only when a check ran and every check verified it. SQL the callback did not find is not a check, so an output with an admitted code block and `delete from users;` in its text counts as verified.
+The math check sends the output to `/verify/natural_language`, which admits no result while the LLM's translation is unverified, so it logs `verified=False`. `verify_sql` is on by default: a SQL block is checked against `sql_schema_ddl` in `sql_dialect` (default `sqlite`). Without a schema, the SQL check records SQL as `UNVERIFIABLE` and sends nothing. Two other checks can still send SQL text: an untagged block that starts with a SQL statement is also checked as code, so with `verify_code` on it goes to `/verify/code`; and with `verify_math` on, an output the math check finds, such as one with `WHERE id = 1`, goes whole to `/verify/natural_language`. `get_summary()` counts an output as verified only when a check ran and every check verified it. SQL the callback did not find is not a check, so an output with an admitted code block and `delete from users;` in its text counts as verified.
 
 ### QWEDVerifiedChain
 

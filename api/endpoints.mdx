@@ -732,7 +732,7 @@ A size claim is decided only when the whole claim is a plain statement of the wi
 
 Verify statistical claims against CSV data. Accepts multipart form data with a CSV file.
 
-Statistical code execution requires the secure Docker sandbox. If Docker is unavailable, the endpoint returns HTTP 503. If the verification is blocked by a security policy, it returns HTTP 403.
+Statistical code execution requires the secure Docker sandbox. If Docker is unavailable, or the generated code fails the security checks, the response is a `BLOCKED` result with HTTP 200, not an HTTP error. See the failure states below.
 
 **Request:**
 
@@ -774,13 +774,10 @@ curl -X POST http://localhost:8000/verify/stats \
 
 Failure states return `status: "BLOCKED"` with a `constraint_id` of `stats_verifier.validation_error` (translation or security validation failed), `stats_verifier.execution_failure` (sandbox execution failed), or `stats_verifier.runtime_unavailable` (Docker unavailable). Blocked results carry no `proof_ref`.
 
-| Status | Description |
-|--------|-------------|
-| 403 | Verification blocked by security policy (e.g., generated code failed AST safety checks) |
-| 503 | Secure Docker sandbox unavailable — statistical verification requires Docker |
+These are results, not HTTP errors: a security-policy failure and a Docker outage both return HTTP 200 with `status: "BLOCKED"`.
 
 <Note>
-Statistical verification requires a running Docker daemon. If Docker is unavailable, the endpoint returns HTTP 503 instead of falling back to in-process execution. See the [Stats engine](/engines/stats) page for details.
+Statistical verification requires a running Docker daemon. If Docker is unavailable, the response is `BLOCKED` with `constraint_id: "stats_verifier.runtime_unavailable"` (HTTP 200) instead of falling back to in-process execution. See the [Stats engine](/engines/stats) page for details.
 
 When the sandbox is at capacity (`QWED_SANDBOX_MAX_CONCURRENT` containers already running) and no slot frees within `QWED_SANDBOX_ACQUIRE_TIMEOUT`, the execution is rejected with `Sandbox capacity reached — retry shortly.` and the result is `BLOCKED`.
 </Note>
