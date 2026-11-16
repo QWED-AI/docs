@@ -5,9 +5,9 @@ description: "Every QWED Security rule: definition, regex, trip example, and pas
 
 # QWED Security rule catalog
 
-Generated from `scan_rules.py` at rule set **qwed-security-ruleset/5**. Every rule ID used in a QWED annotation anchors here as `#<rule-id>`.
+Generated from `scan_rules.py` at rule set **qwed-security-ruleset/17**. Every rule ID used in a QWED annotation anchors here as `#<rule-id>`.
 
-This page intentionally contains live trip strings. Findings on it are covered by narrowly scoped base-branch policy entries (see `.qwed.yml`) — NOT by inline markers: on introduced lines the pipeline voids inline suppression comments as self-suppression, and a voided inline marker then shadows the policy entry that would otherwise apply. Never add `qwed-ignore` to generated trip lines.
+This page intentionally contains live trip strings. Findings on it are covered by narrowly scoped base-branch policy entries (see `.qwed.yml`) — maintainer-controlled and always trusted. Config suppressions are applied FIRST with maintainer-wins precedence (issue #90): an inline `qwed-ignore` marker never shadows a policy entry that covers the same finding, so a voided inline marker (self-suppression on an introduced line) can no longer make a PR verdict worse than no marker at all. Inline markers remain author-controlled and are still voided on introduced lines — but the trip lines on this page need no markers at all: the base policy covers them.
 
 ## Policy: non-downgradable categories
 
@@ -254,7 +254,7 @@ Engine `pattern_scan` · category `secret_exposure` · base action `BLOCK` · so
 Credential embedded in URL userinfo (user:pass@) — the value is a connection string, not a reference.
 
 ```regex
-(?i)[\"\\\'][a-z][a-z0-9+.-]*://[^\s\"\\\'@]*:[^\s\"\\\'@]+@[^\s\"\\\']*[\"\\\']
+(?i)[\"\\\'][a-z][a-z0-9+.-]*://[^\s\"\\\'@/?#]*:(?!\d+(?:[/?#]|[\"\\\']))[^\s\"\\\'@]+@[^\s\"\\\']*[\"\\\']
 ```
 
 Trips:
@@ -782,7 +782,7 @@ Engine `pattern_scan` · category `network_binding` · base action `WARNING` · 
 Binding to 0.0.0.0 exposes the service broadly.
 
 ```regex
-0\.0\.0\.0
+(?<![\d.])0\.0\.0\.0(?!\d|\.\d|/\d)
 ```
 
 Trips:
@@ -1089,10 +1089,8 @@ Engine `verification_integrity` · category `error_suppression` · base action `
 
 Empty except block silently swallows errors. This can hide security failures and verification boundary violations.
 
-> Known engine gap: the live pattern scanner matches line-by-line, so this multi-line shape is currently undetectable in production (tracked in issue #88). The trip below documents the rule definition, not a live detection.
-
 ```regex
-except\s+\w[\w.]*\s*:\s*\n\s*pass
+except\s+\w[\w.]*\s*:\s*\n\s*(pass\b[ \t]*(?:#[^\n]*)?\r?$)
 ```
 
 Trips:
@@ -2106,7 +2104,7 @@ Engine `docker_scan` · category `supply_chain` · base action `WARNING` · sour
 Malformed FROM reference: multiple tags in one image line. Use a single tag or a digest.
 
 ```regex
-^FROM\s+\S+:\S+:
+^FROM\s+(?:[^\s@/]+/)*[^\s@/:]+:[^\s@/:]+:
 ```
 
 Trips:
@@ -2118,7 +2116,8 @@ FROM python:3.12:latest
 Passes:
 
 ```dockerfile
-FROM python:3.12-slim
+FROM python:3.13-slim-bookworm@sha256:9ab8f2c1d4e5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1
+FROM registry:5000/repo:1.2
 ```
 
 ### docker-add-remote
@@ -2295,6 +2294,28 @@ Passes:
 
 ```yaml
 run: curl -sSL -o setup.sh https://example.sh
+```
+
+### svg-active-content
+
+Engine `svg_scan` · category `xss` · base action `WARNING` · source: `SVG_RULES`
+
+SVG active content: a script, iframe, frame, embed or object element, an on* event handler, or a javascript: URL. Opened directly or embedded as a document, the SVG runs it with the access of the origin that serves it. Remove it, or confirm the file is meant to run script.
+
+```regex
+(?i)(<(?:[\w.-]+:)?(?:script|iframe|frame|embed|object)\b)|(?<!\S)(on[a-z]+)\s*=|["';=][\x00-\x20]*(javascript:)
+```
+
+Trips:
+
+```xml
+<svg xmlns="http://www.w3.org/2000/svg" onload="alert(document.domain)"/>
+```
+
+Passes:
+
+```xml
+<svg xmlns="http://www.w3.org/2000/svg"><a href="https://example.com/"><path d="M4 12h16"/></a></svg>
 ```
 
 ### high-entropy-secret
