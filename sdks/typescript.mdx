@@ -76,7 +76,7 @@ Use `isAdmitted(result)` to decide whether to act on a result. Don't gate on `st
 - `status` is `VERIFIED`
 - `proof_ref` is a non-empty string
 
-A missing or unknown admission is never admitted. Endpoints that make no admission decision (`/verify/logic`, `/verify/fact`, `/verify/rag`, `/verify/process`, and batch logic and fact items) are therefore never admitted. The top-level `verified` that `/verify/rag` and `/verify/process` send is their guard's own result. The parser replaces it, and the guard's value stays in `developer_fields.verified`.
+A missing or unknown admission is never admitted. Endpoints that make no admission decision (`/verify/fact`, `/verify/rag`, `/verify/process`, and batch fact items) are therefore never admitted. `/verify/logic` and batch logic items decide one as `/verify/natural_language` does: their verdict covers the constraints an LLM translated the question into, so the admission is `BLOCKED` until QWED verifies the translation itself. `/verify/rag` and `/verify/process` return `UNVERIFIABLE`: what their guards check comes from the request itself, so the guard's result is advisory only, in `developer_fields.advisory_checks`. An older server also sent the guard's result as a top-level `verified`; the parser replaces it, and the guard's value stays in `developer_fields.verified`.
 
 ```typescript
 import { isAdmitted } from '@qwed-ai/sdk';
@@ -153,9 +153,9 @@ Verify logical constraints using QWED-Logic DSL.
 
 ```typescript
 const result = await client.verifyLogic('(AND (GT x 5) (LT y 10))');
-// /verify/logic makes no admission decision: admission is undefined and
-// isAdmitted() is false, whatever the status.
-console.log(result.status, result.model);
+// The verdict covers the translated constraints only: admission is 'BLOCKED'
+// and isAdmitted() is false, whatever the status.
+console.log(result.status, result.admission, result.model);
 ```
 
 ### verifyCode(code, options)
@@ -210,11 +210,14 @@ const result = await client.verifyProcess(
   { mode: 'irac' }
 );
 
-// /verify/process makes no admission decision, so isAdmitted() is false.
-// The guard's own verdict is in developer_fields.verified.
-console.log(result.developer_fields?.verified); // true
-console.log(result.score);                      // 1.0
-console.log(result.missing_steps);              // []
+// /verify/process is UNVERIFIABLE and makes no admission decision, so
+// isAdmitted() is false. The guard's result is advisory only.
+const guard = (result.developer_fields?.advisory_checks as
+  { details: Record<string, unknown> }[] | undefined)?.[0]?.details;
+console.log(result.status);         // 'UNVERIFIABLE'
+console.log(guard?.verified);       // true
+console.log(guard?.score);          // 1.0
+console.log(guard?.missing_steps);  // []
 ```
 
 You can also verify custom milestones:
@@ -228,8 +231,11 @@ const result = await client.verifyProcess(
   }
 );
 
-console.log(result.process_rate);       // 1.0
-console.log(result.missed_milestones);  // []
+const guard = (result.developer_fields?.advisory_checks as
+  { details: Record<string, unknown> }[] | undefined)?.[0]?.details;
+console.log(result.status);              // 'UNVERIFIABLE'
+console.log(guard?.process_rate);        // 1.0
+console.log(guard?.missed_milestones);   // []
 ```
 
 | Parameter | Type | Default | Description |
@@ -254,11 +260,15 @@ const result = await client.verifyRAG(
   { maxDrmRate: '0' } // Zero tolerance
 );
 
-// /verify/rag makes no admission decision, so isAdmitted() is false.
-console.log(result.developer_fields?.verified); // false
-console.log(result.drm_rate);                   // 0.5
-console.log(result.chunks_checked);             // 2
-console.log(result.mismatched_count);           // 1
+// /verify/rag is UNVERIFIABLE and makes no admission decision, so
+// isAdmitted() is false. The guard's result is advisory only.
+const guard = (result.developer_fields?.advisory_checks as
+  { details: Record<string, unknown> }[] | undefined)?.[0]?.details;
+console.log(result.status);            // 'UNVERIFIABLE'
+console.log(guard?.verified);          // false
+console.log(guard?.drm_rate);          // 0.5
+console.log(guard?.chunks_checked);    // 2
+console.log(guard?.mismatched_count);  // 1
 ```
 
 | Parameter | Type | Default | Description |
@@ -271,7 +281,7 @@ console.log(result.mismatched_count);           // 1
 
 Verify multiple items at once. The response is a `BatchResponse` that mirrors the server's batch job: `job_id`, `status` (the job state: `pending`, `processing`, `completed`, `partial`, or `failed`), `progress_percent`, `total_items`, `completed_items`, `failed_items`, and `items`. There is no aggregate `summary`.
 
-Each item has an `id`, a `status` (the item state, such as `completed` or `failed`), and a `result` holding its [`DiagnosticResult`](/advanced/diagnostics). Gate each item with `isAdmitted(item.result)`. Math, code and SQL items carry their route's admission, so an item can be admitted. Natural-language items carry one too, but it is always `BLOCKED`, because nothing proves the translation. Logic and fact items make no decision, so they're never admitted.
+Each item has an `id`, a `status` (the item state, such as `completed` or `failed`), and a `result` holding its [`DiagnosticResult`](/advanced/diagnostics). Gate each item with `isAdmitted(item.result)`. Math, code and SQL items carry their route's admission, so an item can be admitted. Natural-language and logic items carry one too, but it is always `BLOCKED`, because nothing proves the translation. Fact items make no decision, so they're never admitted.
 
 ```typescript
 const batch = await client.verifyBatch([
@@ -376,15 +386,17 @@ console.log(budget.requests.max_per_hour);
 
 ## IRAC audit fields
 
-All guard-related verification responses include IRAC-compliant audit fields for compliance reporting:
+All guard-related verification responses include IRAC-compliant audit fields for compliance reporting. On `/verify/process` and `/verify/rag`, they are in the guard's advisory check, `developer_fields.advisory_checks[0].details`:
 
 ```typescript
 const result = await client.verifyProcess(reasoningTrace, { mode: 'irac' });
+const guard = (result.developer_fields?.advisory_checks as
+  { details: Record<string, unknown> }[] | undefined)?.[0]?.details;
 
-console.log(result['irac.issue']);       // What was evaluated
-console.log(result['irac.rule']);         // The rule being enforced
-console.log(result['irac.application']); // How the rule was applied
-console.log(result['irac.conclusion']);   // Final verdict
+console.log(guard?.['irac.issue']);       // What was evaluated
+console.log(guard?.['irac.rule']);         // The rule being enforced
+console.log(guard?.['irac.application']); // How the rule was applied
+console.log(guard?.['irac.conclusion']);   // Final verdict
 ```
 
 ## Risk codes
@@ -393,7 +405,7 @@ Security-related responses may include a `risk` field indicating the type of thr
 
 | Risk code | Description |
 |-----------|-------------|
-| `DOCUMENT_RETRIEVAL_MISMATCH` | RAG chunks from wrong source document |
+| `DOCUMENT_RETRIEVAL_MISMATCH` | RAG chunks from wrong source document. On `/verify/rag`, it is in `developer_fields.advisory_checks[0].details` |
 | `EXFILTRATION_ATTEMPT` | Data exfiltration to unauthorized endpoint |
 | `MCP_POISONING` | Poisoned MCP tool definition detected |
 | `TOXIC_CHAIN` | Unsafe reasoning chain detected |
