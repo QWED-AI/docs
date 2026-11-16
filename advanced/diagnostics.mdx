@@ -81,7 +81,7 @@ developer_fields = {
 
 Cryptographic hash (`sha256:...`) of retained proof artifact. Present only when `status == VERIFIED` and proof was established. `None` for `UNVERIFIABLE` / `BLOCKED`.
 
-**This is the authority bit.** It says the verdict was decided, not that the claim holds: a claim proven false or code proven unsafe is `VERIFIED` with a `proof_ref` too. Downstream gates admit through `admission_decision()`, which also requires `developer_fields.is_valid`:
+**This is the authority bit.** It says the verdict was decided, not that the claim holds: a claim proven false or code proven unsafe is `VERIFIED` with a `proof_ref` too. Downstream gates admit through `admission_decision()`, which also requires `developer_fields.is_valid` to be `true` and refuses a verdict reached on a model's translation of the question. It returns `BLOCKED` when `developer_fields.query_semantics_verified` is present and not `true`, or when it is absent from a result whose `verification_scope` is `translated_expression_only`:
 
 ```python
 from qwed_new.core.diagnostics import AdmissionDecision, admission_decision

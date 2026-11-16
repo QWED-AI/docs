@@ -105,6 +105,7 @@ The critical case: a **proven-unsafe** artifact is `VERIFIED` (QWED proved it is
 | `VERIFIED`, valid | Proven safe | `ADMIT` |
 | `VERIFIED`, unsafe | Proven unsafe | **`DENY`** |
 | `VERIFIED`, false | Proven false (counter-proof) | **`DENY`** |
+| `VERIFIED`, on a model's translation | Proven for the translated expression only | **`DENY`** |
 | `UNVERIFIABLE` | Not proven | `DENY` (fail-closed) |
 | `BLOCKED` | Verification failed | `DENY` (fail-closed) |
 

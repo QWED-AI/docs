@@ -36,7 +36,7 @@ As of v5.0.0, the `status` field may return `INCONCLUSIVE`, `BLOCKED`, or `UNKNO
 `VerificationResult.is_verified` follows the server's admission decision. The SDK applies the same rule as the server (`is_admitted()` in `qwed_sdk.models`):
 
 - If the response carries an `admission` field, only `ADMIT` admits. `BLOCKED` is never verified.
-- If the route returns no `admission`, `status` must be `VERIFIED` and `is_valid` must be `true`.
+- If the route returns no `admission`, `status` must be `VERIFIED`, `is_valid` must be `true`, and the result must not be a verdict on a model's translation of the question. `query_semantics_verified` must be `true` where present, and a response whose `verification_scope` is `translated_expression_only` must carry it as `true`.
 
 A bare `is_valid: true` or `is_verified: true` in the response never admits on its own. The server flattens engine fields into the response, so a result that a gate blocked can still carry the engine's `is_valid: true`. The server's decision is also available as `result.admission`.
 
