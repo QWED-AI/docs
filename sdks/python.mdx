@@ -191,11 +191,14 @@ result = client.verify_consensus(
     mode="high",
     min_confidence=0.8
 )
-print(result.is_verified)                 # True
-print(result.result["meets_requirement"])  # True
+print(result.status)                       # BLOCKED
+print(result.is_verified)                  # False
+print(result.result["meets_requirement"])  # False
 ```
 
-`verify_consensus` takes `status` from the server's response. `is_verified` is `True` only when the server returns `meets_requirement` exactly `True`, which it sets only for a `VERIFIED` result that meets `min_confidence`. A truthy value that is not `True` admits nothing.
+<Info>Changed in v10.0.0</Info>
+
+`verify_consensus` takes `status` from the server's response. `is_verified` is `True` only when the server returns `meets_requirement` exactly `True`. A truthy value that is not `True` admits nothing. A consensus is `VERIFIED` only when two distinct engines verify the same answer. When only one engine verifies it, as in `single` mode (the default) and `high` mode, the result is `BLOCKED` with `agreement_status` `no_independent_verification`. `meets_requirement` is no longer `True` for a consensus, so `is_verified` is `False`.
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|

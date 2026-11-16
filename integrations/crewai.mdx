@@ -59,14 +59,21 @@ agent = Agent(
     tools=[
         QWEDMathTool(),   # Math verification
         QWEDCodeTool(),   # Code security
-        QWEDSQLTool(),    # SQL validation
+        QWEDSQLTool(      # SQL validation against the schema
+            schema_ddl="CREATE TABLE users (id INT, name TEXT)",
+            dialect="sqlite",
+        ),
     ]
 )
 ```
 
+<Info>Changed in v10.0.0</Info>
+
+The tools call a result wrong (`❌ INCORRECT`, `❌ UNSAFE`, `⚠️ SECURITY ISSUES FOUND`) only when QWED decided it. A result QWED did not decide is `⚠️ UNVERIFIABLE:` or `⛔ BLOCKED:` followed by the server's message. `QWEDVerificationTool` sends its input to `/verify/natural_language`, which admits no result while the LLM's translation is unverified, so a claim that holds is `⚠️ HOLDS, NOT ADMITTED`. `QWEDSQLTool` checks a query against `schema_ddl` in `dialect` (default `sqlite`). Without `schema_ddl`, it answers `⚠️ UNVERIFIABLE` and sends nothing.
+
 ## QWEDVerifiedAgent
 
-Agent wrapper with automatic verification:
+Agent wrapper that creates a CrewAI agent with the QWED tools. It does not check the agent's output by itself: pass each output to `verify_output()`.
 
 ```python
 from qwed_sdk.crewai import QWEDVerifiedAgent, VerificationConfig
@@ -81,13 +88,20 @@ analyst = QWEDVerifiedAgent(
         verify_code=True,
         auto_correct=False,
         log_results=True,
+        sql_schema_ddl="CREATE TABLE users (id INT, name TEXT)",
+        sql_dialect="sqlite",
     )
 )
 
-# Check verification summary
+# Check an output. verify_output() checks through
+# /verify/natural_language, which admits no result yet.
+analyst.verify_output("The compound interest is $6,288.95")
+
 print(analyst.verification_summary())
-# {"total_outputs": 5, "verified": 4, "failed": 1}
+# {"total_outputs": 1, "verified": 0, "failed": 1, "verification_rate": 0.0}
 ```
+
+`sql_schema_ddl` and `sql_dialect` go to the agent's `QWEDSQLTool`. Without a schema, its SQL checks are `UNVERIFIABLE`.
 
 `verify_output()` starts every output as unverified. It sets `verified: True` only when the client's `is_verified` is `True`, which follows the server's admission:
 

@@ -27,7 +27,7 @@ print(result.attestation)  # the signed JWT
 print(result.admission)    # "ADMIT" or "BLOCKED", on routes that decide one
 ```
 
-The maths, code, SQL, and natural-language routes, the agent route, and their batch items decide an admission, and their tokens sign it as `qwed.admission`. Routes that decide none (logic, fact, stats, image, RAG, process, consensus) sign none.
+The maths, code, SQL, natural-language, and logic routes, the agent route, and their batch items decide an admission, and their tokens sign it as `qwed.admission`. A natural-language or logic verdict covers an LLM's translation of the question, so its admission is always `BLOCKED`. Routes that decide none (fact, stats, image, RAG, process, consensus) sign none.
 
 A [Verification Context](/specs/verification-context#version-1-1-and-the-issuer-attestation) document carries its own attestation, of type `qwed-context+jwt`, which signs every other field of the document. Verify it with `verify_document_attestation()`, described on the [Python SDK](/sdks/python#verification-context) page.
 
@@ -63,7 +63,7 @@ Treat a missing attestation, or one that doesn't verify, as a refusal. Never act
 - The issuer, and that the token has not expired (nor is used before any `nbf`).
 - That it attests a `VERIFIED` result.
 - That its `qwed.proof_hash` is the answer's `proof_ref`, so it's this answer's token.
-- When you pass `query`, that its `qwed.query_hash` is the SHA-256 of that statement. For a natural-language answer, pass the translated expression the answer reports (`translated_expression` in its developer fields), not your question: the verdict covers that expression.
+- When you pass `query`, that its `qwed.query_hash` is the SHA-256 of that statement. For a natural-language or logic answer, pass the translated expression the answer reports (`translated_expression` in its developer fields), not your question: the verdict covers that expression.
 - On a route that decides an admission, that the token signs the answer's `admission`.
 
 If no cached key verifies the token, the client fetches the keys once more, at most once every 30 seconds, to pick up a rotated key. If it can't fetch them, it raises `KeysUnavailableError`, a subclass of `AttestationError`. `KeyMismatchError` means no key in the JWKS verifies the token.
@@ -150,6 +150,8 @@ Tokens last `QWED_ATTESTATION_TTL_SECONDS` (24 hours by default, from 60 seconds
 ```
 
 `qwed.admission` is present only on routes that decide an admission. It is `ADMIT` or `BLOCKED`, and the server signs `ADMIT` only for a `VERIFIED` result that is verified and bound to its proof.
+
+`qwed.result.verified` is `true` only when the result is `VERIFIED`, its claim holds (`is_valid` true), and it was not reached on a model's translation of the question. Code proven unsafe, a result with no `is_valid`, and every natural-language or logic verdict are signed `verified: false` (changed in v10.0.0).
 
 ## Issuing attestations
 
@@ -292,7 +294,7 @@ else:
 </ParamField>
 
 <ParamField path="query" type="string | None">
-  Optional statement the verdict covers. For a natural-language verdict, that's the translated expression, not the user's question. When provided, the token's `qwed.query_hash` claim must equal `sha256(query)`, otherwise the decision is blocked. Without it, query binding is not checked.
+  Optional statement the verdict covers. For a natural-language or logic verdict, that's the translated expression, not the user's question. When provided, the token's `qwed.query_hash` claim must equal `sha256(query)`, otherwise the decision is blocked. Without it, query binding is not checked.
 </ParamField>
 
 <ParamField path="admission" type="string | None">
@@ -319,7 +321,7 @@ When a token is present, `enforce_trust_decision` checks these bindings against 
 | Claim | Bound to | Blocked when |
 |-------|----------|--------------|
 | `qwed.result.status` | `result.status.value` | Token status does not match the engine's status. |
-| `qwed.query_hash` | `sha256(query)` | `query` is provided and does not match the token's query hash (for natural language, the translated expression). |
+| `qwed.query_hash` | `sha256(query)` | `query` is provided and does not match the token's query hash (for natural language or logic, the translated expression). |
 | `qwed.proof_hash` | `result.proof_ref` | Token proof hash does not match the diagnostic's proof reference. |
 | `qwed.admission` | `admission` | `admission` is provided and the token signs a different one, or none. |
 

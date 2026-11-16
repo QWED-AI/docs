@@ -28,18 +28,22 @@ result = client.verify_image(
 
 print(result.status)      # "VERIFIED" (deterministic metadata proof)
 print(result.is_verified) # True
-print(result.result["developer_fields"]["analysis"]["metadata"])  # {"width": 800, "height": 600, "format": "png"}
+print(result.result["developer_fields"]["analysis"]["metadata"])  # {"width": 800, "height": 600, "format": "PNG"}
 ```
 
 ## Claim types
 
 | Claim Type      | Method           | Deterministic? |
 | --------------- | ---------------- | -------------- |
-| Size/Dimensions | Metadata parsing | ✅ 100%         |
+| Size/Dimensions, stated plainly | Metadata parsing | ✅ 100%         |
 | Format          | Header detection | ✅ 100%         |
 | Color           | Pixel sampling   | ⚠️ Partial     |
 | Text            | OCR required     | ❌ VLM          |
 | Semantic        | Understanding    | ❌ VLM          |
+
+<Info>Changed in v10.0.0</Info>
+
+A size claim is decided only when the whole claim is a plain statement of the width, the height or both, such as `800x600`, `The image is 800x600 pixels`, `The width is 800` or `The image is 800 pixels wide and 600 pixels tall`. Every dimension it names is checked. Any other size claim, such as a negation (`not 800x600`), a comparison or a claim that says more than the dimensions, is `UNVERIFIABLE`. `HD` is not checked.
 
 ## Result contract
 
@@ -47,9 +51,10 @@ The Image Engine returns a [`DiagnosticResult`](/advanced/diagnostics) whose sta
 
 | Path | `DiagnosticResult.status` | Notes |
 |---|---|---|
-| Deterministic evidence supports the claim | `VERIFIED` | Emits a `proof_ref` bound to pixel or metadata evidence. |
-| Deterministic evidence refutes the claim | `BLOCKED` | Fail-closed refutation. |
-| VLM cross-check only | `UNVERIFIABLE` | VLM results are recorded in `advisory_checks`; the engine never emits `VERIFIED` from a VLM alone. |
+| Deterministic evidence supports the claim | `VERIFIED` | A plain size claim that matches the image's metadata. `constraint_id: "image_verifier.deterministic"`, `is_valid: true`. Emits a `proof_ref` bound to the metadata, the claim and the image's SHA-256. |
+| Deterministic evidence refutes the claim | `BLOCKED` | Fail-closed refutation. `constraint_id: "image_verifier.deterministic_refuted"`. |
+| Size claim that is not a plain statement of the dimensions | `UNVERIFIABLE` | `constraint_id: "image_verifier.inconclusive"`. |
+| VLM cross-check only | `UNVERIFIABLE` | `constraint_id: "image_verifier.vlm_advisory_only"`. VLM results are recorded in `advisory_checks`; the engine never emits `VERIFIED` from a VLM alone. |
 
 This mirrors the [3-tier engine classification](/engines/overview): a VLM signal is advisory and cannot promote a claim to `VERIFIED`.
 

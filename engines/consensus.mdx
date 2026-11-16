@@ -7,7 +7,7 @@ description: "QWED's Consensus Engine orchestrates multiple verification engines
 The Consensus Engine orchestrates multiple verification engines for high-confidence results with fault tolerance.
 
 <Warning>
-**Changed in v4.0.4:** Python code verification within consensus now runs exclusively through the secure Docker executor (`SecureCodeExecutor`). If the Docker sandbox is unavailable, consensus returns a `blocked_secure_execution` status and the API responds with HTTP 503.
+**Changed in v4.0.4:** Python code verification within consensus now runs exclusively through the secure Docker executor (`SecureCodeExecutor`). If the Docker sandbox is unavailable, consensus returns a `blocked_secure_execution` status and the API responds with HTTP 503. From v6.0.0, the API responds with HTTP 200 and `BLOCKED` instead.
 </Warning>
 
 ## Features
@@ -27,29 +27,29 @@ client = QWEDClient(api_key="qwed_...")
 
 result = client.verify_with_consensus(
     query="2 + 2 = 4",
-    mode="maximum"  # single, high, maximum
+    mode="high"  # single, high, maximum
 )
 
 print(result.final_answer)     # 4
-print(result.confidence)       # 0.999
-print(result.engines_used)     # 3
-print(result.agreement_status) # "unanimous"
+print(result.confidence)       # 0.0
+print(result.engines_used)     # 2
+print(result.agreement_status) # "no_independent_verification"
 ```
+
+<Info>Changed in v10.0.0</Info>
+
+One engine is not a consensus. In the example, SymPy verifies the answer and the Python engine is advisory only, so the answer has been verified by one engine alone. The result is `BLOCKED` with `constraint_id: "consensus.no_independent_verification"` and `confidence: 0.0`. A consensus is `VERIFIED` only when two distinct engines verify the same answer, which no two engines do today.
 
 ## Verification modes
 
 | Mode      | Engines             | Speed  | Confidence | Docker required |
 | --------- | ------------------- | ------ | ---------- | --------------- |
-| `single`  | 1 (SymPy)           | ⚡ Fast | Good       | No              |
-| `high`    | 2 (SymPy + Python)  | Medium | High       | Yes             |
+| `single`  | 1 (SymPy)           | ⚡ Fast | No consensus: one engine | No              |
+| `high`    | 2 (SymPy + Python)  | Medium | No consensus: Python is advisory only | Yes             |
 | `maximum` | 3+ (All applicable) | Slower | Maximum    | Yes             |
 
 <Note>
-The `high` and `maximum` modes include the Python engine, which requires the secure Docker sandbox. If Docker is unavailable, these modes return `blocked_secure_execution` instead of falling back to in-process execution.
-</Note>
-
-<Note>
-The Python engine in `high` and `maximum` modes requires Docker. If the secure Docker sandbox is unavailable, consensus verification returns HTTP 503 instead of falling back to in-process code execution.
+The `high` and `maximum` modes include the Python engine, which requires the secure Docker sandbox. If Docker is unavailable, these modes return `blocked_secure_execution` instead of falling back to in-process execution. This status takes precedence over `no_independent_verification`, so it is returned even when SymPy verified the answer. The `/verify/consensus` response is then `BLOCKED` with HTTP 200, not an HTTP error.
 </Note>
 
 ## Async execution
@@ -94,7 +94,7 @@ How the deadline applies:
 - **One aggregate budget, not per-engine stacking.** All selected engines share the same 30-second wall clock. Sequential per-engine waits cannot accumulate beyond it.
 - **Timed-out engines become explicit `BLOCKED` results.** An engine that misses the deadline is recorded in `verification_chain` as a `BLOCKED` `EngineResult` with the timeout in its `error` field (for example, `"Engine timed out after 30s"`). The failure is also recorded with the circuit breaker.
 - **Circuit-open engines are recorded too.** An engine skipped because its circuit breaker is open appears as a `BLOCKED` result rather than being silently dropped.
-- **Partial results still aggregate.** Engines that finished within the deadline contribute normally. The consensus verdict is computed from the results that arrived, with the fail-closed [status propagation](#status-propagation) rules applied — a `BLOCKED` engine result caps the consensus at `UNVERIFIABLE`.
+- **Partial results still aggregate.** Engines that finished within the deadline contribute normally. The consensus verdict is computed from the results that arrived, with the fail-closed [status propagation](#status-propagation) rules applied. A `BLOCKED` engine result prevents `VERIFIED`: the consensus is `UNVERIFIABLE`, or `BLOCKED` when only one engine verified the answer.
 - **Off the event loop.** Engine execution runs in a dedicated per-call executor, so a slow consensus request degrades only itself, not other API traffic.
 
 ```python
@@ -203,16 +203,19 @@ Final confidence = weighted average of agreeing engines.
 | `majority` | More than half of the total weight agrees |
 | `split` | No clear majority among engines |
 | `no_results` | No engines returned a result |
-| `blocked_secure_execution` | The Docker sandbox is unavailable and a required engine cannot run (returns HTTP 503) |
+| `no_independent_verification` | Only one engine verified the answer. The result is `BLOCKED` with `confidence` `0.0` |
+| `blocked_secure_execution` | The Docker sandbox is unavailable and a required engine cannot run. The result is `BLOCKED` (HTTP 200). It takes precedence over every other status, `no_independent_verification` included |
 
 ## Status propagation
 
 Consensus is a status-preserving aggregator, not a proof engine. Per the [3-tier engine classification](/engines/overview), consensus never invents a `VERIFIED` status from disagreement:
 
+- The Python engine finds the Docker sandbox unavailable → the consensus result is `BLOCKED` with `agreement_status` `blocked_secure_execution`, whatever the other engines returned. This rule is checked first.
 - All engines return `BLOCKED` → the consensus result is `BLOCKED`.
-- Any single engine returns `BLOCKED` (but not all) → the consensus result is capped at `UNVERIFIABLE` (fail-closed — a partial block prevents `VERIFIED`).
-- Any engine returns `UNVERIFIABLE` → the consensus result is `UNVERIFIABLE`.
-- Only unanimous `VERIFIED` engine outcomes can produce a `VERIFIED` consensus.
+- Otherwise, only one engine verifies the answer → the consensus result is `BLOCKED` with `constraint_id: "consensus.no_independent_verification"` and `confidence` `0.0`, whatever the other engines returned (advisory, blocked or absent). One engine is not a consensus.
+- Otherwise, any single engine returns `BLOCKED` (but not all) → the consensus result is capped at `UNVERIFIABLE` (fail-closed: a partial block prevents `VERIFIED`).
+- Otherwise, any engine returns `UNVERIFIABLE` → the consensus result is `UNVERIFIABLE`.
+- Only unanimous `VERIFIED` engine outcomes from two distinct engines or more can produce a `VERIFIED` consensus. No two engines do so today.
 - Math-query translation failures fail closed — the engine raises rather than fabricating a numeric answer from a regex or decimal guess.
 
 Individual engine outcomes are exposed via the `status` field on each `EngineResult` in the aggregated result.
@@ -236,7 +239,7 @@ Async and sync consensus verification both return a `ConsensusResult` dataclass 
 | ----- | ---- | ----------- |
 | `final_answer` | `Any` | Best-supported answer across engines |
 | `confidence` | `float` | Weighted confidence, `0.0`–`1.0` |
-| `agreement_status` | `str` | `unanimous`, `majority`, `split`, `no_results`, `all_failed`, or `blocked_secure_execution` |
+| `agreement_status` | `str` | `unanimous`, `majority`, `split`, `no_results`, `all_failed`, `no_independent_verification`, or `blocked_secure_execution` |
 | `engines_used` | `int` | Number of engines that returned a result |
 | `verification_chain` | `List[EngineResult]` | Per-engine outcomes, including each engine's `status` |
 | `total_latency_ms` | `float` | End-to-end latency for the aggregation |
@@ -258,9 +261,9 @@ result = client.verify_with_consensus(query="2 + 2 = 4", mode="high")
 
 dr = result.to_diagnostic_result()
 
-dr.is_verified          # True only if consensus was VERIFIED
-dr.proof_ref            # sha256:... bound to result.verified_evidence
-dr.developer_fields     # {'agreement_status': 'unanimous', 'confidence': 0.99, 'engines_used': 2}
+dr.is_verified          # True only if consensus was VERIFIED; False here
+dr.proof_ref            # None here; on a VERIFIED consensus, sha256:... bound to result.verified_evidence
+dr.developer_fields     # {'agreement_status': 'no_independent_verification', 'confidence': 0.0, 'engines_used': 2, 'constraint_id': 'consensus.no_independent_verification'}
 ```
 
-The conversion is fail-closed: a `VERIFIED` `ConsensusResult` that is missing `verified_evidence` is downgraded to `UNVERIFIABLE` rather than emitting a weaker proof. This is why the `/verify/consensus` endpoint's `meets_requirement` flag is true only when consensus is `VERIFIED` at the trust boundary **and** confidence meets the requested threshold — confidence alone is never sufficient.
+The conversion is fail-closed: a `VERIFIED` `ConsensusResult` that is missing `verified_evidence` is downgraded to `UNVERIFIABLE` rather than emitting a weaker proof. The `/verify/consensus` endpoint's `meets_requirement` flag is true only when the consensus is verified as the attestation and the audit log count it (`VERIFIED`, with `is_valid` true) **and** confidence meets the requested threshold. A consensus result has no `is_valid`, so from v10.0.0 `meets_requirement` is never true. Confidence alone is never sufficient.
