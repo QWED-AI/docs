@@ -19,7 +19,7 @@ The Stats Engine executes statistical queries on tabular data. All model-generat
 
 ## Prerequisites
 
-The Stats Engine requires a running Docker daemon. Without Docker, all statistical verification requests return HTTP 503. See the [deployment guide](/advanced/deployment) for setup instructions.
+The Stats Engine requires a running Docker daemon. Without Docker, every statistical verification request returns a `BLOCKED` result (`stats_verifier.runtime_unavailable`, HTTP 200). See the [deployment guide](/advanced/deployment) for setup instructions.
 
 The Stats Engine runs on Python 3.10 and later, including Python 3.14, which the server Docker image uses.
 
@@ -134,9 +134,9 @@ All generated statistical code is executed inside a Docker container with enforc
 | Scenario | Behavior |
 | -------- | -------- |
 | Docker running, execution succeeds | `UNVERIFIABLE` with the observed result in `developer_fields` |
-| Docker unavailable at startup | Requests return `503 Service Temporarily Unavailable` |
-| Docker becomes unavailable mid-operation | Request is blocked and returns `503` |
-| Code fails AST security check | Request returns `403 Verification Blocked by Security Policy` |
+| Docker unavailable at startup | `BLOCKED` with `stats_verifier.runtime_unavailable` (HTTP 200) |
+| Docker becomes unavailable mid-operation | `BLOCKED` with `stats_verifier.runtime_unavailable` (HTTP 200) |
+| Code fails AST security check | `BLOCKED` with `stats_verifier.validation_error` (HTTP 200) |
 | Code generation fails | `BLOCKED` with `stats_verifier.validation_error` |
 
 <Warning>
@@ -145,7 +145,7 @@ Previous versions of QWED offered Wasm and restricted Python fallbacks when Dock
 
 ## Pre-execution security validation
 
-Generated statistical code is validated with an AST walk before it reaches the sandbox. Code that fails validation is blocked with a `403` and never executes. The check blocks:
+Generated statistical code is validated with an AST walk before it reaches the sandbox. Code that fails validation never executes: the result is `BLOCKED` with `stats_verifier.validation_error` (HTTP 200). The check blocks:
 
 - **Dangerous imports anywhere in the import path.** OS, process, and reflection modules (`os`, `sys`, `subprocess`, `socket`, `posix`, `nt`, `importlib`, `ctypes`, `builtins`) are rejected in every dotted segment of an `import` or `from ... import` statement, including members bound under innocuous aliases (`from pandas.io.common import os as safe`).
 - **Blocked call names on bare names and attribute targets.** Interpreter builtins (`eval`, `exec`, `open`, ...) and OS primitives (`system`, `popen`, `import_module`, the `exec*`/`spawn*` families, `fork`) are rejected whether called directly or as `x.eval(...)`-style attribute calls. This also catches reflective re-binding such as `sys.modules['os'].system(...)` at the call site.

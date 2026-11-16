@@ -129,6 +129,10 @@ print(result["missed_milestones"]) # ["compliance check", "stakeholder review"]
 | `process_rate` | `float` | Decimal score from 0.0 to 1.0 (found / total) |
 | `missed_milestones` | `list[str]` | List of missing milestones |
 
+<Note>
+`verified` here means the keywords were found, not that the reasoning is right. [`POST /verify/process`](/api/endpoints#post-%2Fverify%2Fprocess) returns these fields in `advisory_checks[0].details`, and its `status` is always `UNVERIFIABLE` (changed in v10.0.0).
+</Note>
+
 ## Determinism
 
 The Process Verifier uses **regex pattern matching** and **keyword search** — no LLM calls. All results are 100% reproducible:

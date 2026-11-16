@@ -176,7 +176,7 @@ Keep the key file out of version control. See [Signing keys](/advanced/attestati
 
 ### Docker requirement for code execution
 
-Both the Stats Engine and the Consensus Engine (in `high`/`maximum` mode) execute model-generated Python inside Docker containers. Docker is **required** — there are no in-process fallbacks. If Docker is unavailable, these endpoints return HTTP 503.
+Both the Stats Engine and the Consensus Engine (in `high`/`maximum` mode) execute model-generated Python inside Docker containers. Docker is **required**: there are no in-process fallbacks. If Docker is unavailable, these endpoints answer HTTP 200 with a `BLOCKED` result.
 
 ---
 
@@ -258,7 +258,7 @@ If you prefer to run the application directly on a host or VM:
 ### 1. Prerequisites
 
 **Docker Installation (Required for Secure Code Execution)**
-QWED requires Docker for all model-generated code execution in the Stats Engine and Consensus Engine. Without Docker, these verification endpoints return HTTP 503.
+QWED requires Docker for all model-generated code execution in the Stats Engine and Consensus Engine. Without Docker, these verification endpoints answer with a `BLOCKED` result (HTTP 200).
 
 #### Linux (Ubuntu/Debian)
 ```bash
@@ -415,8 +415,8 @@ Before going to production, ensure the following:
 **Error:** `docker: Got permission denied while trying to connect to the Docker daemon socket`
 **Solution:** Ensure the user running the app is in the `docker` group, or (for Docker Compose) ensure the socket is mounted correctly and the container user has permissions.
 
-### 2. Stats or consensus verification returning 503
-**Error:** `Service temporarily unavailable` on `/verify/stats` or `/verify/consensus`
+### 2. Stats or consensus verification returning BLOCKED
+**Result:** `BLOCKED` on `/verify/stats` (`constraint_id: "stats_verifier.runtime_unavailable"`) or `/verify/consensus` (`agreement_status: "blocked_secure_execution"`), with HTTP 200
 **Cause:** The secure Docker sandbox is unreachable. QWED does not fall back to in-process execution.
 **Solution:**
 1. Check Docker is running: `docker ps`

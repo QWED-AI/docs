@@ -58,12 +58,12 @@ Use these extension-specific actions when you want domain-focused checks in your
 | Input | Description | Required | Default |
 | --- | --- | --- | --- |
 | `api_key` | QWED API key (optional for local mode) | No | - |
-| `action` | Action type: `verify`, `scan-secrets`, `scan-code`, `verify-shell` | No | `verify` |
+| `action` | Action type: `verify`, `scan-secrets`, `scan-code`, `verify-shell`, `verify-process`. See [verify-process mode](#verify-process-mode) | No | `verify` |
 | `provider` | LLM provider (`openai`, `anthropic`, `gemini`) | No | - |
 | `model` | Model name (e.g., `gpt-4o`, `claude-sonnet-4-20250514`) | No | - |
 | `mask_pii` | Mask PII in inputs and outputs | No | `false` |
 | `query` | The user query (e.g., "Derivative of x^2"). Required for `math` and `logic` engines. | Conditional | - |
-| `llm_output` | The LLM output to verify. Required for the `code` engine. | Conditional | - |
+| `llm_output` | The LLM output to verify. Required for the `code` engine, and for `verify-process`, where it is the reasoning trace. | Conditional | - |
 | `engine` | Verification engine: `math`, `logic`, `code`, `sql`, `shell` | No | `math` |
 | `paths` | Comma-separated glob patterns for files to scan (e.g., `src/**/*.py`). Leave unset to use the mode default. See [Scan paths](#scan-paths) | No | `''` (mode default) |
 | `output_format` | Output format: `text`, `json`, `sarif`, `verification-context` | No | `text` |
@@ -108,6 +108,8 @@ Set `mask_pii: "true"` to automatically redact personally identifiable informati
     engine: logic
     query: "User john@example.com claims order total is correct"
 ```
+
+With the `logic` engine, the step fails by default. See [Verify logic](#verify-logic).
 
 ### Scan paths
 
@@ -171,7 +173,7 @@ A passing scan means no known dangerous pattern was found. It doesn't mean the c
 
 | Output | Description |
 | --- | --- |
-| `verified` | `true` if verification passed or no issues found |
+| `verified` | `true` only when the result is admitted (`admission` is `ADMIT`). Always `false` for `verify-process` |
 | `explanation` | Detailed proof or error explanation |
 | `findings_count` | Number of security issues found (for scan modes) |
 | `files_scanned` | Number of files scanned (for scan modes, from v8.0.0). `0` means the scan was not admitted |
@@ -187,7 +189,7 @@ A passing scan means no known dangerous pattern was found. It doesn't mean the c
 
 <Info>New in v7.1.0</Info>
 
-Every action mode (`verify`, `scan-secrets`, `scan-code`, `verify-shell`) emits [Verification Context v1.0](/specs/verification-context) outputs alongside the legacy `verified` flag. The invariants are fail-closed: `proof_ref` is set only on a `VERIFIED` verdict, and non-verified verdicts always carry `admission: DENY`.
+Every action mode (`verify`, `scan-secrets`, `scan-code`, `verify-shell`, `verify-process`) emits [Verification Context v1.0](/specs/verification-context) outputs alongside the legacy `verified` flag. The invariants are fail-closed: `proof_ref` is set only on a `VERIFIED` verdict, and non-verified verdicts always carry `admission: DENY`.
 
 ```yaml
 - name: Verify math
@@ -216,6 +218,28 @@ In `verify` mode, the Action gates its exit code and its `verified` and `admissi
 
 This line means the server reached a verdict but did not admit the content. With `fail_on_findings: true` (the default), the step fails. With the `code` engine, the Action always sends the code to the server's `CodeVerifier`. If the server can't be reached, the verdict is `UNVERIFIABLE · DENY`.
 
+### verify-process mode
+
+<Info>Changed in v10.0.0</Info>
+
+`verify-process` checks a reasoning trace, passed as `llm_output`, for the four IRAC steps (issue, rule, application and conclusion) by keyword. A missing step is a finding, and with `fail_on_findings: true` (the default) the step fails.
+
+Finding every step does not show that the reasoning is right, so the verdict is always `UNVERIFIABLE · DENY`: `verified` is `false`, `admission` is `DENY` and `proof_ref` is empty. Before v10.0.0, a trace with every step was `VERIFIED · ADMIT` with a `proof_ref`. In text output, the log ends with:
+
+```text
+Not verified: keyword matching does not verify the reasoning (UNVERIFIABLE · DENY).
+```
+
+The mode also sets the `irac_score` output, the share of IRAC steps found, and `findings`, the findings as JSON.
+
+```yaml
+- name: Check reasoning structure
+  uses: QWED-AI/qwed-verification@v10.0.0
+  with:
+    action: verify-process
+    llm_output: "The issue is whether the contract was breached. The rule is Article 2 of the UCC. Applying this rule, the seller delivered late. Therefore, the contract was breached."
+```
+
 ### Output integrity
 
 <Info>Changed in v8.0.0 ([GHSA-j788-44pc-8hp3](https://github.com/QWED-AI/qwed-verification/security/advisories/GHSA-j788-44pc-8hp3))</Info>
@@ -242,6 +266,8 @@ Pin the Action to `QWED-AI/qwed-verification@v8.0.0` or later. In earlier versio
 
 ### Verify logic
 
+<Info>Changed in v10.0.0</Info>
+
 ```yaml
 - name: Check Logic
   uses: QWED-AI/qwed-verification@v10.0.0
@@ -251,6 +277,8 @@ Pin the Action to `QWED-AI/qwed-verification@v8.0.0` or later. In earlier versio
     engine: logic
     query: "(AND (GT x 5) (LT x 10))"
 ```
+
+The server does not admit a logic verdict: it covers the constraints an LLM translated the query into, and that translation is not verified. So `admission` is `DENY` and `verified` is `false`, and with `fail_on_findings: true` (the default) the step fails. The `verdict` output still carries the server's status.
 
 ### Check code security
 

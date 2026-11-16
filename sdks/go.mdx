@@ -92,7 +92,7 @@ Use `IsAdmitted()` to decide whether to act on a result. Don't gate on `Status` 
 - `Status` is `StatusVerified`
 - `ProofRef` is non-empty
 
-A missing or unknown admission is never admitted. Endpoints that make no admission decision (`/verify/logic`, `/verify/fact`, `/verify/rag`, `/verify/process`, and batch logic and fact items) are therefore never admitted. The top-level `verified` that `/verify/rag` and `/verify/process` send is their guard's own result. It stays in `Extra["verified"]` and `DeveloperFields["verified"]`.
+A missing or unknown admission is never admitted. Endpoints that make no admission decision (`/verify/fact`, `/verify/rag`, `/verify/process`, and batch fact items) are therefore never admitted. `/verify/logic` and batch logic items decide one as `/verify/natural_language` does: their verdict covers the constraints an LLM translated the question into, so the admission is `AdmissionBlocked` until QWED verifies the translation itself. `/verify/rag` and `/verify/process` return `StatusUnverifiable`: what their guards check comes from the request itself, so the guard's result is advisory only, in `developer_fields.advisory_checks`. An older server also sent the guard's result as a top-level `verified`; it is kept in `Extra["verified"]` and `DeveloperFields["verified"]`.
 
 ```go
 result, err := client.VerifyCode(ctx, code, "python")
@@ -144,8 +144,9 @@ result, err := client.VerifyLogic(ctx, "(AND (GT x 5) (LT y 10))")
 if err != nil {
     log.Fatal(err)
 }
-// /verify/logic makes no admission decision: Admission is "" and IsAdmitted() is false.
-fmt.Println(result.Status, result.Extra["model"])
+// The verdict covers the translated constraints only: Admission is
+// AdmissionBlocked and IsAdmitted() is false, whatever the status.
+fmt.Println(result.Status, result.Admission, result.Extra["model"])
 ```
 
 ### VerifyCode
@@ -182,7 +183,7 @@ fmt.Println(result.IsAdmitted()) // true only for a read-only query the schema a
 
 ### VerifyBatch
 
-`VerifyBatch` returns a `*BatchResponse` that mirrors the server's batch job. Each item's verification answer is in `item.Result`. Call `IsAdmitted()` on each item. There is no aggregate `Summary`. Math, code, and SQL items carry their route's admission, so a proven item can be admitted. Natural-language items always carry `BLOCKED`. Logic and fact items make no decision, so they're never admitted.
+`VerifyBatch` returns a `*BatchResponse` that mirrors the server's batch job. Each item's verification answer is in `item.Result`. Call `IsAdmitted()` on each item. There is no aggregate `Summary`. Math, code, and SQL items carry their route's admission, so a proven item can be admitted. Natural-language and logic items always carry `BLOCKED`. Fact items make no decision, so they're never admitted.
 
 ```go
 items := []qwed.BatchItem{
