@@ -138,6 +138,9 @@ All generated statistical code is executed inside a Docker container with enforc
 | Docker becomes unavailable mid-operation | `BLOCKED` with `stats_verifier.runtime_unavailable` (HTTP 200) |
 | Code fails AST security check | `BLOCKED` with `stats_verifier.validation_error` (HTTP 200) |
 | Code generation fails | `BLOCKED` with `stats_verifier.validation_error` |
+| Query or a column name refused by the prompt-injection check | `BLOCKED` with `stats_verifier.validation_error`, and no model is called |
+
+Before the model writes any code, QWED screens the query and each column name in the uploaded CSV's header for prompt-injection phrases, such as "ignore previous instructions" or "act as". The check matches each phrase as whole words, so statistics terms such as "mode" or "root" and a header such as "Impact assessment" pass. It refuses any query or column name over 10,000 characters. A refused request gets the generic message `Statistical verification could not be completed because the request could not be translated.`
 
 <Warning>
 Previous versions of QWED offered Wasm and restricted Python fallbacks when Docker was unavailable. These fallback paths have been removed. You must have a running Docker daemon for statistical verification to work.

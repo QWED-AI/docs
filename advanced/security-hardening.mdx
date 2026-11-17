@@ -211,6 +211,17 @@ QWED v4.0.0 introduces a multi-layer `EnhancedSecurityGateway` (OWASP LLM01:2025
 
 The gateway is enabled by default for all API endpoints. It also includes a block counter for monitoring injection attempt frequency.
 
+### Screening before translation
+
+Before QWED sends the texts below to a model for translation, it screens them, and it does not resolve or call the provider until each text passes. Two checks apply, depending on the text:
+
+| Text | Check | Refused text |
+|------|-------|--------------|
+| Maths and logic questions, including the `/verify/consensus` query | The seven-layer gateway above, as on `/verify/natural_language` and `/verify/logic` | Consensus returns `BLOCKED` before any engine runs |
+| `/verify/stats` query and CSV column names; `/verify/fact` claim and context | Phrase patterns only, matched as whole words, with a 10,000-character limit | Stats returns `BLOCKED` with `stats_verifier.validation_error`; fact returns `BLOCKED` with `fact_verifier.translation_refused` |
+
+The phrase check does not refuse ordinary words such as "mode" or "system", which a statistics question or a fact's context often contains. The screening is a heuristic. A reworded instruction can get past it, so it does not replace the verdict rules: a stats run that succeeds is `UNVERIFIABLE`, and a fact model answer stays advisory.
+
 ### PII redaction
 
 All API error paths now use a centralized `redact_pii()` function that masks email addresses, phone numbers, SSNs, and IP addresses before they reach logs. Stack traces are suppressed in error responses (`exc_info=False`) to prevent data leakage.
