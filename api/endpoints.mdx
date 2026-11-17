@@ -323,7 +323,7 @@ A symbolic expression, such as `x + x`, has `is_symbolic: true`, no `value`, and
 
 **Error cases:** Division by zero, `log(0)`, and square root of negative numbers in the real domain return `status: "BLOCKED"`, `is_valid: false`, and `admission: "BLOCKED"`, with a descriptive `error` and `agent_message`.
 
-**Tolerance bounding:** This endpoint takes no `tolerance`. The bound applies to the engine method `VerificationEngine.verify_math(expression, expected, tolerance)`, which returns an engine dictionary without `admission`. When it verifies an expression against an expected value with a `tolerance` parameter, the engine enforces a deterministic upper bound on the tolerance. The maximum allowed tolerance is `max(0.01, abs(calculated_value) * 0.01)`. If the requested tolerance exceeds this bound, the request returns a `BLOCKED` status. Invalid tolerance values (negative, `NaN`, `Infinity`, or non-numeric) are also rejected with `BLOCKED`.
+**Tolerance bounding:** This endpoint takes no `tolerance`. The bound applies to the engine method `VerificationEngine.verify_math(expression, expected, tolerance)`, which returns an engine dictionary without `admission`. When it verifies an expression against an expected value with a `tolerance` parameter, the engine enforces a deterministic upper bound on the tolerance. The maximum allowed tolerance is `max(min(0.01, abs(calculated_value)), abs(calculated_value) * 0.01)`: 1% of the value, with a floor of `0.01`, but never more than the value itself. If the requested tolerance exceeds this bound, the request returns a `BLOCKED` status. Invalid tolerance values (negative, `NaN`, `Infinity`, or non-numeric) are also rejected with `BLOCKED`.
 
 **Engine dictionary (tolerance exceeded):**
 
