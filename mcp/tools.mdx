@@ -30,10 +30,10 @@ Before any code runs, the server parses it and admits it only when every module,
 
 - **Modules:** computation-only standard-library modules, such as `math`, `cmath`, `decimal`, `fractions`, `statistics`, `itertools`, `functools`, `collections`, `json`, `re`, `datetime`, `hashlib` and `random`, and in each only the listed names. Modules that reach files, the network, processes, the environment or the import system (`os`, `sys`, `subprocess`, `socket`, `pathlib`, `importlib`, `ctypes` and others) are refused. So is every third-party package, QWED SDK packages included. A module can be used only as `module.name` with a listed name, never as a value.
 - **Builtins:** only builtins that compute. `open`, `eval`, `exec`, `compile`, `__import__`, `getattr`, `vars`, `globals`, `type`, `input`, `breakpoint` and the other builtins that aren't listed are refused wherever they appear, so they can't be rebound or passed on.
-- **Attributes:** no special or private attribute (`__x__`, `_x`) apart from reading `__init__` and `__name__`, no frame or traceback attribute, and `str.format` only on a string literal whose fields read no attribute.
+- **Attributes:** no special or private attribute (`__x__`, `_x`) apart from reading `__init__` and `__name__`, no frame, code-object or traceback attribute, and `str.format` only on a string literal whose fields read no attribute.
 - **Source encoding:** a coding declaration other than UTF-8 is refused. The server writes the script as UTF-8, so the code that runs is the code that was checked.
 
-Refused code never runs. The response lists each reason with its line number, for example `Module 'os' is not admitted (line 1)`.
+Refused code never runs. The response lists each reason, with the line number where one applies, for example `Module 'os' is not admitted (line 1)`.
 
 Admission is a static check of what the code can reach. It is not a proof that the code is correct, and it does not limit resource use: the [execution timeouts](#execution-limits) limit run time, and nothing limits memory. The output of admitted code comes from that code, so treat it as untrusted data.
 
@@ -246,7 +246,7 @@ Execution completed successfully.
 
 ## Migrating from v0.1.x
 
-In v0.1.x, QWED-MCP exposed individual tools (`verify_math`, `verify_logic`, `verify_code`, `verify_sql`, and others). In v0.2.0, all of these were consolidated into `execute_python_code` to reduce context bloat. The LLM now loads one tool schema instead of 14.
+In v0.1.x, QWED-MCP exposed individual tools (`verify_math`, `verify_logic`, `verify_code`, `verify_sql`, and others). In v0.2.1, all of these were consolidated into `execute_python_code` to reduce context bloat. The LLM now loads one tool schema instead of 14.
 
 ### Before (v0.1.x)
 
@@ -255,7 +255,7 @@ User: "Verify the derivative of x³ equals 3x² using verify_math"
 Claude: Calls verify_math tool with expression="x^3", claimed_result="3*x^2", operation="derivative"
 ```
 
-### After (v0.2.0)
+### After (v0.2.1)
 
 ```text
 User: "Write a script to verify the derivative of x³ using execute_python_code"
@@ -274,7 +274,7 @@ In v0.2.x, a script could import a QWED SDK package to replace a removed tool, f
 
 ## Deprecated tools (v0.1.x)
 
-The following tools were available in v0.1.x and have been removed in v0.2.0. They are listed here for reference. Use [execute\_python\_code](#execute_python_code) instead. See [Replacing the removed tools](#replacing-the-removed-tools).
+The following tools were available in v0.1.x and were removed in v0.2.1. They are listed here for reference. Use [execute\_python\_code](#execute_python_code) instead. See [Replacing the removed tools](#replacing-the-removed-tools).
 
 ### verify\_math (deprecated)
 

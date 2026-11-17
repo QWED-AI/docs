@@ -154,7 +154,7 @@ See the [migration guide](/mcp/tools#migrating-from-v0-1-x) and [governance erro
 
 ### "BLOCKED: QWED blocked python execution: Module '...' is not admitted"
 
-**Cause:** From v0.3.0, `execute_python_code` admits code only when every module, builtin and attribute it uses is on the allowlist. Third-party packages are refused, including SymPy and QWED SDK packages such as `qwed_new`, `qwed_legal`, `qwed_finance` and `qwed_ucp`. Installing the package doesn't change this. The message lists every reason with its line number, for example:
+**Cause:** From v0.3.0, `execute_python_code` admits code only when every module, builtin and attribute it uses is on the allowlist. Third-party packages are refused, including SymPy and QWED SDK packages such as `qwed_new`, `qwed_legal`, `qwed_finance` and `qwed_ucp`. Installing the package doesn't change this. The message lists every reason, with the line number where one applies, for example:
 
 ```text
 BLOCKED: QWED blocked python execution: Module 'qwed_legal' is not admitted (line 1) (verification_id=...)
