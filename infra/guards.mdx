@@ -11,7 +11,7 @@ description: "Reference for IamGuard, NetworkGuard, CostGuard, and ArtifactBound
 
 **Engine:** Python matching on the concrete request, combined with the Z3 theorem prover
 
-IamGuard decides whether an AWS IAM policy allows a concrete request. From v0.4.0 it decides every action, resource and condition match in Python on the request values, following the AWS policy language, and Z3 combines those outcomes under Deny precedence. Anything the guard does not model makes the result `UNVERIFIABLE`, never allowed or denied.
+IamGuard decides whether an AWS IAM policy allows a concrete request. From v0.4.0 it decides every action, resource and condition match in Python on the request values, following the AWS policy language, and Z3 combines those outcomes under Deny precedence. An element outside the modelled policy language makes the whole result `UNVERIFIABLE`, and a statement the guard can't evaluate does so whenever the decision depends on it.
 
 ### Capabilities
 
@@ -19,7 +19,7 @@ IamGuard decides whether an AWS IAM policy allows a concrete request. From v0.4.
 - **Matching:** Actions match case-insensitively. `?` matches exactly one character and `*` any run of characters. In a resource ARN with colons, both stay within one colon-separated segment, except a `*` that ends the last segment. Condition key names match case-insensitively. Case folding is ASCII only.
 - **Condition operators:** The `String*`, `Arn*`, `Numeric*` and `Date*` families, `IpAddress`, `NotIpAddress`, `Bool`, `Null` and the `...IfExists` forms, with AWS multi-value semantics.
 - **Absent keys:** A condition on a key the request doesn't carry is false, except for a negated operator (`StringNotEquals`, `NotIpAddress` and the other `...Not...` forms) or an `...IfExists` operator, where it is true. `Null` tests whether the key is present.
-- **Policy variables:** `${aws:username}` and the `${*}`, `${?}` and `${$}` escapes are substituted in resources and condition values when the policy `Version` is `2012-10-17`. With any other version, or none, they are literal text, as in AWS.
+- **Policy variables:** `${aws:username}` and the `${*}`, `${?}` and `${$}` escapes are substituted in resources and in `String*` and `Arn*` condition values when the policy `Version` is `2012-10-17`. In a `Numeric*`, `Date*`, `Bool` or IP condition value a policy variable is not substituted, and the condition can't be evaluated. With any other version, or none, they are literal text, as in AWS.
 - **Least privilege:** `verify_least_privilege(policy)` returns `allowed=True` when the policy grants full access. It judges this from the patterns, not by matching a literal `*` request. An Allow counts, whatever its condition, when it has an `Action` pattern and a `Resource` pattern each made only of `*`, `?` and `:` with at least one `*` (such as `*:*` or `?*`, or `arn:*` for a resource). A Deny counts only when it has no condition and names every action and every resource with a pattern of `*` alone, so a conditional guard-rail such as "deny without MFA" doesn't make an admin policy compliant. An Allow whose coverage the guard can't tell, such as a wildcarded service prefix (`a*`) or a wildcarded partition or service in a resource ARN, makes the result `UNVERIFIABLE`.
 
 ### What is UNVERIFIABLE
@@ -104,7 +104,7 @@ NetworkGuard builds a directed graph from a topology of subnets, route tables an
 | Input | Modelled keys |
 | --- | --- |
 | Top level | `subnets`, `route_tables`, `security_groups` |
-| Subnet | `id`, `security_groups` (each `id` once) |
+| Subnet | `id` (each subnet id once), `security_groups` |
 | Route table | `subnet_id`, `routes` (one table per subnet). Route targets `igw...` (internet gateway) or `local`, with CIDR destinations |
 | Security group | `ingress`, `egress` (an inbound query reads only `ingress`) |
 | Ingress rule | `cidr`, and either `port` or both `from_port` and `to_port` |
@@ -239,7 +239,7 @@ The package identity is derived from the inspected `package_dir`, so a caller ca
 
 ### Hatchling inputs
 
-From v0.4.0, ArtifactBoundaryGuard blocks a package, as unmodelled, when its project has any of these:
+From v0.4.0, ArtifactBoundaryGuard blocks a package when its project has any of these:
 
 - A `hatch.toml` file, which hatchling merges over `[tool.hatch]`, or a `PKG-INFO` file in the project root.
 - `[project] dynamic` fields other than `version`.
@@ -249,7 +249,7 @@ From v0.4.0, ArtifactBoundaryGuard blocks a package, as unmodelled, when its pro
 - Context formatting (`{env:...}`, `{root}`) in dependency strings.
 - `[tool.hatch.build]` options that apply to every target and add files or run code (such as `include`, `force-include`, `sources`, `packages` or `hooks`).
 - Sdist options that add or remap files (`force-include`, `sources`, `hooks`), because `python -m build` builds the wheel from the sdist.
-- Wheel options the guard doesn't model (such as `shared-data`, `extra-metadata`, `sources` or `hooks`), and wheel `force-include` even with `only-packages`.
+- Wheel options the guard doesn't model (such as `shared-data`, `extra-metadata`, `sources` or `hooks`), and wheel `force-include` even with `only-packages` (reported as `missing_control`; every other input here is `unknown_boundary`).
 - A version source other than `regex`, a version `path` through a symlink, a hidden file or directory, or outside the project root, and `[tool.hatch.metadata]` hooks.
 - `[project]` readme files other than plain `README*` files in the project root, or license files other than plain `LICENSE*`, `LICENCE*`, `COPYING*`, `NOTICE*` or `AUTHORS*` files there. Symlinks and names that match a sensitive file pattern are refused.
 
@@ -266,7 +266,7 @@ These checks have limits. The root-level name check uses a list of known names, 
 
 ## TerraformParser and unmodelled declarations
 
-`TerraformParser().parse_directory(path)` reads the `.tf` files in one directory into a model with `instances`, `policies`, `subnets`, `security_groups`, `volumes` and, from v0.4.0, `unmodelled`. It models `aws_instance`, `aws_iam_policy` and `aws_ebs_volume`, and it records or refuses every other declaration instead of dropping it.
+`TerraformParser().parse_directory(path)` reads the `.tf` files in one directory into a model with `instances`, `policies`, `subnets`, `security_groups`, `volumes` and, from v0.4.0, `unmodelled`. It models `aws_instance`, `aws_iam_policy` and `aws_ebs_volume`, and it records or refuses every other resource block instead of dropping it.
 
 `unmodelled` is a list of `{"address", "reason"}` entries. The parser adds one for:
 
