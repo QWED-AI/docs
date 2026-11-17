@@ -13,7 +13,7 @@ The Consensus Engine orchestrates multiple verification engines for high-confide
 ## Features
 
 - **Async parallel execution** — Run engines concurrently
-- **Circuit breaker** — Auto-disable failing engines
+- **Circuit breaker** — Temporarily excludes engines that time out or raise errors
 - **Engine health monitoring** — Track reliability
 - **Weighted consensus** — Consider engine reliability
 - **Secure code execution** — Python engine runs through the Docker sandbox only
@@ -68,7 +68,15 @@ async def verify_many():
 
 ## Circuit breaker
 
-When an engine fails repeatedly, it's automatically disabled:
+The circuit breaker excludes an engine that stops answering. It measures engine health, not verdicts:
+
+- **A verdict is never a failure.** An engine that returns a result within the [execution deadline](#execution-deadlines-and-partial-results) counts as healthy, whatever it decides: a wrong claim, an unsatisfiable model or a question it cannot use.
+- **Only an engine that does not answer counts as a failure:** a timeout, or an exception the engine does not handle.
+- **Three consecutive failures open the circuit for 30 seconds.** During that time the engine is skipped and recorded as a `BLOCKED` result with the error `Engine excluded by open circuit breaker`. A skipped engine records no new failure. After 30 seconds the engine is `degraded` and runs again, and one success returns it to `healthy`. Any success resets the count of consecutive failures.
+- **The breaker is shared by every request on the server.** One caller's timeouts can exclude an engine for every other caller until the circuit closes.
+
+Before this fix, an engine's verdict counted as a failure, so three wrong claims in a row opened SymPy's circuit for 30 seconds for every caller.
+
 
 ```python
 # Check engine health
