@@ -477,6 +477,7 @@ The control plane also records a `trust_boundary` object that describes exactly 
     "formal_proof": false,
     "translation_claim_self_consistent": true,
     "provider_used": "openai_compat",
+    "translation_model": "gpt-4o-mini",
     "overall_status": "VERIFIED"
   }
 }
@@ -490,6 +491,8 @@ The control plane also records a `trust_boundary` object that describes exactly 
 | `deterministic_expression_evaluation` | Whether the expression itself was evaluated deterministically |
 | `formal_proof` | Whether a formal proof was established |
 | `translation_claim_self_consistent` | Whether the LLM's claimed answer matches the computed answer |
+| `provider_used` | The LLM provider that translated the query |
+| `translation_model` | The model that provider is configured to call, read from the server's provider settings, never from the model's answer. `null` when the provider names no model |
 | `overall_status` | The response-level status reflecting the trust boundary |
 
 <Note>
@@ -637,6 +640,7 @@ When math verification runs through the natural language pipeline (`POST /verify
     "formal_proof": false,
     "translation_claim_self_consistent": true,
     "provider_used": "openai",
+    "translation_model": "gpt-4o-mini",
     "trust_enforced": "VERIFIED",
     "attestation_policy": "mandatory",
     "overall_status": "VERIFIED"
@@ -653,6 +657,7 @@ When math verification runs through the natural language pipeline (`POST /verify
 | `formal_proof` | boolean | Always `false` — SymPy evaluation is deterministic but not a formal proof of the original query |
 | `translation_claim_self_consistent` | boolean | Whether the translated expression matched its own claimed answer |
 | `provider_used` | string | The LLM provider used for translation |
+| `translation_model` | string or null | The model that provider is configured to call, read from the server's provider settings, never from the model's answer. `null` when the provider names no model. It records provenance and admits nothing |
 | `trust_enforced` | string | Status returned by the mandatory trust-boundary enforcement step. Always matches `overall_status`. |
 | `attestation_policy` | string | Always `"mandatory"` — the control plane requires a signed attestation before returning a `VERIFIED` result |
 | `attestation_error` | string | Present only if attestation signing failed. Machine-readable code (e.g. `SIGNING_FAILURE`, `CRYPTO_UNAVAILABLE`) that caused the downgrade to `BLOCKED`. |

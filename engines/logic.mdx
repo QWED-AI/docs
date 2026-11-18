@@ -279,12 +279,15 @@ When you verify a natural-language logic query, QWED translates it to DSL using 
 ```python
 result = client.verify_logic("x must be greater than 5 and less than 3")
 print(result.provider_used)  # "openai_compat", also set when the request fails
+print(result.result["translation_model"])  # the model the provider is configured to call, or None
 if result.status == "BLOCKED":
     raise RuntimeError(f"Logic verification failed: {result.error}")
 print(result.status)         # "UNVERIFIABLE" (unsatisfiable)
 ```
 
 This field also appears in error responses, which helps you debug provider-related issues without inspecting server logs.
+
+The response also carries `translation_model`: the model the provider is configured to call, read from the server's provider settings, never from the model's answer. It is `None` when no model is known, for example when the provider was never reached. QWED stores `provider_used` and `translation_model` in the audit row, so a stored verdict names what produced the DSL it decided. Neither field changes the verdict or the admission. If you call `DSLLogicVerifier.verify_from_natural_language()` directly, the result's `translation_model` attribute carries the same value.
 
 ### Python-style constraints
 
