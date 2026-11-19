@@ -11,14 +11,14 @@ Jump to: [Translation model in natural-language and logic results](#qwed-verific
 
 ## QWED Verification — natural-language and logic results name the translation model
 
-**Unreleased** · [GitHub PR #648](https://github.com/QWED-AI/qwed-verification/pull/648) · [Issue #585](https://github.com/QWED-AI/qwed-verification/issues/585)
+**v11.0.0** · [GitHub PR #648](https://github.com/QWED-AI/qwed-verification/pull/648) · [Issue #585](https://github.com/QWED-AI/qwed-verification/issues/585)
 
 > `POST /verify/natural_language` and `POST /verify/logic` now record which provider and which model translated your question, in the response and in the audit row.
 
 ### What changed
 
-- **`translation_model` on both routes.** The response and its `developer_fields` carry `translation_model`: the model the provider is configured to call, read from the server's provider settings, never from the model's answer. It is `null` when the provider names no model. On `/verify/logic` it is also set on error responses.
-- **`provider_used` on natural-language results.** `POST /verify/natural_language` now returns `provider_used` in the response, where before only the control plane's `trust_boundary` recorded it. The `trust_boundary` record also gains `translation_model`.
+- **`translation_model` on both routes.** On `/verify/logic` the response and its `developer_fields` carry `translation_model`; on `/verify/natural_language` they carry it when the translated expression reaches a decided verdict. It is the model the provider is configured to call, read from the server's provider settings, never from the model's answer, and is `null` when the provider names no model. On `/verify/logic` it is also set on error responses.
+- **`provider_used` on natural-language results.** `POST /verify/natural_language` now returns `provider_used` in the response and stores it in the audit row; before, the route's response and audit row named no provider. The `trust_boundary` record also gains `translation_model`.
 - **Stored in the audit row.** Both fields are written to the route's audit row, so a stored verdict names what produced the translation it decided.
 - **Provenance only.** The fields do not change the verdict or the admission, which stays `BLOCKED` on both routes.
 

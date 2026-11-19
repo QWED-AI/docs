@@ -150,8 +150,8 @@ The endpoint returns the [`DiagnosticResult`](/advanced/diagnostics) verdict tha
 | `translated_expression` | string | The expression the LLM produced and the engine evaluated |
 | `verification_scope` | string | Always `"translated_expression_only"`. The verdict covers the translated expression, not your question |
 | `query_semantics_verified` | boolean | Always `false`. QWED cannot prove the translation means what you asked |
-| `provider_used` | string | LLM provider that translated the query. The audit row stores it too |
-| `translation_model` | string or null | Model that provider is configured to call, read from the server's provider settings, not from the model's answer. `null` when the provider names no model. The audit row stores it too. It does not change the verdict or the admission |
+| `provider_used` | string | LLM provider that translated the query. Present only when the translated expression reached a decided verdict (`VERIFIED`, including a translated claim proven false); absent otherwise. The audit row stores it too |
+| `translation_model` | string or null | Model that provider is configured to call, read from the server's provider settings, not from the model's answer. `null` when the provider names no model. Present and absent with `provider_used`. The audit row stores it too. It does not change the verdict or the admission |
 | `admission` | string | Always `"BLOCKED"` (`DENY`) for this endpoint, even when the translated claim holds |
 
 Admission is always `BLOCKED` because the LLM translation itself is unverified, so QWED never admits the result as an answer to your question. The verdict itself is unchanged. The audit log row's `is_verified` follows admission, so it is always `false`. The row's domain is `NATURAL_LANGUAGE`. Rows written before this fix store `MATH`, because the domain is part of each signed, chained entry and QWED doesn't rewrite it. QWED returns `BLOCKED` as the verdict when the control plane returns a malformed diagnostic or when the output sanitizer rejects the translated expression.
@@ -406,7 +406,7 @@ The response is a [`DiagnosticResult`](/advanced/diagnostics), with the control 
 
 Every response carries `admission`, and it is always `BLOCKED`. The verdict covers the constraints the LLM translated your question into, and nothing checks that they mean what you asked, so QWED does not admit it as an answer to your question. The verdict itself is unchanged. `query_semantics_verified` is always `false`. When the DSL is known, the verdict names its scope: `verification_scope` is `"translated_expression_only"` and `translated_expression` is the statement Z3 decided, the DSL after a `(VAR name Sort)` for each declared variable. The attestation signs the admission and binds `translated_expression`. The audit row's `is_verified` follows admission, so it is always `false`. Before v10.0.0 the route made no admission decision and the response had no `admission`.
 
-The `provider_used` field shows which LLM provider handled the translation, and `translation_model` shows the model that provider is configured to call, in success and error responses alike. `translation_model` is `null` when no model is known, for example when the provider was never reached. Both fields are also stored in the audit row. They record provenance only and do not change the verdict or the admission.
+The `provider_used` field shows which LLM provider handled the translation, and `translation_model` shows the model that provider is configured to call, in success and error responses alike, except when the security or policy check blocks the request, when neither is present. `translation_model` is `null` when no model is known, for example when the provider was never reached. Both fields are also stored in the audit row. They record provenance only and do not change the verdict or the admission.
 
 **Error response:**
 
@@ -417,13 +417,13 @@ The `provider_used` field shows which LLM provider handled the translation, and 
   "developer_fields": {
     "constraint_id": "api.logic.execution_error",
     "provider_used": "openai_compat",
-    "translation_model": "gpt-4o-mini"
+    "translation_model": null
   },
   "proof_ref": null,
   "is_authoritative": false,
   "constraint_id": "api.logic.execution_error",
   "provider_used": "openai_compat",
-  "translation_model": "gpt-4o-mini",
+  "translation_model": null,
   "admission": "BLOCKED"
 }
 ```

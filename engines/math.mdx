@@ -477,7 +477,7 @@ The control plane also records a `trust_boundary` object that describes exactly 
     "formal_proof": false,
     "translation_claim_self_consistent": true,
     "provider_used": "openai_compat",
-    "translation_model": "gpt-4o-mini",
+    "translation_model": "your-configured-model",
     "overall_status": "VERIFIED"
   }
 }
@@ -628,7 +628,7 @@ The engine also rejects invalid tolerance values (negative numbers, `NaN`, `Infi
 
 ## Trust boundary
 
-When math verification runs through the natural language pipeline (`POST /verify/natural_language`), the response includes a `trust_boundary` object. This object describes exactly what the pipeline proved and what it did not, separating deterministic expression evaluation from the non-deterministic LLM translation step — and records the mandatory attestation admission decision.
+When math verification runs through the natural language pipeline (`POST /verify/natural_language`), the control plane builds a `trust_boundary` record; the route's response does not include it. This record describes exactly what the pipeline proved and what it did not, separating deterministic expression evaluation from the non-deterministic LLM translation step — and records the mandatory attestation admission decision.
 
 ```json
 {
@@ -640,7 +640,7 @@ When math verification runs through the natural language pipeline (`POST /verify
     "formal_proof": false,
     "translation_claim_self_consistent": true,
     "provider_used": "openai",
-    "translation_model": "gpt-4o-mini",
+    "translation_model": "your-configured-model",
     "trust_enforced": "VERIFIED",
     "attestation_policy": "mandatory",
     "overall_status": "VERIFIED"
