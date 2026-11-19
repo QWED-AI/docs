@@ -455,7 +455,6 @@ When you verify a natural language math query through the `/verify/natural_langu
 ```json
 {
   "status": "VERIFIED",
-  "is_valid": true,
   "translated_expression": "0.15 * 200",
   "verification_scope": "translated_expression_only",
   "query_semantics_verified": false,
@@ -463,7 +462,7 @@ When you verify a natural language math query through the `/verify/natural_langu
 }
 ```
 
-Admission is always `BLOCKED` (`DENY`) for natural language queries, even when the translated claim holds, because nothing proves the translation means what you asked. A translated claim proven false is `VERIFIED` with `is_valid: false`.
+Admission is always `BLOCKED` (`DENY`) for natural language queries, even when the translated claim holds, because nothing proves the translation means what you asked. When the translated expression holds, the response carries no `is_valid`, because that proves the LLM's translation, not your claim. A translated claim proven false is `VERIFIED` with `is_valid: false`.
 
 The control plane also records a `trust_boundary` object that describes exactly what the pipeline proved and what it did not:
 
