@@ -18,7 +18,7 @@ The legacy `VerificationEngine.verify_logic_rule()` method has been removed as o
 | -------------------- | ------------------------------------ |
 | **Satisfiability**   | Check if constraints have a solution |
 | **Model Finding**    | Find values that satisfy constraints |
-| **Proof Generation** | Prove tautologies                    |
+| **Proof Generation** | Prove that a claim follows from constraints, or find a counterexample |
 | **Quantifiers**      | FORALL, EXISTS support               |
 | **Arithmetic**       | Integer and real arithmetic          |
 
@@ -26,21 +26,39 @@ The legacy `VerificationEngine.verify_logic_rule()` method has been removed as o
 
 ## Quick start
 
+`client.verify_logic()` sends a question to `POST /verify/logic`. The configured LLM translates it into constraints (what the question takes as given) and a claim (what it asks you to prove). Z3 then decides whether the claim holds for every value of the variables that meets the constraints.
+
 ```python
 from qwed_sdk import QWEDClient
 
 client = QWEDClient()
 
-# Check if constraints are satisfiable
-result = client.verify_logic("(AND (GT x 5) (LT x 10))")
-if result.status == "VERIFIED":            # satisfiable
-    print(result.result["model"])          # {"x": "7"}
-elif result.status == "UNVERIFIABLE":      # unsatisfiable
-    print("No solution exists")
+result = client.verify_logic("x is greater than 5. Is x greater than 3?")
+if result.status == "VERIFIED" and result.result.get("is_valid") is False:
+    print("Proven false, counterexample:", result.result["model"])
+elif result.status == "VERIFIED":
+    print("The claim follows from the constraints")
+elif result.status == "UNVERIFIABLE":
+    print("Not proven:", result.result.get("agent_message"))
 else:
     # BLOCKED: the query could not be translated or solved. Fail closed.
     raise RuntimeError(f"Logic verification failed ({result.status}): {result.error}")
 ```
+
+| `status` | Solver result (`developer_fields.status`) | Meaning |
+| --- | --- | --- |
+| `VERIFIED` | `VALID` | The claim follows from the constraints. The response carries no `is_valid`, because this proves the LLM's translation, not your question. |
+| `VERIFIED`, `is_valid: false` | `INVALID` | The claim is proven false. `model` is a counterexample: values that meet the constraints and make the claim false. |
+| `UNVERIFIABLE` | `VACUOUS` | The constraints contradict each other, so every claim follows from them and none is proven (`constraint_id: "dsl_logic_verifier.vacuous_premises"`). |
+| `UNVERIFIABLE` | `SAT` | No claim to prove: the translation states none, or asks only whether some values meet the conditions (goal `SATISFIABILITY`). The conditions can hold, but one satisfying assignment proves nothing (`constraint_id: "logic.satisfiable_not_proven"`). |
+| `UNVERIFIABLE` | `UNSAT` | No claim to prove, or the question asks only whether some values meet the conditions, and no values meet them. |
+| `BLOCKED` | anything else | A translation or solver error, or a timeout. |
+
+`admission` is always `BLOCKED`, so `result.is_verified` is `False`: nothing checks that the translation means what you asked.
+
+<Warning>
+**Changed in v11.0.0.** `/verify/logic` used to report satisfiable constraints as `VERIFIED`. A question such as "Prove x > 5 implies x > 10" came back `VERIFIED` with `x = 11`, though the claim fails for `x = 6`. It now returns `VERIFIED` with `is_valid: false` and a counterexample. Constraints with no claim are `UNVERIFIABLE`. To find values that satisfy constraints, call `DSLLogicVerifier.verify_from_dsl()` directly (see [Satisfiability checking](#satisfiability-checking)).
+</Warning>
 
 ---
 
@@ -102,22 +120,51 @@ QWED does not infer the sort of an undeclared name from a Boolean literal, becau
 
 ### Basic check
 
+`POST /verify/logic` does not report satisfiability as `VERIFIED`. To check whether constraints have a solution, run the DSL with `DSLLogicVerifier.verify_from_dsl()`, which returns `SAT` with a model or `UNSAT`:
+
 ```python
+from qwed_new.core.dsl_logic_verifier import DSLLogicVerifier
+
+verifier = DSLLogicVerifier()
+
+
 def check(result):
-    if result.status == "VERIFIED":        # satisfiable: a model exists
-        return result.result["model"]
-    if result.status == "UNVERIFIABLE":    # unsatisfiable: no model
+    if result.status == "SAT":       # satisfiable: a model exists
+        return result.model
+    if result.status == "UNSAT":     # unsatisfiable: no model
         return None
-    # BLOCKED: the query could not be translated or solved. Fail closed.
+    # ERROR, BLOCKED or UNKNOWN: the solver reached no verdict. Fail closed.
     raise RuntimeError(f"Logic verification failed ({result.status}): {result.error}")
 
-print(check(client.verify_logic("(AND (GT x 0) (LT x 100))")))  # {"x": "50"}
-print(check(client.verify_logic("(AND (GT x 10) (LT x 5))")))   # None: x can't be > 10 AND < 5
+print(check(verifier.verify_from_dsl("(AND (GT x 0) (LT x 100))")))  # {"x": "1"}, for example
+print(check(verifier.verify_from_dsl("(AND (GT x 10) (LT x 5))")))   # None: x can't be > 10 AND < 5
+```
+
+### Proving a claim
+
+`DSLLogicVerifier.prove_from_dsl(premises_dsl, claim_dsl, variables)` decides whether a claim follows from premises for every value of the variables. It is the check `POST /verify/logic` runs on a translation that states a claim. Pass `""` as `premises_dsl` to decide the claim on its own.
+
+| `status` | Meaning |
+| --- | --- |
+| `VALID` | The premises can hold, and no assignment meets them with the claim false |
+| `INVALID` | An assignment meets the premises with the claim false. `model` is that counterexample |
+| `VACUOUS` | The premises cannot hold together, so every claim follows and none is proven (`constraint_id: "dsl_logic_verifier.vacuous_premises"`) |
+| `UNKNOWN`, `ERROR`, `BLOCKED` | The solver did not decide a step. Fail closed |
+
+`dsl_code` is the statement decided: `(IMPLIES premises claim)`, or the claim alone when there are no premises.
+
+```python
+result = verifier.prove_from_dsl("(GT x 5)", "(GT x 10)", [{"name": "x", "type": "Int"}])
+print(result.status, result.model)  # INVALID {'x': '6'}, for example: 5 < x <= 10
+print(result.dsl_code)              # (IMPLIES (GT x 5) (GT x 10))
+
+result = verifier.prove_from_dsl("(GT x 5)", "(GT x 3)", [{"name": "x", "type": "Int"}])
+print(result.status)                # VALID
 ```
 
 ### Finding all solutions
 
-The SDK client's `verify_logic()` returns a single verdict with one model. For all-solutions enumeration, iterate with a low-level solver (e.g. `z3`) or use the `LogicVerifier` low-level API and extend constraints yourself:
+`verify_from_dsl()` returns a single verdict with one model. For all-solutions enumeration, iterate with a low-level solver (e.g. `z3`) or use the `LogicVerifier` low-level API and extend constraints yourself:
 
 ```python
 from z3 import Int, Solver
@@ -294,9 +341,13 @@ QWED also converts Python-style constraints from a structured logic task into DS
 | ---------- | ------------ |
 | `==`, `!=` | `EQ`, `NEQ` |
 | `>`, `<`, `>=`, `<=` | `GT`, `LT`, `GTE`, `LTE` |
-| `+`, `-`, `*`, `/`, `%`, `**` | `PLUS`, `MINUS`, `MULT`, `DIV`, `MOD`, `POW` |
+| `+`, `-`, `*`, `%`, `**` | `PLUS`, `MINUS`, `MULT`, `MOD`, `POW` |
 
 Constraints such as `x >= 5` or `x * 2 <= 10` compile and return `SAT` or `UNSAT`. Earlier releases emitted `GE`, `LE`, `NE`, and `MUL`, so these constraints came back `BLOCKED`.
+
+The bridge does not translate `/`, and it translates `%` only with a positive whole-number divisor, such as `x % 2`. DSL `DIV` and `MOD` are Z3's integer division and Euclidean remainder, which differ from Python's `/` and from `%` with any other divisor, so a claim could be decided in the wrong arithmetic. A translation that uses either fails, and `POST /verify/logic` returns `BLOCKED`. `DIV` and `MOD` stay available when you write the DSL yourself.
+
+A helper call with keyword arguments, such as `And(a, **{"k": b})`, also fails the translation instead of dropping the keyword part.
 
 You can join conditions with infix `and`/`or`/`not` in any case, or with the call forms `And(...)` and `Or(...)`:
 
@@ -351,7 +402,7 @@ elif result.status == "BLOCKED":
 ## `LogicVerifier` returns `DiagnosticResult` (v6.0.0)
 
 <Info>
-**Introduced in v6.0.0.** `LogicVerifier` is the second engine — after `FactVerifier` — to conform to the unified [`DiagnosticResult` contract](/advanced/diagnostics). The legacy `LogicResult` dataclass has been removed from the verifier's return surface. The `/verify/logic` endpoint, and so `client.verify_logic()`, maps the DSL verdict instead: `SAT` is `VERIFIED` with the model as evidence, `UNSAT` is `UNVERIFIABLE`, and anything else (`UNKNOWN`, `ERROR`, `BLOCKED`) is `BLOCKED`. `DSLLogicVerifier.verify_from_dsl()` returns the raw `SAT`, `UNSAT`, `UNKNOWN`, `ERROR` or `BLOCKED`.
+**Introduced in v6.0.0.** `LogicVerifier` is the second engine — after `FactVerifier` — to conform to the unified [`DiagnosticResult` contract](/advanced/diagnostics). The legacy `LogicResult` dataclass has been removed from the verifier's return surface. The `/verify/logic` endpoint, and so `client.verify_logic()`, maps the DSL verdict instead: `VALID` is `VERIFIED`, `INVALID` is `VERIFIED` with `is_valid: false` and the counterexample, `VACUOUS`, `SAT` and `UNSAT` are `UNVERIFIABLE`, and anything else (`UNKNOWN`, `ERROR`, `BLOCKED`) is `BLOCKED` (see [Quick start](#quick-start)). `DSLLogicVerifier.verify_from_dsl()` returns the raw `SAT`, `UNSAT`, `UNKNOWN`, `ERROR` or `BLOCKED`.
 </Info>
 
 If you call the low-level `LogicVerifier` class directly, every one of its nine public methods now returns a `DiagnosticResult`:

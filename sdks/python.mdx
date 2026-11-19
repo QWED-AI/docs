@@ -88,12 +88,19 @@ result = client.verify_math("x**2 + 2*x + 1 = (x+1)**2")
 
 ### verify_logic(query)
 
-Verify logical constraints (QWED-Logic DSL).
+Check whether a claim follows from the conditions a question states. The server's LLM translates the question into constraints and a claim, and Z3 decides the claim for every value of the variables.
 
 ```python
-result = client.verify_logic("(AND (GT x 5) (LT y 10))")
-print(result.model)  # {"x": 6, "y": 9}
+result = client.verify_logic("x is greater than 5. Is x greater than 3?")
+print(result.status)       # "VERIFIED": the claim follows from the constraints
+print(result.is_verified)  # False: the translation is not verified, so it is not admitted
+
+result = client.verify_logic("x is greater than 5. Is x greater than 10?")
+print(result.status, result.result["is_valid"])  # "VERIFIED" False: proven false
+print(result.result["model"])                    # the counterexample, such as {"x": "6"}
 ```
+
+Constraints with no claim are `UNVERIFIABLE`: one satisfying assignment proves nothing. See [`POST /verify/logic`](/api/endpoints#post-%2Fverify%2Flogic).
 
 ### verify_code(code, language)
 

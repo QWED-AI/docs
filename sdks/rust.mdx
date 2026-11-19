@@ -110,8 +110,8 @@ println!("{:?}", result.extra.get("is_valid"));  // Some(Bool(true))
 ### verify\_logic
 
 ```rust
-let result = client.verify_logic("(AND (GT x 5) (LT y 10))").await?;
-// The verdict covers the translated constraints only: admission is
+let result = client.verify_logic("x is greater than 5. Is x greater than 10?").await?;
+// The verdict covers the translated constraints and claim only: admission is
 // Some(Blocked) and is_admitted() is false, whatever the status.
 println!("{:?} {:?} {:?}", result.status, result.admission, result.extra.get("model"));
 ```

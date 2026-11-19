@@ -349,13 +349,13 @@ A symbolic expression, such as `x + x`, has `is_symbolic: true`, no `value`, and
 
 ### POST /verify/logic
 
-Verify logical constraints. Routes through the QWED Control Plane.
+Check whether a claim follows from the conditions a question states. Routes through the QWED Control Plane. The LLM provider translates the question into constraints (what it takes as given) and a claim (what it asks to prove), and Z3 decides the claim for every value of the variables that meets the constraints.
 
 **Request:**
 
 ```json
 {
-  "query": "Is there an x greater than 5 and less than 10?",
+  "query": "x is greater than 5. Is x greater than 10?",
   "provider": "openai"
 }
 ```
@@ -372,31 +372,42 @@ The response is a [`DiagnosticResult`](/advanced/diagnostics), with the control 
 ```json
 {
   "status": "VERIFIED",
-  "agent_message": "Logic constraints are satisfiable",
+  "agent_message": "The claim does not follow from the logic constraints: the model is a counterexample",
   "proof_ref": "sha256:4c1e…",
   "is_authoritative": true,
   "attestation": "eyJ…",
+  "is_valid": false,
   "model": {"x": "6"},
-  "dsl_code": "(AND (GT x 5) (LT x 10))",
+  "dsl_code": "(IMPLIES (GT x 5) (GT x 10))",
   "declarations": {"x": "Int"},
   "provider_used": "openai_compat",
+  "translation_model": "your-configured-model",
   "query_semantics_verified": false,
   "query_interpretation_source": "llm_translation",
   "verification_scope": "translated_expression_only",
-  "translated_expression": "(VAR x Int) (AND (GT x 5) (LT x 10))",
+  "translated_expression": "(VAR x Int) (IMPLIES (GT x 5) (GT x 10))",
   "admission": "BLOCKED",
   "developer_fields": {
-    "status": "SAT",
-    "...": "model, dsl_code, declarations, provider_used and the scope fields, as above"
+    "status": "INVALID",
+    "...": "is_valid, model, dsl_code, declarations, provider_used, translation_model and the scope fields, as above"
   }
 }
 ```
 
 | `status` | Solver result (`developer_fields.status`) | Meaning |
 |----------|-------------------------------------------|---------|
-| `VERIFIED` | `SAT` | Satisfiable: a solution exists, in `model` |
-| `UNVERIFIABLE` | `UNSAT` | Unsatisfiable: no solution exists |
-| `BLOCKED` | anything else (`ERROR`, `BLOCKED`, `UNKNOWN`) | Blocked by security policy, a translation or solver error, or a timeout |
+| `VERIFIED` | `VALID` | The claim follows from the constraints. No `is_valid` field, because this proves the LLM's translation, not your question |
+| `VERIFIED`, `is_valid: false` | `INVALID` | The claim is proven false. `model` is a counterexample that meets the constraints and fails the claim |
+| `UNVERIFIABLE` | `VACUOUS` | The constraints contradict each other, so no claim is proven (`constraint_id: "dsl_logic_verifier.vacuous_premises"`) |
+| `UNVERIFIABLE` | `SAT` | The translation states no claim to prove, or asks only whether some values meet the conditions. The conditions can hold, which proves nothing (`constraint_id: "logic.satisfiable_not_proven"`) |
+| `UNVERIFIABLE` | `UNSAT` | No claim to prove, or the question asks only whether some values meet the conditions, and no values meet them |
+| `BLOCKED` | anything else (`ERROR`, `BLOCKED`, `UNKNOWN`) | Blocked by security policy, a translation or solver error, or a timeout. A translation that uses `/`, `%` with a divisor other than a positive whole number, or a helper call with keyword arguments fails |
+
+`dsl_code` and `translated_expression` name the statement Z3 decided: `(IMPLIES constraints claim)`, or the claim alone when the question gives no constraints.
+
+<Warning>
+**Changed in v11.0.0. Breaking change.** Before this change, the route decided only whether the translated constraints were satisfiable, and reported a satisfiable set as `VERIFIED` with `developer_fields.status: "SAT"`. "Prove x > 5 implies x > 10" came back `VERIFIED` with `x = 11`. It now returns `VERIFIED` with `is_valid: false` and a counterexample, and satisfiable constraints with no claim are `UNVERIFIABLE`. If you read `status: "VERIFIED"` as "a solution exists", check `is_valid` and `developer_fields.status` instead. Admission is unchanged.
+</Warning>
 
 <Info>Changed in v10.0.0</Info>
 
@@ -999,7 +1010,7 @@ Math, logic, and natural-language items return the [`DiagnosticResult`](/advance
 | Item type | `result` |
 |-----------|----------|
 | `math` | The `POST /verify/math` verdict. See [Math items](#math-items-proof-vs-simplification) below. |
-| `logic` | The `POST /verify/logic` response. `VERIFIED` with a `proof_ref` when the constraints are satisfiable (SAT), `UNVERIFIABLE` when they are unsatisfiable (UNSAT), and `BLOCKED` otherwise, with `admission`, which is always `BLOCKED`. The control plane's own output (`status: "SAT"`, `model`, `provider_used`) and the verdict's scope fields stay under `result.developer_fields`. |
+| `logic` | The `POST /verify/logic` response. `VERIFIED` with a `proof_ref` when the translated claim follows from the constraints (`VALID`), or with `is_valid: false` and a counterexample when it is proven false (`INVALID`). `UNVERIFIABLE` when no claim is proven (`VACUOUS`, `SAT` or `UNSAT`), and `BLOCKED` otherwise. `admission` is always `BLOCKED`. The control plane's own output (such as `status: "INVALID"`, `model`, `provider_used`) and the verdict's scope fields stay under `result.developer_fields`. |
 | `natural_language` | The `POST /verify/natural_language` response, with `admission`, which is always `BLOCKED`. Only the verdict is kept: `final_answer`, `translation`, and `trust_boundary` are not returned. |
 | `code`, `fact`, `sql` | The item type's route result, unchanged apart from the trust step. A code item's `admission` is decided on the enforced verdict. |
 
@@ -1016,20 +1027,20 @@ A logic item, for example:
 ```json
 {
   "id": "batch_abc123-1",
-  "query": "(AND (GT x 5) (LT y 10))",
+  "query": "x is greater than 5. Is x greater than 3?",
   "type": "logic",
   "status": "completed",
   "result": {
     "status": "VERIFIED",
-    "agent_message": "Logic constraints are satisfiable",
+    "agent_message": "The claim follows from the logic constraints",
     "developer_fields": {
-      "status": "SAT",
-      "model": {"x": "6", "y": "9"},
+      "status": "VALID",
       "provider_used": "openai_compat",
+      "translation_model": "your-configured-model",
       "query_semantics_verified": false,
       "query_interpretation_source": "llm_translation",
       "verification_scope": "translated_expression_only",
-      "translated_expression": "(VAR x Int) (VAR y Int) (AND (GT x 5) (LT y 10))"
+      "translated_expression": "(VAR x Int) (IMPLIES (GT x 5) (GT x 3))"
     },
     "proof_ref": "sha256:4c1e…",
     "attestation": "eyJ…",
