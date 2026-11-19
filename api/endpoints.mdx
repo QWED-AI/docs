@@ -132,7 +132,6 @@ The endpoint returns the [`DiagnosticResult`](/advanced/diagnostics) verdict tha
   "agent_message": "Expression verified successfully",
   "proof_ref": "sha256:...",
   "is_authoritative": true,
-  "is_valid": true,
   "calculated_value": 30.0,
   "claimed_value": 30.0,
   "translated_expression": "0.15 * 200",
@@ -146,7 +145,7 @@ The endpoint returns the [`DiagnosticResult`](/advanced/diagnostics) verdict tha
 | Field | Type | Description |
 |-------|------|-------------|
 | `status` | string | Verdict for the translated expression: `VERIFIED`, `UNVERIFIABLE`, or `BLOCKED` |
-| `is_valid` | boolean | `true` when the translated claim holds. A translated claim proven false is `VERIFIED` with `is_valid: false` |
+| `is_valid` | boolean | `false` when the translated claim is proven false (`VERIFIED` with `is_valid: false`). Absent when the translated expression holds, because that proves the LLM's translation, not your claim |
 | `translated_expression` | string | The expression the LLM produced and the engine evaluated |
 | `verification_scope` | string | Always `"translated_expression_only"`. The verdict covers the translated expression, not your question |
 | `query_semantics_verified` | boolean | Always `false`. QWED cannot prove the translation means what you asked |
@@ -1549,7 +1548,6 @@ The route returns the enforced result with its `admission`, in the shape `POST /
   "developer_fields": {
     "status": "VERIFIED",
     "calculated_value": 30.0,
-    "is_valid": true,
     "translated_expression": "0.15 * 200",
     "verification_scope": "translated_expression_only",
     "query_semantics_verified": false
@@ -1557,7 +1555,6 @@ The route returns the enforced result with its `admission`, in the shape `POST /
   "proof_ref": "sha256:7a3d…",
   "is_authoritative": true,
   "calculated_value": 30.0,
-  "is_valid": true,
   "translated_expression": "0.15 * 200",
   "verification_scope": "translated_expression_only",
   "query_semantics_verified": false,
