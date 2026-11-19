@@ -233,12 +233,7 @@ pip install --upgrade qwed-legal
 
 **Problem:** MCP tools don't show legal verification options.
 
-**Solution:** Reinstall qwed-mcp after installing qwed-legal:
-
-```bash
-pip install qwed-legal
-pip install --upgrade qwed-mcp
-```
+**Solution:** qwed-mcp has no legal tools of its own. From qwed-mcp v0.3.0, its `execute_python_code` tool refuses `qwed_legal` imports, so installing qwed-legal doesn't make the guards available through MCP. Call the guards from your own Python code instead. See [What code is admitted](/mcp/tools#what-code-is-admitted).
 
 ---
 
