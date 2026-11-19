@@ -54,10 +54,11 @@ from qwed_sdk import QWEDClient
 
 client = QWEDClient(api_key="qwed_your_key")
 
-result = client.verify_logic("(AND (GT x 5) (LT y 10))")
-print(result.status)           # VERIFIED (satisfiable)
-print(result.result["model"])  # {"x": "6", "y": "9"}
-print(result.admission)        # BLOCKED: the constraints are an LLM's translation of the query
+result = client.verify_logic("x is greater than 5. Is x greater than 10?")
+print(result.status)               # VERIFIED: the claim was decided
+print(result.result["is_valid"])   # False: proven false
+print(result.result["model"])      # a counterexample, such as {"x": "6"}
+print(result.admission)            # BLOCKED: the constraints and claim are an LLM's translation of the query
 ```
 
 ## Determinism vs probability

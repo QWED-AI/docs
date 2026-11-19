@@ -13,7 +13,7 @@ The Consensus Engine orchestrates multiple verification engines for high-confide
 ## Features
 
 - **Async parallel execution** — Run engines concurrently
-- **Circuit breaker** — Auto-disable failing engines
+- **Circuit breaker** — Temporarily excludes engines that time out or raise errors
 - **Engine health monitoring** — Track reliability
 - **Weighted consensus** — Consider engine reliability
 - **Secure code execution** — Python engine runs through the Docker sandbox only
@@ -68,7 +68,15 @@ async def verify_many():
 
 ## Circuit breaker
 
-When an engine fails repeatedly, it's automatically disabled:
+The circuit breaker excludes an engine that stops answering. It measures engine health, not verdicts:
+
+- **A verdict is never a failure.** An engine that returns a result within the [execution deadline](#execution-deadlines-and-partial-results) counts as healthy, whatever it decides: a wrong claim, an unsatisfiable model or a question it cannot use.
+- **Only an engine that does not answer counts as a failure:** a timeout, or an exception the engine does not handle.
+- **Three consecutive failures open the circuit for 30 seconds.** During that time the engine is skipped and recorded as a `BLOCKED` result with the error `Engine excluded by open circuit breaker`. A skipped engine records no new failure. After 30 seconds the engine is `degraded` and runs again, and one success returns it to `healthy`. Any success resets the count of consecutive failures. While the engine is `degraded`, one more failure opens the circuit again for another 30 seconds, because only a success resets the count.
+- **The breaker is shared by every request handled by the same server process.** One caller's timeouts can exclude an engine for every other caller until the circuit closes.
+
+Before this fix, an engine's verdict counted as a failure, so three wrong claims in a row opened SymPy's circuit for 30 seconds for every caller.
+
 
 ```python
 # Check engine health
@@ -78,7 +86,7 @@ print(health)
 # {
 #   "SymPy": {"state": "healthy", "failures": 0},
 #   "Python": {"state": "healthy", "failures": 0},
-#   "Z3": {"state": "degraded", "failures": 2}
+#   "Z3": {"state": "open", "failures": 3}
 # }
 
 # Reset circuit breakers
@@ -203,14 +211,16 @@ Final confidence = weighted average of agreeing engines.
 | `majority` | More than half of the total weight agrees |
 | `split` | No clear majority among engines |
 | `no_results` | No engines returned a result |
+| `blocked` | Every engine returned `BLOCKED`, or the prompt-injection check refused the query before any engine ran (`engines_used` `0`). The result is `BLOCKED` |
 | `no_independent_verification` | Only one engine verified the answer. The result is `BLOCKED` with `confidence` `0.0` |
-| `blocked_secure_execution` | The Docker sandbox is unavailable and a required engine cannot run. The result is `BLOCKED` (HTTP 200). It takes precedence over every other status, `no_independent_verification` included |
+| `blocked_secure_execution` | The Docker sandbox is unavailable and a required engine cannot run. The result is `BLOCKED` (HTTP 200). It takes precedence over every status that engine results produce, `no_independent_verification` included |
 
 ## Status propagation
 
 Consensus is a status-preserving aggregator, not a proof engine. Per the [3-tier engine classification](/engines/overview), consensus never invents a `VERIFIED` status from disagreement:
 
-- The Python engine finds the Docker sandbox unavailable → the consensus result is `BLOCKED` with `agreement_status` `blocked_secure_execution`, whatever the other engines returned. This rule is checked first.
+- The prompt-injection check refuses the query → the consensus result is `BLOCKED` with `agreement_status` `blocked` and no answer. This check runs before any engine is selected, so no engine runs, none answers the query and none records a failure with its circuit breaker. It is the check `/verify/natural_language` applies, so it also refuses a query over 2,000 characters or one that contains words such as `mode`, `root` or `system`.
+- The Python engine finds the Docker sandbox unavailable → the consensus result is `BLOCKED` with `agreement_status` `blocked_secure_execution`, whatever the other engines returned. This rule is checked first among engine results.
 - All engines return `BLOCKED` → the consensus result is `BLOCKED`.
 - Otherwise, only one engine verifies the answer → the consensus result is `BLOCKED` with `constraint_id: "consensus.no_independent_verification"` and `confidence` `0.0`, whatever the other engines returned (advisory, blocked or absent). One engine is not a consensus.
 - Otherwise, any single engine returns `BLOCKED` (but not all) → the consensus result is capped at `UNVERIFIABLE` (fail-closed: a partial block prevents `VERIFIED`).

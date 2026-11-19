@@ -5,7 +5,7 @@ description: "Release notes for the QWED Protocol: version history, new guards, 
 
 All notable changes to the QWED platform, listed by release.
 
-Jump to: [Translation model in natural-language and logic results](#qwed-verification-—-natural-language-and-logic-results-name-the-translation-model) · [Open Responses v0.6.2](#qwed-open-responses-v0-6-2-—-toolguard-verifies-responses-output-tool-calls) · [QWED-Infra v0.4.0](#qwed-infra-v0-4-0-—-fail-closed-iam-network-cost-and-release-checks) · [QWED-MCP v0.3.0](#qwed-mcp-v0-3-0-—-allowlist-admission-for-execute_python_code) · [v10.0.0](#v10-0-0-evidence-is-not-proof) · [v9.1.0](#v9-1-0-—-allowlist-admission-for-python-code) · [v9.0.0](#v9-0-0-—-eleven-advisories-and-models-you-configure) · [List agents and owner activity access](#qwed-verification-—-list-agents-and-owners-read-agent-activity) · [Session admin auth, key list, and user list](#qwed-verification-—-session-sign-in-for-key-rotation-and-threats-richer-key-list-and-user-list) · [Audit CSV exports and natural-language domain](#qwed-verification-—-audit-csv-exports-carry-verdict-and-admission-natural-language-audit-domain) · [Owner sign-in from qwed init](#qwed-verification-—-qwed-init-can-create-an-owner-who-can-sign-in) · [Whole-chain trail scope and Verification Context audit rows](#qwed-verification-—-whole-chain-trail-scope-and-verifiable-verification-context-audit-rows) · [Startup hook digest pins](#qwed-verification-—-startup-hooks-can-be-allowed-by-content-digest) · [SQL and code verifier false positives](#qwed-verification-—-sql-and-code-verifier-false-positive-fixes-and-python-3-14) · [diff() and batch math verdicts](#qwed-verification-—-math-identities-read-diff-and-batch-math-matches-verify-math) · [Claude providers stop sending `temperature`](#qwed-verification-—-claude-providers-stop-sending-temperature) · [AgentStateGuard JSON numbers](#qwed-verification-—-agentstateguard-gives-one-verdict-on-a-json-number) · [QWED-MCP v0.2.3](#qwed-mcp-v0-2-3-—-qwedai-com-no-longer-trusted-and-mcp-sdk-pinned-below-2-0) · [v8.0.0](#v8-0-0-—-attested-verdicts-and-upgrade-guide) · [Batch and agent routes enforce attestations](#qwed-verification-—-batch-and-agent-verify-routes-return-enforced-attested-results) · [Audit paging and security events](#qwed-verification-—-audit-log-paging-caller-and-admission-fields-and-security-events) · [Clients fail closed](#qwed-verification-—-python-sdk-integrations-and-github-action-fail-closed) · [Pinned sandbox image](#qwed-verification-—-pinned-sandbox-image-and-hardened-container) · [CrossHair in the Docker sandbox](#qwed-verification-—-crosshair-runs-only-in-the-docker-sandbox) · [Signed audit chain for API rows](#qwed-verification-—-api-audit-rows-written-through-the-signed-hash-chain) · [Logic DSL fixes](#qwed-verification-—-logic-dsl-compiles-iff-and-quantifiers-and-rejects-boolean-coercion) · [Proven-false math claims](#qwed-verification-—-proven-false-math-claims-are-verified-with-admission-deny) · [GitHub Action scan paths](#qwed-verification-—-github-action-scans-use-mode-defaults-and-deny-empty-scans) · [Compliance session sign-in](#qwed-verification-—-session-sign-in-and-whole-chain-check-for-compliance-endpoints) · [Security activity summary](#qwed-verification-—-security-activity-summary-replaces-the-soc-2-report) · [Role checks and hashed agent tokens](#qwed-verification-—-role-checks-on-api-key-and-audit-routes-hashed-agent-tokens) · [Docker image runs the API server](#qwed-verification-—-docker-image-runs-the-api-server-and-the-compose-stack-builds) · [Go, TypeScript, and Rust SDK admission gating](#qwed-verification-—-go-typescript-and-rust-sdks-read-the-diagnosticresult-envelope) · [Signed Verification Context documents](#qwed-verification-—-signed-verification-context-documents-and-attestation-checks) · [Contacts moved to qwedai.tech](#qwed-verification-—-contacts-and-links-moved-to-qwedai-tech) · [v7.3.0](#v7-3-0-—-five-advisories-tenant-scoping-and-credential-hardening) · [Admin endpoint tenant scoping](#qwed-verification-—-tenant-scoped-admin-endpoints-and-working-rbac) · [`verify_fact` fails closed offline](#qwed-verification-—-verify_fact-fails-closed-offline-and-money-rejects-non-finite-amounts) · [Request caps and sandbox limits](#qwed-verification-—-request-body-caps-timeouts-and-sandbox-concurrency-limits) · [v7.2.3](#v7-2-3-—-code-secret-and-sql-verification-security-release) · [QWED-A2A runtime hardening](#qwed-a2a-—-request-size-limits-engine-budget-and-code-guard-hardening) · [QWED-Tax v0.2.1](#qwed-tax-v0-2-1-—-classification-claim-vocabulary-and-strict-facts) · [QWED-Legal v0.5.1](#qwed-legal-v0-5-1-—-deadlineguard-signing-anchor-allowlist) · [v7.2.2](#v7-2-2-—-verification-soundness-and-safety-hardening) · [Open Responses v0.6.1](#qwed-open-responses-v0-6-1-—-toolguard-verifies-client-action-items) · [QWED-Finance v3.0.1](#qwed-finance-v3-0-1-—-iso-20022-sanctions-and-queryguard-security-fixes) · [QWED-Legal date and input bounds](#qwed-legal-—-fail-closed-date-handling-and-input-bounds) · [Open Responses v0.6.0](#qwed-open-responses-v0-6-0-—-fail-closed-hardening) · [QWED-Legal fail-closed hardening](#qwed-legal-—-fail-closed-hardening-for-guards-diagnostics-and-github-action) · [`qwed init` server identity handshake](#qwed-verification-—-qwed-init-server-identity-handshake) · [Leaked key auto-revocation](#qwed-verification-—-leaked-api-key-auto-revocation-and-false-positive-feedback) · [API-key format spec](#qwed-verification-—-canonical-api-key-format-spec) · [Signed secret-scanning webhook](#qwed-verification-—-signed-secret-scanning-webhook-endpoint) · [v7.2.1](#v7-2-1-—-math-answer-comparison-security-patch) · [v7.2.0](#v7-2-0-—-precision-advisory-and-security-hardening-batch) · [v7.1.0](#v7-1-0-—-verification-context-v1-0-rollout) · [v7.0.0](#v7-0-0-—-full-diagnosticresult-engine-conformance)
+Jump to: [Translation model in natural-language and logic results](#qwed-verification-—-natural-language-and-logic-results-name-the-translation-model) · [Prompt-injection screening and circuit-breaker fix](#qwed-verification-—-prompt-injection-screening-before-translation-and-a-consensus-circuit-breaker-fix) · [Logic route proves a claim](#qwed-verification-—-the-logic-route-proves-a-claim-instead-of-reporting-satisfiability) · [Admission reads translation scope](#qwed-verification-—-every-admission-rule-reads-translation-scope) · [Open Responses v0.6.2](#qwed-open-responses-v0-6-2-—-toolguard-verifies-responses-output-tool-calls) · [QWED-Infra v0.4.0](#qwed-infra-v0-4-0-—-fail-closed-iam-network-cost-and-release-checks) · [QWED-MCP v0.3.0](#qwed-mcp-v0-3-0-—-allowlist-admission-for-execute_python_code) · [v10.0.0](#v10-0-0-evidence-is-not-proof) · [v9.1.0](#v9-1-0-—-allowlist-admission-for-python-code) · [v9.0.0](#v9-0-0-—-eleven-advisories-and-models-you-configure) · [List agents and owner activity access](#qwed-verification-—-list-agents-and-owners-read-agent-activity) · [Session admin auth, key list, and user list](#qwed-verification-—-session-sign-in-for-key-rotation-and-threats-richer-key-list-and-user-list) · [Audit CSV exports and natural-language domain](#qwed-verification-—-audit-csv-exports-carry-verdict-and-admission-natural-language-audit-domain) · [Owner sign-in from qwed init](#qwed-verification-—-qwed-init-can-create-an-owner-who-can-sign-in) · [Whole-chain trail scope and Verification Context audit rows](#qwed-verification-—-whole-chain-trail-scope-and-verifiable-verification-context-audit-rows) · [Startup hook digest pins](#qwed-verification-—-startup-hooks-can-be-allowed-by-content-digest) · [SQL and code verifier false positives](#qwed-verification-—-sql-and-code-verifier-false-positive-fixes-and-python-3-14) · [diff() and batch math verdicts](#qwed-verification-—-math-identities-read-diff--and-batch-math-matches-%2Fverify%2Fmath) · [Claude providers stop sending `temperature`](#qwed-verification-—-claude-providers-stop-sending-temperature) · [AgentStateGuard JSON numbers](#qwed-verification-—-agentstateguard-gives-one-verdict-on-a-json-number) · [QWED-MCP v0.2.3](#qwed-mcp-v0-2-3-—-qwedai-com-no-longer-trusted-and-mcp-sdk-pinned-below-2-0) · [v8.0.0](#v8-0-0-—-attested-verdicts-and-upgrade-guide) · [Batch and agent routes enforce attestations](#qwed-verification-—-batch-and-agent-verify-routes-return-enforced-attested-results) · [Audit paging and security events](#qwed-verification-—-audit-log-paging-caller-and-admission-fields-and-security-events) · [Clients fail closed](#qwed-verification-—-python-sdk-integrations-and-github-action-fail-closed) · [Pinned sandbox image](#qwed-verification-—-pinned-sandbox-image-and-hardened-container) · [CrossHair in the Docker sandbox](#qwed-verification-—-crosshair-runs-only-in-the-docker-sandbox) · [Signed audit chain for API rows](#qwed-verification-—-api-audit-rows-written-through-the-signed-hash-chain) · [Logic DSL fixes](#qwed-verification-—-logic-dsl-compiles-iff-and-quantifiers-and-rejects-boolean-coercion) · [Proven-false math claims](#qwed-verification-—-proven-false-math-claims-are-verified-with-admission-deny) · [GitHub Action scan paths](#qwed-verification-—-github-action-scans-use-mode-defaults-and-deny-empty-scans) · [Compliance session sign-in](#qwed-verification-—-session-sign-in-and-whole-chain-check-for-compliance-endpoints) · [Security activity summary](#qwed-verification-—-security-activity-summary-replaces-the-soc-2-report) · [Role checks and hashed agent tokens](#qwed-verification-—-role-checks-on-api-key-and-audit-routes-hashed-agent-tokens) · [Docker image runs the API server](#qwed-verification-—-docker-image-runs-the-api-server-and-the-compose-stack-builds) · [Go, TypeScript, and Rust SDK admission gating](#qwed-verification-—-go-typescript-and-rust-sdks-read-the-diagnosticresult-envelope) · [Signed Verification Context documents](#qwed-verification-—-signed-verification-context-documents-and-attestation-checks) · [Contacts moved to qwedai.tech](#qwed-verification-—-contacts-and-links-moved-to-qwedai-tech) · [v7.3.0](#v7-3-0-—-five-advisories-tenant-scoping-and-credential-hardening) · [Admin endpoint tenant scoping](#qwed-verification-—-tenant-scoped-admin-endpoints-and-working-rbac) · [`verify_fact` fails closed offline](#qwed-verification-—-verify_fact-fails-closed-offline-and-money-rejects-non-finite-amounts) · [Request caps and sandbox limits](#qwed-verification-—-request-body-caps-timeouts-and-sandbox-concurrency-limits) · [v7.2.3](#v7-2-3-—-code-secret-and-sql-verification-security-release) · [QWED-A2A runtime hardening](#qwed-a2a-—-request-size-limits-engine-budget-and-code-guard-hardening) · [QWED-Tax v0.2.1](#qwed-tax-v0-2-1-—-classification-claim-vocabulary-and-strict-facts) · [QWED-Legal v0.5.1](#qwed-legal-v0-5-1-—-deadlineguard-signing-anchor-allowlist) · [v7.2.2](#v7-2-2-—-verification-soundness-and-safety-hardening) · [Open Responses v0.6.1](#qwed-open-responses-v0-6-1-—-toolguard-verifies-client-action-items) · [QWED-Finance v3.0.1](#qwed-finance-v3-0-1-—-iso-20022-sanctions-and-queryguard-security-fixes) · [QWED-Legal date and input bounds](#qwed-legal-—-fail-closed-date-handling-and-input-bounds) · [Open Responses v0.6.0](#qwed-open-responses-v0-6-0-—-fail-closed-hardening) · [QWED-Legal fail-closed hardening](#qwed-legal-—-fail-closed-hardening-for-guards-diagnostics-and-github-action) · [`qwed init` server identity handshake](#qwed-verification-—-qwed-init-server-identity-handshake) · [Leaked key auto-revocation](#qwed-verification-—-leaked-api-key-auto-revocation-and-false-positive-feedback) · [API-key format spec](#qwed-verification-—-canonical-api-key-format-spec) · [Signed secret-scanning webhook](#qwed-verification-—-signed-secret-scanning-webhook-endpoint) · [v7.2.1](#v7-2-1-—-math-answer-comparison-security-patch) · [v7.2.0](#v7-2-0-—-precision-advisory-and-security-hardening-batch) · [v7.1.0](#v7-1-0-—-verification-context-v1-0-rollout) · [v7.0.0](#v7-0-0-—-full-diagnosticresult-engine-conformance)
 
 ---
 
@@ -23,6 +23,97 @@ Jump to: [Translation model in natural-language and logic results](#qwed-verific
 - **Provenance only.** The fields do not change the verdict or the admission, which stays `BLOCKED` on both routes.
 
 See [`POST /verify/natural_language`](/api/endpoints#post-%2Fverify%2Fnatural_language) and [Provider tracking](/engines/logic#provider-tracking).
+
+---
+
+## QWED Verification — prompt-injection screening before translation, and a consensus circuit-breaker fix
+
+**v11.0.0** · [GitHub PR #641](https://github.com/QWED-AI/qwed-verification/pull/641) · [GitHub PR #643](https://github.com/QWED-AI/qwed-verification/pull/643) · [GitHub PR #644](https://github.com/QWED-AI/qwed-verification/pull/644) · [GitHub PR #647](https://github.com/QWED-AI/qwed-verification/pull/647)
+
+`/verify/natural_language` and `/verify/logic` already screened the question for prompt injection before translating it. `/verify/consensus`, `/verify/stats` and `/verify/fact` called the model without that check, so a question the natural-language route refuses reached the model through consensus.
+
+### What changed
+
+- **Consensus refuses before any engine runs.** The query gets the check `/verify/natural_language` applies. A refused query is `BLOCKED` with `agreement_status: "blocked"`, `engines_used: 0` and no answer, and no engine records a circuit-breaker failure for it.
+- **Stats screens the query and each column name.** A phrase check, matched as whole words with a 10,000-character limit, runs before the model writes code. A refused request is `BLOCKED` with `stats_verifier.validation_error`.
+- **Fact screens the claim and the context before the model advisory.** When you name a provider and the advisory runs, a refused claim or context makes the request `BLOCKED` with the new `constraint_id` `fact_verifier.translation_refused`. The deterministic fields stay in `developer_fields`.
+- **A wrong claim no longer opens the consensus circuit breaker** ([GitHub PR #643](https://github.com/QWED-AI/qwed-verification/pull/643)). The breaker counted an engine's verdict as a failure, and every request on the server shares it, so three wrong claims in a row excluded SymPy for 30 seconds for every caller, and no consensus request could be `VERIFIED` until the circuit closed. It now counts only an engine that did not answer: a timeout or an unhandled exception.
+- **The phrase check reads through invisible characters and fullwidth letters** ([GitHub PR #644](https://github.com/QWED-AI/qwed-verification/pull/644)). Invisible characters such as a zero-width space inside or between a phrase's words, and fullwidth letters (read through the text's NFKC form), no longer hide a phrase. The 10,000-character limit also applies to the NFKC form. This check is also the one `/verify/natural_language` and `/verify/logic` run, and it can only refuse more text than before, never less, so some requests that passed are now `BLOCKED`.
+- **Screening a long question no longer stalls the server** ([GitHub PR #647](https://github.com/QWED-AI/qwed-verification/pull/647)). Phrases are searched in linear time. No verdict changes.
+
+<Warning>
+Requests that passed before can now be `BLOCKED`:
+
+- A `/verify/consensus` query over 2,000 characters, or one containing words such as `mode`, `root` or `system`. Send statistics questions over data to `/verify/stats`.
+- A `/verify/fact` request that names a provider, when the advisory runs and the claim or context is over 10,000 characters. Send no provider to get the deterministic result alone.
+- A `/verify/stats` query or CSV column name over 10,000 characters, or one that holds a prompt-injection phrase.
+</Warning>
+
+See [Screening before translation](/advanced/security-hardening#screening-before-translation).
+
+---
+
+## QWED Verification — the logic route proves a claim instead of reporting satisfiability
+
+**v11.0.0** · [GitHub PR #640](https://github.com/QWED-AI/qwed-verification/pull/640) · Closes [issue #631](https://github.com/QWED-AI/qwed-verification/issues/631)
+
+> `POST /verify/logic` now decides whether the claim in your question follows from its conditions for every value of the variables. It used to report satisfiable constraints as `VERIFIED`, so "Prove x > 5 implies x > 10" came back `VERIFIED` with `x = 11`, though the claim fails for `x = 6`.
+
+### What changed
+
+- **Constraints and a claim.** The LLM translation now separates what the question takes as given (constraints) from what it asks to prove (the claim, goal `VALIDITY`). A question that only asks whether some values meet its conditions keeps the goal `SATISFIABILITY`, and its claim is checked as one more condition, never proven or refuted.
+- **New verdicts.** A claim that follows is `VERIFIED` with no `is_valid`. A claim proven false is `VERIFIED` with `is_valid: false` and a counterexample in `model`. Constraints that contradict each other are `UNVERIFIABLE` (`dsl_logic_verifier.vacuous_premises`). Satisfiable constraints with no claim are `UNVERIFIABLE` (`logic.satisfiable_not_proven`). Batch logic items follow the same mapping.
+- **Admission is unchanged.** `admission` is still always `BLOCKED` on `/verify/logic` and on batch logic items.
+- **Division fails closed.** The translation bridge no longer translates `/`, and translates `%` only with a positive whole-number divisor, where Python's remainder and Z3's agree. A translation that uses either, or a helper call with keyword arguments, is `BLOCKED`.
+- **`DSLLogicVerifier.prove_from_dsl()`.** The new method decides a claim from premises and returns `VALID`, `INVALID` with the counterexample, or `VACUOUS`. `verify_from_dsl()` still returns `SAT` or `UNSAT`.
+- **LangChain.** `QWEDLogicTool` takes a question with its conditions and claim, and reports `HOLDS, NOT ADMITTED`, `DOES NOT FOLLOW` or `SATISFIABLE, NOT PROVEN`.
+
+<Warning>
+**Breaking change.** `status: "VERIFIED"` from `/verify/logic` no longer means "a solution exists".
+
+Before:
+
+```python
+result = client.verify_logic("(AND (GT x 5) (LT y 10))")
+if result.status == "VERIFIED":   # satisfiable
+    print(result.result["model"])
+```
+
+After:
+
+```python
+result = client.verify_logic("x is greater than 5. Is x greater than 10?")
+if result.status == "VERIFIED" and result.result.get("is_valid") is False:
+    print("Proven false:", result.result["model"])   # counterexample
+elif result.status == "VERIFIED":
+    print("The claim follows from the constraints")
+elif result.status == "UNVERIFIABLE":
+    print("Not proven")
+```
+
+To find values that satisfy constraints, call `DSLLogicVerifier.verify_from_dsl()` directly. See [Logic engine](/engines/logic#quick-start) and [`POST /verify/logic`](/api/endpoints#post-%2Fverify%2Flogic).
+</Warning>
+
+---
+
+## QWED Verification — every admission rule reads translation scope
+
+**v11.0.0** · [GitHub PR #639](https://github.com/QWED-AI/qwed-verification/pull/639) · Closes [issue #630](https://github.com/QWED-AI/qwed-verification/issues/630)
+
+> `admission_decision()`, the Verification Context bridge and the Python SDK's fallback rule now refuse a `VERIFIED` result reached on a model's translation of the question, as the natural-language route already did. A natural-language maths result whose translated expression holds no longer carries `is_valid: true`.
+
+### What changed
+
+- **`admission_decision()` reads translation scope.** It returns `BLOCKED` for a `VERIFIED` result with `is_valid: true` when `query_semantics_verified` is present and not `true`, or absent from a result whose `verification_scope` is `translated_expression_only`. A Verification Context document built from a natural-language verdict now has admission `DENY`.
+- **Translation engines record their scope.** A `VERIFIED` natural-language, logic or consensus result that does not record `query_semantics_verified` gets it as `false` before it is signed or admitted.
+- **No `is_valid` for a held translated expression.** `POST /verify/natural_language` no longer returns `is_valid: true` when the translated expression holds. A translated claim proven false is still `VERIFIED` with `is_valid: false`. Admission is `BLOCKED` either way, as before.
+- **Python SDK fallback.** When a response has no `admission` field, `is_admitted()` and `VerificationResult.is_verified` apply the same translation-scope check as the server.
+
+<Warning>
+If your code reads `is_valid` from `POST /verify/natural_language` to decide whether the translated answer held, it now finds no `is_valid` in that case. Gate on `admission`, which is `BLOCKED` for this route.
+</Warning>
+
+See [`POST /verify/natural_language`](/api/endpoints#post-%2Fverify%2Fnatural_language) and [Layer 3: proof diagnostics](/advanced/diagnostics#layer-3-—-proof-diagnostics).
 
 ---
 
