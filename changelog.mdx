@@ -11,7 +11,7 @@ Jump to: [Prompt-injection screening and circuit-breaker fix](#qwed-verification
 
 ## QWED Verification — prompt-injection screening before translation, and a consensus circuit-breaker fix
 
-**Unreleased** · [GitHub PR #641](https://github.com/QWED-AI/qwed-verification/pull/641) · [GitHub PR #643](https://github.com/QWED-AI/qwed-verification/pull/643) · [GitHub PR #644](https://github.com/QWED-AI/qwed-verification/pull/644)
+**v11.0.0** · [GitHub PR #641](https://github.com/QWED-AI/qwed-verification/pull/641) · [GitHub PR #643](https://github.com/QWED-AI/qwed-verification/pull/643) · [GitHub PR #644](https://github.com/QWED-AI/qwed-verification/pull/644) · [GitHub PR #647](https://github.com/QWED-AI/qwed-verification/pull/647)
 
 `/verify/natural_language` and `/verify/logic` already screened the question for prompt injection before translating it. `/verify/consensus`, `/verify/stats` and `/verify/fact` called the model without that check, so a question the natural-language route refuses reached the model through consensus.
 
@@ -20,14 +20,16 @@ Jump to: [Prompt-injection screening and circuit-breaker fix](#qwed-verification
 - **Consensus refuses before any engine runs.** The query gets the check `/verify/natural_language` applies. A refused query is `BLOCKED` with `agreement_status: "blocked"`, `engines_used: 0` and no answer, and no engine records a circuit-breaker failure for it.
 - **Stats screens the query and each column name.** A phrase check, matched as whole words with a 10,000-character limit, runs before the model writes code. A refused request is `BLOCKED` with `stats_verifier.validation_error`.
 - **Fact screens the claim and the context before the model advisory.** When you name a provider and the advisory runs, a refused claim or context makes the request `BLOCKED` with the new `constraint_id` `fact_verifier.translation_refused`. The deterministic fields stay in `developer_fields`.
-- **A wrong claim no longer opens the consensus circuit breaker** ([GitHub PR #643](https://github.com/QWED-AI/qwed-verification/pull/643)). The breaker counted an engine's verdict as a failure, and every request on the server shares it, so three wrong claims in a row made every caller's consensus request `BLOCKED` for 30 seconds. It now counts only an engine that did not answer: a timeout or an unhandled exception.
-- **The phrase check reads through invisible characters and fullwidth letters** ([GitHub PR #644](https://github.com/QWED-AI/qwed-verification/pull/644)). Invisible characters such as a zero-width space inside or between a phrase's words, and fullwidth letters (read through the text's NFKC form), no longer hide a phrase. The 10,000-character limit also applies to the NFKC form. This check is also the one `/verify/natural_language` and `/verify/logic` run, and it only refuses more: no verdict changes.
+- **A wrong claim no longer opens the consensus circuit breaker** ([GitHub PR #643](https://github.com/QWED-AI/qwed-verification/pull/643)). The breaker counted an engine's verdict as a failure, and every request on the server shares it, so three wrong claims in a row excluded SymPy for 30 seconds for every caller, and no consensus request could be `VERIFIED` until the circuit closed. It now counts only an engine that did not answer: a timeout or an unhandled exception.
+- **The phrase check reads through invisible characters and fullwidth letters** ([GitHub PR #644](https://github.com/QWED-AI/qwed-verification/pull/644)). Invisible characters such as a zero-width space inside or between a phrase's words, and fullwidth letters (read through the text's NFKC form), no longer hide a phrase. The 10,000-character limit also applies to the NFKC form. This check is also the one `/verify/natural_language` and `/verify/logic` run, and it can only refuse more text than before, never less, so some requests that passed are now `BLOCKED`.
+- **Screening a long question no longer stalls the server** ([GitHub PR #647](https://github.com/QWED-AI/qwed-verification/pull/647)). Phrases are searched in linear time. No verdict changes.
 
 <Warning>
 Requests that passed before can now be `BLOCKED`:
 
 - A `/verify/consensus` query over 2,000 characters, or one containing words such as `mode`, `root` or `system`. Send statistics questions over data to `/verify/stats`.
 - A `/verify/fact` request that names a provider, when the advisory runs and the claim or context is over 10,000 characters. Send no provider to get the deterministic result alone.
+- A `/verify/stats` query or CSV column name over 10,000 characters, or one that holds a prompt-injection phrase.
 </Warning>
 
 See [Screening before translation](/advanced/security-hardening#screening-before-translation).

@@ -669,7 +669,7 @@ Only unanimous `VERIFIED` engine outcomes, from two distinct engines or more and
 
 A confidence below `min_confidence` is not an HTTP error: the response is `UNVERIFIABLE` with a message such as `Confidence (70.0%) below required minimum (95.0%)`. When the secure Docker sandbox is unavailable for the Python engine in `high` or `maximum` mode, the response is `BLOCKED` with `agreement_status: "blocked_secure_execution"`.
 
-Before any engine runs, QWED screens the query with the same prompt-injection check that `/verify/natural_language` applies. A refused query is `BLOCKED` with `agreement_status: "blocked"`, `engines_used: 0` and `confidence: 0.0`, and no engine answers it. That check also refuses queries over 2,000 characters and queries that contain words such as `mode`, `root` or `system` anywhere, even inside a longer word such as `model`. For a statistics question over data, use [`/verify/stats`](#post-%2Fverify%2Fstats).
+Before any engine runs, QWED screens the query with the same prompt-injection check that `/verify/natural_language` applies. A refused query is `BLOCKED` with `agreement_status: "blocked"`, `engines_used: 0` and `confidence: 0.0`, and no engine answers it. The message reads `Consensus verification: all engines blocked`, as when every engine is blocked; `engines_used: 0` tells the two apart. That check also refuses queries over 2,000 characters and queries that contain words such as `mode`, `root` or `system` anywhere, even inside a longer word such as `model`. For a statistics question over data, use [`/verify/stats`](#post-%2Fverify%2Fstats).
 
 | Status | Description |
 |--------|-------------|
