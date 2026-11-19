@@ -581,6 +581,8 @@ Verify a factual claim against a provided context.
 | `REFUTED` | Claim contradicts the context |
 | `INCONCLUSIVE` | Not enough evidence in the context |
 
+When you name a `provider` and the deterministic checks are not confident enough, QWED asks the model for an advisory. It first screens the claim and the context for prompt-injection phrases and refuses either one over 10,000 characters. A refused claim or context returns `BLOCKED` with `constraint_id: "fact_verifier.translation_refused"`, and no model is called. See [Prompt-injection screening](/engines/fact#prompt-injection-screening).
+
 | Status | Description |
 |--------|-------------|
 | 503 | `Fact verification timed out.` The provider call exceeded `QWED_PROVIDER_TIMEOUT` (default 30 seconds) |
@@ -676,6 +678,8 @@ Only unanimous `VERIFIED` engine outcomes, from two distinct engines or more and
 </Note>
 
 A confidence below `min_confidence` is not an HTTP error: the response is `UNVERIFIABLE` with a message such as `Confidence (70.0%) below required minimum (95.0%)`. When the secure Docker sandbox is unavailable for the Python engine in `high` or `maximum` mode, the response is `BLOCKED` with `agreement_status: "blocked_secure_execution"`.
+
+Before any engine runs, QWED screens the query with the same prompt-injection check that `/verify/natural_language` applies. A refused query is `BLOCKED` with `agreement_status: "blocked"`, `engines_used: 0` and `confidence: 0.0`, and no engine answers it. The message reads `Consensus verification: all engines blocked`, as when every engine is blocked; `engines_used: 0` tells the two apart. That check also refuses queries over 2,000 characters and queries that contain words such as `mode`, `root` or `system` anywhere, even inside a longer word such as `model`. For a statistics question over data, use [`/verify/stats`](#post-%2Fverify%2Fstats).
 
 | Status | Description |
 |--------|-------------|
