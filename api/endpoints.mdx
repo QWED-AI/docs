@@ -382,6 +382,7 @@ The response is a [`DiagnosticResult`](/advanced/diagnostics), with the control 
   "dsl_code": "(IMPLIES (GT x 5) (GT x 10))",
   "declarations": {"x": "Int"},
   "provider_used": "openai_compat",
+  "translation_model": "your-configured-model",
   "query_semantics_verified": false,
   "query_interpretation_source": "llm_translation",
   "verification_scope": "translated_expression_only",
@@ -389,7 +390,7 @@ The response is a [`DiagnosticResult`](/advanced/diagnostics), with the control 
   "admission": "BLOCKED",
   "developer_fields": {
     "status": "INVALID",
-    "...": "is_valid, model, dsl_code, declarations, provider_used and the scope fields, as above"
+    "...": "is_valid, model, dsl_code, declarations, provider_used, translation_model and the scope fields, as above"
   }
 }
 ```
@@ -400,13 +401,13 @@ The response is a [`DiagnosticResult`](/advanced/diagnostics), with the control 
 | `VERIFIED`, `is_valid: false` | `INVALID` | The claim is proven false. `model` is a counterexample that meets the constraints and fails the claim |
 | `UNVERIFIABLE` | `VACUOUS` | The constraints contradict each other, so no claim is proven (`constraint_id: "dsl_logic_verifier.vacuous_premises"`) |
 | `UNVERIFIABLE` | `SAT` | The translation states no claim to prove, or asks only whether some values meet the conditions. The conditions can hold, which proves nothing (`constraint_id: "logic.satisfiable_not_proven"`) |
-| `UNVERIFIABLE` | `UNSAT` | No claim to prove, and the conditions cannot hold together |
+| `UNVERIFIABLE` | `UNSAT` | No claim to prove, or the question asks only whether some values meet the conditions, and no values meet them |
 | `BLOCKED` | anything else (`ERROR`, `BLOCKED`, `UNKNOWN`) | Blocked by security policy, a translation or solver error, or a timeout. A translation that uses `/`, `%` with a divisor other than a positive whole number, or a helper call with keyword arguments fails |
 
 `dsl_code` and `translated_expression` name the statement Z3 decided: `(IMPLIES constraints claim)`, or the claim alone when the question gives no constraints.
 
 <Warning>
-**Unreleased. Breaking change.** Before this change, the route decided only whether the translated constraints were satisfiable, and reported a satisfiable set as `VERIFIED` with `developer_fields.status: "SAT"`. "Prove x > 5 implies x > 10" came back `VERIFIED` with `x = 11`. It now returns `VERIFIED` with `is_valid: false` and a counterexample, and satisfiable constraints with no claim are `UNVERIFIABLE`. If you read `status: "VERIFIED"` as "a solution exists", check `is_valid` and `developer_fields.status` instead. Admission is unchanged.
+**Changed in v11.0.0. Breaking change.** Before this change, the route decided only whether the translated constraints were satisfiable, and reported a satisfiable set as `VERIFIED` with `developer_fields.status: "SAT"`. "Prove x > 5 implies x > 10" came back `VERIFIED` with `x = 11`. It now returns `VERIFIED` with `is_valid: false` and a counterexample, and satisfiable constraints with no claim are `UNVERIFIABLE`. If you read `status: "VERIFIED"` as "a solution exists", check `is_valid` and `developer_fields.status` instead. Admission is unchanged.
 </Warning>
 
 <Info>Changed in v10.0.0</Info>
@@ -1036,6 +1037,7 @@ A logic item, for example:
     "developer_fields": {
       "status": "VALID",
       "provider_used": "openai_compat",
+      "translation_model": "your-configured-model",
       "query_semantics_verified": false,
       "query_interpretation_source": "llm_translation",
       "verification_scope": "translated_expression_only",

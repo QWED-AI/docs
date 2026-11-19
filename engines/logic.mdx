@@ -51,13 +51,13 @@ else:
 | `VERIFIED`, `is_valid: false` | `INVALID` | The claim is proven false. `model` is a counterexample: values that meet the constraints and make the claim false. |
 | `UNVERIFIABLE` | `VACUOUS` | The constraints contradict each other, so every claim follows from them and none is proven (`constraint_id: "dsl_logic_verifier.vacuous_premises"`). |
 | `UNVERIFIABLE` | `SAT` | No claim to prove: the translation states none, or asks only whether some values meet the conditions (goal `SATISFIABILITY`). The conditions can hold, but one satisfying assignment proves nothing (`constraint_id: "logic.satisfiable_not_proven"`). |
-| `UNVERIFIABLE` | `UNSAT` | No claim to prove, and the conditions cannot hold together. |
+| `UNVERIFIABLE` | `UNSAT` | No claim to prove, or the question asks only whether some values meet the conditions, and no values meet them. |
 | `BLOCKED` | anything else | A translation or solver error, or a timeout. |
 
-`admission` is always `BLOCKED` (`DENY`), so `result.is_verified` is `False`: nothing checks that the translation means what you asked.
+`admission` is always `BLOCKED`, so `result.is_verified` is `False`: nothing checks that the translation means what you asked.
 
 <Warning>
-**Unreleased.** `/verify/logic` used to report satisfiable constraints as `VERIFIED`. A question such as "Prove x > 5 implies x > 10" came back `VERIFIED` with `x = 11`, though the claim fails for `x = 6`. It now returns `VERIFIED` with `is_valid: false` and a counterexample. Constraints with no claim are `UNVERIFIABLE`. To find values that satisfy constraints, call `DSLLogicVerifier.verify_from_dsl()` directly (see [Satisfiability checking](#satisfiability-checking)).
+**Changed in v11.0.0.** `/verify/logic` used to report satisfiable constraints as `VERIFIED`. A question such as "Prove x > 5 implies x > 10" came back `VERIFIED` with `x = 11`, though the claim fails for `x = 6`. It now returns `VERIFIED` with `is_valid: false` and a counterexample. Constraints with no claim are `UNVERIFIABLE`. To find values that satisfy constraints, call `DSLLogicVerifier.verify_from_dsl()` directly (see [Satisfiability checking](#satisfiability-checking)).
 </Warning>
 
 ---
