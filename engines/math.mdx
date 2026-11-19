@@ -587,10 +587,10 @@ result = client.verify_math(
 
 ### Tolerance bounding
 
-To prevent inflated tolerances from masking incorrect results, the math engine enforces a deterministic upper bound on the `tolerance` parameter. QWED computes the maximum allowed tolerance as a function of the result's magnitude:
+To prevent inflated tolerances from masking incorrect results, the math engine enforces a deterministic upper bound on the `tolerance` parameter. QWED computes the maximum allowed tolerance as a function of the result's magnitude: 1% of the value, with a floor of `0.01`, but never more than the value itself.
 
 ```
-max_tolerance = max(0.01, abs(calculated_value) * 0.01)
+max_tolerance = max(min(0.01, abs(calculated_value)), abs(calculated_value) * 0.01)
 ```
 
 If the requested tolerance exceeds this bound, QWED rejects the verification with a `BLOCKED` status instead of returning a potentially misleading `VERIFIED` result. This applies to both decimal and float precision modes.
@@ -828,7 +828,7 @@ These bounds are far above anything legitimate verification needs — `2^100`, `
 | Bare decimal (`.5`, `2.`) | Rejected before evaluation — write `0.5`, `2.0` |
 | Non-ASCII characters (`α`, fullwidth digits) | Rejected before evaluation — use ASCII names like `alpha` |
 | Strings, attribute access, comparisons, subscripts | Rejected by the AST allowlist — see [Expression input rules](#expression-input-rules) |
-| Non-equality expression in batch verification | Returns `is_valid: false` with `status: "SIMPLIFIED"` — simplification is not a proof |
+| Expression without `=` (`2+2`, `x + x`), on the route or as a batch item | Returns `UNVERIFIABLE` with `constraint_id: "math.no_claim"` and the computed value as evidence. Send `expression = value` to have it checked |
 | Oversized exponent, power tower, or huge factorial | Rejected before evaluation — see [Compute-cost bounds](#compute-cost-bounds) |
 | Ambiguous mode (multimodal data) | Returns "BLOCKED" with `ambiguous_modes` — only a unique mode can verify |
 | Incomplete or over-complete eigenvalue claim | Returns "DISPROVEN" with `calculated_count`/`claimed_count` |
