@@ -31,12 +31,12 @@ As of v5.0.0, the `status` field may return `INCONCLUSIVE`, `BLOCKED`, or `UNKNO
 
 ## How `is_verified` is decided
 
-<Info>Changed in v8.0.0 ([GHSA-jppc-7r58-7pjh](https://github.com/QWED-AI/qwed-verification/security/advisories/GHSA-jppc-7r58-7pjh))</Info>
+<Info>Changed in v8.0.0 ([GHSA-jppc-7r58-7pjh](https://github.com/QWED-AI/qwed-verification/security/advisories/GHSA-jppc-7r58-7pjh)) and v11.0.0</Info>
 
 `VerificationResult.is_verified` follows the server's admission decision. The SDK applies the same rule as the server (`is_admitted()` in `qwed_sdk.models`):
 
 - If the response carries an `admission` field, only `ADMIT` admits. `BLOCKED` is never verified.
-- If the route returns no `admission`, `status` must be `VERIFIED` and `is_valid` must be `true`.
+- If the route returns no `admission`, `status` must be `VERIFIED`, `is_valid` must be `true`, and the result must not be a verdict on a model's translation of the question. `query_semantics_verified` must be `true` where present, and a response whose `verification_scope` is `translated_expression_only` must carry it as `true`.
 
 A bare `is_valid: true` or `is_verified: true` in the response never admits on its own. The server flattens engine fields into the response, so a result that a gate blocked can still carry the engine's `is_valid: true`. The server's decision is also available as `result.admission`.
 
@@ -88,12 +88,19 @@ result = client.verify_math("x**2 + 2*x + 1 = (x+1)**2")
 
 ### verify_logic(query)
 
-Verify logical constraints (QWED-Logic DSL).
+Check whether a claim follows from the conditions a question states. The server's LLM translates the question into constraints and a claim, and Z3 decides the claim for every value of the variables.
 
 ```python
-result = client.verify_logic("(AND (GT x 5) (LT y 10))")
-print(result.model)  # {"x": 6, "y": 9}
+result = client.verify_logic("x is greater than 5. Is x greater than 3?")
+print(result.status)       # "VERIFIED": the claim follows from the constraints
+print(result.is_verified)  # False: the translation is not verified, so it is not admitted
+
+result = client.verify_logic("x is greater than 5. Is x greater than 10?")
+print(result.status, result.result["is_valid"])  # "VERIFIED" False: proven false
+print(result.result["model"])                    # the counterexample, such as {"x": "6"}
 ```
+
+Constraints with no claim are `UNVERIFIABLE`: one satisfying assignment proves nothing. See [`POST /verify/logic`](/api/endpoints#post-%2Fverify%2Flogic).
 
 ### verify_code(code, language)
 

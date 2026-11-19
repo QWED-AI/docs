@@ -149,11 +149,11 @@ console.log(result.is_valid);    // true
 
 ### verifyLogic(query)
 
-Verify logical constraints using QWED-Logic DSL.
+Check whether a claim follows from the conditions a question states.
 
 ```typescript
-const result = await client.verifyLogic('(AND (GT x 5) (LT y 10))');
-// The verdict covers the translated constraints only: admission is 'BLOCKED'
+const result = await client.verifyLogic('x is greater than 5. Is x greater than 10?');
+// The verdict covers the translated constraints and claim only: admission is 'BLOCKED'
 // and isAdmitted() is false, whatever the status.
 console.log(result.status, result.admission, result.model);
 ```

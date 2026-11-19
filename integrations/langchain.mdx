@@ -52,7 +52,7 @@ from qwed_sdk.langchain import QWEDMathTool, QWEDLogicTool, QWEDCodeTool
 
 tools = [
     QWEDMathTool(),   # Math expressions
-    QWEDLogicTool(),  # QWED-Logic DSL
+    QWEDLogicTool(),  # A question with its conditions and a claim
     QWEDCodeTool(),   # Code security
 ]
 ```
@@ -65,14 +65,16 @@ The tools call a result wrong only when QWED decided it. A result QWED did not d
 | --- | --- | --- |
 | `QWEDMathTool` | Admitted | `✅ VERIFIED: <expression> is correct` |
 | `QWEDMathTool` | `VERIFIED`, claim proven false | `❌ INCORRECT:` and the server's message |
-| `QWEDLogicTool` | `VERIFIED`, not admitted | `⚠️ SAT, NOT ADMITTED:` with the assignment, and why it is not admitted |
+| `QWEDLogicTool` | `VERIFIED`, not admitted | `⚠️ HOLDS, NOT ADMITTED:` the translated claim follows from the translated constraints, and why it is not admitted |
+| `QWEDLogicTool` | `VERIFIED`, claim proven false | `❌ DOES NOT FOLLOW:` with the counterexample, and why it is not admitted |
+| `QWEDLogicTool` | `UNVERIFIABLE`, no claim and satisfiable | `⚠️ SATISFIABLE, NOT PROVEN:` with the assignment, and that the translation states no claim |
 | `QWEDLogicTool` | `UNVERIFIABLE`, unsatisfiable | `❌ UNSAT: no assignment satisfies the translated constraints.` |
 | `QWEDCodeTool` | Admitted | `✅ SAFE: No security issues detected` |
 | `QWEDCodeTool` | `VERIFIED`, proven unsafe | `⚠️ SECURITY ISSUES:` and up to five `severity: description` lines |
 | All three | `UNVERIFIABLE` | `⚠️ UNVERIFIABLE:` and the server's message |
 | All three | `BLOCKED` | `⛔ BLOCKED:` and the server's message |
 
-`/verify/logic` admits no result while the LLM's translation of the query is unverified, so `QWEDLogicTool` reports a satisfiable query as `SAT, NOT ADMITTED`, not `SAT`.
+`QWEDLogicTool` takes a question with its conditions and the claim to check, such as `x is greater than 5. Is x greater than 3?`. `/verify/logic` admits no result while the LLM's translation of the query is unverified, so the tool reports a claim that follows as `HOLDS, NOT ADMITTED`. Constraints with no claim prove nothing, so the tool reports them as `SATISFIABLE, NOT PROVEN`, not as a verified answer.
 
 ### QWEDVerificationCallback
 

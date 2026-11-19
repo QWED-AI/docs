@@ -212,13 +212,15 @@ A compile error returns `ERROR`, never `SAT` or `VERIFIED`.
 
 **Python:**
 ```python
-result = client.verify_logic("(AND (GTE age 18) (LTE age 65))")
-if result.status == "VERIFIED":            # SAT
-    print(result.result["model"])          # e.g. {"age": "18"}
-elif result.status == "UNVERIFIABLE":      # UNSAT
+from qwed_new.core.dsl_logic_verifier import DSLLogicVerifier
+
+result = DSLLogicVerifier().verify_from_dsl("(AND (GTE age 18) (LTE age 65))")
+if result.status == "SAT":
+    print(result.model)                    # e.g. {"age": "18"}
+elif result.status == "UNSAT":
     print("No age satisfies the rule")
 else:
-    # BLOCKED: the query could not be translated or solved. Fail closed.
+    # ERROR, BLOCKED or UNKNOWN: the solver reached no verdict. Fail closed.
     raise RuntimeError(f"Logic verification failed ({result.status}): {result.error}")
 ```
 
@@ -276,19 +278,23 @@ else:
 
 ### Reading results
 
-```python
-result = client.verify_logic("(AND (GT x 5) (LT x 10))")
+The table above is the DSL verdict, which `DSLLogicVerifier.verify_from_dsl()` returns as is. `POST /verify/logic`, and so `client.verify_logic()`, does not report it directly. The LLM translates your question into constraints and a claim, and Z3 decides whether the claim follows from the constraints for every value:
 
-if result.status == "VERIFIED":          # SAT on /verify/logic
-    print(result.result["model"])        # {"x": "6"}
-elif result.status == "UNVERIFIABLE":    # UNSAT
-    print("No solution exists")
+```python
+result = client.verify_logic("x is greater than 5. Is x greater than 10?")
+
+if result.status == "VERIFIED" and result.result.get("is_valid") is False:
+    print("Proven false:", result.result["model"])   # a counterexample, such as {"x": "6"}
+elif result.status == "VERIFIED":
+    print("The claim follows from the constraints")
+elif result.status == "UNVERIFIABLE":
+    print("Not proven")   # no claim, or constraints that contradict each other
 else:
     # BLOCKED: the query could not be translated or solved. Fail closed.
     raise RuntimeError(f"Logic verification failed ({result.status}): {result.error}")
 ```
 
-The table above is the DSL verdict, which `DSLLogicVerifier.verify_from_dsl()` returns as is. `POST /verify/logic`, and so `client.verify_logic()`, maps it: `SAT` is `VERIFIED` with the model as evidence, `UNSAT` is `UNVERIFIABLE`, and anything else is `BLOCKED`. The response carries `admission`, and it is always `BLOCKED`: the DSL is an LLM's translation of your question, and nothing checks that it means what you asked. So the Python SDK's `is_verified` stays `False`; read `status` and the model.
+Satisfiable constraints with no claim are `UNVERIFIABLE` (`logic.satisfiable_not_proven`), not `VERIFIED`. See [`POST /verify/logic`](/api/endpoints#post-%2Fverify%2Flogic) for the full mapping. The response carries `admission`, and it is always `BLOCKED`: the constraints and claim are an LLM's translation of your question, and nothing checks that they mean what you asked. So the Python SDK's `is_verified` stays `False`; read `status`, `is_valid` and the model.
 
 ---
 
@@ -301,22 +307,15 @@ from qwed import QWEDClient
 
 client = QWEDClient(api_key="qwed_your_key")
 
-# Simple constraint: check the status before using the result, as below
-result = client.verify_logic("(GT x 5)")
+# A question with its conditions and the claim to prove
+result = client.verify_logic("x is a multiple of 14. Is x a multiple of 7?")
 
-# Complex constraint
-result = client.verify_logic("""
-  (AND 
-    (GTE x 0) 
-    (LTE x 100)
-    (EQ (MOD x 7) 0)
-  )
-""")
-
-if result.status == "VERIFIED":
-    print(f"Solution: x = {result.result['model']['x']}")
+if result.status == "VERIFIED" and result.result.get("is_valid") is False:
+    print(f"Proven false, counterexample: {result.result['model']}")
+elif result.status == "VERIFIED":
+    print("The claim follows from the conditions")
 elif result.status == "UNVERIFIABLE":
-    print("No solution exists")
+    print("Not proven")
 else:
     raise RuntimeError(f"Logic verification failed ({result.status}): {result.error}")
 ```
