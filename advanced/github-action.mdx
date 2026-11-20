@@ -34,7 +34,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Verify Calculation
-        uses: QWED-AI/qwed-verification@v10.0.0
+        uses: QWED-AI/qwed-verification@v11.0.0
         with:
           api_key: ${{ secrets.QWED_API_KEY }}
           action: verify
@@ -84,7 +84,7 @@ You can now specify which LLM provider and model the action uses. When you pass 
 
 ```yaml
 - name: Verify with Claude
-  uses: QWED-AI/qwed-verification@v10.0.0
+  uses: QWED-AI/qwed-verification@v11.0.0
   with:
     api_key: ${{ secrets.ANTHROPIC_API_KEY }}
     provider: anthropic
@@ -100,7 +100,7 @@ Set `mask_pii: "true"` to automatically redact personally identifiable informati
 
 ```yaml
 - name: Verify with PII masking
-  uses: QWED-AI/qwed-verification@v10.0.0
+  uses: QWED-AI/qwed-verification@v11.0.0
   with:
     api_key: ${{ secrets.QWED_API_KEY }}
     mask_pii: "true"
@@ -149,7 +149,7 @@ Matches that aren't regular files, such as a symlinked directory, are ignored, a
 ```yaml
 - name: Scan source code
   id: scan
-  uses: QWED-AI/qwed-verification@v10.0.0  # files_scanned needs v8.0.0 or later
+  uses: QWED-AI/qwed-verification@v11.0.0  # files_scanned needs v8.0.0 or later
   with:
     action: scan-code
     paths: "src/**/*.py,scripts/**/*.py"
@@ -196,7 +196,7 @@ Every action mode (`verify`, `scan-secrets`, `scan-code`, `verify-shell`, `verif
 ```yaml
 - name: Verify math
   id: qwed
-  uses: QWED-AI/qwed-verification@v10.0.0
+  uses: QWED-AI/qwed-verification@v11.0.0
   with:
     action: verify
     engine: math
@@ -236,7 +236,7 @@ The mode also sets the `irac_score` output, the share of IRAC steps found, and `
 
 ```yaml
 - name: Check reasoning structure
-  uses: QWED-AI/qwed-verification@v10.0.0
+  uses: QWED-AI/qwed-verification@v11.0.0
   with:
     action: verify-process
     llm_output: "The issue is whether the contract was breached. The rule is Article 2 of the UCC. Applying this rule, the seller delivered late. Therefore, the contract was breached."
@@ -258,7 +258,7 @@ Pin the Action to `QWED-AI/qwed-verification@v8.0.0` or later. In earlier versio
 
 ```yaml
 - name: Check Math
-  uses: QWED-AI/qwed-verification@v10.0.0
+  uses: QWED-AI/qwed-verification@v11.0.0
   with:
     api_key: ${{ secrets.QWED_API_KEY }}
     action: verify
@@ -272,7 +272,7 @@ Pin the Action to `QWED-AI/qwed-verification@v8.0.0` or later. In earlier versio
 
 ```yaml
 - name: Check Logic
-  uses: QWED-AI/qwed-verification@v10.0.0
+  uses: QWED-AI/qwed-verification@v11.0.0
   with:
     api_key: ${{ secrets.QWED_API_KEY }}
     action: verify
@@ -286,7 +286,7 @@ The server does not admit a logic verdict: it covers the constraints an LLM tran
 
 ```yaml
 - name: Security Check
-  uses: QWED-AI/qwed-verification@v10.0.0
+  uses: QWED-AI/qwed-verification@v11.0.0
   with:
     api_key: ${{ secrets.QWED_API_KEY }}
     action: verify
@@ -298,7 +298,7 @@ The server does not admit a logic verdict: it covers the constraints an LLM tran
 
 ```yaml
 - name: Scan Code
-  uses: QWED-AI/qwed-verification@v10.0.0
+  uses: QWED-AI/qwed-verification@v11.0.0
   with:
     api_key: ${{ secrets.QWED_API_KEY }}
     action: scan-code
