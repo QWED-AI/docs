@@ -87,11 +87,9 @@ qwed test
 #   [ok] 2+2=4                  -> VERIFIED | ADMIT
 #   [ok] 2+2=5                  -> VERIFIED (false) | DENY
 #   ...
-
-# Verify logic constraints
-qwed verify-logic "(AND (GT x 5) (LT y 10))"
-# -> SAT: {x=6, y=9}
 ```
+
+To prove a claim from its conditions with Z3, see [Logic verification](/getting-started/quickstart#3-logic-verification) in the quick start: given x > 5, the claim x > 3 follows, and x > 10 comes back with a counterexample such as x = 6.
 
 <Steps>
   <Step title="Install and configure">
