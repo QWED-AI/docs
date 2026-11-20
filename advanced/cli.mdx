@@ -367,7 +367,7 @@ Use this command to confirm that verification engines are working correctly afte
 | Engine | Test cases |
 |---|---|
 | Math | Valid expression (`2+2=4`), invalid expression (`2+2=5`), large computation |
-| Logic | Contradictions (`x>5 AND x<3`), satisfiable constraints, conflicting assignments |
+| Logic | Contradiction (`x>5 AND x<3`), a claim that follows from its premise (`x>5 => x>3`), a claim that does not (`x>5 => x>10`) |
 | SQL | Valid SELECT, `OR 1=1` injection detection, stacked `DROP TABLE` detection |
 | Code | Safe function, `eval(input())` detection, `curl \| bash` detection |
 
@@ -387,8 +387,8 @@ Math:
 
 Logic:
   [ok] x>5 AND x<3            -> UNVERIFIABLE (contradiction) | DENY
-  [ok] x>3 AND x<10           -> VERIFIED (x=4) | ADMIT
-  [ok] approval=1 AND approval=0 -> UNVERIFIABLE (contradiction) | DENY
+  [ok] x>5 => x>3             -> VERIFIED | ADMIT
+  [ok] x>5 => x>10            -> VERIFIED (false) | DENY
 
 SQL:
   [ok] Valid SELECT            -> VERIFIED (safe) | ADMIT
@@ -404,6 +404,8 @@ Code:
 ```
 
 Each line prints the verdict together with its admission decision, so `VERIFIED` never appears alone. `VERIFIED` means the engine decided the claim, not that the claim is safe to use. A claim proven false, such as `2+2=5`, is `VERIFIED (false) | DENY`. A test case whose self-check fails prints `FAILED` instead of a verdict, and an engine that raises prints `ERROR`.
+
+The two `=>` lines prove a claim from the premise `x>5` for every integer `x`. `x>3` follows from it, so that line is `VERIFIED | ADMIT`. `x>10` does not, so the engine returns a counterexample (a value of `x` from 6 to 10) and the line is `VERIFIED (false) | DENY`. Each line passes only when the engine gives that exact answer and the verdict carries a `proof_ref`, as `/verify/logic` returns it. On these lines, a result that is only satisfiable or vacuous prints `FAILED`, not `VERIFIED`. To prove your own claims, use `LogicVerifier.prove_theorem()` or `/verify/logic`, not `verify_logic()`.
 
 #### Verbose mode
 
