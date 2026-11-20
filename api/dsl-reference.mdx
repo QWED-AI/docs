@@ -322,14 +322,7 @@ else:
 
 ### CLI
 
-```bash
-# Verify a constraint
-qwed verify-logic "(AND (GT x 5) (LT x 10))"
-
-# From file
-echo "(EQ (PLUS x y) 10)" > constraint.dsl
-qwed verify-logic -f constraint.dsl
-```
+The `qwed` CLI has no command that takes DSL. `qwed test` runs the logic engine on fixed cases; see the [CLI reference](/advanced/cli) for every command.
 
 ### HTTP API
 

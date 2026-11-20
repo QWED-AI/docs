@@ -465,17 +465,11 @@ VerificationCache(cache_dir: Optional[str] = None, ttl: int = 86400)
 ## CLI
 
 ```bash
+# Run Math, Logic, SQL and Code on known cases (no LLM needed)
+qwed test
+
 # Verify
 qwed verify "2+2=4"
-
-# Verify logic
-qwed verify-logic "(AND (GT x 5) (LT y 10))"
-
-# Verify code file
-qwed verify-code -f script.py
-
-# Batch verify
-qwed batch -f queries.json
 
 # Verification Context utilities
 qwed context validate --server http://localhost:8000 document.json

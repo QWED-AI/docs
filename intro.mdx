@@ -81,17 +81,15 @@ pip install qwed==10.0.0
 The examples below use the `qwed` CLI that this installs. The `qwedai/qwed-verification:10.0.0` Docker image runs the API server instead; see [Self-hosting](/advanced/self-hosting#docker).
 
 ```bash
-# Run every engine on known cases (no LLM needed)
+# Run Math, Logic, SQL and Code on known cases (no LLM needed)
 qwed test
 # Math:
 #   [ok] 2+2=4                  -> VERIFIED | ADMIT
 #   [ok] 2+2=5                  -> VERIFIED (false) | DENY
 #   ...
-
-# Verify logic constraints
-qwed verify-logic "(AND (GT x 5) (LT y 10))"
-# -> SAT: {x=6, y=9}
 ```
+
+To prove a claim from its conditions with Z3, see [Logic verification](/getting-started/quickstart#3-logic-verification) in the quick start: given x > 5, the claim x > 3 follows, and x > 10 comes back with a counterexample such as x = 6. This needs qwed 11.0.0 or later (`pip install "qwed>=11.0.0"`); 10.0.0, pinned above, only checks whether the conditions can all hold.
 
 <Steps>
   <Step title="Install and configure">
