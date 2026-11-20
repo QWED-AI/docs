@@ -17,9 +17,9 @@ Jump to: [ConfigGuard public hashes](#qwed-verification-—-configguard-no-longe
 
 ### What changed
 
-- **Public shapes are skipped.** The built-in `AWS_SECRET_KEY` pattern skips a run of base64 characters that is wholly the commit of a pinned `uses:` step, a hex digest of the exact length after its `sha1:` to `sha512:` label, an integrity hash of the exact length under an `integrity` key or attribute, a run of only `=`, or a run in strictly ascending order.
+- **Public shapes are skipped.** The built-in `AWS_SECRET_KEY` pattern skips a run of base64 characters that is wholly the commit of a pinned `uses:` step, a hex digest of its algorithm's exact length after a `sha1:`, `sha256:`, `sha384:` or `sha512:` label, an integrity hash of the exact length under an `integrity` key or attribute, a run of only `=`, or a run in strictly ascending order.
 - **Everything else is still reported.** A bare 40-character hex value, a label or key that continues a longer name (`my_sha1:`, `notintegrity`), and a 40-character base64 value with `=` padding are reported as before.
-- **Parsed configuration matches the file.** `verify_config_safety` reads a value under a `uses` or `integrity` key with its key, so a parsed workflow or lock file gives the same result as the file.
+- **Parsed configuration reads the key too.** `verify_config_safety` reads a value under a key named exactly `uses` or `integrity` with its key, so a pinned step or an integrity hash in a parsed workflow or lock file is skipped as it is in the file.
 - **Custom patterns are searched as written.** An `AWS_SECRET_KEY` pattern you pass in `custom_patterns` does not skip these shapes.
 
 The shapes are recognised by their form, not proven public. See [Public hashes and the AWS secret key pattern](/sdks/guards#public-hashes-and-the-aws-secret-key-pattern).

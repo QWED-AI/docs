@@ -589,7 +589,7 @@ The built-in `AWS_SECRET_KEY` pattern matches any 40 base64 characters. In relea
 - A run made only of `=`, such as a comment rule.
 - A run in strictly ascending character order, such as a written-out alphabet.
 
-`ConfigGuard` still reports every other run. A bare 40-character hex value is reported. A label or `integrity` key counts only when it does not continue a longer name, so `my_sha1:`, `notintegrity` and `data-integrity` are reported. In `verify_config_safety`, a value under a `uses` or `integrity` key is read with its key, so a parsed workflow or lock file gives the same result as the file.
+`ConfigGuard` still reports every other run. A bare 40-character hex value is reported. A label or `integrity` key counts only when it does not continue a longer name, so `my_sha1:`, `notintegrity` and `data-integrity` are reported. In `verify_config_safety`, a value under a key named exactly `uses` or `integrity`, in lowercase, is read with its key, so a pinned step or an integrity hash in a parsed workflow or lock file is skipped as it is in the file.
 
 Only the built-in pattern skips these shapes. An `AWS_SECRET_KEY` pattern you pass in `custom_patterns`, even with the default text, is searched as written, and the other patterns are unchanged.
 
