@@ -597,6 +597,28 @@ Only the built-in pattern skips these shapes. An `AWS_SECRET_KEY` pattern you pa
 `ConfigGuard` recognises these values by their shape and context. It does not prove them public. A secret written in one of these shapes is not reported as an AWS secret key.
 </Note>
 
+### Passwords in URLs
+
+The built-in `DATABASE_URL` pattern reports a URL that carries a password in the form `user:password@` after `://`. In v11.0.0 and earlier, it matched only the `postgres://`, `mysql://` and `mongodb://` schemes. In releases after v11.0.0, it matches any scheme in any case, for example `postgresql://`, `postgresql+psycopg2://`, `mongodb+srv://`, `redis://`, `amqp://` and `https://`. Every match is reported under the `DATABASE_URL` type.
+
+For any scheme, `ConfigGuard` reads the URL as one token:
+
+- Whitespace and the quote characters `"`, `'` and `` ` `` end the URL.
+- The user runs to the first `:`. It may be empty, as in `redis://:<password>@host`, and may contain `@`. It can't contain `/`, `?`, `#`, `[` or `]`.
+- The password runs to the next `@`. It may contain a raw `/`, `?` or `#`, but not `://`.
+
+The `postgres://`, `mysql://` and `mongodb://` schemes keep the reach they had before. Their password runs to the first `@` across whitespace, quotes and lines, so a password containing spaces or quotes is still reported for them. Their password stops where the next `postgres://`, `mysql://` or `mongodb://` URL starts.
+
+`ConfigGuard` doesn't report these shapes:
+
+- A port of one to five digits followed by `/`, `?` or `#`, so the `@` in `host:4873/@scope/pkg` is read as part of the path. An empty port or a port of six or more digits before an `@` in the path is reported.
+- A hex digest of its algorithm's exact length after a `sha1:`, `sha256:`, `sha384:` or `sha512:` label directly after the `@`, ending the URL, as in an image pinned by digest (`docker://alpine:3.18@sha256:<digest>`).
+- A password that is exactly a placeholder of the form `${NAME}` or `<name>`. `${NAME:-default}`, `$NAME` and a run of `*` are reported, because a literal password can have those shapes.
+
+For schemes other than `postgres`, `mysql` and `mongodb`, a password that contains whitespace, a quote character or `://` is not reported. A password that contains `postgres://`, `mysql://` or `mongodb://` is not reported under any scheme.
+
+A `DATABASE_URL` pattern you pass in `custom_patterns` replaces the built-in pattern.
+
 ---
 
 ## Server-side guards
