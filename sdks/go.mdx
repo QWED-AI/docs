@@ -7,16 +7,16 @@ description: "QWED Go SDK documentation. Install via go get, use context-based v
 ## Installation
 
 ```bash
-go get github.com/QWED-AI/qwed-verification/sdk-go/v10
+go get github.com/QWED-AI/qwed-verification/sdk-go/v11
 ```
 
-The module lives in the `sdk-go/` subdirectory and follows the main QWED version line, so its import path carries the `/v10` suffix from 10.0.0. Releases are tagged `sdk-go/vX.Y.Z`. Pin a release with the version only:
+The module lives in the `sdk-go/` subdirectory and follows the main QWED version line, so its import path carries the `/v11` suffix from 11.0.0. Releases are tagged `sdk-go/vX.Y.Z`. Pin a release with the version only:
 
 ```bash
-go get github.com/QWED-AI/qwed-verification/sdk-go/v10@v10.0.0
+go get github.com/QWED-AI/qwed-verification/sdk-go/v11@v11.0.0
 ```
 
-If you upgrade from 9.x, change every `sdk-go/v9` import to `sdk-go/v10`. See [Upgrading to 10.0.0](/changelog#v10-0-0-evidence-is-not-proof).
+If you upgrade from 10.x, change every `sdk-go/v10` import to `sdk-go/v11`. See [Upgrading to 11.0.0](/changelog#v11-0-0-ten-advisories-and-admission-only-on-proof).
 
 ## Quick start
 
@@ -28,7 +28,7 @@ import (
     "fmt"
     "log"
 
-    qwed "github.com/QWED-AI/qwed-verification/sdk-go/v10"
+    qwed "github.com/QWED-AI/qwed-verification/sdk-go/v11"
 )
 
 func main() {
@@ -52,7 +52,7 @@ Pass options to `NewClient` to point the client at your self-hosted QWED server 
 import (
     "time"
 
-    qwed "github.com/QWED-AI/qwed-verification/sdk-go/v10"
+    qwed "github.com/QWED-AI/qwed-verification/sdk-go/v11"
 )
 
 client := qwed.NewClient("qwed_your_key",

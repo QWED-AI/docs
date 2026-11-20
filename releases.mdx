@@ -6,8 +6,8 @@ description: "QWED Protocol release history with download links, installation in
 
 ## Current release
 
-<Card title="v10.0.0: Evidence is not proof" icon="shield-check" href="https://github.com/QWED-AI/qwed-verification/releases/tag/v10.0.0">
-  Major release. Routes stop reporting `VERIFIED`, or admitting a result, on evidence that does not prove the claim, the `claude_opus` provider is removed, and the Go module path ends in `/v10`. Three dependency advisories are fixed. Read the [upgrade steps](/changelog#v10-0-0-evidence-is-not-proof) before upgrading.
+<Card title="v11.0.0: Ten advisories and admission only on proof" icon="shield-check" href="https://github.com/QWED-AI/qwed-verification/releases/tag/v11.0.0">
+  Major release with ten security fixes. The code, SQL, maths, image and guard checks admit only what they can show safe, `QWEDLocal` never reports a claim as verified, `/verify/logic` proves a claim instead of reporting satisfiability, and the Go module path ends in `/v11`. Read the [upgrade steps](/changelog#v11-0-0-ten-advisories-and-admission-only-on-proof) before upgrading.
 </Card>
 
 ### Install
@@ -15,23 +15,23 @@ description: "QWED Protocol release history with download links, installation in
 <CodeGroup>
 
 ```bash pip
-pip install qwed==10.0.0
+pip install qwed==11.0.0
 ```
 
 ```bash docker
-docker pull qwedai/qwed-verification:10.0.0
+docker pull qwedai/qwed-verification:11.0.0
 ```
 
 ```bash npm
-npm install @qwed-ai/sdk@10.0.0
+npm install @qwed-ai/sdk@11.0.0
 ```
 
 ```bash cargo
-cargo add qwed@10.0.0
+cargo add qwed@11.0.0
 ```
 
 ```bash go
-go get github.com/QWED-AI/qwed-verification/sdk-go/v10@v10.0.0
+go get github.com/QWED-AI/qwed-verification/sdk-go/v11@v11.0.0
 ```
 
 </CodeGroup>
@@ -41,6 +41,12 @@ go get github.com/QWED-AI/qwed-verification/sdk-go/v10@v10.0.0
 ## Release history
 
 <AccordionGroup>
+
+<Accordion title="v10.0.0: Evidence is not proof (November 14, 2026)" icon="shield-check">
+  **Major release.** Routes stop reporting `VERIFIED`, or admitting a result, on evidence that does not prove the claim, the `claude_opus` provider is removed, and the Go module path ends in `/v10`. Three dependency advisories are fixed.
+
+  [Full Release Notes →](/changelog#v10-0-0-evidence-is-not-proof) · [GitHub Release ↗](https://github.com/QWED-AI/qwed-verification/releases/tag/v10.0.0)
+</Accordion>
 
 <Accordion title="v9.1.0 — Allowlist admission for Python code (November 7, 2026)" icon="shield-check">
   Minor release with one security fix (GHSA-9r7q-mx75-hcj7). `CodeVerifier` admits Python code only when the modules, builtins and special attributes it uses are listed, so code that 9.0.0 admitted may now be refused. The server reads `.env` before any of its settings. Read the [upgrade steps](/changelog#v9-1-0-—-allowlist-admission-for-python-code) before you upgrade.
