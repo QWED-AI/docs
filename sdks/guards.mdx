@@ -579,6 +579,24 @@ Scans configuration files for exposed secrets and credentials. See [Security har
 
 `ConfigGuard` detects OpenAI API keys in all current formats: project-scoped (`sk-proj-`), service-account (`sk-svcacct-`), and admin (`sk-admin-`) keys, as well as legacy `sk-` keys. Anthropic keys (`sk-ant-`) are reported separately. Detection of the scoped OpenAI formats was added in v7.2.3 ([GHSA-64xf-wffc-63fm](https://github.com/QWED-AI/qwed-verification/security/advisories/GHSA-64xf-wffc-63fm)).
 
+### Public hashes and the AWS secret key pattern
+
+The built-in `AWS_SECRET_KEY` pattern matches any 40 base64 characters. In releases after v11.0.0, `ConfigGuard` skips its matches inside a run of base64 characters when the whole run has one of these shapes:
+
+- The 40-character hex commit of a pinned step on its own line, such as `uses: actions/checkout@<commit>`. Quotes are allowed, and so is a comment after whitespace.
+- A hex digest of its algorithm's exact length after a `sha1:`, `sha256:`, `sha384:` or `sha512:` label.
+- An integrity hash (`sha256-`, `sha384-` or `sha512-` and the base64 digest of that exact length) as the value of an `integrity` key or attribute, as in `package-lock.json` or an HTML `integrity="..."`.
+- A run made only of `=`, such as a comment rule.
+- A run in strictly ascending character order, such as a written-out alphabet.
+
+`ConfigGuard` still reports every other run. A bare 40-character hex value is reported. A label or `integrity` key counts only when it does not continue a longer name, so `my_sha1:`, `notintegrity` and `data-integrity` are reported. In `verify_config_safety`, a value under a key named exactly `uses` or `integrity`, in lowercase, is read with its key, so a pinned step or an integrity hash in a parsed workflow or lock file is skipped as it is in the file.
+
+Only the built-in pattern skips these shapes. An `AWS_SECRET_KEY` pattern you pass in `custom_patterns`, even with the default text, is searched as written, and the other patterns are unchanged.
+
+<Note>
+`ConfigGuard` recognises these values by their shape and context. It does not prove them public. A secret written in one of these shapes is not reported as an AWS secret key.
+</Note>
+
 ---
 
 ## Server-side guards
