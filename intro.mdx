@@ -6,7 +6,7 @@ icon: "shield-check"
 ---
 
 <Note>
-**QWED v11.0.0 is the current release.** It fixes ten advisories, and the code, SQL, maths, image and guard checks admit only what they can show safe. `QWEDLocal` never reports a claim as verified, `/verify/logic` proves a claim instead of reporting satisfiability, and the Go module path ends in `/v11`. Read the [11.0.0 upgrade steps](/changelog#v11-0-0-ten-advisories-and-admission-only-on-proof) before you upgrade.
+**QWED v11.0.0 is the current release.** It fixes ten advisories. The code, SQL, maths, image and guard checks admit only what they can show safe. `QWEDLocal.verify`, `verify_math` and `verify_logic` no longer report a claim as verified. `/verify/logic` proves a claim instead of reporting satisfiability. The Go module path ends in `/v11`. Read the [11.0.0 upgrade steps](/changelog#v11-0-0-ten-advisories-and-admission-only-on-proof) before you upgrade.
 </Note>
 
 ## What is QWED?
@@ -134,10 +134,10 @@ To prove a claim from its conditions with Z3, see [Logic verification](/getting-
 
 <AccordionGroup>
   <Accordion title="Admission only on proof" icon="shield-check" defaultOpen>
-    From v11.0.0, the code, SQL, maths, image and guard checks admit only what they can show safe, which fixes ten advisories. `/verify/code` never admits JavaScript, TypeScript, Java or Go, and `/verify/sql` admits only reads of tables and known functions. `/verify/logic` is `VERIFIED` only when the claim follows for every value, and a claim that does not follow comes back with a counterexample. Every translation is screened for prompt injection in one place, before any provider is called. [Read the 11.0.0 notes →](/changelog#v11-0-0-ten-advisories-and-admission-only-on-proof)
+    From v11.0.0, the code, SQL, maths, image and guard checks admit only what they can show safe, which fixes ten advisories. `/verify/code` never admits JavaScript, TypeScript, Java or Go. `/verify/sql` admits only reads of tables and known functions. `/verify/logic` decides whether a claim follows for every value. A claim that follows is `VERIFIED`, and a claim proven false is also `VERIFIED`, with `is_valid: false` and a counterexample. Every translation is screened for prompt injection in one place, before any provider is called. [Read the 11.0.0 notes →](/changelog#v11-0-0-ten-advisories-and-admission-only-on-proof)
   </Accordion>
   <Accordion title="Before you upgrade" icon="triangle-exclamation">
-    From v11.0.0, `QWEDLocal.verify`, `verify_math` and `verify_logic` return `verified` False for every claim, and `qwed verify` exits 1: send a maths claim as an equation to `/verify/math`. A satisfiable set of constraints is no longer `VERIFIED` on `/verify/logic`, some SQL and maths that 10.0.0 admitted is now refused, and the Go module path moves to `/v11`. [Read the upgrade steps →](/changelog#v11-0-0-ten-advisories-and-admission-only-on-proof)
+    From v11.0.0, `QWEDLocal.verify`, `verify_math` and `verify_logic` return `verified` False for every claim, and `qwed verify` exits 1. Send a maths claim as an equation to `/verify/math`. A satisfiable set of constraints is no longer `VERIFIED` on `/verify/logic`. Some SQL and maths that 10.0.0 admitted is now refused. The Go module path moves to `/v11`. [Read the upgrade steps →](/changelog#v11-0-0-ten-advisories-and-admission-only-on-proof)
   </Accordion>
 </AccordionGroup>
 

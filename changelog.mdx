@@ -30,11 +30,11 @@ The shapes are recognised by their form, not proven public. See [Public hashes a
 
 **Released: November 19, 2026** · [GitHub PR #653](https://github.com/QWED-AI/qwed-verification/pull/653) · [GitHub Release](https://github.com/QWED-AI/qwed-verification/releases/tag/v11.0.0)
 
-> **Major release.** Fixes ten advisories. The code, SQL, maths, image and guard checks admit only what they can show safe, and `QWEDLocal` no longer calls a model's answer verified because the model's own formula or expression agrees with it. `/verify/logic` proves a claim instead of reporting satisfiability, and the Go module path ends in `/v11`. The soundness eval has 163 known-answer claims, 0 accepted wrongly.
+> **Major release.** Fixes ten advisories. The code, SQL, maths, image and guard checks admit only what they can show safe. `QWEDLocal` no longer calls a model's answer verified because the model's own formula or expression agrees with it. `/verify/logic` proves a claim instead of reporting satisfiability. The Go module path ends in `/v11`. The soundness eval has 163 known-answer claims, 0 accepted wrongly.
 
 ### Security fixes (advisories)
 
-These affect versions up to 10.0.0. Upgrading is recommended.
+These affect versions up to 10.0.0. Upgrade to 11.0.0.
 
 - **`/verify/code` admits only code it can show safe** ([GHSA-7xrf-75qr-2r5w](https://github.com/QWED-AI/qwed-verification/security/advisories/GHSA-7xrf-75qr-2r5w), high). JavaScript, TypeScript, Java and Go are never admitted, SQL is decided by `SQLVerifier`, and Python that reads a name it never binds is refused.
 - **`/verify/sql` and `SQLGuard` admit only reads of tables and known functions** ([GHSA-wgcp-398q-m296](https://github.com/QWED-AI/qwed-verification/security/advisories/GHSA-wgcp-398q-m296), high). Files, URLs, stages, script transforms, substitution, server values, and functions that read files or secrets or call a model are refused.
@@ -59,9 +59,9 @@ These affect versions up to 10.0.0. Upgrading is recommended.
 <Warning>
 **Upgrading to 11.0.0.** These changes can break existing callers.
 
-1. **`QWEDLocal` never verifies.** `verify`, `verify_math` and `verify_logic` return `verified` False for every claim, with the reason in `error`, and `qwed verify` exits 1. Send a maths claim as an equation to `/verify/math`. For logic, write the variables and constraints and use `LogicVerifier`.
+1. **`QWEDLocal.verify`, `verify_math` and `verify_logic` never verify.** They return `verified` False for every claim, with the reason in `error`, and `qwed verify` exits 1. `QWEDLocal.verify_code` is not affected: code that `CodeVerifier` admits is still `verified`. Send a maths claim as an equation to `/verify/math`. For logic, write the variables, the premises and the claim, and call `LogicVerifier.prove_theorem()`. It is `VERIFIED` when the claim follows and `BLOCKED` with a counterexample when it does not. Don't use `LogicVerifier.verify_logic()` for this: it is `VERIFIED` whenever the constraints can all hold.
 2. **`/verify/code`.** `javascript`, `typescript`, `java` and `go` are `UNVERIFIABLE` when no listed pattern shows them unsafe, never admitted. SQL there is checked without a schema; send it to `/verify/sql` to check tables and columns. Python that reads a name it does not bind is refused: pass the names your runtime binds with `CodeVerifier(bound_names=...)`.
-3. **`/verify/logic`.** `VERIFIED` when the claim follows for every value, proven false with a counterexample when it does not, and `UNVERIFIABLE` with no claim or with constraints that cannot hold together. A satisfiable set of constraints is no longer `VERIFIED`.
+3. **`/verify/logic`.** A claim that follows for every value is `VERIFIED`. A claim proven false is also `VERIFIED`, with `is_valid: false` and a counterexample in `model`, so read `is_valid` too. With no claim, or with constraints that cannot hold together, the result is `UNVERIFIABLE`. A satisfiable set of constraints is no longer `VERIFIED`.
 4. **SQL.** Three new constraints: `sql_verifier.unknown_function`, `sql_verifier.unrestricted_or` and `sql_verifier.ambiguous_tokenization`. `SQLGuard` answers `UNKNOWN_FUNCTION_BLOCKED`, `EXTERNAL_READ_BLOCKED` or `AMBIGUOUS_TOKENS`. `SELECT ... INTO` is destructive. Some queries that 10.0.0 admitted are refused by design, such as less common or user-defined functions, ORs of ranges, optional-parameter idioms and backslashes; the [`CHANGELOG.md`](https://github.com/QWED-AI/qwed-verification/blob/v11.0.0/CHANGELOG.md) lists them.
 5. **Maths.** Superscripts, subscripts, Roman numerals, other-width letters, leading zeros and numbers separated only by a space are refused, with a message saying how to write them. A claim that calls `Float`, or whose decimals cannot be read exactly, is `UNVERIFIABLE` (`math.inexact_decimal`).
 6. **Images.** A size claim is `UNVERIFIABLE` for animated WebP and for a file that does not hold together as one image.
