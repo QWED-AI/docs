@@ -190,7 +190,7 @@ result = client.verify_stats(
 
 <Info>New in v4.0.0</Info>
 
-Multi-engine consensus verification.
+Runs multi-engine consensus on a query. The result is advisory only: it is never verified.
 
 ```python
 result = client.verify_consensus(
@@ -201,15 +201,27 @@ result = client.verify_consensus(
 print(result.status)                       # BLOCKED
 print(result.is_verified)                  # False
 print(result.result["meets_requirement"])  # False
+print(result.result["advisory_only"])      # True
 ```
 
 <Info>Changed in v10.0.0</Info>
 
-`verify_consensus` takes `status` from the server's response. `is_verified` is `True` only when the server returns `meets_requirement` exactly `True`. A truthy value that is not `True` admits nothing. A consensus is `VERIFIED` only when two distinct engines verify the same answer. When only one engine verifies it, as in `single` mode (the default) and `high` mode, the result is `BLOCKED` with `agreement_status` `no_independent_verification`. `meets_requirement` is no longer `True` for a consensus, so `is_verified` is `False`.
+When only one engine verifies the answer, as in `single` mode (the default) and `high` mode, the result is `BLOCKED` with `agreement_status` `no_independent_verification`.
+
+<Info>Changed in releases after v11.0.0</Info>
+
+`verify_consensus` on `QWEDClient` and `QWEDAsyncClient` reads every response as advisory, whatever the server answers. A server from before this change can still answer `VERIFIED` with `meets_requirement: true` and an attestation, and the client does not take it as verified:
+
+- `status` is the server's only when it is exactly `UNVERIFIABLE` or `BLOCKED`. Any other value, `VERIFIED` included, a missing status, or one that is not a string, becomes `UNVERIFIABLE`.
+- `is_verified` is always `False`.
+- The result carries no `attestation`, `proof_ref` or `admission`, so `verify_attestation` refuses it.
+- `result.result` is a copy of the response with that status, `meets_requirement: false`, `advisory_only: true`, and no `attestation`, `proof_ref` or `admission`. Its other fields are as the server sent them.
+
+Before this change, `verify_consensus` took the server's `status`, set `is_verified` from `meets_requirement`, and carried the server's attestation.
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `query` | str | — | Claim to verify |
+| `query` | str | — | Query to check |
 | `mode` | str | `"single"` | `single`, `high`, or `maximum` |
 | `min_confidence` | float | `0.8` | Minimum confidence threshold |
 

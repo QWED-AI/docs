@@ -51,7 +51,7 @@ flowchart TB
 
 ### 3) Verification engines (deterministic)
 
-Verification engines are grouped into three tiers with distinct output guarantees. Only a **deterministic proof** — from a proof engine or a deterministic sub-path of a hybrid engine (Graph, Image, Consensus) — can emit `VERIFIED` with a `proof_ref`. **Policy enforcement engines** emit `BLOCK` / `UNVERIFIABLE`, and **advisory engines** (Fact, Reasoning) emit `AdvisoryCheck` records only. See [Verification engines](/engines/overview) for the full 3-tier classification.
+Verification engines are grouped into three tiers with distinct output guarantees. Only a **deterministic proof** — from a proof engine or a deterministic sub-path of a hybrid engine (Graph, Image) — can emit `VERIFIED` with a `proof_ref`. **Policy enforcement engines** emit `BLOCK` / `UNVERIFIABLE`, and **advisory engines** (Fact, Reasoning) emit `AdvisoryCheck` records only. See [Verification engines](/engines/overview) for the full 3-tier classification.
 
 | Engine | Purpose |
 |---|---|---|
@@ -62,7 +62,7 @@ Verification engines are grouped into three tiers with distinct output guarantee
 | Schema / Stats / Taint | Structural and data-flow proofs |
 | Graph / Image | Hybrid — deterministic paths can emit `VERIFIED` with a `proof_ref`; LLM/VLM fallbacks are advisory |
 | Fact / Reasoning | Advisory analysis (never `VERIFIED`) |
-| Consensus | Status-preserving aggregator: `VERIFIED` only on unanimous engine outcomes from two distinct engines or more; an answer one engine verified alone is `BLOCKED` |
+| Consensus | Advisory only: `UNVERIFIABLE` or `BLOCKED`, never `VERIFIED`; an answer one engine verified alone is `BLOCKED` |
 
 ### 4) Agent security guards
 
