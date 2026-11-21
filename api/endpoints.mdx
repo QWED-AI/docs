@@ -598,7 +598,11 @@ When you name a `provider` and the deterministic checks are not confident enough
 
 <Info>New in v4.0.0 · Updated in v5.0.0</Info>
 
-Multi-engine consensus verification. Runs the query through multiple verification engines and requires agreement above a confidence threshold. This endpoint is rate-limited per API key.
+Multi-engine consensus, advisory only. Runs the query through several verification engines and reports their agreement and confidence. This endpoint is rate-limited per API key.
+
+<Warning>
+**Advisory only (releases after v11.0.0).** Every engine decides a model's translation of the query, so engines that agree have not verified a claim. The response `status` is `UNVERIFIABLE` or `BLOCKED`, never `VERIFIED`, in every mode. Every response carries `advisory_only: true` and `meets_requirement: false`, and none carries a `proof_ref` or an attestation. Before this change, two distinct engines that verified the same answer made the consensus `VERIFIED`. Read the result as a signal for review. See [Consensus engine](/engines/consensus).
+</Warning>
 
 Mathematical expressions are parsed and compared using `Decimal` arithmetic internally, which avoids floating-point drift when engines cross-check results.
 
@@ -616,21 +620,21 @@ Mathematical expressions are parsed and compared using `Decimal` arithmetic inte
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
-| `query` | string | Yes | — | The claim to verify |
-| `verification_mode` | string | No | `single` | `single`, `high`, or `maximum` |
+| `query` | string | Yes | — | The query to check |
+| `verification_mode` | string | No | `single` | How many engines run: `single`, `high`, or `maximum`. Every mode is advisory |
 | `min_confidence` | float | No | `0.95` | Minimum confidence threshold, 0–1 |
 
 **Verification modes:**
 
 | Mode | Engines | Use case |
 |------|---------|----------|
-| `single` | 1 | Fast, single engine verification |
-| `high` | 2 | Higher confidence for important claims |
-| `maximum` | 3+ | Critical domains (medical, financial) |
+| `single` | 1 | SymPy alone. An answer it verifies alone is `BLOCKED` |
+| `high` | 2 | SymPy and Python. Python's run is advisory |
+| `maximum` | 3+ | Adds Z3, which proves the claim of a logic translation from its constraints, and Stats for statistical queries |
 
 <Info>Changed in v10.0.0</Info>
 
-One engine is not a consensus. An answer that only one engine verifies is `BLOCKED` with `constraint_id: "consensus.no_independent_verification"`, `agreement_status: "no_independent_verification"` and `confidence: 0.0`, whatever the other engines returned. In `single` mode, the default, that is every verified answer, and in `high` mode the Python engine is advisory only, so SymPy is the only engine that can verify. A consensus is `VERIFIED` only when two distinct engines verify the same answer, which no two engines do today. Before v10.0.0, one engine's answer was `VERIFIED` with `meets_requirement: true`.
+One engine is not a consensus. An answer that only one engine verifies is `BLOCKED` with `constraint_id: "consensus.no_independent_verification"`, `agreement_status: "no_independent_verification"` and `confidence: 0.0`, whatever the other engines returned. In `single` mode, the default, that is every verified answer, and in `high` mode the Python engine is advisory only, so SymPy is the only engine that can verify. When two distinct engines verify, as SymPy and Z3 can in `maximum` mode, the result is `UNVERIFIABLE`. Before v10.0.0, one engine's answer was `VERIFIED` with `meets_requirement: true`.
 
 **Response:**
 
@@ -645,6 +649,7 @@ One engine is not a consensus. An answer that only one engine verifies is `BLOCK
   "confidence": 0.0,
   "engines_used": 2,
   "agreement_status": "no_independent_verification",
+  "advisory_only": true,
   "verification_chain": [
     {
       "engine": "SymPy",
@@ -676,19 +681,28 @@ One engine is not a consensus. An answer that only one engine verifies is `BLOCK
 | `confidence` | float | Confidence from 0 to 1. `0.0` when only one engine verified the answer |
 | `verification_chain` | array | Detailed results from each engine |
 | `verification_chain[].status` | string | Trust-boundary status from that engine: `VERIFIED`, `UNVERIFIABLE`, or `BLOCKED` |
-| `meets_requirement` | boolean | True only when the consensus is verified as the attestation and the audit log count it (`VERIFIED`, with `is_valid` true) **and** `confidence` meets `min_confidence`. A consensus result has no `is_valid`, so it is never true from v10.0.0. Confidence alone is never sufficient. |
+| `advisory_only` | boolean | Always `true`. The result is a signal for review, not a verification |
+| `meets_requirement` | boolean | Always `false`, on every response. A consensus is never verified, and confidence alone is never sufficient |
 
 <Note>
-Only unanimous `VERIFIED` engine outcomes, from two distinct engines or more and with no engine `BLOCKED`, can produce a `VERIFIED` consensus. Advisory-only sub-engines (statistical computation, code execution) always return `UNVERIFIABLE`, so they never count as a second engine. See the [Consensus engine](/engines/consensus#sub-engine-status-contract) page for the full sub-engine contract.
+No combination of engine outcomes produces a `VERIFIED` consensus. A `VERIFIED` entry in `verification_chain` is that engine's own verdict. Advisory-only sub-engines (statistical computation, code execution) always return `UNVERIFIABLE`, so they never count as a second engine that verified. See the [Consensus engine](/engines/consensus#sub-engine-status-contract) page for the full sub-engine contract.
 </Note>
 
-A confidence below `min_confidence` is not an HTTP error: the response is `UNVERIFIABLE` with a message such as `Confidence (70.0%) below required minimum (95.0%)`. When the secure Docker sandbox is unavailable for the Python engine in `high` or `maximum` mode, the response is `BLOCKED` with `agreement_status: "blocked_secure_execution"`.
+Every consensus outcome is an HTTP 200 answer, not an error. An unavailable secure Docker sandbox for the Python engine in `high` or `maximum` mode (`agreement_status: "blocked_secure_execution"`), engines that are all blocked, and a result only one engine verified are `BLOCKED`, whatever the confidence. Otherwise, a confidence below `min_confidence` is `UNVERIFIABLE` with a message such as `Confidence (70.0%) below required minimum (95.0%)`.
 
 Before any engine runs, QWED screens the query with the same prompt-injection check that `/verify/natural_language` applies. A refused query is `BLOCKED` with `agreement_status: "blocked"`, `engines_used: 0` and `confidence: 0.0`, and no engine answers it. The message reads `Consensus verification: all engines blocked`, as when every engine is blocked; `engines_used: 0` tells the two apart. That check also refuses queries over 2,000 characters and queries that contain words such as `mode`, `root` or `system` anywhere, even inside a longer word such as `model`. For a statistics question over data, use [`/verify/stats`](#post-%2Fverify%2Fstats).
 
 | Status | Description |
 |--------|-------------|
 | 400 | Invalid verification mode |
+| 401 | API key invalid, inactive, expired or revoked |
+| 403 | Organisation inactive or missing |
+| 408 | Request body not received in time |
+| 413 | Request body over the size limit |
+| 422 | No `x-api-key` header, or a body that does not validate |
+| 429 | Rate limit exceeded. See `Retry-After` |
+| 500 | Audit record not stored, or an unexpected server error |
+| 503 | Server busy: too many requests in flight. Retry shortly |
 
 Each server process runs at most `QWED_SANDBOX_MAX_CONCURRENT` sandbox containers at once (default 4). If a Python engine run can't get a sandbox slot within `QWED_SANDBOX_ACQUIRE_TIMEOUT` (default 10 seconds), QWED rejects the run with `Sandbox capacity reached — retry shortly.` instead of starting another container. A capacity rejection never produces a `VERIFIED` result.
 

@@ -1,10 +1,14 @@
 ---
 sidebar_position: "9"
 title: "Consensus engine"
-description: "QWED's Consensus Engine orchestrates multiple verification engines in parallel for high-confidence results with circuit breaker patterns and weighted consensus."
+description: "QWED's Consensus engine runs several verification engines on one query as an advisory signal: UNVERIFIABLE or BLOCKED, never VERIFIED, in every mode."
 ---
 
-The Consensus Engine orchestrates multiple verification engines for high-confidence results with fault tolerance.
+The Consensus Engine runs several verification engines on one query, with fault tolerance. Its result is advisory only.
+
+<Warning>
+**Consensus is advisory only (releases after v11.0.0).** Every engine decides a model's translation of your query, and the query states no claim of yours, so engines that agree have not verified anything. `/verify/consensus` returns `UNVERIFIABLE` or `BLOCKED`, never `VERIFIED`, in every mode. Every response carries `advisory_only: true`, `meets_requirement: false`, no `proof_ref` and no attestation. Use the result as a signal for review, not as a verification.
+</Warning>
 
 <Warning>
 **Changed in v4.0.4:** Python code verification within consensus now runs exclusively through the secure Docker executor (`SecureCodeExecutor`). If the Docker sandbox is unavailable, consensus returns a `blocked_secure_execution` status and the API responds with HTTP 503. From v6.0.0, the API responds with HTTP 200 and `BLOCKED` instead.
@@ -38,7 +42,9 @@ print(result.agreement_status) # "no_independent_verification"
 
 <Info>Changed in v10.0.0</Info>
 
-One engine is not a consensus. In the example, SymPy verifies the answer and the Python engine is advisory only, so the answer has been verified by one engine alone. The result is `BLOCKED` with `constraint_id: "consensus.no_independent_verification"` and `confidence: 0.0`. A consensus is `VERIFIED` only when two distinct engines verify the same answer, which no two engines do today.
+One engine is not a consensus. In the example, SymPy verifies the answer and the Python engine is advisory only, so the answer has been verified by one engine alone. The result is `BLOCKED` with `constraint_id: "consensus.no_independent_verification"` and `confidence: 0.0`.
+
+When two distinct engines verify, the result is still not `VERIFIED`. It is `UNVERIFIABLE`, because consensus is advisory only.
 
 ## Verification modes
 
@@ -46,7 +52,7 @@ One engine is not a consensus. In the example, SymPy verifies the answer and the
 | --------- | ------------------- | ------ | ---------- | --------------- |
 | `single`  | 1 (SymPy)           | ⚡ Fast | No consensus: one engine | No              |
 | `high`    | 2 (SymPy + Python)  | Medium | No consensus: Python is advisory only | Yes             |
-| `maximum` | 3+ (All applicable) | Slower | Maximum    | Yes             |
+| `maximum` | 3+ (All applicable) | Slower | Advisory: never `VERIFIED` | Yes             |
 
 <Note>
 The `high` and `maximum` modes include the Python engine, which requires the secure Docker sandbox. If Docker is unavailable, these modes return `blocked_secure_execution` instead of falling back to in-process execution. This status takes precedence over `no_independent_verification`, so it is returned even when SymPy verified the answer. The `/verify/consensus` response is then `BLOCKED` with HTTP 200, not an HTTP error.
@@ -102,7 +108,7 @@ How the deadline applies:
 - **One aggregate budget, not per-engine stacking.** All selected engines share the same 30-second wall clock. Sequential per-engine waits cannot accumulate beyond it.
 - **Timed-out engines become explicit `BLOCKED` results.** An engine that misses the deadline is recorded in `verification_chain` as a `BLOCKED` `EngineResult` with the timeout in its `error` field (for example, `"Engine timed out after 30s"`). The failure is also recorded with the circuit breaker.
 - **Circuit-open engines are recorded too.** An engine skipped because its circuit breaker is open appears as a `BLOCKED` result rather than being silently dropped.
-- **Partial results still aggregate.** Engines that finished within the deadline contribute normally. The consensus verdict is computed from the results that arrived, with the fail-closed [status propagation](#status-propagation) rules applied. A `BLOCKED` engine result prevents `VERIFIED`: the consensus is `UNVERIFIABLE`, or `BLOCKED` when only one engine verified the answer.
+- **Partial results still aggregate.** Engines that finished within the deadline contribute normally. The consensus verdict is computed from the results that arrived, with the fail-closed [status propagation](#status-propagation) rules applied. The consensus is `UNVERIFIABLE`, or `BLOCKED` when only one engine verified.
 - **Off the event loop.** Engine execution runs in a dedicated per-call executor, so a slow consensus request degrades only itself, not other API traffic.
 
 ```python
@@ -186,22 +192,38 @@ The consensus engine automatically selects which engines to run based on the ver
 | `high`    | SymPy, Python                       |
 | `maximum` | SymPy, Python, Z3 (+ Stats for statistical queries) |
 
+### Z3 engine in `maximum` mode
+
+The Z3 engine proves a claim, as [`/verify/logic`](/engines/logic) does. The model translates the query into constraints and a claim, and Z3 decides whether the claim follows from the constraints. Before this fix, the Z3 engine failed on every query and was recorded as `BLOCKED`.
+
+| Z3 outcome | Z3 engine status |
+| ---------- | ---------------- |
+| The claim follows from the constraints (`VALID`) | `VERIFIED` |
+| Z3 finds a counterexample (`INVALID`) | `UNVERIFIABLE` |
+| The constraints cannot all hold (`VACUOUS`) | `UNVERIFIABLE` |
+| Z3 does not decide (`UNKNOWN`) | `UNVERIFIABLE` |
+| The translation states no claim | `UNVERIFIABLE` |
+| The translation is refused, for example an unsupported goal, or Z3 cannot run the proof | `BLOCKED` |
+
+The Z3 engine's `VERIFIED` is its own verdict on the translated claim, shown in `verification_chain`. It cannot make the consensus `VERIFIED`. Z3 decides whether a claim holds, not a value, so it does not vote on the answer. It still counts as an engine that verified: when SymPy and Z3 both verify, the consensus is `UNVERIFIABLE`, and when only Z3 verifies, the consensus is `BLOCKED` with no `final_answer`.
+
+The Z3 solve runs on the same dedicated thread as `/verify/logic` solves and is bounded by `QWED_Z3_TIMEOUT` (default 15 seconds), counted from when the solve is queued. A solve that does not finish in time is recorded as a `BLOCKED` Z3 result and as a failure with the [circuit breaker](#circuit-breaker). The 30-second consensus deadline still applies to the whole engine run, translation included.
+
 <Note>The fact engine is excluded from automatic engine selection. Fact verification requires external context, and including it in consensus without that context would create self-referential verification loops. If fact verification is invoked during consensus, it returns an error indicating that external context is required.</Note>
 
 ---
 
 ## Consensus calculation
 
-The engine uses weighted voting:
+The engine weights each answer by engine reliability:
 
 | Engine | Reliability Weight |
 | ------ | ------------------ |
 | SymPy  | 1.00               |
-| Z3     | 0.995              |
 | Python | 0.99               |
 | Stats  | 0.98               |
 
-Final confidence = weighted average of agreeing engines.
+Final confidence = weighted average of agreeing engines. Z3 does not vote on the answer (see [Z3 engine in `maximum` mode](#z3-engine-in-maximum-mode)). Agreement and confidence never make the result `VERIFIED`.
 
 ### Agreement statuses
 
@@ -211,21 +233,21 @@ Final confidence = weighted average of agreeing engines.
 | `majority` | More than half of the total weight agrees |
 | `split` | No clear majority among engines |
 | `no_results` | No engines returned a result |
+| `no_answer` | No engine that computes an answer succeeded, so there is no answer to vote on (Z3 does not vote). The result is `UNVERIFIABLE` |
 | `blocked` | Every engine returned `BLOCKED`, or the prompt-injection check refused the query before any engine ran (`engines_used` `0`). The result is `BLOCKED` |
 | `no_independent_verification` | Only one engine verified the answer. The result is `BLOCKED` with `confidence` `0.0` |
 | `blocked_secure_execution` | The Docker sandbox is unavailable and a required engine cannot run. The result is `BLOCKED` (HTTP 200). It takes precedence over every status that engine results produce, `no_independent_verification` included |
 
 ## Status propagation
 
-Consensus is a status-preserving aggregator, not a proof engine. Per the [3-tier engine classification](/engines/overview), consensus never invents a `VERIFIED` status from disagreement:
+Consensus is advisory, not a proof engine. Per the [3-tier engine classification](/engines/overview), the consensus result is `UNVERIFIABLE` or `BLOCKED`, never `VERIFIED`:
 
 - The prompt-injection check refuses the query → the consensus result is `BLOCKED` with `agreement_status` `blocked` and no answer. This check runs before any engine is selected, so no engine runs, none answers the query and none records a failure with its circuit breaker. It is the check `/verify/natural_language` applies, so it also refuses a query over 2,000 characters or one that contains words such as `mode`, `root` or `system`.
 - The Python engine finds the Docker sandbox unavailable → the consensus result is `BLOCKED` with `agreement_status` `blocked_secure_execution`, whatever the other engines returned. This rule is checked first among engine results.
 - All engines return `BLOCKED` → the consensus result is `BLOCKED`.
 - Otherwise, only one engine verifies the answer → the consensus result is `BLOCKED` with `constraint_id: "consensus.no_independent_verification"` and `confidence` `0.0`, whatever the other engines returned (advisory, blocked or absent). One engine is not a consensus.
-- Otherwise, any single engine returns `BLOCKED` (but not all) → the consensus result is capped at `UNVERIFIABLE` (fail-closed: a partial block prevents `VERIFIED`).
-- Otherwise, any engine returns `UNVERIFIABLE` → the consensus result is `UNVERIFIABLE`.
-- Only unanimous `VERIFIED` engine outcomes from two distinct engines or more can produce a `VERIFIED` consensus. No two engines do so today.
+- Otherwise → the consensus result is `UNVERIFIABLE`, whether the engines agree or not and however many verified. Before this change, two distinct engines that verified the same answer made the consensus `VERIFIED`.
+- The route passes every result through one more check: any status other than `UNVERIFIABLE` or `BLOCKED` is returned as `UNVERIFIABLE`, so no status reaches the response, the attestation or the audit row as `VERIFIED`.
 - Math-query translation failures fail closed — the engine raises rather than fabricating a numeric answer from a regex or decimal guess.
 
 Individual engine outcomes are exposed via the `status` field on each `EngineResult` in the aggregated result.
@@ -239,7 +261,7 @@ Not every sub-engine that runs under consensus can emit `VERIFIED`. The table be
 | Stats (mean, median, variance) | `UNVERIFIABLE` — computed value stays on the result as advisory | Calculating a statistic is not verifying a claim. Only comparison against a claimed value with proof of correctness can produce `VERIFIED`. |
 | Python code execution | `UNVERIFIABLE` — captured output stays on the result as advisory | Runtime success only disproves by crashing; executing an expression is not proving its result matches the query's semantics. |
 
-This mirrors the existing [Fact engine](/engines/fact) heuristic contract: a TF-IDF `SUPPORTED` verdict is capped at `UNVERIFIABLE` because heuristic support is not a proof. Because a `VERIFIED` consensus requires **every** contributing engine to have emitted `VERIFIED`, a query answered only by Stats or code execution can never reach `VERIFIED` — it stops at `UNVERIFIABLE` with the computed value carried through as advisory data.
+This mirrors the existing [Fact engine](/engines/fact) heuristic contract: a TF-IDF `SUPPORTED` verdict is capped at `UNVERIFIABLE` because heuristic support is not a proof. A query answered only by Stats or code execution stops at `UNVERIFIABLE`, with the computed value carried through as advisory data.
 
 ## ConsensusResult
 
@@ -254,26 +276,26 @@ Async and sync consensus verification both return a `ConsensusResult` dataclass 
 | `verification_chain` | `List[EngineResult]` | Per-engine outcomes, including each engine's `status` |
 | `total_latency_ms` | `float` | End-to-end latency for the aggregation |
 | `parallel_execution` | `bool` | True when engines ran concurrently |
-| `status` | `Optional[DiagnosticStatus]` | Trust-boundary status — `VERIFIED`, `UNVERIFIABLE`, or `BLOCKED` (enum, not a bare string) |
-| `proof_ref` | `Optional[str]` | Populated only on `VERIFIED` consensus — the sha256 hash of the canonical evidence |
-| `verified_evidence` | `Optional[Dict[str, Any]]` | Populated only on `VERIFIED` consensus — the exact evidence bound to `proof_ref` (agreement status, contributing engines, and the winning chain) |
+| `status` | `Optional[DiagnosticStatus]` | Trust-boundary status: `UNVERIFIABLE` or `BLOCKED` (enum, not a bare string). Never `VERIFIED` |
+| `proof_ref` | `Optional[str]` | Always `None`. Kept so code that reads it keeps working |
+| `verified_evidence` | `Optional[Dict[str, Any]]` | Always `None`. Kept so code that reads it keeps working |
 
 <Info>
-`status` is now a [`DiagnosticStatus`](/advanced/diagnostics) enum rather than a bare string. Code that compared `result.status == "VERIFIED"` should use `result.status is DiagnosticStatus.VERIFIED` or check `result.status.value` for the string form.
+`status` is now a [`DiagnosticStatus`](/advanced/diagnostics) enum rather than a bare string. Code that compared `result.status == "BLOCKED"` should use `result.status is DiagnosticStatus.BLOCKED` or check `result.status.value` for the string form.
 </Info>
 
 ### `.to_diagnostic_result()`
 
-`ConsensusResult` converts cleanly to a [`DiagnosticResult`](/advanced/diagnostics) using the stored `verified_evidence`, so downstream attestation hashes bind to the exact evidence used to reach agreement:
+`ConsensusResult` converts to a [`DiagnosticResult`](/advanced/diagnostics) that is `UNVERIFIABLE` or `BLOCKED`, with `advisory_only: true` in its developer fields:
 
 ```python
 result = client.verify_with_consensus(query="2 + 2 = 4", mode="high")
 
 dr = result.to_diagnostic_result()
 
-dr.is_verified          # True only if consensus was VERIFIED; False here
-dr.proof_ref            # None here; on a VERIFIED consensus, sha256:... bound to result.verified_evidence
-dr.developer_fields     # {'agreement_status': 'no_independent_verification', 'confidence': 0.0, 'engines_used': 2, 'constraint_id': 'consensus.no_independent_verification'}
+dr.is_verified          # False: a consensus is never verified
+dr.proof_ref            # None
+dr.developer_fields     # {'agreement_status': 'no_independent_verification', 'confidence': 0.0, 'engines_used': 2, 'advisory_only': True, 'constraint_id': 'consensus.no_independent_verification'}
 ```
 
-The conversion is fail-closed: a `VERIFIED` `ConsensusResult` that is missing `verified_evidence` is downgraded to `UNVERIFIABLE` rather than emitting a weaker proof. The `/verify/consensus` endpoint's `meets_requirement` flag is true only when the consensus is verified as the attestation and the audit log count it (`VERIFIED`, with `is_valid` true) **and** confidence meets the requested threshold. A consensus result has no `is_valid`, so from v10.0.0 `meets_requirement` is never true. Confidence alone is never sufficient.
+The conversion is fail-closed: a `ConsensusResult` whose `status` says `VERIFIED`, such as one built by hand, converts to `UNVERIFIABLE`. The `/verify/consensus` endpoint's `meets_requirement` flag is always `false`, on every response. Confidence alone is never sufficient.
