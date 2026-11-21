@@ -142,7 +142,7 @@ Matches that aren't regular files, such as a symlinked directory, are ignored, a
 
 `scan-secrets` uses `ConfigGuard`'s patterns. In releases after v11.0.0, it no longer reports pinned action commits, labelled digests or integrity hashes as AWS secret keys. See [Public hashes and the AWS secret key pattern](/sdks/guards#public-hashes-and-the-aws-secret-key-pattern).
 
-In releases after v11.0.0, `scan-secrets` also reports a password in a URL of any scheme, such as `postgresql://`, `mongodb+srv://` or `redis://`, not only `postgres://`, `mysql://` and `mongodb://`. A job that passed before can fail on such a URL. Move the password into a variable or a placeholder such as `${DB_PASSWORD}`. See [Passwords in URLs](/sdks/guards#passwords-in-urls).
+In releases after v11.0.0, `scan-secrets` also reports a password in a URL of any scheme, such as `postgresql://`, `mongodb+srv://` or `redis://`, not only `postgres://`, `mysql://` and `mongodb://`. A job that passed before can fail on such a URL. Move the password into a variable or a placeholder such as `${DB_PASSWORD}`. `scan-secrets` reads JSON as text, so it reports a placeholder URL in compact JSON when another `@` follows in the same run. See [Passwords in URLs](/sdks/guards#passwords-in-urls).
 
 <Warning>
 **Behavior change in v8.0.0.** Jobs that passed before can now fail. A `paths` value under which no file is scanned, or a `scan-code` run that includes Python files that don't parse, now returns `UNVERIFIABLE · DENY`. Narrow `paths` to the files you want scanned.

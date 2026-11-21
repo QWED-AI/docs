@@ -604,7 +604,7 @@ The built-in `DATABASE_URL` pattern reports a URL that carries a password in the
 For any scheme, `ConfigGuard` reads the URL as one token:
 
 - Whitespace and the quote characters `"`, `'` and `` ` `` end the URL.
-- The user runs to the first `:`. It may be empty, as in `redis://:<password>@host`, and may contain `@`. It can't contain `/`, `?`, `#`, `[` or `]`.
+- The user runs to the first `:`. It may be empty, as in `redis://:Tr0ub4dor3@cache.internal:6379`, and may contain `@`. It can't contain `/`, `?`, `#`, `[` or `]`.
 - The password runs to the next `@`. It may contain a raw `/`, `?` or `#`, but not `://`.
 
 The `postgres://`, `mysql://` and `mongodb://` schemes keep the reach they had before. Their password runs to the first `@` across whitespace, quotes and lines, so a password containing spaces or quotes is still reported for them. Their password stops where the next `postgres://`, `mysql://` or `mongodb://` URL starts.
@@ -612,10 +612,12 @@ The `postgres://`, `mysql://` and `mongodb://` schemes keep the reach they had b
 `ConfigGuard` doesn't report these shapes:
 
 - A port of one to five digits followed by `/`, `?` or `#`, so the `@` in `host:4873/@scope/pkg` is read as part of the path. An empty port or a port of six or more digits before an `@` in the path is reported.
-- A hex digest of its algorithm's exact length after a `sha1:`, `sha256:`, `sha384:` or `sha512:` label directly after the `@`, ending the URL, as in an image pinned by digest (`docker://alpine:3.18@sha256:<digest>`).
-- A password that is exactly a placeholder of the form `${NAME}` or `<name>`. `${NAME:-default}`, `$NAME` and a run of `*` are reported, because a literal password can have those shapes.
+- A hex digest of its algorithm's exact length after a `sha1:`, `sha256:`, `sha384:` or `sha512:` label directly after the `@`, as in an image pinned by digest (`docker://alpine:3.18@sha256:<digest>`). The digest must contain at least one letter from `a` to `f`. A digest of digits alone can read as a host named `sha256` and a zero-padded port, so `ConfigGuard` reports it. The digest must end at whitespace or the end of the text. It may also end at a quote, `,`, `]` or `}`, as in a YAML flow collection such as `images: [docker://alpine:3.18@sha256:<digest>]`, when no other `@` follows before the next whitespace.
+- A password that is exactly a placeholder of the form `${NAME}` or `<name>` in ASCII, when no other `@` follows the URL's `@` before the next whitespace. A quote doesn't end that run. A placeholder followed by `@`, more text and the host's `@`, as in `postgresql://admin:${PG_PASSWORD}@x@db.internal/app`, is a longer literal password, and `ConfigGuard` reports it. `${NAME:-default}`, `$NAME` and a run of `*` are also reported, because a literal password can have those shapes.
 
 For schemes other than `postgres`, `mysql` and `mongodb`, a password that contains whitespace, a quote character or `://` is not reported. A password that contains `postgres://`, `mysql://` or `mongodb://` is not reported under any scheme.
+
+`scan_string` reads compact JSON as text, so a quote doesn't end a value. A pinned image or a placeholder URL followed later in the same run by another `@`, such as an email address in the next JSON value, is reported. `verify_config_safety` reads each parsed value alone and doesn't report it.
 
 A `DATABASE_URL` pattern you pass in `custom_patterns` replaces the built-in pattern.
 

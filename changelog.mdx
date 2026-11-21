@@ -11,22 +11,24 @@ Jump to: [ConfigGuard URL passwords](#qwed-verification-—-configguard-reports-
 
 ## QWED Verification — ConfigGuard reports a password in a URL of any scheme
 
-**Unreleased** · [GitHub PR #662](https://github.com/QWED-AI/qwed-verification/pull/662) · [Issue #658](https://github.com/QWED-AI/qwed-verification/issues/658)
+**Unreleased** · [GitHub PR #662](https://github.com/QWED-AI/qwed-verification/pull/662) · [GitHub PR #666](https://github.com/QWED-AI/qwed-verification/pull/666) · [Issue #658](https://github.com/QWED-AI/qwed-verification/issues/658)
 
 > The built-in `DATABASE_URL` pattern named only `postgres://`, `mysql://` and `mongodb://`, so `ConfigGuard` and the GitHub Action's `scan-secrets` mode passed a literal password in `postgresql://`, `postgresql+psycopg2://`, `mongodb+srv://`, `redis://` and every other scheme.
 
 ### What changed
 
-- **Any scheme is read.** `DATABASE_URL` reports `user:password@` after `://` under any scheme, in any case, including an empty user as in `redis://:<password>@host`. For these schemes the URL is read as one token, so whitespace and quote characters end it.
+- **Any scheme is read.** `DATABASE_URL` reports `user:password@` after `://` under any scheme, in any case, including an empty user as in `redis://:Tr0ub4dor3@cache.internal:6379`. For these schemes the URL is read as one token, so whitespace and quote characters end it.
 - **The three schemes named before keep their reach.** For `postgres://`, `mysql://` and `mongodb://`, the password still runs to the first `@` across whitespace, quotes and lines.
-- **Some shapes are read out.** A port of one to five digits before a path, query or fragment, a hex digest of its exact length after the `@` (an image pinned by digest), and a password that is exactly `${NAME}` or `<name>` are not reported. A run of `*` is still reported.
+- **Some shapes are read out.** `ConfigGuard` doesn't report a port of one to five digits before a path, query or fragment, a hex digest of its exact length after the `@` that contains a letter from `a` to `f` (an image pinned by digest, also as an item of a YAML flow collection), or a password that is exactly `${NAME}` or `<name>`. It still reports a run of `*` and a digest of digits alone.
+- **A later `@` keeps the URL reported.** `ConfigGuard` reads out a digest or a placeholder only when no other `@` follows it before the next whitespace. A quote doesn't end that run, so `ConfigGuard` reports `postgresql://admin:${PG_PASSWORD}@x@db.internal/app`.
+- **Known false positive.** `scan_string` and `scan-secrets` read compact JSON as text, so they report a pinned image or a placeholder URL with a later `@`, such as an email address in the next value. `verify_config_safety` reads each parsed value alone and passes it.
 - **Known gaps.** Outside the three named schemes, a password containing whitespace, a quote character or `://` is not reported. Under any scheme, a password containing `postgres://`, `mysql://` or `mongodb://` is not reported.
 
 <Warning>
-`scan-secrets` jobs that passed before can now fail on a URL with a literal password, for example `postgresql://user:<password>@host/db` in a workflow or `.env` file.
+`scan-secrets` jobs that passed before can now fail on a URL with a literal password, for example `postgresql://app:Tr0ub4dor3@db.internal/app` in a workflow or `.env` file.
 
-- **Before:** `DATABASE_URL: postgresql://qwed:<password>@localhost:5432/qwed_db`
-- **After:** keep the literal password out of the file, for example `DATABASE_URL: postgresql://qwed:${PG_PASSWORD}@localhost:5432/qwed_db` with `PG_PASSWORD` set from your secrets store. A password that is exactly `${NAME}` or `<name>` is not reported.
+- **Before:** `DATABASE_URL: postgresql://qwed:Tr0ub4dor3@localhost:5432/qwed_db`
+- **After:** keep the literal password out of the file, for example `DATABASE_URL: postgresql://qwed:${PG_PASSWORD}@localhost:5432/qwed_db` with `PG_PASSWORD` set from your secrets store. `ConfigGuard` doesn't report a password that is exactly `${NAME}` or `<name>` when no other `@` follows before the next whitespace.
 </Warning>
 
 See [Passwords in URLs](/sdks/guards#passwords-in-urls).
