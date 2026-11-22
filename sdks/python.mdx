@@ -210,7 +210,7 @@ When only one engine verifies the answer, as in `single` mode (the default) and 
 
 <Info>Changed in releases after v11.0.0</Info>
 
-`verify_consensus` on `QWEDClient` and `QWEDAsyncClient` reads every response as advisory, whatever the server answers. A server from before this change can still answer `VERIFIED` with `meets_requirement: true` and an attestation, and the client does not take it as verified:
+`verify_consensus` on `QWEDClient` and `QWEDAsyncClient` reads every response as advisory, whatever the server answers. A server from before v10.0.0 can still answer `VERIFIED` with `meets_requirement: true` and an attestation, and the client does not take that, or any server's answer, as verified:
 
 - `status` is the server's only when it is exactly `UNVERIFIABLE` or `BLOCKED`. Any other value, `VERIFIED` included, a missing status, or one that is not a string, becomes `UNVERIFIABLE`.
 - `is_verified` is always `False`.
@@ -223,7 +223,7 @@ Before this change, `verify_consensus` took the server's `status`, set `is_verif
 |-----------|------|---------|-------------|
 | `query` | str | — | Query to check |
 | `mode` | str | `"single"` | `single`, `high`, or `maximum` |
-| `min_confidence` | float | `0.8` | Minimum confidence threshold |
+| `min_confidence` | float | `0.95` | Minimum confidence threshold |
 
 ### verify_image(image_path, claim)
 

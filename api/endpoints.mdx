@@ -601,7 +601,7 @@ When you name a `provider` and the deterministic checks are not confident enough
 Multi-engine consensus, advisory only. Runs the query through several verification engines and reports their agreement and confidence. This endpoint is rate-limited per API key.
 
 <Warning>
-**Advisory only (releases after v11.0.0).** Every engine decides a model's translation of the query, so engines that agree have not verified a claim. The response `status` is `UNVERIFIABLE` or `BLOCKED`, never `VERIFIED`, in every mode. Every response carries `advisory_only: true` and `meets_requirement: false`, and none carries a `proof_ref` or an attestation. Before this change, two distinct engines that verified the same answer made the consensus `VERIFIED`. Read the result as a signal for review. See [Consensus engine](/engines/consensus).
+**Advisory only (releases after v11.0.0).** Every engine decides a model's translation of the query, so engines that agree have not verified a claim. The response `status` is `UNVERIFIABLE` or `BLOCKED`, never `VERIFIED`, in every mode. Every response carries `advisory_only: true` and `meets_requirement: false`, its `proof_ref` is always `null`, and none carries an attestation. Before this change, a consensus was `VERIFIED` only when two distinct engines verified the same answer, which no two engines did, as the Z3 engine failed on every query. Read the result as a signal for review. See [Consensus engine](/engines/consensus).
 </Warning>
 
 Mathematical expressions are parsed and compared using `Decimal` arithmetic internally, which avoids floating-point drift when engines cross-check results.
@@ -672,7 +672,7 @@ One engine is not a consensus. An answer that only one engine verifies is `BLOCK
   ],
   "total_latency_ms": 45.2,
   "meets_requirement": false,
-  "developer_fields": { "...": "agreement_status, confidence, engines_used and constraint_id, as above" }
+  "developer_fields": { "...": "agreement_status, confidence, engines_used, advisory_only and constraint_id, as above" }
 }
 ```
 
