@@ -240,7 +240,7 @@ QWED bounds request size, slow work, and sandbox usage so one request can't stal
 |----------|---------|----------------|
 | `QWED_CODE_VERIFY_TIMEOUT` | `10` | Seconds a `/verify/code` scan can run. A timeout returns `503`. |
 | `QWED_PROVIDER_TIMEOUT` | `30` | Seconds an LLM provider call can run for `/verify/natural_language`, `/verify/logic`, and `/verify/fact`. Calls run off the event loop. A timeout fails closed: `/verify/fact` returns `503`, the others return an `ERROR` result. |
-| `QWED_Z3_TIMEOUT` | `15` | Seconds a `/verify/logic` Z3 solve can run. Solves run one at a time on a dedicated thread. |
+| `QWED_Z3_TIMEOUT` | `15` | Seconds QWED waits for one Z3 solve on `/verify/logic` or in the `/verify/consensus` Z3 engine (`maximum` mode). Solves from both run one at a time on one dedicated thread, and the time counts from when the solve is queued, so waiting for that thread counts toward it. The model translation before the solve is not included. |
 | `QWED_BATCH_MAX_JOBS` | `1000` | Jobs kept in the `/verify/batch` job store. QWED evicts the oldest finished job first and never evicts a running job. An evicted job returns `404` from `GET /verify/batch/{job_id}`. When every stored job is active, new submissions get `503 Batch capacity reached — retry shortly.` |
 | `QWED_BATCH_ITEM_TIMEOUT` | `60` | Seconds a single batch item can run. A timed-out item is marked `failed` so the job can finish. |
 | `QWED_SANDBOX_MAX_CONCURRENT` | `4` | Sandbox containers running at once per server process, across `/verify/consensus` and `/verify/stats` with the Docker executor. |

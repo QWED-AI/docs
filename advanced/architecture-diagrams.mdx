@@ -125,7 +125,7 @@ flowchart LR
 
 ## 4) Consensus verification path
 
-**Use this when:** you want resilience through multi-engine cross-checking.
+**Use this when:** you want an advisory multi-engine cross-check. The result is `UNVERIFIABLE` or `BLOCKED`, never `VERIFIED`.
 
 ```mermaid
 flowchart TD
@@ -140,7 +140,7 @@ flowchart TD
     H -->|Yes| Vote[Weighted consensus]
     H -->|No| Degraded[Degraded mode policy]
     Degraded --> Vote
-    Vote --> Out[Final deterministic verdict]
+    Vote --> Out[Advisory result: UNVERIFIABLE or BLOCKED]
 ```
 
 ## Diagram usage guide
