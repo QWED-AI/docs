@@ -599,7 +599,7 @@ Only the built-in pattern skips these shapes. An `AWS_SECRET_KEY` pattern you pa
 
 ### Passwords in URLs
 
-The built-in `DATABASE_URL` pattern reports a URL that carries a password in the form `user:password@` after `://`. In v11.0.0 and earlier, it matched only the `postgres://`, `mysql://` and `mongodb://` schemes. In releases after v11.0.0, it matches any scheme in any case, for example `postgresql://`, `postgresql+psycopg2://`, `mongodb+srv://`, `redis://`, `amqp://` and `https://`. Every match is reported under the `DATABASE_URL` type.
+The built-in `DATABASE_URL` pattern reports a URL that carries a password in the form `user:password@` after `://`. In v11.0.0 and earlier, it matched only the `postgres://`, `mysql://` and `mongodb://` schemes. In releases after v11.0.0, it matches any scheme in any case, for example `postgresql://`, `postgresql+psycopg2://`, `mongodb+srv://`, `redis://`, `amqp://` and `https://`. `ConfigGuard` reports every match under the `DATABASE_URL` type.
 
 For any scheme, `ConfigGuard` reads the URL as one token:
 
@@ -613,11 +613,13 @@ The `postgres://`, `mysql://` and `mongodb://` schemes keep the reach they had b
 
 - A port of one to five digits followed by `/`, `?` or `#`, so the `@` in `host:4873/@scope/pkg` is read as part of the path. An empty port or a port of six or more digits before an `@` in the path is reported.
 - A hex digest of its algorithm's exact length after a `sha1:`, `sha256:`, `sha384:` or `sha512:` label directly after the `@`, as in an image pinned by digest (`docker://alpine:3.18@sha256:<digest>`). The digest must contain at least one letter from `a` to `f`. A digest of digits alone can read as a host named `sha256` and a zero-padded port, so `ConfigGuard` reports it. The digest must end at whitespace or the end of the text. It may also end at a quote, `,`, `]` or `}`, as in a YAML flow collection such as `images: [docker://alpine:3.18@sha256:<digest>]`, when no other `@` follows before the next whitespace.
-- A password that is exactly a placeholder of the form `${NAME}` or `<name>` in ASCII, when no other `@` follows the URL's `@` before the next whitespace. A quote doesn't end that run. A placeholder followed by `@`, more text and the host's `@`, as in `postgresql://admin:${PG_PASSWORD}@x@db.internal/app`, is a longer literal password, and `ConfigGuard` reports it. `${NAME:-default}`, `$NAME` and a run of `*` are also reported, because a literal password can have those shapes.
+- A password that is exactly a placeholder of the form `${NAME}` or `<name>` in ASCII, when no other `@` follows the URL's `@` before the next whitespace. A quote doesn't end that run. A placeholder followed by `@`, more text and the host's `@`, as in `postgresql://admin:${PG_PASSWORD}@x@db.internal/app`, is a longer literal password, and `ConfigGuard` reports it. It also reports `${NAME:-default}`, `$NAME` and a run of `*`, because a literal password can have those shapes.
 
-For schemes other than `postgres`, `mysql` and `mongodb`, a password that contains whitespace, a quote character or `://` is not reported. A password that contains `postgres://`, `mysql://` or `mongodb://` is not reported under any scheme.
+For schemes other than `postgres`, `mysql` and `mongodb`, `ConfigGuard` doesn't report a password that contains whitespace, a quote character or `://`. Under any scheme, it doesn't report a password that contains `postgres://`, `mysql://` or `mongodb://`. Whitespace, including a no-break space, ends the run after a placeholder or a digest, so it doesn't report a placeholder followed by `@`, text, a space and another `@`.
 
-`scan_string` reads compact JSON as text, so a quote doesn't end a value. A pinned image or a placeholder URL followed later in the same run by another `@`, such as an email address in the next JSON value, is reported. `verify_config_safety` reads each parsed value alone and doesn't report it.
+`scan_string` reads compact JSON as text, so a quote doesn't end a value. `ConfigGuard` reports a pinned image or a placeholder URL followed later in the same run by another `@`, such as an email address in the next JSON value. `verify_config_safety` reads each parsed value alone and doesn't report it.
+
+In a GitHub Actions workflow, set the whole URL from a secret, as in `DATABASE_URL: ${{ secrets.DATABASE_URL }}`. `ConfigGuard` doesn't read a `${{ }}` expression inside the URL as a placeholder, and GitHub Actions doesn't expand `${NAME}` in a workflow's YAML.
 
 A `DATABASE_URL` pattern you pass in `custom_patterns` replaces the built-in pattern.
 
