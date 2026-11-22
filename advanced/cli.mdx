@@ -391,21 +391,23 @@ Logic:
   [ok] x>5 => x>10            -> VERIFIED (false) | DENY
 
 SQL:
-  [ok] Valid SELECT            -> VERIFIED (safe) | ADMIT
+  [ok] Valid SELECT           -> VERIFIED (safe) | ADMIT
   [ok] OR 1=1 injection       -> VERIFIED (unsafe) | DENY
   [ok] DROP TABLE stacked     -> VERIFIED (unsafe) | DENY
 
 Code:
-  [ok] Safe function           -> VERIFIED (safe) | ADMIT
-  [ok] eval(input)             -> VERIFIED (unsafe, critical) | DENY
-  [ok] curl | bash             -> VERIFIED (unsafe, critical) | DENY
+  [ok] Safe function          -> VERIFIED (safe) | ADMIT
+  [ok] eval(input)            -> VERIFIED (unsafe, critical) | DENY
+  [ok] curl | bash            -> VERIFIED (unsafe, critical) | DENY
 
 12/12 tests passed. All engines ready.
 ```
 
 Each line prints the verdict together with its admission decision, so `VERIFIED` never appears alone. `VERIFIED` means the engine decided the claim, not that the claim is safe to use. A claim proven false, such as `2+2=5`, is `VERIFIED (false) | DENY`. A test case whose self-check fails prints `FAILED` instead of a verdict, and an engine that raises prints `ERROR`.
 
-The two `=>` lines prove a claim from the premise `x>5` for every integer `x`. `x>3` follows from it, so that line is `VERIFIED | ADMIT`. `x>10` does not, so the engine returns a counterexample (a value of `x` from 6 to 10) and the line is `VERIFIED (false) | DENY`. Each line passes only when the engine gives that exact answer and the verdict carries a `proof_ref`, as `/verify/logic` returns it. On these lines, a result that is only satisfiable or vacuous prints `FAILED`, not `VERIFIED`. To prove your own claims, use `LogicVerifier.prove_theorem()` or `/verify/logic`, not `verify_logic()`.
+In releases after v11.0.0, the two `=>` lines prove a claim from the premise `x>5` for every integer `x`. `x>3` follows from it, so that line is `VERIFIED | ADMIT`. `x>10` does not, so the engine returns a counterexample (a value of `x` from 6 to 10) and the line is `VERIFIED (false) | DENY`. Each line passes only when the engine gives that exact answer and the verdict, mapped the way `/verify/logic` maps it, is `VERIFIED` with a `proof_ref`. On these lines, a result that is only satisfiable or vacuous prints `FAILED`, not `VERIFIED`. To prove your own claims, call `DSLLogicVerifier.prove_from_dsl()`, the check these lines run (see [Proving a claim](/engines/logic#proving-a-claim)), or send the question to `/verify/logic` with `client.verify_logic()`. Don't use `LogicVerifier.verify_logic()` for this: it is `VERIFIED` whenever the constraints can all hold.
+
+v11.0.0 and earlier print `x>3 AND x<10 -> VERIFIED (x=4) | ADMIT` and `approval=1 AND approval=0 -> UNVERIFIABLE (contradiction) | DENY` in place of the two `=>` lines.
 
 #### Verbose mode
 
