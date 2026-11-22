@@ -149,7 +149,7 @@ The endpoint returns the [`DiagnosticResult`](/advanced/diagnostics) verdict tha
 | `translated_expression` | string | The expression the LLM produced and the engine evaluated |
 | `verification_scope` | string | Always `"translated_expression_only"`. The verdict covers the translated expression, not your question |
 | `query_semantics_verified` | boolean | Always `false`. QWED cannot prove the translation means what you asked |
-| `provider_used` | string | LLM provider that translated the query. Present only when the translated expression reached a decided verdict (`VERIFIED`, including a translated claim proven false); absent otherwise. The audit row stores it too |
+| `provider_used` | string | LLM provider that translated the query. Present when the translated expression reached a decided verdict (`VERIFIED`, including a translated claim proven false), and, in releases after v11.0.0, when the result is `UNVERIFIABLE` because the model's translation marks the query as not a maths question; absent otherwise. The audit row stores it too |
 | `translation_model` | string or null | Model that provider is configured to call, read from the server's provider settings, not from the model's answer. `null` when the provider names no model. Present and absent with `provider_used`. The audit row stores it too. It does not change the verdict or the admission |
 | `admission` | string | Always `"BLOCKED"` (`DENY`) for this endpoint, even when the translated claim holds |
 
@@ -588,6 +588,8 @@ Verify a factual claim against a provided context.
 
 When you name a `provider` and the deterministic checks are not confident enough, QWED asks the model for an advisory. It first screens the claim and the context for prompt-injection phrases and refuses either one over 10,000 characters. A refused claim or context returns `BLOCKED` with `constraint_id: "fact_verifier.translation_refused"`, and no model is called. See [Prompt-injection screening](/engines/fact#prompt-injection-screening).
 
+The model's advisory appears in `advisory_checks`, at the top level and in `developer_fields`, as the `llm_fallback` check, with `llm_verdict`, `llm_confidence` and `llm_reasoning` in its `details`. In releases after v11.0.0, its `details` also carry `provider_used` and `translation_model`, the provider and model that gave the advisory. The verdict is the deterministic one, so `developer_fields` itself names no model.
+
 | Status | Description |
 |--------|-------------|
 | 503 | `Fact verification timed out.` The provider call exceeded `QWED_PROVIDER_TIMEOUT` (default 30 seconds) |
@@ -658,7 +660,9 @@ One engine is not a consensus. An answer that only one engine verifies is `BLOCK
       "confidence": 1.0,
       "latency_ms": 12.5,
       "success": true,
-      "status": "VERIFIED"
+      "status": "VERIFIED",
+      "provider_used": "openai_compat",
+      "translation_model": "your-configured-model"
     },
     {
       "engine": "Python",
@@ -667,7 +671,9 @@ One engine is not a consensus. An answer that only one engine verifies is `BLOCK
       "confidence": 0.99,
       "latency_ms": 30.1,
       "success": true,
-      "status": "UNVERIFIABLE"
+      "status": "UNVERIFIABLE",
+      "provider_used": "openai_compat",
+      "translation_model": "your-configured-model"
     }
   ],
   "total_latency_ms": 45.2,
@@ -681,6 +687,8 @@ One engine is not a consensus. An answer that only one engine verifies is `BLOCK
 | `confidence` | float | Confidence from 0 to 1. `0.0` when only one engine verified the answer |
 | `verification_chain` | array | Detailed results from each engine |
 | `verification_chain[].status` | string | Trust-boundary status from that engine: `VERIFIED`, `UNVERIFIABLE`, or `BLOCKED` |
+| `verification_chain[].provider_used` | string or null | In releases after v11.0.0, the LLM provider whose translation of the query that engine decided on. `null` when the engine had no translation |
+| `verification_chain[].translation_model` | string or null | In releases after v11.0.0, the model that provider is configured to call, read from the server's provider settings, not from the model's answer. `null` when the engine had no translation or the provider names no model |
 | `advisory_only` | boolean | Always `true`. The result is a signal for review, not a verification |
 | `meets_requirement` | boolean | Always `false`, on every response. A consensus is never verified, and confidence alone is never sufficient |
 
@@ -794,7 +802,9 @@ curl -X POST http://localhost:8000/verify/stats \
     "columns": ["salary"],
     "dataset_sha256": "9f2c...",
     "sandbox_type": "docker",
-    "execution_time_ms": 412.7
+    "execution_time_ms": 412.7,
+    "provider_used": "openai_compat",
+    "translation_model": "your-configured-model"
   },
   "proof_ref": null,
   "is_authoritative": false
@@ -804,6 +814,8 @@ curl -X POST http://localhost:8000/verify/stats \
 <Warning>
 **Breaking change (v7.0.0):** the endpoint returns the unified [`DiagnosticResult`](/advanced/diagnostics) shape instead of the legacy `{"status": "SUCCESS" | "ERROR" | "BLOCKED", "result": ..., "code": ...}` shape. Successful execution now reports `status: "UNVERIFIABLE"` with the observed value in `developer_fields.observed_result` — execution success alone is never presented as a proven claim, so `VERIFIED` is not emitted from this endpoint.
 </Warning>
+
+In releases after v11.0.0, once the model has written the analysis code, `developer_fields` also carry `provider_used` and `translation_model`: the provider and the model that wrote it. This applies to `UNVERIFIABLE` and `BLOCKED` results alike.
 
 Failure states return `status: "BLOCKED"` with a `constraint_id` of `stats_verifier.validation_error` (translation or security validation failed), `stats_verifier.execution_failure` (sandbox execution failed), or `stats_verifier.runtime_unavailable` (Docker unavailable). Blocked results carry no `proof_ref`.
 

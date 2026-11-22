@@ -73,8 +73,10 @@ When the deterministic confidence is below `min_confidence` and a provider is co
   "engine": "Fact",
   "advisory_checks": [
     {"name": "tfidf_similarity", "score": 0.62, "threshold": 0.75},
-    {"name": "llm_reasoning", "advisory_only": True, "text": "..."},
-    {"name": "llm_confidence", "advisory_only": True, "value": 0.71}
+    {"name": "llm_fallback", "advisory_only": True, "constraint_id": "fact_verifier.llm_advisory_only",
+     "details": {"llm_verdict": "SUPPORTED", "llm_confidence": 0.71, "llm_reasoning": "...",
+                 "advisory_only": True, "provider_used": "openai_compat",
+                 "translation_model": "your-configured-model"}}
   ],
   "developer_fields": {"deterministic_confidence": 0.62}
 }
