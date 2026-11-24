@@ -104,6 +104,24 @@ Treat `503` responses from these limits as retryable. Back off and resend the re
 
 ## Verification endpoints
 
+### Causes that stop a verification
+
+In releases after v11.0.0, a request that stops before an engine decides it gets one verdict for each cause, on every route that calls a model: `/verify/natural_language`, `/verify/logic`, `/verify/consensus`, `/verify/stats` and `/verify/fact`. `constraint_id` names the cause. QWED admits none of these results and writes an audit row for each, as for any other verdict. Batch items carry their route's verdict.
+
+| `constraint_id` | `status` | Cause |
+|-----------------|----------|-------|
+| `translation.no_provider` | `UNVERIFIABLE` | No model is configured, or the request names a provider QWED does not know. The message names the setting to fix |
+| `translation.failed` | `UNVERIFIABLE` | The provider failed or ran out of time before the model answered, or QWED could not use its translation. The message carries nothing from the provider |
+| `security.input_refused` | `BLOCKED` | The prompt-injection screen refused your text before any model saw it. The message is always `The input was refused by the injection screen before any model saw it`. The screen's reason, which names the pattern it matched, stays in the server log |
+| `security.output_refused` | `BLOCKED` | The safety check refused the model's translation |
+| `policy.blocked` | `BLOCKED` | The control plane's policy refused the request (`/verify/natural_language` and `/verify/logic`) |
+
+An error after the model has answered is not a translation cause, so it stays `BLOCKED`. On `/verify/natural_language` and `/verify/logic` it carries `constraint_id: "control_plane.pipeline_error"`. A consensus engine that fails after its translation names no cause. On `/verify/logic`, a DSL step that refuses what the model wrote also stays `BLOCKED` with no cause.
+
+On `/verify/fact` the model only adds an advisory to the deterministic verdict, so `translation.failed` does not apply there. A provider that fails at run time leaves the deterministic verdict without the advisory, and a provider call that runs out of time returns `503`.
+
+To tell causes apart, read `constraint_id`, not the message or the route's own status fields. Before this change, a missing model was `BLOCKED` on `/verify/logic`, `/verify/consensus`, `/verify/stats` and `/verify/fact`, and `UNVERIFIABLE` through the legacy mapping on `/verify/natural_language`, each with a message of its own.
+
 ### POST /verify/natural_language
 
 Main entry point for verifying natural language queries. Routes through the QWED Control Plane with multi-tenancy support.
@@ -153,7 +171,7 @@ The endpoint returns the [`DiagnosticResult`](/advanced/diagnostics) verdict tha
 | `translation_model` | string or null | Model that provider is configured to call, read from the server's provider settings, not from the model's answer. `null` when the provider names no model. Present and absent with `provider_used`. The audit row stores it too. It does not change the verdict or the admission |
 | `admission` | string | Always `"BLOCKED"` (`DENY`) for this endpoint, even when the translated claim holds |
 
-Admission is always `BLOCKED` because the LLM translation itself is unverified, so QWED never admits the result as an answer to your question. The verdict itself is unchanged. The audit log row's `is_verified` follows admission, so it is always `false`. The row's domain is `NATURAL_LANGUAGE`. Rows written before this fix store `MATH`, because the domain is part of each signed, chained entry and QWED doesn't rewrite it. QWED returns `BLOCKED` as the verdict when the control plane returns a malformed diagnostic or when the output sanitizer rejects the translated expression.
+Admission is always `BLOCKED` because the LLM translation itself is unverified, so QWED never admits the result as an answer to your question. The verdict itself is unchanged. The audit log row's `is_verified` follows admission, so it is always `false`. The row's domain is `NATURAL_LANGUAGE`. Rows written before this fix store `MATH`, because the domain is part of each signed, chained entry and QWED doesn't rewrite it. QWED returns `BLOCKED` as the verdict when the control plane returns a malformed diagnostic or when the output sanitizer rejects the translated expression. A request that stops before the engine decides it, for example with no model configured or a refused query, gets its cause's verdict and `constraint_id`. See [Causes that stop a verification](#causes-that-stop-a-verification).
 
 For a deterministic, admissible result, send the expression to [`POST /verify/math`](#post-%2Fverify%2Fmath) directly.
 
@@ -404,7 +422,8 @@ The response is a [`DiagnosticResult`](/advanced/diagnostics), with the control 
 | `UNVERIFIABLE` | `VACUOUS` | The constraints contradict each other, so no claim is proven (`constraint_id: "dsl_logic_verifier.vacuous_premises"`) |
 | `UNVERIFIABLE` | `SAT` | The translation states no claim to prove, or asks only whether some values meet the conditions. The conditions can hold, which proves nothing (`constraint_id: "logic.satisfiable_not_proven"`) |
 | `UNVERIFIABLE` | `UNSAT` | No claim to prove, or the question asks only whether some values meet the conditions, and no values meet them |
-| `BLOCKED` | anything else (`ERROR`, `BLOCKED`, `UNKNOWN`) | Blocked by security policy, a translation or solver error, or a timeout. A translation that uses `/`, `%` with a divisor other than a positive whole number, or a helper call with keyword arguments fails |
+| `UNVERIFIABLE` | `ERROR` | No model is configured (`translation.no_provider`), or the provider failed or ran out of time before the model answered (`translation.failed`). See [Causes that stop a verification](#causes-that-stop-a-verification) |
+| `BLOCKED` | anything else (`ERROR`, `BLOCKED`, `UNKNOWN`) | A refused query (`security.input_refused`), refused model output (`security.output_refused`), a policy block (`policy.blocked`), an error after the model answered (`control_plane.pipeline_error`), or a solver error or timeout. A translation that uses `/`, `%` with a divisor other than a positive whole number, or a helper call with keyword arguments fails |
 
 `dsl_code` and `translated_expression` name the statement Z3 decided: `(IMPLIES constraints claim)`, or the claim alone when the question gives no constraints.
 
@@ -438,7 +457,7 @@ The `provider_used` field shows which LLM provider handled the translation, and 
 }
 ```
 
-The provider translation step runs under `QWED_PROVIDER_TIMEOUT` (default 30 seconds) and the Z3 solve under `QWED_Z3_TIMEOUT` (default 15 seconds). A timeout returns `BLOCKED`.
+The provider translation step runs under `QWED_PROVIDER_TIMEOUT` (default 30 seconds). That bound covers the whole translation call, including the DSL step that reads the model's answer. A call that runs out of time before the model answers returns `UNVERIFIABLE` with `constraint_id: "translation.failed"`. One that runs out of time after the model answered returns `BLOCKED` with `constraint_id: "control_plane.pipeline_error"`, and the audit row keeps the answer. An answer that arrives after the deadline does not change the cause. The Z3 solve runs under `QWED_Z3_TIMEOUT` (default 15 seconds), and a Z3 timeout returns `BLOCKED`.
 
 ---
 
@@ -586,7 +605,7 @@ Verify a factual claim against a provided context.
 | `REFUTED` | Claim contradicts the context |
 | `INCONCLUSIVE` | Not enough evidence in the context |
 
-When you name a `provider` and the deterministic checks are not confident enough, QWED asks the model for an advisory. It first screens the claim and the context for prompt-injection phrases and refuses either one over 10,000 characters. A refused claim or context returns `BLOCKED` with `constraint_id: "fact_verifier.translation_refused"`, and no model is called. See [Prompt-injection screening](/engines/fact#prompt-injection-screening).
+When you name a `provider` and the deterministic checks are not confident enough, QWED asks the model for an advisory. It first screens the claim and the context for prompt-injection phrases and refuses either one over 10,000 characters. A refused claim or context returns `BLOCKED` with `constraint_id: "security.input_refused"`, and no model is called. With no model configured for the provider, or a provider QWED does not know, the request returns `UNVERIFIABLE` with `constraint_id: "translation.no_provider"`. Both results keep the deterministic fields in `developer_fields`. See [Prompt-injection screening](/engines/fact#prompt-injection-screening) and [Causes that stop a verification](#causes-that-stop-a-verification). Before this change they were `BLOCKED` with `fact_verifier.translation_refused` and `fact_verifier.provider_config_error`.
 
 The model's advisory appears in `advisory_checks`, at the top level and in `developer_fields`, as the `llm_fallback` check, with `llm_verdict`, `llm_confidence` and `llm_reasoning` in its `details`. In releases after v11.0.0, its `details` also carry `provider_used` and `translation_model`, the provider and model that gave the advisory. The verdict is the deterministic one, so `developer_fields` itself names no model.
 
@@ -696,9 +715,9 @@ One engine is not a consensus. An answer that only one engine verifies is `BLOCK
 No combination of engine outcomes produces a `VERIFIED` consensus. A `VERIFIED` entry in `verification_chain` is that engine's own verdict. Advisory-only sub-engines (statistical computation, code execution) always return `UNVERIFIABLE`, so they never count as a second engine that verified. See the [Consensus engine](/engines/consensus#sub-engine-status-contract) page for the full sub-engine contract.
 </Note>
 
-Every consensus outcome is an HTTP 200 answer, not an error. An unavailable secure Docker sandbox for the Python engine in `high` or `maximum` mode (`agreement_status: "blocked_secure_execution"`), engines that are all blocked, and a result only one engine verified are `BLOCKED`, whatever the confidence. Otherwise, a confidence below `min_confidence` is `UNVERIFIABLE` with a message such as `Confidence (70.0%) below required minimum (95.0%)`.
+Every consensus outcome is an HTTP 200 answer, not an error. An unavailable secure Docker sandbox for the Python engine in `high` or `maximum` mode (`agreement_status: "blocked_secure_execution"`), engines that are all blocked, and a result only one engine verified are `BLOCKED`, whatever the confidence. When every engine stopped for a translation cause, the same one or not, the result is `UNVERIFIABLE` with `agreement_status: "not_translated"` and that cause as `constraint_id` (`translation.no_provider` when any engine had no provider). When every engine was refused for the same cause, the result is `BLOCKED` with that cause. Any other mix, or an engine blocked for no named cause, stays `BLOCKED` with the message `Consensus verification: all engines blocked`. See [Causes that stop a verification](#causes-that-stop-a-verification). Otherwise, a confidence below `min_confidence` is `UNVERIFIABLE` with a message such as `Confidence (70.0%) below required minimum (95.0%)`.
 
-Before any engine runs, QWED screens the query with the same prompt-injection check that `/verify/natural_language` applies. A refused query is `BLOCKED` with `agreement_status: "blocked"`, `engines_used: 0` and `confidence: 0.0`, and no engine answers it. The message reads `Consensus verification: all engines blocked`, as when every engine is blocked; `engines_used: 0` tells the two apart. That check also refuses queries over 2,000 characters and queries that contain words such as `mode`, `root` or `system` anywhere, even inside a longer word such as `model`. For a statistics question over data, use [`/verify/stats`](#post-%2Fverify%2Fstats).
+Before any engine runs, QWED screens the query with the same prompt-injection check that `/verify/natural_language` applies. A refused query is `BLOCKED` with `constraint_id: "security.input_refused"`, `agreement_status: "blocked"`, `engines_used: 0` and `confidence: 0.0`, and no engine answers it. The message is the fixed `security.input_refused` message, not `Consensus verification: all engines blocked`. That check also refuses queries over 2,000 characters and queries that contain words such as `mode`, `root` or `system` anywhere, even inside a longer word such as `model`. For a statistics question over data, use [`/verify/stats`](#post-%2Fverify%2Fstats).
 
 | Status | Description |
 |--------|-------------|
@@ -817,7 +836,9 @@ curl -X POST http://localhost:8000/verify/stats \
 
 In releases after v11.0.0, once the model has written the analysis code, `developer_fields` also carry `provider_used` and `translation_model`: the provider and the model that wrote it. This applies to `UNVERIFIABLE` and `BLOCKED` results alike.
 
-Failure states return `status: "BLOCKED"` with a `constraint_id` of `stats_verifier.validation_error` (translation or security validation failed), `stats_verifier.execution_failure` (sandbox execution failed), or `stats_verifier.runtime_unavailable` (Docker unavailable). Blocked results carry no `proof_ref`.
+Before the model writes code, a request can stop for a [cause shared by every route](#causes-that-stop-a-verification): `UNVERIFIABLE` with `translation.no_provider` (no model configured) or `translation.failed` (the provider failed, or its reply had no code), or `BLOCKED` with `security.input_refused` (the query or a column name was refused). Before this change, each of these was `BLOCKED` with `stats_verifier.validation_error`.
+
+Other failure states return `status: "BLOCKED"` with a `constraint_id` of `stats_verifier.validation_error` (the generated code failed security validation), `stats_verifier.execution_failure` (sandbox execution failed), or `stats_verifier.runtime_unavailable` (Docker unavailable). Blocked results carry no `proof_ref`.
 
 These are results, not HTTP errors: a security-policy failure and a Docker outage both return HTTP 200 with `status: "BLOCKED"`.
 
@@ -1045,7 +1066,7 @@ Math, logic, and natural-language items return the [`DiagnosticResult`](/advance
 | Item type | `result` |
 |-----------|----------|
 | `math` | The `POST /verify/math` verdict. See [Math items](#math-items-proof-vs-simplification) below. |
-| `logic` | The `POST /verify/logic` response. `VERIFIED` with a `proof_ref` when the translated claim follows from the constraints (`VALID`), or with `is_valid: false` and a counterexample when it is proven false (`INVALID`). `UNVERIFIABLE` when no claim is proven (`VACUOUS`, `SAT` or `UNSAT`), and `BLOCKED` otherwise. `admission` is always `BLOCKED`. The control plane's own output (such as `status: "INVALID"`, `model`, `provider_used`) and the verdict's scope fields stay under `result.developer_fields`. |
+| `logic` | The `POST /verify/logic` response. `VERIFIED` with a `proof_ref` when the translated claim follows from the constraints (`VALID`), or with `is_valid: false` and a counterexample when it is proven false (`INVALID`). `UNVERIFIABLE` when no claim is proven (`VACUOUS`, `SAT` or `UNSAT`) or the request stopped for no model or a failed translation, and `BLOCKED` otherwise. `admission` is always `BLOCKED`. The control plane's own output (such as `status: "INVALID"`, `model`, `provider_used`) and the verdict's scope fields stay under `result.developer_fields`. |
 | `natural_language` | The `POST /verify/natural_language` response, with `admission`, which is always `BLOCKED`. Only the verdict is kept: `final_answer`, `translation`, and `trust_boundary` are not returned. |
 | `code`, `fact`, `sql` | The item type's route result, unchanged apart from the trust step. A code item's `admission` is decided on the enforced verdict. |
 

@@ -290,7 +290,7 @@ elif result.status == "VERIFIED":
 elif result.status == "UNVERIFIABLE":
     print("Not proven")   # no claim, or constraints that contradict each other
 else:
-    # BLOCKED: the query could not be translated or solved. Fail closed.
+    # BLOCKED: the query was refused or could not be solved. Fail closed.
     raise RuntimeError(f"Logic verification failed ({result.status}): {result.error}")
 ```
 
