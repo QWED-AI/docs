@@ -375,7 +375,7 @@ result = client.verify_logic("tier == 'gold' and tier == 'silver'")
 
 # Encode categories as integers (gold = 1, silver = 2)
 result = client.verify_logic("(AND (EQ tier 1) (EQ tier 2))")
-if result.status == "UNVERIFIABLE":        # unsatisfiable: a tier can't be both
+if result.status == "UNVERIFIABLE":        # unsatisfiable: a tier can't be both (no model or a failed translation is UNVERIFIABLE too: read constraint_id)
     print("The claims contradict each other")
 elif result.status == "BLOCKED":
     # The query was refused or could not be solved. Fail closed.
@@ -394,6 +394,7 @@ Before v7.3.0, the bridge turned each string into a free integer variable, so co
 result = client.verify_logic("(AND (GT x 5) (LT x 0))")
 
 if result.status == "UNVERIFIABLE":
+    # Also UNVERIFIABLE: no model or a failed translation. Read constraint_id.
     print("No solution exists")
     print(result.result.get("agent_message"))   # "Logic constraints are unsatisfiable"
 elif result.status == "BLOCKED":

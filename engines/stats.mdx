@@ -34,7 +34,7 @@ Before v9.0.0, the Stats Engine could not load on Python 3.14, which removed `as
 | Outcome | `status` | `constraint_id` | `proof_ref` |
 | ------- | -------- | --------------- | ----------- |
 | Execution succeeded | `UNVERIFIABLE` | `stats_verifier.claim_not_verified` | `null` |
-| No model configured | `UNVERIFIABLE` | `translation.no_provider` | `null` |
+| No model configured, or an unknown provider | `UNVERIFIABLE` | `translation.no_provider` | `null` |
 | Code generation failed, or the reply had no code | `UNVERIFIABLE` | `translation.failed` | `null` |
 | Query or a column name refused by the prompt-injection check | `BLOCKED` | `security.input_refused` | `null` |
 | Generated code failed security validation | `BLOCKED` | `stats_verifier.validation_error` | `null` |

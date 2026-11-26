@@ -46,7 +46,7 @@ The Fact Engine returns a [`DiagnosticResult`](/advanced/diagnostics). The deter
 | Empty claim or context | `UNVERIFIABLE` | Returns `constraint_id: fact_verifier.empty_input`. |
 | Pipeline error | `BLOCKED` | Unexpected errors fail closed rather than silently pass. |
 | Advisory requested, claim or context refused | `BLOCKED` | Returns `constraint_id: security.input_refused`. See [Prompt-injection screening](#prompt-injection-screening). |
-| Advisory requested, no model configured or unknown provider | `UNVERIFIABLE` | Returns `constraint_id: translation.no_provider`. The message names the setting to fix. |
+| Advisory requested, no model configured or unknown provider | `UNVERIFIABLE` | Returns `constraint_id: translation.no_provider`. The message names the setting to fix, or lists the providers QWED knows. |
 
 When you call the engine through the Python SDK, `QWEDClient.verify_fact` also fails closed on the client side. If the QWED service is unreachable or the request times out, the client returns `status="UNVERIFIABLE"` and `is_verified=False` instead of raising. See [`verify_fact`](/sdks/python#verify_fact-claim-context).
 

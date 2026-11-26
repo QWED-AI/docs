@@ -13,17 +13,17 @@ Jump to: [One verdict for each stop cause](#qwed-verification-—-one-verdict-fo
 
 **Unreleased** · [GitHub PR #667](https://github.com/QWED-AI/qwed-verification/pull/667) · [Issue #519](https://github.com/QWED-AI/qwed-verification/issues/519)
 
-> With no model configured, `/verify/logic`, `/verify/consensus`, `/verify/stats` and `/verify/fact` were `BLOCKED` and `/verify/natural_language` was `UNVERIFIABLE` through the legacy mapping, each with a message of its own. Each cause now has one verdict on every route, named in `constraint_id`, and QWED admits none of them.
+> With no model configured, `/verify/logic`, `/verify/consensus`, `/verify/stats` and `/verify/fact` (with a provider named) were `BLOCKED` and `/verify/natural_language` was `UNVERIFIABLE` through the legacy mapping, each with a message of its own. Each cause now has one verdict on every route, named in `constraint_id`, and QWED admits none of them.
 
 ### What changed
 
 - **Translation causes are `UNVERIFIABLE`.** `translation.no_provider` (no model configured, or a provider QWED does not know) and `translation.failed` (the provider failed or ran out of time, or QWED could not use its translation). On `/verify/fact`, only `translation.no_provider` applies.
 - **Refusals are `BLOCKED`.** `security.input_refused` (the injection screen refused the caller's text), `security.output_refused` (the safety check refused the model's translation) and `policy.blocked`.
-- **An error after the model answered stays `BLOCKED`.** It is `control_plane.pipeline_error` on `/verify/natural_language` and `/verify/logic`, and names no cause in a consensus engine.
+- **An error after the model answered stays `BLOCKED`.** An unexpected error is `control_plane.pipeline_error` on `/verify/natural_language` and `/verify/logic`. The logic DSL step refusing the model's output, and a consensus engine that fails after its translation, name no cause.
 - **A refused question gets a fixed message.** The screen's reason, which `/verify/logic`'s `error` and the `/verify/fact` message showed before, stays in the server log.
 - **Consensus reports the shared cause.** When every engine stopped for a translation cause, the consensus is `UNVERIFIABLE` with `agreement_status: not_translated`. When every engine was refused for the same cause, it is `BLOCKED` with that cause. Any other mix stays `BLOCKED`, "all engines blocked".
 - **Route-specific ids are replaced.** `/verify/stats` no longer reports these causes as `stats_verifier.validation_error`, and `/verify/fact` no longer reports `fact_verifier.translation_refused` or `fact_verifier.provider_config_error`.
-- **`QWED_PROVIDER_TIMEOUT` is checked at start.** The server does not start unless the value is a finite number of seconds above zero. Before, zero or less ended every provider call at once, and infinity bounded none.
+- **`QWED_PROVIDER_TIMEOUT` is checked at start.** When `QWED_PROVIDER_TIMEOUT` is set, the server does not start unless its value is a finite number of seconds above zero. Before, zero or less ended every provider call at once, and infinity bounded none.
 
 <Warning>
 **Callers that read a cause from the status or the message.** Before: a missing model was `BLOCKED` on most routes, and a refused question was `BLOCKED` on `/verify/logic` with the screen's reason in `error`. After: no provider and a failed translation are `UNVERIFIABLE`, and every route names the cause in `constraint_id`. Read `constraint_id` instead of the status or the message, and check that `QWED_PROVIDER_TIMEOUT`, when set, is a finite number above zero.
