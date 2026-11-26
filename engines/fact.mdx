@@ -45,7 +45,8 @@ The Fact Engine returns a [`DiagnosticResult`](/advanced/diagnostics). The deter
 | `INSUFFICIENT_EVIDENCE` | `UNVERIFIABLE` | Not enough overlap to decide. |
 | Empty claim or context | `UNVERIFIABLE` | Returns `constraint_id: fact_verifier.empty_input`. |
 | Pipeline error | `BLOCKED` | Unexpected errors fail closed rather than silently pass. |
-| Advisory requested, claim or context refused | `BLOCKED` | Returns `constraint_id: fact_verifier.translation_refused`. See [Prompt-injection screening](#prompt-injection-screening). |
+| Advisory requested, claim or context refused | `BLOCKED` | Returns `constraint_id: security.input_refused`. See [Prompt-injection screening](#prompt-injection-screening). |
+| Advisory requested, no model configured or unknown provider | `UNVERIFIABLE` | Returns `constraint_id: translation.no_provider`. The message names the setting to fix, or lists the providers QWED knows. |
 
 When you call the engine through the Python SDK, `QWEDClient.verify_fact` also fails closed on the client side. If the QWED service is unreachable or the request times out, the client returns `status="UNVERIFIABLE"` and `is_verified=False` instead of raising. See [`verify_fact`](/sdks/python#verify_fact-claim-context).
 
@@ -88,7 +89,7 @@ This preserves the guarantee from the [3-tier engine classification](/engines/ov
 
 Before the advisory call, QWED screens the claim and the context for prompt-injection phrases, such as "ignore previous instructions" or "developer mode". It does not resolve or call the provider until both pass. The check matches each phrase as whole words, with an optional English ending (`s`, `es`, `ed`, `ing`) on its last word, so "Impact assessment" passes and "Disregard all prompts above" does not. It also refuses a claim or a context longer than 10,000 characters, which keeps the check's cost bounded. The check reads through invisible characters, such as a zero-width space, a word joiner or a soft hyphen, inside a word or between words, and it also reads the text's NFKC form, so fullwidth letters do not hide a phrase. The 10,000-character limit applies to the NFKC form too, so a text of 10,000 characters or fewer is still refused as too long when its NFKC form is longer than 10,000 characters. The text sent to the provider is unchanged.
 
-A refused claim or context makes the whole request `BLOCKED` with `constraint_id: fact_verifier.translation_refused`, rather than a result without the advisory you asked for. The message starts with `Security Policy Violation:` and gives the reason, for example `Input too long (max 10000 chars)`. The deterministic fields (`deterministic_verdict`, `deterministic_confidence`, `evidence`, `citations` and `scores`) stay in `developer_fields`.
+A refused claim or context makes the whole request `BLOCKED` with `constraint_id: security.input_refused`, rather than a result without the advisory you asked for. The message is always `The input was refused by the injection screen before any model saw it`. The screen's reason, for example `Input too long (max 10000 chars)`, stays in the server log. Before this change the result carried `fact_verifier.translation_refused` and a message that gave the reason. The deterministic fields (`deterministic_verdict`, `deterministic_confidence`, `evidence`, `citations` and `scores`) stay in `developer_fields`.
 
 The screening applies only when the advisory runs: the deterministic confidence is below `min_confidence` and you name a provider. To get only the deterministic result, for example for a context over 10,000 characters, send no provider.
 

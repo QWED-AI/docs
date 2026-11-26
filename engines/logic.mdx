@@ -41,7 +41,7 @@ elif result.status == "VERIFIED":
 elif result.status == "UNVERIFIABLE":
     print("Not proven:", result.result.get("agent_message"))
 else:
-    # BLOCKED: the query could not be translated or solved. Fail closed.
+    # BLOCKED: the query was refused or could not be solved. Fail closed.
     raise RuntimeError(f"Logic verification failed ({result.status}): {result.error}")
 ```
 
@@ -52,7 +52,8 @@ else:
 | `UNVERIFIABLE` | `VACUOUS` | The constraints contradict each other, so every claim follows from them and none is proven (`constraint_id: "dsl_logic_verifier.vacuous_premises"`). |
 | `UNVERIFIABLE` | `SAT` | No claim to prove: the translation states none, or asks only whether some values meet the conditions (goal `SATISFIABILITY`). The conditions can hold, but one satisfying assignment proves nothing (`constraint_id: "logic.satisfiable_not_proven"`). |
 | `UNVERIFIABLE` | `UNSAT` | No claim to prove, or the question asks only whether some values meet the conditions, and no values meet them. |
-| `BLOCKED` | anything else | A translation or solver error, or a timeout. |
+| `UNVERIFIABLE` | `ERROR` | No model is configured (`translation.no_provider`), or the provider failed or ran out of time before the model answered (`translation.failed`). See [Causes that stop a verification](/api/endpoints#causes-that-stop-a-verification). |
+| `BLOCKED` | anything else | A refused query (`security.input_refused`), a policy block (`policy.blocked`), an error after the model answered (`control_plane.pipeline_error`), a DSL step that refuses the translation, or a solver error or timeout. |
 
 `admission` is always `BLOCKED`, so `result.is_verified` is `False`: nothing checks that the translation means what you asked.
 
@@ -374,10 +375,10 @@ result = client.verify_logic("tier == 'gold' and tier == 'silver'")
 
 # Encode categories as integers (gold = 1, silver = 2)
 result = client.verify_logic("(AND (EQ tier 1) (EQ tier 2))")
-if result.status == "UNVERIFIABLE":        # unsatisfiable: a tier can't be both
+if result.status == "UNVERIFIABLE":        # unsatisfiable: a tier can't be both (no model or a failed translation is UNVERIFIABLE too: read constraint_id)
     print("The claims contradict each other")
 elif result.status == "BLOCKED":
-    # The query could not be translated or solved. Fail closed.
+    # The query was refused or could not be solved. Fail closed.
     raise RuntimeError(f"Logic verification failed: {result.error}")
 ```
 
@@ -393,10 +394,11 @@ Before v7.3.0, the bridge turned each string into a free integer variable, so co
 result = client.verify_logic("(AND (GT x 5) (LT x 0))")
 
 if result.status == "UNVERIFIABLE":
+    # Also UNVERIFIABLE: no model or a failed translation. Read constraint_id.
     print("No solution exists")
     print(result.result.get("agent_message"))   # "Logic constraints are unsatisfiable"
 elif result.status == "BLOCKED":
-    # The query could not be translated or solved; error says why. Fail closed.
+    # The query was refused or could not be solved; error says why. Fail closed.
     raise RuntimeError(f"Logic verification failed: {result.error}")
 ```
 
@@ -405,7 +407,7 @@ elif result.status == "BLOCKED":
 ## `LogicVerifier` returns `DiagnosticResult` (v6.0.0)
 
 <Info>
-**Introduced in v6.0.0.** `LogicVerifier` is the second engine — after `FactVerifier` — to conform to the unified [`DiagnosticResult` contract](/advanced/diagnostics). The legacy `LogicResult` dataclass has been removed from the verifier's return surface. The `/verify/logic` endpoint, and so `client.verify_logic()`, maps the DSL verdict instead: `VALID` is `VERIFIED`, `INVALID` is `VERIFIED` with `is_valid: false` and the counterexample, `VACUOUS`, `SAT` and `UNSAT` are `UNVERIFIABLE`, and anything else (`UNKNOWN`, `ERROR`, `BLOCKED`) is `BLOCKED` (see [Quick start](#quick-start)). `DSLLogicVerifier.verify_from_dsl()` returns the raw `SAT`, `UNSAT`, `UNKNOWN`, `ERROR` or `BLOCKED`.
+**Introduced in v6.0.0.** `LogicVerifier` is the second engine — after `FactVerifier` — to conform to the unified [`DiagnosticResult` contract](/advanced/diagnostics). The legacy `LogicResult` dataclass has been removed from the verifier's return surface. The `/verify/logic` endpoint, and so `client.verify_logic()`, maps the DSL verdict instead: `VALID` is `VERIFIED`, `INVALID` is `VERIFIED` with `is_valid: false` and the counterexample, `VACUOUS`, `SAT` and `UNSAT` are `UNVERIFIABLE`, and anything else (`UNKNOWN`, `ERROR`, `BLOCKED`) is `BLOCKED` (see [Quick start](#quick-start)). In releases after v11.0.0, an `ERROR` for no model or a failed translation is `UNVERIFIABLE` instead. `DSLLogicVerifier.verify_from_dsl()` returns the raw `SAT`, `UNSAT`, `UNKNOWN`, `ERROR` or `BLOCKED`.
 </Info>
 
 If you call the low-level `LogicVerifier` class directly, every one of its nine public methods now returns a `DiagnosticResult`:

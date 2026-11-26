@@ -34,7 +34,10 @@ Before v9.0.0, the Stats Engine could not load on Python 3.14, which removed `as
 | Outcome | `status` | `constraint_id` | `proof_ref` |
 | ------- | -------- | --------------- | ----------- |
 | Execution succeeded | `UNVERIFIABLE` | `stats_verifier.claim_not_verified` | `null` |
-| Translation or security validation failed | `BLOCKED` | `stats_verifier.validation_error` | `null` |
+| No model configured, or an unknown provider | `UNVERIFIABLE` | `translation.no_provider` | `null` |
+| Code generation failed, or the reply had no code | `UNVERIFIABLE` | `translation.failed` | `null` |
+| Query or a column name refused by the prompt-injection check | `BLOCKED` | `security.input_refused` | `null` |
+| Generated code failed security validation | `BLOCKED` | `stats_verifier.validation_error` | `null` |
 | Execution failed in the sandbox | `BLOCKED` | `stats_verifier.execution_failure` | `null` |
 | Docker sandbox unavailable | `BLOCKED` | `stats_verifier.runtime_unavailable` | `null` |
 
@@ -137,10 +140,10 @@ All generated statistical code is executed inside a Docker container with enforc
 | Docker unavailable at startup | `BLOCKED` with `stats_verifier.runtime_unavailable` (HTTP 200) |
 | Docker becomes unavailable mid-operation | `BLOCKED` with `stats_verifier.runtime_unavailable` (HTTP 200) |
 | Code fails AST security check | `BLOCKED` with `stats_verifier.validation_error` (HTTP 200) |
-| Code generation fails | `BLOCKED` with `stats_verifier.validation_error` |
-| Query or a column name refused by the prompt-injection check | `BLOCKED` with `stats_verifier.validation_error`, and no model is called |
+| Code generation fails | `UNVERIFIABLE` with `translation.failed` |
+| Query or a column name refused by the prompt-injection check | `BLOCKED` with `security.input_refused`, and no model is called |
 
-Before the model writes any code, QWED screens the query and each column name in the uploaded CSV's header for prompt-injection phrases, such as "ignore previous instructions" or "act as". The check matches each phrase as whole words, so statistics terms such as "mode" or "root" and a header such as "Impact assessment" pass. It refuses any query or column name over 10,000 characters, or whose NFKC form is over 10,000 characters. The check reads through invisible characters, such as a zero-width space, a word joiner or a soft hyphen, inside a word or between words, and it also reads the text's NFKC form, so fullwidth letters do not hide a phrase. A refused request gets the generic message `Statistical verification could not be completed because the request could not be translated.`
+Before the model writes any code, QWED screens the query and each column name in the uploaded CSV's header for prompt-injection phrases, such as "ignore previous instructions" or "act as". The check matches each phrase as whole words, so statistics terms such as "mode" or "root" and a header such as "Impact assessment" pass. It refuses any query or column name over 10,000 characters, or whose NFKC form is over 10,000 characters. The check reads through invisible characters, such as a zero-width space, a word joiner or a soft hyphen, inside a word or between words, and it also reads the text's NFKC form, so fullwidth letters do not hide a phrase. A refused request gets the fixed message `The input was refused by the injection screen before any model saw it`, and the screen's reason stays in the server log. Before this change, a refused request, a missing model and a failed code generation were all `BLOCKED` with `stats_verifier.validation_error`. See [Causes that stop a verification](/api/endpoints#causes-that-stop-a-verification).
 
 <Warning>
 Previous versions of QWED offered Wasm and restricted Python fallbacks when Docker was unavailable. These fallback paths have been removed. You must have a running Docker daemon for statistical verification to work.

@@ -288,9 +288,9 @@ if result.status == "VERIFIED" and result.result.get("is_valid") is False:
 elif result.status == "VERIFIED":
     print("The claim follows from the constraints")
 elif result.status == "UNVERIFIABLE":
-    print("Not proven")   # no claim, or constraints that contradict each other
+    print("Not proven")   # no claim, contradictory constraints, or no model or a failed translation (read constraint_id)
 else:
-    # BLOCKED: the query could not be translated or solved. Fail closed.
+    # BLOCKED: the query or its translation was refused, or it could not be solved. Fail closed.
     raise RuntimeError(f"Logic verification failed ({result.status}): {result.error}")
 ```
 

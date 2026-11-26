@@ -108,7 +108,7 @@ How the deadline applies:
 - **One aggregate budget, not per-engine stacking.** All selected engines share the same 30-second wall clock. Sequential per-engine waits cannot accumulate beyond it.
 - **Timed-out engines become explicit `BLOCKED` results.** An engine that misses the deadline is recorded in `verification_chain` as a `BLOCKED` `EngineResult` with the timeout in its `error` field (for example, `"Engine timed out after 30s"`). The failure is also recorded with the circuit breaker.
 - **Circuit-open engines are recorded too.** An engine skipped because its circuit breaker is open appears as a `BLOCKED` result rather than being silently dropped.
-- **Partial results still aggregate.** Engines that finished within the deadline contribute normally. The consensus verdict is computed from the results that arrived, with the fail-closed [status propagation](#status-propagation) rules applied. The consensus is `UNVERIFIABLE`, or `BLOCKED` when every engine is blocked or only one engine verified.
+- **Partial results still aggregate.** Engines that finished within the deadline contribute normally. The consensus verdict is computed from the results that arrived, with the fail-closed [status propagation](#status-propagation) rules applied. The consensus is `UNVERIFIABLE`, or `BLOCKED` when every engine is blocked, not all of them for a translation cause, or only one engine verified. In releases after v11.0.0, a translating engine that started and was still waiting for the model at the deadline carries the cause `translation.failed`, so when every engine stops that way the consensus is `UNVERIFIABLE` with `agreement_status` `not_translated`. An engine that already had its translation, or never started, names no cause. An engine skipped because its circuit breaker is open names no cause either.
 - **Off the event loop.** Engine execution runs in a dedicated per-call executor, so a slow consensus request degrades only itself, not other API traffic.
 
 ```python
@@ -235,7 +235,8 @@ Final confidence = weighted average of agreeing engines. Z3 does not vote on the
 | `no_results` | No engines returned a result |
 | `all_failed` | No engine succeeded and not every engine was blocked, for example when SymPy finds the answer wrong. The result is `UNVERIFIABLE` |
 | `no_answer` | No engine that computes an answer succeeded, so there is no answer to vote on (Z3 does not vote). The result is `UNVERIFIABLE`. When Z3 is the only engine that verified, the status is `no_independent_verification` instead, and the result is `BLOCKED` |
-| `blocked` | Every engine returned `BLOCKED`, or the prompt-injection check refused the query before any engine ran (`engines_used` `0`). The result is `BLOCKED` |
+| `not_translated` | Every engine stopped for a translation cause (no provider, or a failed translation), the same one or not. The result is `UNVERIFIABLE`, with `constraint_id` `translation.no_provider` when any engine had no provider, otherwise `translation.failed` |
+| `blocked` | Every engine returned `BLOCKED`, not all of them for a translation cause, or the prompt-injection check refused the query before any engine ran (`engines_used` `0`, `constraint_id` `security.input_refused`). The result is `BLOCKED`. When every engine was refused for the same cause, `constraint_id` names it |
 | `no_independent_verification` | Only one engine verified the answer. The result is `BLOCKED` with `confidence` `0.0` |
 | `blocked_secure_execution` | The Docker sandbox is unavailable and a required engine cannot run. The result is `BLOCKED` (HTTP 200). It takes precedence over every status that engine results produce, `no_independent_verification` included |
 
@@ -243,9 +244,10 @@ Final confidence = weighted average of agreeing engines. Z3 does not vote on the
 
 Consensus is advisory, not a proof engine. Per the [3-tier engine classification](/engines/overview), the consensus result is `UNVERIFIABLE` or `BLOCKED`, never `VERIFIED`:
 
-- The prompt-injection check refuses the query → the consensus result is `BLOCKED` with `agreement_status` `blocked` and no answer. This check runs before any engine is selected, so no engine runs, none answers the query and none records a failure with its circuit breaker. It is the check `/verify/natural_language` applies, so it also refuses a query over 2,000 characters or one that contains words such as `mode`, `root` or `system`.
+- The prompt-injection check refuses the query → the consensus result is `BLOCKED` with `agreement_status` `blocked`, `constraint_id` `security.input_refused` and no answer. This check runs before any engine is selected, so no engine runs, none answers the query and none records a failure with its circuit breaker. It is the check `/verify/natural_language` applies, so it also refuses a query over 2,000 characters or one that contains words such as `mode`, `root` or `system`.
 - The Python engine finds the Docker sandbox unavailable → the consensus result is `BLOCKED` with `agreement_status` `blocked_secure_execution`, whatever the other engines returned. This rule is checked first among engine results.
-- All engines return `BLOCKED` → the consensus result is `BLOCKED`.
+- All engines stop for a translation cause → the consensus result is `UNVERIFIABLE` with `agreement_status` `not_translated` and that cause. An engine still waiting for the model at its deadline counts as `translation.failed`. An engine cancelled before it started names no cause.
+- All engines return `BLOCKED` → the consensus result is `BLOCKED`, with the shared cause when every engine was refused for the same one.
 - Otherwise, only one engine verifies the answer → the consensus result is `BLOCKED` with `constraint_id: "consensus.no_independent_verification"` and `confidence` `0.0`, whatever the other engines returned (advisory, blocked or absent). One engine is not a consensus.
 - Otherwise → the consensus result is `UNVERIFIABLE`, whether the engines agree or not and however many verified. Before this change, a consensus was `VERIFIED` only when two distinct engines verified the same answer, which no two engines did, as the Z3 engine failed on every query.
 - The route passes every result through one more check: any status other than `UNVERIFIABLE` or `BLOCKED` is returned as `UNVERIFIABLE`, so the consensus `status` never reaches the response, the attestation or the audit row as `VERIFIED`. Each `verification_chain` entry keeps its engine's own status, which can be `VERIFIED`.
@@ -272,7 +274,7 @@ Async and sync consensus verification both return a `ConsensusResult` dataclass 
 | ----- | ---- | ----------- |
 | `final_answer` | `Any` | Best-supported answer across engines |
 | `confidence` | `float` | Weighted confidence, `0.0`–`1.0` |
-| `agreement_status` | `str` | `unanimous`, `majority`, `split`, `no_results`, `all_failed`, `no_answer`, `blocked`, `no_independent_verification`, or `blocked_secure_execution` |
+| `agreement_status` | `str` | `unanimous`, `majority`, `split`, `no_results`, `all_failed`, `no_answer`, `not_translated`, `blocked`, `no_independent_verification`, or `blocked_secure_execution` |
 | `engines_used` | `int` | Number of engines that returned a result |
 | `verification_chain` | `List[EngineResult]` | Per-engine outcomes, including each engine's `status` |
 | `total_latency_ms` | `float` | End-to-end latency for the aggregation |
