@@ -106,7 +106,7 @@ Treat `503` responses from these limits as retryable. Back off and resend the re
 
 ### Causes that stop a verification
 
-In releases after v11.0.0, a request that stops before an engine decides it gets one verdict for each cause, on every route that calls a model: `/verify/natural_language`, `/verify/logic`, `/verify/consensus`, `/verify/stats` and `/verify/fact`. `constraint_id` names the cause. QWED admits none of these results and writes an audit row for each, as for any other verdict. Batch items carry their route's verdict.
+In releases after v11.0.0, a request that stops before an engine decides it gets one verdict for each cause, on every route that calls a model: `/verify/natural_language`, `/verify/logic`, `/verify/consensus`, `/verify/stats` and `/verify/fact`. `POST /agents/{agent_id}/verify` runs the `/verify/natural_language` pipeline, so it returns the same causes. `constraint_id` names the cause. QWED admits none of these results and writes an audit row for each, as for any other verdict. Batch items carry their route's verdict.
 
 | `constraint_id` | `status` | Cause |
 |-----------------|----------|-------|
@@ -206,7 +206,7 @@ The control plane treats attestation as an admission gate, not a decoration:
 See [Cryptographic attestations](/advanced/attestations) for the full `AttestationResult` contract and [Trust boundary](/engines/math#trust-boundary) for the math-engine discussion.
 
 <Note>
-The LLM provider call runs off the server's event loop under `QWED_PROVIDER_TIMEOUT` (default 30 seconds). If the provider doesn't respond in time, the request fails closed with an `ERROR` status instead of stalling other requests.
+The LLM provider call runs off the server's event loop under `QWED_PROVIDER_TIMEOUT` (default 30 seconds). If the provider doesn't respond in time, the request fails closed instead of stalling other requests: in releases after v11.0.0 it returns `UNVERIFIABLE` with `constraint_id: "translation.failed"`. See [Causes that stop a verification](#causes-that-stop-a-verification).
 </Note>
 
 ---
@@ -437,7 +437,7 @@ Every response carries `admission`, and it is always `BLOCKED`. The verdict cove
 
 The `provider_used` field shows which LLM provider handled the translation, and `translation_model` shows the model that provider is configured to call, in success and error responses alike, except when the security or policy check blocks the request, when neither is present. `translation_model` is `null` when no model is known, for example when the provider was never reached. Both fields are also stored in the audit row. They record provenance only and do not change the verdict or the admission.
 
-**Error response:**
+**Error response (unexpected route error):** The route answers `BLOCKED` with `constraint_id: "api.logic.execution_error"` only when an unexpected error escapes the control plane. A missing model or a failed translation is `UNVERIFIABLE` with its own cause instead (see [Causes that stop a verification](#causes-that-stop-a-verification)).
 
 ```json
 {
@@ -1595,7 +1595,7 @@ X-Agent-Token: qwed_agent_...
 
 **Response:**
 
-The route returns the enforced result with its `admission`, in the shape `POST /verify/natural_language` returns: the `DiagnosticResult` fields, with the engine's `developer_fields` also copied to the top level. QWED signs a `VERIFIED` result and enforces the attestation as mandatory. If the attestation cannot be issued or does not match, the result is `BLOCKED`, with `verdict_status` and `verdict_proof_ref` kept beside the block (see [Attestation enforcement](#attestation-enforcement)). The agent activity log records the same response.
+The route returns the enforced result with its `admission`, in the shape `POST /verify/natural_language` returns: the `DiagnosticResult` fields, with the engine's `developer_fields` also copied to the top level. QWED signs a `VERIFIED` result and enforces the attestation as mandatory. If the attestation cannot be issued or does not match, the result is `BLOCKED`, with `verdict_status` and `verdict_proof_ref` kept beside the block (see [Attestation enforcement](#attestation-enforcement)). The agent activity log records the same response. A request stopped before the engine decides it, such as one with no model configured or a refused query, carries its cause in `constraint_id`, as on `POST /verify/natural_language` (see [Causes that stop a verification](#causes-that-stop-a-verification)).
 
 ```json
 {
