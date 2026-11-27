@@ -201,12 +201,12 @@ QWED v4.0.0 introduces a multi-layer `EnhancedSecurityGateway` (OWASP LLM01:2025
 
 | Layer | Defense | Description |
 |-------|---------|-------------|
-| 1 | Pattern detection | Heuristic matching against 14 known injection patterns |
-| 2 | Length limiting | Strict 2,000-character limit (blocks ~70% of injection attacks) |
-| 3 | Base64 decoding | Detects and decodes base64-encoded payloads, then scans for injection keywords |
+| 1 | Pattern detection | Matches known injection phrases as whole words, such as an instruction verb, up to four qualifiers and what it names ("ignore all the prior instructions"), or a fixed phrase such as "developer mode" |
+| 2 | Length limiting | Refuses text over 10,000 characters, the same limit as the phrase check |
+| 3 | Base64 decoding | Detects and decodes base64-encoded payloads, then scans each decoded piece for the injection phrases and the words in layer 5 |
 | 4 | Semantic similarity | Uses sequence matching against system prompt (threshold: 0.6) |
-| 5 | Keyword detection | 28 high-risk keywords: `disregard`, `override`, `bypass`, `jailbreak`, etc. |
-| 6 | Unicode script mixing | Detects Cyrillic/Arabic/Greek characters mixed with Latin (homoglyph attacks) |
+| 5 | Keyword detection | Refuses `jailbreak`, `sudo` and `role play` only as words of their own, so "sudoku" passes |
+| 6 | Unicode script mixing | Detects Cyrillic or Arabic characters mixed with Latin, and a Greek letter inside a Latin word (homoglyph attacks). A Greek letter that stands apart from Latin words, such as theta in "sin θ", passes as maths notation |
 | 7 | Zero-width characters | Detects invisible characters (`\u200B`, `\u200C`, `\u200D`, `\uFEFF`) used to hide payloads |
 
 The gateway screens `/verify/natural_language`, `/verify/logic` and `/verify/consensus` questions; stats and fact text gets the phrase patterns only. It also includes a block counter for monitoring injection attempt frequency.
@@ -220,7 +220,7 @@ Before QWED sends the texts below to a model for translation, it screens them, a
 | Maths and logic questions, including the `/verify/consensus` query | The seven-layer gateway above, as on `/verify/natural_language` and `/verify/logic` | Consensus returns `BLOCKED` before any engine runs |
 | `/verify/stats` query and CSV column names; `/verify/fact` claim and context | Phrase patterns only, matched as whole words, with a 10,000-character limit | Both return `BLOCKED` with `security.input_refused` and a fixed message; the screen's reason stays in the server log |
 
-The phrase check does not refuse ordinary words such as "mode" or "system", which a statistics question or a fact's context often contains. The phrase patterns, here and in the gateway's pattern-detection layer, read through invisible characters (Unicode default-ignorable code points such as a zero-width space, a word joiner or a soft hyphen) inside a word or between words. They also read the text's NFKC form, so fullwidth letters do not hide a phrase. The 10,000-character limit applies to the caller's text and, separately, to its NFKC form: a text of 10,000 characters or fewer is refused with `Input too long (max 10000 chars)` when its NFKC form is longer than 10,000 characters. The text sent to the provider is unchanged. Each phrase is searched in time linear in the length of the text, and the gateway's similarity layer skips its full comparison when a quick upper bound already rules a match out, so a long crafted question cannot stall the server.
+The phrase check does not refuse ordinary words such as "mode" or "system", which a statistics question or a fact's context often contains, and neither does the gateway in releases after v11.0.0. A phrase's words may be joined by whitespace, invisible characters, a dash, an underscore, a comma, an apostrophe inside a contraction such as "let's", or a dot with no space after it. A phrase does not run across the end of a sentence. The check also reads a copy of the text with Cyrillic and Greek look-alike letters read as Latin, so "іgnore" with a Cyrillic "і" does not hide a phrase. The phrase patterns, here and in the gateway's pattern-detection layer, read through invisible characters (Unicode default-ignorable code points such as a zero-width space, a word joiner or a soft hyphen) inside a word or between words. They also read the text's NFKC form, so fullwidth letters do not hide a phrase. The 10,000-character limit applies to the caller's text and, separately, to its NFKC form: a text of 10,000 characters or fewer is refused with `Input too long (max 10000 chars)` when its NFKC form is longer than 10,000 characters. The text sent to the provider is unchanged. Each phrase is searched in time linear in the length of the text, and the gateway's similarity layer skips its full comparison when a quick upper bound already rules a match out, so a long crafted question cannot stall the server.
 
 The screening is a heuristic that matches known phrases, and a reworded instruction can get past it. It does not replace the verdict rules: a stats run that succeeds is `UNVERIFIABLE`, and a fact model answer stays advisory.
 
