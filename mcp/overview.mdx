@@ -11,7 +11,7 @@ description: "QWED-MCP is a Model Context Protocol server that admits assistant-
  ![Tests](https://github.com/QWED-AI/qwed-mcp/actions/workflows/publish.yml/badge.svg)
  ![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)
 
-QWED-MCP brings deterministic computation to Claude Desktop, VS Code, and any MCP-compatible AI assistant. Instead of trusting LLMs to compute correctly, QWED-MCP runs Python scripts written by the assistant. From v0.3.0, a script runs only when every module, builtin and attribute it uses is on an allowlist of computation-only standard-library features. All execution is local.
+QWED-MCP brings script-based checks to Claude Desktop, VS Code, and any MCP-compatible AI assistant. Instead of trusting LLMs to compute correctly, QWED-MCP runs Python scripts written by the assistant. From v0.3.0, a script runs only when every module, builtin and attribute it uses is on an allowlist of computation-only standard-library features. The allowlist admits `random` and `time`, so a script that uses them can print a different result on each run. All execution is local. The server sends nothing to external services unless you set `SENTRY_DSN`, and then it sends error reports to Sentry.
 
 Use QWED-MCP when you want an MCP-compatible assistant to check a calculation or an argument with a script instead of computing the answer itself.
 
@@ -232,6 +232,7 @@ asyncio.run(main())
 | `QWED_LOG_LEVEL` | Logging level (`DEBUG`, `INFO`, `WARNING`, `ERROR`) | `INFO` |
 | `QWED_TIMEOUT` | Synchronous tool execution timeout in seconds | `30` |
 | `QWED_MCP_BACKGROUND_TIMEOUT` | Background worker timeout in seconds for jobs dispatched with `background=true`. Clamped to a hard ceiling of `600`. Non-numeric or non-positive values fall back to the default | `120` |
+| `SENTRY_DSN` | Sentry DSN. When set, the server sends error reports to Sentry. A report can include stack-frame values, such as the code of the script that was running. The server strips this variable from the environment of `execute_python_code` subprocesses | Not set |
 | `QWED_SKILL_MANIFEST` | Path to a skill manifest JSON file. When set, the server validates the manifest at startup using [`SkillProvenanceGuard`](/mcp/tools#skillprovenanceguard-security) and refuses to start if verification fails | Not set |
 
 <Warning>
