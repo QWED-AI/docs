@@ -20,7 +20,7 @@ Execute Python code in a subprocess after an allowlist admission check.
 
 The `execute_python_code` tool parses the code and runs it in a subprocess only when it passes the [allowlist admission check](#what-code-is-admitted). Admitted code can use computation-only standard-library modules, such as `decimal`, `fractions`, `math`, `statistics` and `itertools`. From v0.3.0, it can't import third-party packages, including SymPy and the QWED SDK packages (`qwed_new`, `qwed_legal`, `qwed_finance`, `qwed_ucp`).
 
-The tool captures `stdout` and `stderr` from the subprocess and returns them as text.
+The server writes the code to a temporary file, runs it and deletes the file after the run. If the server is killed mid-run, the file can stay behind. The tool captures `stdout` and `stderr` from the subprocess and returns them as text.
 
 ### What code is admitted
 
