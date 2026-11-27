@@ -5,7 +5,7 @@ description: "Every QWED Security rule: definition, regex, trip example, and pas
 
 # QWED Security rule catalog
 
-Generated from `scan_rules.py` at rule set **qwed-security-ruleset/17**. Every rule ID used in a QWED annotation anchors here as `#<rule-id>`.
+Generated from `scan_rules.py` at rule set **qwed-security-ruleset/32**. Every rule ID used in a QWED annotation anchors here as `#<rule-id>`.
 
 This page intentionally contains live trip strings. Findings on it are covered by narrowly scoped base-branch policy entries (see `.qwed.yml`) — maintainer-controlled and always trusted. Config suppressions are applied FIRST with maintainer-wins precedence (issue #90): an inline `qwed-ignore` marker never shadows a policy entry that covers the same finding, so a voided inline marker (self-suppression on an introduced line) can no longer make a PR verdict worse than no marker at all. Inline markers remain author-controlled and are still voided on introduced lines — but the trip lines on this page need no markers at all: the base policy covers them.
 
@@ -254,7 +254,7 @@ Engine `pattern_scan` · category `secret_exposure` · base action `BLOCK` · so
 Credential embedded in URL userinfo (user:pass@) — the value is a connection string, not a reference.
 
 ```regex
-(?i)[\"\\\'][a-z][a-z0-9+.-]*://[^\s\"\\\'@/?#]*:(?!\d+(?:[/?#]|[\"\\\']))[^\s\"\\\'@]+@[^\s\"\\\']*[\"\\\']
+(?i)[\"\\\'][a-z][a-z0-9+.-]*://[^\s\"\\\':/?#\[\]]*:(?![0-9]+(?:[/?#]|[\"\\\']))[^\s\"\\\'@]+@(?!(?a:sha1:[0-9a-f]{40}|sha256:[0-9a-f]{64}|sha384:[0-9a-f]{96}|sha512:[0-9a-f]{128})[\"\\\'])[^\s\"\\\']*[\"\\\']
 ```
 
 Trips:
@@ -933,22 +933,22 @@ Passes:
 
 Engine `secret_scan` · category `secret_exposure` · base action `BLOCK` · source: `SECRET_RULES`
 
-Database URL contains embedded credentials.
+Connection URL contains embedded credentials.
 
 ```regex
-(?i)(mysql|postgres|mongodb|redis)://\S+:\S+@
+(?i)(?:(?:mysql|postgres|mongodb|redis)://\S[^\s:]*:(?!(?a:\$\{[A-Za-z_][A-Za-z0-9_]*\}|<[A-Za-z_][A-Za-z0-9_-]*>)@[^\s@]*(?:\s|$))(?:(?!(?:mysql|postgres|mongodb|redis)://)\S)+@)|(?:://[^\s\"'`:/?#\[\]]*:(?![0-9]+[/?#])(?!(?a:\$\{[A-Za-z_][A-Za-z0-9_]*\}|<[A-Za-z_][A-Za-z0-9_-]*>)@[^\s@]*(?:\s|$))(?:[^\s\"'`:@]|:(?!//))+@(?!(?a:sha1:[0-9a-f]{40}|sha256:[0-9a-f]{64}|sha384:[0-9a-f]{96}|sha512:[0-9a-f]{128})(?:[\s\"'`]|$|[,\]}][^\s@]*(?:\s|$))))
 ```
 
 Trips:
 
 ```text
-DATABASE_URL=postgres://admin:hunter2@db:5432/app
+DATABASE_URL=postgresql://admin:hunter2@db:5432/app
 ```
 
 Passes:
 
 ```text
-DATABASE_URL=postgres://db.internal:5432/app
+DATABASE_URL=postgresql://admin:${DB_PASSWORD}@db:5432/app
 ```
 
 ### config-github-pat
